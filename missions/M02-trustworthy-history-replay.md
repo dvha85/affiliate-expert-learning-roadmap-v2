@@ -1,7 +1,7 @@
 ---
 mission_id: M02
 title: Trustworthy History + Replay v0.2
-status: planned
+status: ready
 requires_missions: [M01]
 minimum_evidence: E1 + replayable local history
 authority: A0 deterministic
