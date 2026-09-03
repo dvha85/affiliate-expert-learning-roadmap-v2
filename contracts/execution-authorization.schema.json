@@ -12,7 +12,11 @@
     "approval_id": {"type":"string","minLength":1},
     "canary_grant_id": {"type":"string","minLength":1},
     "canary_grant_version": {"type":"string","minLength":1},
+    "canary_grant_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
     "canary_gate_id": {"type":"string","minLength":1},
+    "canary_cost_bound_id": {"type":"string","minLength":1},
+    "canary_cost_bound_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "canary_cost_bound_minor": {"type":"integer","minimum":0},
     "executor_id": {"type":"string","minLength":1},
     "authorized_at": {"type":"string","format":"date-time"},
     "expires_at": {"type":"string","format":"date-time"},
@@ -24,11 +28,11 @@
   "allOf": [
     {
       "if":{"properties":{"execution_mode":{"const":"APPROVED_LIVE"}},"required":["execution_mode"]},
-      "then":{"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_gate_id"]}]}}
+      "then":{"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]}]}}
     },
     {
       "if":{"properties":{"execution_mode":{"const":"GOVERNED_CANARY"}},"required":["execution_mode"]},
-      "then":{"required":["canary_grant_id","canary_grant_version","canary_gate_id"],"not":{"required":["approval_id"]}}
+      "then":{"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"required":["approval_id"]}}
     }
   ],
   "additionalProperties": false

@@ -16,9 +16,14 @@
   {"case_id":"M10-E15-rate-limit","mutation":"rate_limit","expected_decision":"WAIT","expected_reason":"RATE_LIMIT_REACHED"},
   {"case_id":"M10-E16-cost-budget-exhausted","mutation":"cost_budget","expected_decision":"REQUIRE_APPROVAL","expected_reason":"CANARY_COST_BUDGET_EXHAUSTED"},
   {"case_id":"M10-E17-outcome-backpressure","mutation":"pending_outcome","expected_decision":"WAIT","expected_reason":"OUTCOME_BACKPRESSURE"},
-  {"case_id":"M10-E18-cost-metadata-required","mutation":"missing_cost","expected_decision":"DENY","expected_reason":"COST_METADATA_REQUIRED"},
+  {"case_id":"M10-E18-cost-bound-required","mutation":"missing_cost_bound","expected_decision":"DENY","expected_reason":"COST_BOUND_MISSING"},
   {"case_id":"M10-E19-reconciliation-blocks","mutation":"reconciliation","expected_decision":"WAIT","expected_reason":"RECONCILIATION_REQUIRED"},
   {"case_id":"M10-E20-duplicate-success","mutation":"duplicate","expected_decision":"WAIT","expected_reason":"DUPLICATE_EXECUTION"},
   {"case_id":"M10-E21-stale-policy","mutation":"stale_policy","expected_decision":"DENY","expected_reason":"POLICY_REVALIDATION_FAILED"},
-  {"case_id":"M10-E22-wildcard-grant-invalid","mutation":"wildcard_grant","expected_decision":"DENY","expected_reason":"INVALID_GRANT"}
+  {"case_id":"M10-E22-wildcard-grant-invalid","mutation":"wildcard_grant","expected_decision":"DENY","expected_reason":"INVALID_GRANT"},
+  {"case_id":"M10-E23-grant-approval-hash-mismatch","mutation":"grant_approval_mismatch","expected_decision":"DENY","expected_reason":"GRANT_APPROVAL_MISMATCH"},
+  {"case_id":"M10-E24-governance-inputs-unavailable","mutation":"governance_unavailable","expected_decision":"DENY","expected_reason":"GOVERNANCE_INPUTS_UNAVAILABLE"},
+  {"case_id":"M10-E25-tampered-cost-bound","mutation":"tampered_cost_bound","expected_decision":"DENY","expected_reason":"TAMPERED_COST_BOUND"},
+  {"case_id":"M10-E26-expired-cost-bound","mutation":"expired_cost_bound","expected_decision":"DENY","expected_reason":"COST_BOUND_EXPIRED"},
+  {"case_id":"M10-E27-ledger-grant-hash-mismatch","mutation":"ledger_grant_hash","expected_decision":"DENY","expected_reason":"LEDGER_MISMATCH"}
 ]

@@ -3,17 +3,31 @@
   "$id": "canary-ledger.schema.json",
   "title": "CanaryLedger",
   "type": "object",
-  "required": ["grant_id","grant_version","window_started_at","executions_total","executions_in_window","cost_minor_total","pending_outcomes","successful_idempotency_keys","observed_outcome_ids","reconciliation_required","updated_at"],
+  "required": ["grant_id","grant_version","grant_hash","window_started_at","executions_total","executions_in_window","cost_minor_total","pending_outcomes","pending_execution_ids","successful_idempotency_keys","outcome_links","reconciliation_required","updated_at"],
   "properties": {
     "grant_id": {"type":"string","minLength":1},
     "grant_version": {"type":"string","minLength":1},
+    "grant_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
     "window_started_at": {"type":"string","format":"date-time"},
     "executions_total": {"type":"integer","minimum":0},
     "executions_in_window": {"type":"integer","minimum":0},
     "cost_minor_total": {"type":"integer","minimum":0},
     "pending_outcomes": {"type":"integer","minimum":0},
+    "pending_execution_ids": {"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
     "successful_idempotency_keys": {"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-    "observed_outcome_ids": {"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "outcome_links": {
+      "type":"array",
+      "items": {
+        "type":"object",
+        "required":["outcome_id","execution_id","observed_at"],
+        "properties": {
+          "outcome_id":{"type":"string","minLength":1},
+          "execution_id":{"type":"string","minLength":1},
+          "observed_at":{"type":"string","format":"date-time"}
+        },
+        "additionalProperties": false
+      }
+    },
     "reconciliation_required": {"type":"boolean"},
     "last_execution_at": {"type":"string","format":"date-time"},
     "updated_at": {"type":"string","format":"date-time"}
