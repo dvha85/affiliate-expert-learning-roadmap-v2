@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "execution-record.schema.json",
+  "title": "ExecutionRecord",
+  "type": "object",
+  "required": ["execution_id","authorization_id","approval_id","intent_id","intent_hash","executor_id","attempted_at","status","side_effect_performed","correlation_id"],
+  "properties": {
+    "execution_id": {"type":"string","minLength":1},
+    "authorization_id": {"type":"string","minLength":1},
+    "approval_id": {"type":"string","minLength":1},
+    "intent_id": {"type":"string","minLength":1},
+    "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "executor_id": {"type":"string","minLength":1},
+    "attempted_at": {"type":"string","format":"date-time"},
+    "status": {"enum":["SUCCEEDED","FAILED","CANCELLED"]},
+    "side_effect_performed": {"type":"boolean"},
+    "external_ref": {"type":"string"},
+    "error": {"type":"string"},
+    "correlation_id": {"type":"string","minLength":1}
+  },
+  "additionalProperties": false
+}
