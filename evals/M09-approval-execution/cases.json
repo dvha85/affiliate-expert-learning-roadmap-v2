@@ -12,5 +12,6 @@
   {"case_id":"M09-E11-policy-blocked","mutation":"policy_deny","expected":"DENY_POLICY_STATE"},
   {"case_id":"M09-E12-duplicate-success","mutation":"already_executed","expected":"WAIT_ALREADY_EXECUTED"},
   {"case_id":"M09-E13-tampered-intent","mutation":"tampered_intent","expected":"DENY_TAMPERED_INTENT"},
-  {"case_id":"M09-E14-expired-intent","mutation":"expired_intent","expected":"DENY_EXPIRED_INTENT"}
+  {"case_id":"M09-E14-expired-intent","mutation":"expired_intent","expected":"DENY_EXPIRED_INTENT"},
+  {"case_id":"M09-E15-approval-before-policy","mutation":"approval_before_policy","expected":"DENY_APPROVAL_BEFORE_POLICY"}
 ]
