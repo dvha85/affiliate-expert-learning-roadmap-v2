@@ -46,7 +46,8 @@ for marker in [
     "BOOT.0", "M00 | First Real Evidence Packet", "M01 | Smallest Deterministic Bot v0.1",
     "M02 | Trustworthy History + Replay v0.2", "M03 | First Tracked Human Action",
     "M07 | Read-only Evidence Agent", "M11 | Production Closed Loop",
-    "Decision != Approval != Execution", "Tool result != trusted evidence",
+    "Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)",
+    "Tool result (kết quả tool) != trusted evidence (bằng chứng đáng tin)",
     "real != reliable != current != authoritative != complete",
     "CURRENT IMPLEMENTATION LIMIT != FUNDAMENTAL SYSTEM LAW",
 ]:
@@ -117,7 +118,7 @@ for marker in [
         errors.append(f"M02 ready contract missing marker: {marker}")
 
 mission_index = (ROOT / "missions/README.md").read_text(encoding="utf-8")
-if "| M02 | Trustworthy History + Replay v0.2 | A0 deterministic | ready |" not in mission_index:
+if "| M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | A0 tất định | ready |" not in mission_index:
     errors.append("M02 mission index must be ready after corrective planned gate")
 
 history_schema = json.loads((ROOT / "contracts/history-record.schema.json").read_text(encoding="utf-8"))

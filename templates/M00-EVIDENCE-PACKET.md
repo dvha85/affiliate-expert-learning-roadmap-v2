@@ -1,59 +1,59 @@
-# M00 Evidence Packet
+# M00 Evidence Packet (gói bằng chứng M00)
 
-## Market question
+## Market question (câu hỏi thị trường)
 
-- Audience/problem:
-- Offer/category:
+- Audience/problem (nhóm mục tiêu/vấn đề):
+- Offer/category (offer/danh mục):
 - Decision cần hỗ trợ:
-- Outcome có thể làm đổi quyết định:
+- Outcome (kết quả) có thể làm đổi quyết định:
 
-## Public observations
+## Public observations (các quan sát công khai)
 
-### Observation 1
+### Observation 1 (quan sát 1)
 
-- source_url:
-- observed_at:
-- access_method:
-- claim/value:
-- claim_kind: fact | estimate | assumption | unknown
-- observed_state: observed | missing | pending | not_yet_observable | inconclusive
-- limitation:
+- source_url: URL nguồn
+- observed_at: thời điểm quan sát
+- access_method: cách truy cập
+- claim/value: phát biểu/giá trị
+- claim_kind: `fact | estimate | assumption | unknown` — sự thật được hỗ trợ | ước tính | giả định | chưa biết
+- observed_state: `observed | missing | pending | not_yet_observable | inconclusive` — đã quan sát | thiếu | đang chờ | chưa thể quan sát | chưa đủ kết luận
+- limitation: giới hạn
 
-### Observation 2
+### Observation 2 (quan sát 2)
 
-- source_url:
-- observed_at:
-- access_method:
-- claim/value:
-- claim_kind:
-- observed_state:
-- limitation:
+- source_url: URL nguồn
+- observed_at: thời điểm quan sát
+- access_method: cách truy cập
+- claim/value: phát biểu/giá trị
+- claim_kind: loại phát biểu
+- observed_state: trạng thái quan sát
+- limitation: giới hạn
 
-### Observation 3
+### Observation 3 (quan sát 3)
 
-- source_url:
-- observed_at:
-- access_method:
-- claim/value:
-- claim_kind:
-- observed_state:
-- limitation:
+- source_url: URL nguồn
+- observed_at: thời điểm quan sát
+- access_method: cách truy cập
+- claim/value: phát biểu/giá trị
+- claim_kind: loại phát biểu
+- observed_state: trạng thái quan sát
+- limitation: giới hạn
 
-## Human DecisionPacket
+## Human DecisionPacket (gói quyết định do người lập)
 
-- question:
-- supported_facts:
-- assumptions:
-- unknowns:
-- decision_state: RANK_SCENARIO | GET_MORE_DATA | HUMAN_REVIEW
-- reason:
-- missing_evidence:
-- next_measurement:
-- action: null
+- question: câu hỏi
+- supported_facts: các fact được bằng chứng hỗ trợ
+- assumptions: các giả định
+- unknowns: điều chưa biết
+- decision_state: `RANK_SCENARIO | GET_MORE_DATA | HUMAN_REVIEW` — xếp hạng kịch bản | cần thêm dữ liệu | người kiểm tra
+- reason: lý do
+- missing_evidence: bằng chứng còn thiếu
+- next_measurement: phép đo tiếp theo
+- action: `null` — không có hành động
 
-## Explain-back
+## Explain-back (tự giải thích lại)
 
 1. Điều gì trong packet là fact và nguồn nào hỗ trợ?
-2. Điều gì vẫn chỉ là assumption/unknown?
-3. Vì sao real evidence chưa đủ để gọi output là recommendation?
-4. Measurement tiếp theo có khả năng thay đổi decision như thế nào?
+2. Điều gì vẫn chỉ là assumption/unknown (giả định/chưa biết)?
+3. Vì sao real evidence (bằng chứng thật) chưa đủ để gọi output là recommendation (khuyến nghị)?
+4. Measurement (phép đo) tiếp theo có khả năng thay đổi decision như thế nào?

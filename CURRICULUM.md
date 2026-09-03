@@ -1,73 +1,75 @@
 # Chương trình hiện hành — Affiliate Intelligence Bot có kiểm soát
 
-**Trạng thái:** Active canonical curriculum  
-**Đối tượng:** Người mới; không mặc định biết terminal, Go hay Agent framework.  
+**Trạng thái:** chương trình chuẩn đang hoạt động  
+**Đối tượng:** Người mới; không mặc định biết terminal (dòng lệnh), Go hay Agent framework (khung phát triển Agent).  
 **Mục tiêu:** xây một **Affiliate Intelligence Bot tiến hóa dần tới tự động hóa cao nhưng vẫn kiểm soát được**.
 
-`CURRICULUM.md` là authority duy nhất cho learner sequence, evidence ladder, authority ceiling và PASS model.
+`CURRICULUM.md` là nguồn có thẩm quyền duy nhất cho thứ tự học, thang bằng chứng, trần quyền hạn và mô hình PASS.
 
 ## 1. Mục tiêu hệ thống
 
 ```text
-Evidence
-→ Deterministic Decision
-→ Grounded AI khi cần
-→ ActionIntent
-→ Deterministic Policy / Risk
-→ Human Approval khi cần
-→ Controlled Execution
-→ Outcome
-→ Evaluation
-→ Reviewed Improvement
+Evidence (bằng chứng)
+→ Deterministic Decision (quyết định tất định)
+→ Grounded AI (AI dựa trên bằng chứng) khi cần
+→ ActionIntent (ý định hành động có cấu trúc)
+→ Deterministic Policy / Risk (chính sách / rủi ro tất định)
+→ Human Approval (phê duyệt của người) khi cần
+→ Controlled Execution (thực thi có kiểm soát)
+→ Outcome (kết quả)
+→ Evaluation (đánh giá)
+→ Reviewed Improvement (cải tiến đã review)
 ↺
 ```
 
-Invariant:
+Các bất biến:
 
 ```text
-AI confidence != execution permission
-Decision != Approval != Execution
-Agent proposal != authorized ActionIntent
-Tool result != trusted evidence
-real evidence != automatic recommendation
+AI confidence (độ tin cậy AI) != execution permission (quyền thực thi)
+Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)
+Agent proposal (đề xuất của Agent) != authorized ActionIntent (ActionIntent đã được cấp quyền)
+Tool result (kết quả tool) != trusted evidence (bằng chứng đáng tin)
+real evidence (bằng chứng thật) != automatic recommendation (khuyến nghị tự động)
 real != reliable != current != authoritative != complete
+(thật != đáng tin != hiện hành != có thẩm quyền != đầy đủ)
 ```
 
-## 2. Reality-First nhưng không Publish-First
+## 2. Reality-First (ưu tiên thực tế) nhưng không Publish-First (ưu tiên xuất bản)
 
-M00 bắt đầu bằng public observation thật nhưng không yêu cầu publish, spend, send hoặc mutate account. External action đầu tiên thuộc M03 và do human thực hiện sau review.
+M00 bắt đầu bằng public observation (quan sát công khai) thật nhưng không yêu cầu publish (đăng), spend (chi tiền), send (gửi) hoặc mutate account (thay đổi tài khoản). External action (hành động bên ngoài) đầu tiên thuộc M03 và do người thực hiện sau review.
 
 ```text
 REALITY-FIRST != PUBLISH-FIRST
+(ưu tiên thực tế != ưu tiên xuất bản)
 ```
 
-## 3. Mission spine
+## 3. Trục Mission chính
 
-| Mission | Outcome bàn giao | Evidence tối thiểu | Authority ceiling |
+| Mission | Kết quả bàn giao | Bằng chứng tối thiểu | Trần quyền hạn |
 |---|---|---|---|
-| O00 | Safe synthetic walkthrough, không PASS | E0 | no side effect |
-| M00 | First Real Evidence Packet + Human DecisionPacket | E1 | human/read-only |
-| M01 | Smallest Deterministic Bot v0.1 | E0 + E1 support | A0 deterministic, no action |
-| M02 | Trustworthy History + Replay v0.2 | E1/E3-ready | A0 deterministic |
-| M03 | First Tracked Human Action + Outcome context | E2→E3 | human executes |
-| M04 | Grounded AI Advisor v0.4 | E3 | A1 advisory, no tools/write |
-| M05 | First Reviewed Improvement | E4 | A1 propose only |
-| M06 | Reliable Automatic Watcher | E4 | automatic read-only |
-| M07 | Read-only Evidence Agent | E4 | A2-RO |
-| M08 | Shadow ActionIntent + Policy | E4 | A3-shadow |
-| M09 | Durable Approval + Controlled Executor | E4/E5-ready | approval-gated action |
-| M10 | Governed Canary | E5 | bounded RISK0/RISK1 auto; RISK2 approval |
-| M11 | Production Closed Loop | E6 | governed production |
+| O00 | Safe synthetic walkthrough (mô phỏng tổng thể an toàn), không PASS | E0 | không side effect |
+| M00 | First Real Evidence Packet (gói bằng chứng thật đầu tiên) + Human DecisionPacket (gói quyết định do người lập) | E1 | người/read-only |
+| M01 | Smallest Deterministic Bot v0.1 (Bot tất định nhỏ nhất) | E0 + hỗ trợ E1 | A0 tất định, không hành động |
+| M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | E1/E3-ready | A0 tất định |
+| M03 | First Tracked Human Action + Outcome context (hành động thật đầu tiên do người làm + ngữ cảnh kết quả) | E2→E3 | người thực thi |
+| M04 | Grounded AI Advisor v0.4 (AI tư vấn dựa trên bằng chứng) | E3 | A1 tư vấn, không tool ghi |
+| M05 | First Reviewed Improvement (cải tiến đầu tiên có review) | E4 | A1 chỉ đề xuất |
+| M06 | Reliable Automatic Watcher (bộ theo dõi tự động chỉ đọc đáng tin) | E4 | tự động chỉ đọc |
+| M07 | Read-only Evidence Agent (Agent bằng chứng chỉ đọc) | E4 | A2-RO |
+| M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | E4 | A3-shadow |
+| M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | E4/E5-ready | hành động qua cổng phê duyệt |
+| M10 | Governed Canary (canary có quản trị) | E5 | tự động RISK0/RISK1 trong giới hạn; RISK2 cần phê duyệt |
+| M11 | Production Closed Loop (vòng kín production có quản trị) | E6 | production có quản trị |
 
 ```text
 O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → M09 → M10 → M11
 ```
 
-Mỗi Mission chỉ tăng một lớp capability/authority chính. Không dùng capability Mission sau để vượt gate Mission trước.
+Mỗi Mission chỉ tăng một lớp capability (năng lực) hoặc authority (quyền hạn) chính. Không dùng capability của Mission sau để vượt gate (cổng kiểm soát) của Mission trước.
 
-## 4. Learner lesson layer
+## 4. Lớp bài học cho người học
 
-Learner-facing lesson dùng ID theo Mission:
+Bài học dùng ID theo Mission:
 
 ```text
 BOOT.0
@@ -78,88 +80,103 @@ M00.3
 M01.1 ...
 ```
 
-`BOOT.0`/`BOOT.1` là onboarding/tooling, không phải Mission PASS gate. Numeric lesson inventory của repo lịch sử không được migrate thành learner path. Knowledge có giá trị chỉ được đưa sang khi được pull bởi Mission cụ thể.
+`BOOT.0`/`BOOT.1` là onboarding/tooling (làm quen môi trường/công cụ), không phải Mission PASS gate. Danh mục bài học đánh số của repo lịch sử không được chuyển sang learner path (đường học) mới. Kiến thức có giá trị chỉ được đưa sang khi một Mission cụ thể cần đến.
 
-## 5. M00 — First Real Evidence Packet
+## 5. M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên)
 
-M00 không cần Go, n8n, AI, API key hoặc affiliate automation.
+M00 không cần Go, n8n, AI, API key hoặc affiliate automation (tự động hóa affiliate).
 
-Knowledge cards đầu tiên:
+Các thẻ kiến thức đầu tiên:
 
 1. `M00.1` — Affiliate Intelligence Bot đang tối ưu điều gì?
-2. `M00.2` — Evidence, uncertainty và missing data.
-3. `M00.3` — Decision ≠ Approval ≠ Execution.
+2. `M00.2` — Evidence (bằng chứng), uncertainty (bất định) và missing data (dữ liệu thiếu).
+3. `M00.3` — Decision (quyết định) ≠ Approval (phê duyệt) ≠ Execution (thực thi).
 
-Ship target:
+Mục tiêu bàn giao:
 
 ```text
-3+ public observations có source + observed_at + access method
-→ provenance/limitation rõ
+3+ public observations (quan sát công khai) có source + observed_at + access_method
+→ provenance/limitation (nguồn gốc/giới hạn) rõ
 → fact / estimate / assumption / unknown
-→ Human DecisionPacket
+  (sự thật được hỗ trợ / ước tính / giả định / chưa biết)
+→ Human DecisionPacket (gói quyết định do người lập)
 → state + reason + missing evidence + next measurement
-→ NO external execution
+  (trạng thái + lý do + bằng chứng thiếu + phép đo tiếp theo)
+→ KHÔNG thực thi hành động bên ngoài
 ```
 
-## 6. Authority progression
+## 6. Tiến trình quyền hạn
 
 ```text
-M00 human/read-only
-→ M01–M02 A0 deterministic
-→ M03 human executes
-→ M04–M05 A1 advisory/propose
-→ M06 automatic read-only
-→ M07 A2-RO
-→ M08 A3-shadow
-→ M09 approval-gated execution
-→ M10 bounded governed automation
-→ M11 governed production
+M00 — người/read-only (chỉ đọc)
+→ M01–M02 — A0 tất định
+→ M03 — người thực thi
+→ M04–M05 — A1 tư vấn/chỉ đề xuất
+→ M06 — tự động chỉ đọc
+→ M07 — A2-RO
+→ M08 — A3-shadow (chạy bóng)
+→ M09 — thực thi qua cổng phê duyệt
+→ M10 — tự động hóa có quản trị trong giới hạn
+→ M11 — production có quản trị
 ```
 
-## 7. Implementation principles
+## 7. Nguyên tắc triển khai
 
 ```text
 DETERMINISTIC CORE FIRST != CODE FIRST
+(ưu tiên lõi tất định != ưu tiên viết code trước)
+
 NO-CODE WHEN AUDITABLE
+(không cần code khi vẫn kiểm toán được)
+
 CODE WHEN IT REDUCES AMBIGUITY OR FAILURE SURFACE
+(dùng code khi nó giảm mơ hồ hoặc bề mặt lỗi)
+
 AGENT WHEN DETERMINISTIC LOGIC IS NOT ENOUGH
+(dùng Agent khi logic tất định không đủ)
+
 AUTOMATION ONLY AFTER EVIDENCE + POLICY + AUDIT + RECOVERY
+(chỉ tự động hóa sau khi có bằng chứng + chính sách + kiểm toán + phục hồi)
+
 CURRENT IMPLEMENTATION LIMIT != FUNDAMENTAL SYSTEM LAW
+(giới hạn triển khai hiện tại != quy luật nền tảng của hệ thống)
 ```
 
-Mission semantics không phụ thuộc vendor/framework. Technology profile có thể đổi mà không đổi authority ceiling.
+Semantics (ngữ nghĩa) của Mission không phụ thuộc vendor/framework. Technology Profile (hồ sơ công nghệ) có thể đổi mà không đổi trần quyền hạn.
 
-## 8. Real Evidence Ladder
+## 8. Thang bằng chứng thực tế
 
-| Level | Bằng chứng |
+| Mức | Bằng chứng |
 |---|---|
-| E0 | synthetic/test/replay; chỉ chứng minh plumbing/behavior |
-| E1 | public observation thật có source + observed_at + access method + limitation/provenance |
-| E2 | human external action thật có ActionRecord |
-| E3 | outcome/analytics/export thật, kể cả observed value = 0 |
-| E4 | Decision → Action → Outcome → Evaluation → reviewed proposal |
-| E5 | bounded governed canary có policy/audit/kill switch |
-| E6 | production loop qua observation window + recovery + reviewed improvement |
+| E0 | synthetic/test/replay (mô phỏng/kiểm thử/phát lại); chỉ chứng minh plumbing/behavior (luồng kỹ thuật/hành vi) |
+| E1 | quan sát công khai thật có source + observed_at + access_method + limitation/provenance |
+| E2 | hành động bên ngoài thật do người thực hiện có `ActionRecord` |
+| E3 | outcome/analytics/export (kết quả/phân tích/dữ liệu xuất) thật, kể cả observed value = 0 |
+| E4 | Decision → Action → Outcome → Evaluation → reviewed proposal (quyết định → hành động → kết quả → đánh giá → đề xuất đã review) |
+| E5 | governed canary (canary có quản trị) trong giới hạn, có policy/audit/kill switch |
+| E6 | production loop (vòng production) qua observation window + recovery + reviewed improvement |
 
-Sample không thể thay E1–E6. `real` chỉ mô tả origin; không tự chứng minh source reliable/current/authoritative/complete.
+Sample (mẫu) không thể thay E1–E6. `real` chỉ mô tả origin (nguồn gốc); không tự chứng minh source đáng tin, hiện hành, có thẩm quyền hoặc đầy đủ.
 
-## 9. PASS model
+## 9. Mô hình PASS
 
 Mission chỉ PASS khi contract của Mission đạt các lớp áp dụng:
 
 ```text
-Capability + Reality + Operated
+Capability (năng lực)
++ Reality (thực tế)
++ Operated (đã tự vận hành/chạy chứng minh)
 ```
 
 `draft`, `ready`, CI xanh hoặc fixture PASS không tự tạo Reality PASS.
 
-## 10. Authority order trong repo v2
+## 10. Thứ tự thẩm quyền trong repo v2
 
-1. `CURRICULUM.md` — sequence/evidence/authority/PASS.
-2. `curriculum/` — learner path hiện hành.
-3. `missions/` — execution contract.
-4. `docs/architecture/` và `docs/technology/` — implementation/safety detail.
-5. `contracts/` — machine-readable boundaries.
-6. `starter-kits/`, `evals/`, `lab/` — implementation/evidence support.
+1. `CURRICULUM.md` — thứ tự/bằng chứng/quyền hạn/PASS.
+2. `curriculum/` — đường học hiện hành.
+3. `missions/` — contract thực hiện Mission.
+4. `docs/architecture/` và `docs/technology/` — chi tiết triển khai/an toàn.
+5. `contracts/` — ranh giới máy có thể đọc.
+6. `starter-kits/`, `evals/`, `lab/` — hỗ trợ triển khai/bằng chứng.
 
-Không tạo migration mapping layer để che conflict. Nếu file authority thấp mâu thuẫn với file cao hơn, sửa hoặc xóa file thấp hơn.
+Không tạo migration mapping layer (lớp ánh xạ chuyển đổi) để che conflict (xung đột). Nếu file thẩm quyền thấp mâu thuẫn với file cao hơn, sửa hoặc xóa file thấp hơn.

@@ -1,19 +1,19 @@
-# Progress — learner state
+# Tiến độ — trạng thái người học
 
-Repo v2 bắt đầu theo Mission spine mới.
+Repo v2 bắt đầu theo trục Mission mới.
 
-## Credit từ repo lịch sử
+## Kết quả được công nhận từ repo lịch sử
 
-- `BOOT.1 — Chạy, sửa và kiểm thử Bot`: **PASS credit preserved** nếu learner đã hoàn thành pilot Bài 0.1 trước curriculum reset.
-- Credit BOOT.1 chỉ xác nhận tooling capability; không tạo M00 Reality PASS.
+- `BOOT.1 — Chạy, sửa và kiểm thử Bot`: **giữ nguyên PASS credit (kết quả PASS được công nhận)** nếu learner đã hoàn thành pilot (bài thử) Bài 0.1 trước khi curriculum reset (đặt lại chương trình).
+- Kết quả BOOT.1 chỉ xác nhận tooling capability (năng lực sử dụng công cụ); không tạo M00 Reality PASS.
 
-## Current learner position
+## Vị trí học hiện tại
 
-- Current Mission: **M00 — First Real Evidence Packet**
-- Current lesson: **M00.1 — Affiliate Intelligence Bot đang tối ưu điều gì?**
-- M00 Reality status: not yet recorded in repo v2
-- Next gate: hoàn thành 3+ public observations E1 + Human DecisionPacket.
+- Mission hiện tại: **M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên)**
+- Bài hiện tại: **M00.1 — Affiliate Intelligence Bot đang tối ưu điều gì?**
+- Trạng thái Reality (thực tế) của M00: chưa được ghi nhận trong repo v2
+- Gate tiếp theo: hoàn thành 3+ public observations (quan sát công khai) E1 + Human DecisionPacket (gói quyết định do người lập).
 
-## Rule
+## Quy tắc
 
-Progress chỉ được cập nhật khi có evidence tương ứng. CI xanh, fixture PASS hoặc authoring `ready` không tự tạo learner PASS.
+Progress (tiến độ) chỉ được cập nhật khi có evidence (bằng chứng) tương ứng. CI xanh, fixture PASS hoặc trạng thái authoring `ready` không tự tạo learner PASS.

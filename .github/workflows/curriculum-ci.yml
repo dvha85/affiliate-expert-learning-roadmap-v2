@@ -18,6 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/validate_repo.py
+      - run: python scripts/validate_language_policy.py
 
   evidence-and-safety:
     name: evidence-and-safety
@@ -28,11 +29,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/validate_repo.py
+      - run: python scripts/validate_language_policy.py
       - name: Guard consequential boundaries
         run: |
-          grep -q "Decision != Approval != Execution" CURRICULUM.md
-          grep -q "Tool result != trusted evidence" CURRICULUM.md
-          grep -q "real evidence != automatic recommendation" CURRICULUM.md
+          grep -q "Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)" CURRICULUM.md
+          grep -q "Tool result (kết quả tool) != trusted evidence (bằng chứng đáng tin)" CURRICULUM.md
+          grep -q "real evidence (bằng chứng thật) != automatic recommendation (khuyến nghị tự động)" CURRICULUM.md
           grep -q "real evidence != RECOMMEND" lab/affiliate-bot/README.md
           grep -q '"M01-E07-conflict-dominates-missing"' evals/M01-deterministic-bot/cases.json
           grep -q '"M02-E07-input-hash-tamper"' evals/M02-history-replay/cases.json
@@ -49,6 +51,7 @@ jobs:
           python-version: "3.12"
       - run: python -m compileall -q scripts
       - run: python scripts/validate_repo.py
+      - run: python scripts/validate_language_policy.py
 
   deterministic-runtime:
     name: deterministic-runtime
