@@ -3,11 +3,14 @@
   "$id": "execution-record.schema.json",
   "title": "ExecutionRecord",
   "type": "object",
-  "required": ["execution_id","authorization_id","approval_id","intent_id","intent_hash","executor_id","idempotency_key","attempted_at","status","side_effect_state","correlation_id"],
+  "required": ["execution_id","authorization_id","intent_id","intent_hash","executor_id","idempotency_key","attempted_at","status","side_effect_state","correlation_id"],
   "properties": {
     "execution_id": {"type":"string","minLength":1},
     "authorization_id": {"type":"string","minLength":1},
     "approval_id": {"type":"string","minLength":1},
+    "canary_grant_id": {"type":"string","minLength":1},
+    "canary_grant_version": {"type":"string","minLength":1},
+    "canary_gate_id": {"type":"string","minLength":1},
     "intent_id": {"type":"string","minLength":1},
     "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
     "executor_id": {"type":"string","minLength":1},
@@ -19,6 +22,10 @@
     "error": {"type":"string"},
     "correlation_id": {"type":"string","minLength":1}
   },
+  "oneOf": [
+    {"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_gate_id"]}]}},
+    {"required":["canary_grant_id","canary_grant_version","canary_gate_id"],"not":{"required":["approval_id"]}}
+  ],
   "allOf": [
     {"if":{"properties":{"status":{"const":"SUCCEEDED"}},"required":["status"]},"then":{"properties":{"side_effect_state":{"const":"PERFORMED"}}}},
     {"if":{"properties":{"status":{"const":"RECONCILIATION_REQUIRED"}},"required":["status"]},"then":{"properties":{"side_effect_state":{"const":"UNKNOWN"}}}}

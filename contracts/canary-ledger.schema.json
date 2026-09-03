@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canary-ledger.schema.json",
+  "title": "CanaryLedger",
+  "type": "object",
+  "required": ["grant_id","grant_version","window_started_at","executions_total","executions_in_window","cost_minor_total","pending_outcomes","successful_idempotency_keys","observed_outcome_ids","reconciliation_required","updated_at"],
+  "properties": {
+    "grant_id": {"type":"string","minLength":1},
+    "grant_version": {"type":"string","minLength":1},
+    "window_started_at": {"type":"string","format":"date-time"},
+    "executions_total": {"type":"integer","minimum":0},
+    "executions_in_window": {"type":"integer","minimum":0},
+    "cost_minor_total": {"type":"integer","minimum":0},
+    "pending_outcomes": {"type":"integer","minimum":0},
+    "successful_idempotency_keys": {"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "observed_outcome_ids": {"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "reconciliation_required": {"type":"boolean"},
+    "last_execution_at": {"type":"string","format":"date-time"},
+    "updated_at": {"type":"string","format":"date-time"}
+  },
+  "additionalProperties": false
+}
