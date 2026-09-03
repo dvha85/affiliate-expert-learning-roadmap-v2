@@ -94,6 +94,8 @@ type OutcomeRecord struct {
 	Status     string            `json:"status"`
 	Metrics    map[string]float64 `json:"metrics"`
 	SourceRef  string            `json:"source_ref"`
+	// Internal alias used by pre-cleanup M11 reference code; never serialized as canonical JSON.
+	ActionID string `json:"-"`
 }
 
 func ValidateHumanActionRecord(r HumanActionRecord) string {
@@ -118,7 +120,10 @@ func ValidateHumanActionRecord(r HumanActionRecord) string {
 }
 
 func ValidateOutcomeRecord(r OutcomeRecord) string {
-	if strings.TrimSpace(r.OutcomeID) == "" || ValidateEffectRef(r.EffectRef) != missionValid || strings.TrimSpace(r.SourceRef) == "" {
+	if strings.TrimSpace(r.OutcomeID) == "" || strings.TrimSpace(r.SourceRef) == "" {
+		return missionInvalid
+	}
+	if ValidateEffectRef(r.EffectRef) != missionValid && strings.TrimSpace(r.ActionID) == "" {
 		return missionInvalid
 	}
 	if _, e := time.Parse(time.RFC3339, r.ObservedAt); e != nil {
@@ -214,6 +219,8 @@ type EvaluationRecord struct {
 	Result       string    `json:"result"`
 	EvidenceIDs  []string  `json:"evidence_ids"`
 	Limitations  []string  `json:"limitations"`
+	// Internal alias used by pre-cleanup M11 reference code; never serialized as canonical JSON.
+	ActionID string `json:"-"`
 }
 type ImprovementProposal struct {
 	ProposalID      string   `json:"proposal_id"`
