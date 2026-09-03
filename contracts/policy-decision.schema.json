@@ -5,7 +5,7 @@
   "type": "object",
   "required": [
     "policy_version", "intent_id", "intent_hash", "decision", "risk_class", "reason",
-    "approval_required", "shadow_only", "execution_authorized", "policy_checked_at"
+    "policy_review_required", "policy_mode", "execution_authorized", "policy_checked_at"
   ],
   "properties": {
     "policy_version": {"type": "string", "minLength": 1},
@@ -14,19 +14,19 @@
     "decision": {"enum": ["ALLOW", "DENY", "WAIT", "GET_MORE_DATA", "HUMAN_REVIEW"]},
     "risk_class": {"enum": ["RISK0", "RISK1", "RISK2"]},
     "reason": {"type": "string", "minLength": 1},
-    "approval_required": {"type": "boolean"},
-    "shadow_only": {"const": true},
+    "policy_review_required": {"type": "boolean"},
+    "policy_mode": {"const": "NON_AUTHORIZING"},
     "execution_authorized": {"const": false},
     "policy_checked_at": {"type": "string", "format": "date-time"}
   },
   "allOf": [
     {
       "if": {"properties": {"decision": {"const": "HUMAN_REVIEW"}}, "required": ["decision"]},
-      "then": {"properties": {"approval_required": {"const": true}}}
+      "then": {"properties": {"policy_review_required": {"const": true}}}
     },
     {
       "if": {"properties": {"decision": {"enum": ["ALLOW", "DENY", "WAIT", "GET_MORE_DATA"]}}, "required": ["decision"]},
-      "then": {"properties": {"approval_required": {"const": false}}}
+      "then": {"properties": {"policy_review_required": {"const": false}}}
     }
   ],
   "additionalProperties": false
