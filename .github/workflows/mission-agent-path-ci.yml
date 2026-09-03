@@ -1,0 +1,57 @@
+name: Mission Agent Path CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  structure-and-language:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python scripts/validate_agent_path.py
+      - run: python scripts/validate_language_policy.py
+
+  mission-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/mission-runtime/go.mod
+      - name: O00 and M03-M07 executable eval packs
+        working-directory: lab/mission-runtime
+        run: go test ./...
+      - name: Vet mission runtime
+        working-directory: lab/mission-runtime
+        run: go vet ./...
+      - name: Smoke all mission demos
+        working-directory: lab/mission-runtime
+        run: |
+          go run ./cmd/demo O00 | grep -q 'DRY_RUN_ONLY'
+          go run ./cmd/demo M03 | grep -q 'VALID'
+          go run ./cmd/demo M04 | grep -q 'SUPPORTED'
+          go run ./cmd/demo M05 | grep -q 'REVIEW_REQUIRED'
+          go run ./cmd/demo M06 | grep -q 'NEW'
+          go run ./cmd/demo M07 | grep -q 'SUPPORTED'
+
+  safety-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard M03-M07 authority ceilings
+        run: |
+          grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
+          grep -q '"write_tool_requested".*"const":false' contracts/advisor-output.schema.json
+          grep -q '"auto_apply".*"const":false' contracts/improvement-proposal.schema.json
+          grep -q '"read_only".*"const":true' contracts/tool-registry.schema.json
+          grep -q 'REJECT_MACHINE_EXECUTION' lab/mission-runtime/cmd/demo/m03_m05.go
+          grep -q 'REJECT_WRITE_METHOD' lab/mission-runtime/cmd/demo/m06_m07.go
+          grep -q 'REJECT_TOOL' lab/mission-runtime/cmd/demo/m06_m07.go

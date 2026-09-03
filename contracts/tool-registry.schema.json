@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"tool-registry.schema.json",
+  "title":"ToolRegistry",
+  "type":"array",
+  "items":{"type":"object","required":["name","read_only","allowed_methods","allowed_hosts"],"properties":{"name":{"type":"string","minLength":1},"read_only":{"const":true},"allowed_methods":{"type":"array","items":{"enum":["GET","HEAD"]}},"allowed_hosts":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}},"additionalProperties":false}
+}

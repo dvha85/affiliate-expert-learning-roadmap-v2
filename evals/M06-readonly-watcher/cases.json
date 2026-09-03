@@ -1,0 +1,9 @@
+[
+  {"case_id":"M06-E01-new-readonly-observation","request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c1","body":"same"},"expected":"NEW"},
+  {"case_id":"M06-E02-unchanged","request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c2","body":"same","previous_hash":"0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"},"expected":"UNCHANGED"},
+  {"case_id":"M06-E03-changed","request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c3","body":"changed","previous_hash":"0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"},"expected":"CHANGED"},
+  {"case_id":"M06-E04-post-rejected","request":{"method":"POST","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c4","body":"x"},"expected":"REJECT_WRITE_METHOD"},
+  {"case_id":"M06-E05-host-not-allowlisted","request":{"method":"GET","url":"https://evil.example/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c5","body":"x"},"expected":"REJECT_SOURCE"},
+  {"case_id":"M06-E06-http-rejected","request":{"method":"GET","url":"http://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"c6","body":"x"},"expected":"REJECT_SOURCE"},
+  {"case_id":"M06-E07-missing-correlation","request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"","body":"x"},"expected":"INVALID"}
+]

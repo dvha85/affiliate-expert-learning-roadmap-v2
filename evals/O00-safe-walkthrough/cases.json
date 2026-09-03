@@ -1,0 +1,5 @@
+[
+  {"case_id":"O00-E01-no-side-effect","expected_final_state":"DRY_RUN_ONLY","expected_external_side_effects":false},
+  {"case_id":"O00-E02-shows-policy-boundary","required_stage":"deterministic_policy"},
+  {"case_id":"O00-E03-shows-dry-run-executor","required_stage":"dry_run_executor"}
+]

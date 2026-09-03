@@ -1,0 +1,8 @@
+[
+  {"case_id":"M05-E01-valid-proposal","proposal":{"proposal_id":"p1","evaluation_ids":["ev1"],"current_version":"v1","proposed_version":"v2","change_summary":"add conversion evidence","expected_benefit":"reduce weak ranking","risks":["overfit"],"rollback":"restore v1","auto_apply":false},"expected":"REVIEW_REQUIRED"},
+  {"case_id":"M05-E02-auto-apply-rejected","proposal":{"proposal_id":"p2","evaluation_ids":["ev1"],"current_version":"v1","proposed_version":"v2","change_summary":"change formula","expected_benefit":"better score","rollback":"restore v1","auto_apply":true},"expected":"REJECT_AUTO_APPLY"},
+  {"case_id":"M05-E03-missing-evaluation","proposal":{"proposal_id":"p3","evaluation_ids":[],"current_version":"v1","proposed_version":"v2","change_summary":"change formula","expected_benefit":"better score","rollback":"restore v1","auto_apply":false},"expected":"INVALID"},
+  {"case_id":"M05-E04-missing-rollback","proposal":{"proposal_id":"p4","evaluation_ids":["ev1"],"current_version":"v1","proposed_version":"v2","change_summary":"change formula","expected_benefit":"better score","rollback":"","auto_apply":false},"expected":"INVALID"},
+  {"case_id":"M05-E05-same-version-invalid","proposal":{"proposal_id":"p5","evaluation_ids":["ev1"],"current_version":"v1","proposed_version":"v1","change_summary":"change formula","expected_benefit":"better score","rollback":"restore v1","auto_apply":false},"expected":"INVALID"},
+  {"case_id":"M05-E06-missing-benefit","proposal":{"proposal_id":"p6","evaluation_ids":["ev1"],"current_version":"v1","proposed_version":"v2","change_summary":"change formula","expected_benefit":"","rollback":"restore v1","auto_apply":false},"expected":"INVALID"}
+]

@@ -1,0 +1,11 @@
+{
+  "name":"M06 Read-only Watcher Blueprint",
+  "nodes":[
+    {"name":"Schedule Trigger","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[0,0],"parameters":{"rule":{"interval":[{"field":"hours","hoursInterval":24}]}}},
+    {"name":"Read-only HTTP","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[240,0],"parameters":{"method":"GET","url":"https://example.com/replace-with-allowed-public-source","options":{"timeout":10000}}},
+    {"name":"Normalize Evidence","type":"n8n-nodes-base.code","typeVersion":2,"position":[480,0],"parameters":{"jsCode":"return items.map((item, i) => ({json:{source_ref:'replace-me', observed_at:new Date().toISOString(), access_method:'HTTP GET', correlation_id:$execution.id, raw:item.json}}));"}}
+  ],
+  "connections":{"Schedule Trigger":{"main":[[{"node":"Read-only HTTP","type":"main","index":0}]]},"Read-only HTTP":{"main":[[{"node":"Normalize Evidence","type":"main","index":0}]]}},
+  "active":false,
+  "settings":{}
+}
