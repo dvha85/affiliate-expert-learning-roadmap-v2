@@ -66,7 +66,7 @@ except Exception as exc:
     errors.append(f"invalid M06 n8n blueprint: {exc}")
 
 m06_lesson = (ROOT / "curriculum/M06/M06.3-n8n-readonly-workflow.md").read_text(encoding="utf-8")
-for marker in ["Watcher cache != canonical history", "store.history.push", "canonical_history_handoff=REQUIRED", "Continuity Gate"]:
+for marker in ["Watcher cache (bộ nhớ đệm) != canonical history", "store.history.push", "canonical_history_handoff=REQUIRED", "Continuity Gate"]:
     if marker not in m06_lesson:
         errors.append(f"M06 lesson boundary marker missing: {marker}")
 
