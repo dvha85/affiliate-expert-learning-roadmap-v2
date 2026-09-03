@@ -7,6 +7,6 @@
 - [ ] expiry, target allowlist và policy version được kiểm.
 - [ ] idempotency duplicate/collision semantics được thử.
 - [ ] PolicyDecision luôn `execution_authorized=false`, kể cả `ALLOW`.
-- [ ] policy unavailable/invalid fail closed.
+- [ ] policy unavailable/invalid phải fail closed (đóng an toàn).
 - [ ] không có write tool/executor trong operated path.
 - [ ] Reality + Operated evidence đã lưu.
