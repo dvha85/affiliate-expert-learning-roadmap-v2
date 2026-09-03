@@ -10,7 +10,8 @@ Repo chính để học và xây một **Affiliate Intelligence Bot tiến hóa 
 2. Đọc `curriculum/README.md` — đường học hiện hành cho người học.
 3. Nếu bắt đầu từ máy chưa chuẩn bị môi trường, học `BOOT.0`.
 4. Nếu chưa từng chạy/sửa/test Bot, học `BOOT.1`.
-5. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
+5. Chạy `O00.1` để nhìn toàn bộ vòng hệ thống bằng dữ liệu synthetic (mô phỏng); O00 chỉ orientation (định hướng), không tạo PASS.
+6. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
 
 ## Lộ trình chuẩn
 
@@ -29,6 +30,23 @@ O00 — walkthrough tổng thể bằng dữ liệu synthetic (mô phỏng), kh�
 → M10 — governed canary (tự động hóa canary có kiểm soát)
 → M11 — production closed loop (vòng kín production có quản trị)
 ```
+
+## Bot phải tiến hóa liên tục, không phải tập demo rời
+
+Từ M02 trở đi, artifact phải nối được provenance (nguồn gốc) xuyên chuỗi:
+
+```text
+Observation / History
+→ DecisionPacket
+→ ActionRecord
+→ OutcomeRecord
+→ EvaluationRecord
+→ ImprovementProposal + ReviewRecord
+→ automated Observation
+→ grounded Agent proposal
+```
+
+Runtime/eval offline chỉ chứng minh capability/boundary. Reality/Operated PASS phải dùng artifact thật và các ID liên kết phải resolve được tới artifact trước đó.
 
 ## Các bất biến kiểm soát
 
