@@ -118,7 +118,7 @@ for marker in [
         errors.append(f"M02 ready contract missing marker: {marker}")
 
 mission_index = (ROOT / "missions/README.md").read_text(encoding="utf-8")
-if "| M02 | Trustworthy History + Replay v0.2 | A0 deterministic | ready |" not in mission_index:
+if "| M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | A0 tất định | ready |" not in mission_index:
     errors.append("M02 mission index must be ready after corrective planned gate")
 
 history_schema = json.loads((ROOT / "contracts/history-record.schema.json").read_text(encoding="utf-8"))
