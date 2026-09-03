@@ -5,35 +5,39 @@
   "type": "object",
   "required": ["authorization_id","intent_id","intent_hash","policy_version","executor_id","authorized_at","expires_at","idempotency_key","correlation_id","execution_mode","execution_authorized"],
   "properties": {
-    "authorization_id": {"type":"string","minLength":1},
-    "intent_id": {"type":"string","minLength":1},
-    "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "policy_version": {"type":"string","minLength":1},
-    "approval_id": {"type":"string","minLength":1},
-    "canary_grant_id": {"type":"string","minLength":1},
-    "canary_grant_version": {"type":"string","minLength":1},
-    "canary_grant_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "canary_gate_id": {"type":"string","minLength":1},
-    "canary_cost_bound_id": {"type":"string","minLength":1},
-    "canary_cost_bound_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "canary_cost_bound_minor": {"type":"integer","minimum":0},
-    "executor_id": {"type":"string","minLength":1},
-    "authorized_at": {"type":"string","format":"date-time"},
-    "expires_at": {"type":"string","format":"date-time"},
-    "idempotency_key": {"type":"string","minLength":1},
-    "correlation_id": {"type":"string","minLength":1},
-    "execution_mode": {"enum":["APPROVED_LIVE","GOVERNED_CANARY"]},
-    "execution_authorized": {"const":true}
+    "authorization_id":{"type":"string","minLength":1},
+    "intent_id":{"type":"string","minLength":1},
+    "intent_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "policy_version":{"type":"string","minLength":1},
+    "approval_id":{"type":"string","minLength":1},
+    "canary_grant_id":{"type":"string","minLength":1},
+    "canary_grant_version":{"type":"string","minLength":1},
+    "canary_grant_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "canary_gate_id":{"type":"string","minLength":1},
+    "canary_cost_bound_id":{"type":"string","minLength":1},
+    "canary_cost_bound_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "canary_cost_bound_minor":{"type":"integer","minimum":0},
+    "production_lease_id":{"type":"string","minLength":1},
+    "production_lease_version":{"type":"string","minLength":1},
+    "production_lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_gate_id":{"type":"string","minLength":1},
+    "production_health_snapshot_id":{"type":"string","minLength":1},
+    "production_health_snapshot_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_cost_bound_id":{"type":"string","minLength":1},
+    "production_cost_bound_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_cost_bound_minor":{"type":"integer","minimum":0},
+    "executor_id":{"type":"string","minLength":1},
+    "authorized_at":{"type":"string","format":"date-time"},
+    "expires_at":{"type":"string","format":"date-time"},
+    "idempotency_key":{"type":"string","minLength":1},
+    "correlation_id":{"type":"string","minLength":1},
+    "execution_mode":{"enum":["APPROVED_LIVE","GOVERNED_CANARY","GOVERNED_PRODUCTION"]},
+    "execution_authorized":{"const":true}
   },
   "allOf": [
-    {
-      "if":{"properties":{"execution_mode":{"const":"APPROVED_LIVE"}},"required":["execution_mode"]},
-      "then":{"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]}]}}
-    },
-    {
-      "if":{"properties":{"execution_mode":{"const":"GOVERNED_CANARY"}},"required":["execution_mode"]},
-      "then":{"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"required":["approval_id"]}}
-    }
+    {"if":{"properties":{"execution_mode":{"const":"APPROVED_LIVE"}},"required":["execution_mode"]},"then":{"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]},{"required":["production_lease_id"]},{"required":["production_gate_id"]}]}}},
+    {"if":{"properties":{"execution_mode":{"const":"GOVERNED_CANARY"}},"required":["execution_mode"]},"then":{"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["production_lease_id"]},{"required":["production_gate_id"]}]}}},
+    {"if":{"properties":{"execution_mode":{"const":"GOVERNED_PRODUCTION"}},"required":["execution_mode"]},"then":{"required":["production_lease_id","production_lease_version","production_lease_hash","production_gate_id","production_health_snapshot_id","production_health_snapshot_hash","production_cost_bound_id","production_cost_bound_hash","production_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["canary_grant_id"]},{"required":["canary_gate_id"]}]}}}
   ],
   "additionalProperties": false
 }

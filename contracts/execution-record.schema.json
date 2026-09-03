@@ -1,38 +1,48 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "execution-record.schema.json",
-  "title": "ExecutionRecord",
-  "type": "object",
-  "required": ["execution_id","authorization_id","intent_id","intent_hash","executor_id","idempotency_key","attempted_at","status","side_effect_state","correlation_id"],
-  "properties": {
-    "execution_id": {"type":"string","minLength":1},
-    "authorization_id": {"type":"string","minLength":1},
-    "approval_id": {"type":"string","minLength":1},
-    "canary_grant_id": {"type":"string","minLength":1},
-    "canary_grant_version": {"type":"string","minLength":1},
-    "canary_grant_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "canary_gate_id": {"type":"string","minLength":1},
-    "canary_cost_bound_id": {"type":"string","minLength":1},
-    "canary_cost_bound_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "canary_cost_bound_minor": {"type":"integer","minimum":0},
-    "intent_id": {"type":"string","minLength":1},
-    "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "executor_id": {"type":"string","minLength":1},
-    "idempotency_key": {"type":"string","minLength":1},
-    "attempted_at": {"type":"string","format":"date-time"},
-    "status": {"enum":["SUCCEEDED","FAILED","CANCELLED","RECONCILIATION_REQUIRED"]},
-    "side_effect_state": {"enum":["PERFORMED","NOT_PERFORMED","UNKNOWN"]},
-    "external_ref": {"type":"string"},
-    "error": {"type":"string"},
-    "correlation_id": {"type":"string","minLength":1}
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"execution-record.schema.json",
+  "title":"ExecutionRecord",
+  "type":"object",
+  "required":["execution_id","authorization_id","intent_id","intent_hash","executor_id","idempotency_key","attempted_at","status","side_effect_state","correlation_id"],
+  "properties":{
+    "execution_id":{"type":"string","minLength":1},
+    "authorization_id":{"type":"string","minLength":1},
+    "approval_id":{"type":"string","minLength":1},
+    "canary_grant_id":{"type":"string","minLength":1},
+    "canary_grant_version":{"type":"string","minLength":1},
+    "canary_grant_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "canary_gate_id":{"type":"string","minLength":1},
+    "canary_cost_bound_id":{"type":"string","minLength":1},
+    "canary_cost_bound_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "canary_cost_bound_minor":{"type":"integer","minimum":0},
+    "production_lease_id":{"type":"string","minLength":1},
+    "production_lease_version":{"type":"string","minLength":1},
+    "production_lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_gate_id":{"type":"string","minLength":1},
+    "production_health_snapshot_id":{"type":"string","minLength":1},
+    "production_health_snapshot_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_cost_bound_id":{"type":"string","minLength":1},
+    "production_cost_bound_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "production_cost_bound_minor":{"type":"integer","minimum":0},
+    "intent_id":{"type":"string","minLength":1},
+    "intent_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "executor_id":{"type":"string","minLength":1},
+    "idempotency_key":{"type":"string","minLength":1},
+    "attempted_at":{"type":"string","format":"date-time"},
+    "status":{"enum":["SUCCEEDED","FAILED","CANCELLED","RECONCILIATION_REQUIRED"]},
+    "side_effect_state":{"enum":["PERFORMED","NOT_PERFORMED","UNKNOWN"]},
+    "external_ref":{"type":"string"},
+    "error":{"type":"string"},
+    "correlation_id":{"type":"string","minLength":1}
   },
-  "oneOf": [
-    {"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]}]}},
-    {"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"required":["approval_id"]}}
+  "oneOf":[
+    {"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["production_lease_id"]}]}},
+    {"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["production_lease_id"]}]}},
+    {"required":["production_lease_id","production_lease_version","production_lease_hash","production_gate_id","production_health_snapshot_id","production_health_snapshot_hash","production_cost_bound_id","production_cost_bound_hash","production_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["canary_grant_id"]}]}}
   ],
-  "allOf": [
+  "allOf":[
     {"if":{"properties":{"status":{"const":"SUCCEEDED"}},"required":["status"]},"then":{"properties":{"side_effect_state":{"const":"PERFORMED"}}}},
     {"if":{"properties":{"status":{"const":"RECONCILIATION_REQUIRED"}},"required":["status"]},"then":{"properties":{"side_effect_state":{"const":"UNKNOWN"}}}}
   ],
-  "additionalProperties": false
+  "additionalProperties":false
 }

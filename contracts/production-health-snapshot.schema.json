@@ -1,0 +1,24 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-health-snapshot.schema.json",
+  "title":"ProductionHealthSnapshot",
+  "type":"object",
+  "required":["snapshot_id","lease_id","lease_version","lease_hash","observed_at","source_refs","dependency_state","telemetry_complete","consecutive_failures","reconciliation_required","compliance_alert_count","oldest_pending_outcome_age_seconds","hash_version","snapshot_hash"],
+  "properties":{
+    "snapshot_id":{"type":"string","minLength":1},
+    "lease_id":{"type":"string","minLength":1},
+    "lease_version":{"type":"string","minLength":1},
+    "lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "observed_at":{"type":"string","format":"date-time"},
+    "source_refs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "dependency_state":{"enum":["HEALTHY","DEGRADED","UNAVAILABLE"]},
+    "telemetry_complete":{"type":"boolean"},
+    "consecutive_failures":{"type":"integer","minimum":0},
+    "reconciliation_required":{"type":"boolean"},
+    "compliance_alert_count":{"type":"integer","minimum":0},
+    "oldest_pending_outcome_age_seconds":{"type":"integer","minimum":0},
+    "hash_version":{"const":"go-json-v1"},
+    "snapshot_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties":false
+}
