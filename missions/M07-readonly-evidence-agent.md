@@ -13,7 +13,7 @@ eval_pack: evals/M07-readonly-evidence-agent/
 
 ## Contract bàn giao
 
-Read-only Tool Registry; Agent proposal grounding; prompt-injection boundary; n8n Agent blueprint.
+Tool Registry (sổ đăng ký tool) chỉ đọc; Agent proposal (đề xuất của Agent) phải bám bằng chứng; prompt injection (chèn chỉ dẫn độc hại) không được nâng quyền; có n8n Agent blueprint (bản thiết kế Agent trên n8n).
 
 ## Authority ceiling
 

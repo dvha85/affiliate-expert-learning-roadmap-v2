@@ -13,7 +13,7 @@ eval_pack: evals/M05-reviewed-improvement/
 
 ## Contract bàn giao
 
-Versioned ImprovementProposal; evaluation linkage; human review; rollback; no auto-apply.
+`ImprovementProposal` phải có version (phiên bản), liên kết evaluation (đánh giá), human review (người review), rollback (quay lui) và không được tự áp dụng.
 
 ## Authority ceiling
 

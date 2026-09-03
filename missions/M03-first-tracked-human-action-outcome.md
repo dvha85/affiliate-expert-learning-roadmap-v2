@@ -13,7 +13,7 @@ eval_pack: evals/M03-tracked-human-action/
 
 ## Contract bàn giao
 
-ActionRecord + OutcomeRecord; human-only external action; measurement window; compliance review.
+`ActionRecord` + `OutcomeRecord`: hành động bên ngoài chỉ do người thực hiện, có measurement window (cửa sổ đo lường) và compliance review (rà soát tuân thủ).
 
 ## Authority ceiling
 

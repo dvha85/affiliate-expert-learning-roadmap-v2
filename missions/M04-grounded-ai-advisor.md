@@ -13,7 +13,7 @@ eval_pack: evals/M04-grounded-ai-advisor/
 
 ## Contract bàn giao
 
-Grounded AdvisorOutput; evidence IDs; freshness; abstention; no write tool.
+`AdvisorOutput` phải bám evidence IDs (định danh bằng chứng), kiểm freshness (độ mới), hỗ trợ abstention (từ chối kết luận khi chưa đủ dữ liệu) và không có write tool (tool ghi).
 
 ## Authority ceiling
 

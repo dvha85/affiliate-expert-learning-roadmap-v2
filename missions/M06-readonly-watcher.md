@@ -13,7 +13,7 @@ eval_pack: evals/M06-readonly-watcher/
 
 ## Contract bàn giao
 
-Read-only watcher; GET/HEAD allowlist; change detection; correlation; n8n blueprint.
+Watcher (bộ theo dõi) chỉ đọc dùng GET/HEAD trên allowlist (danh sách cho phép), phân biệt NEW/UNCHANGED/CHANGED, có correlation (liên kết lần chạy) và n8n blueprint (bản thiết kế n8n).
 
 ## Authority ceiling
 
