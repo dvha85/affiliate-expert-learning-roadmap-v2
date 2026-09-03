@@ -28,6 +28,7 @@ func TestM09EvalPack(t *testing.T){
 	case "already_executed": ctx.AlreadySucceeded["k"]=true
 	case "tampered_intent": s.Intent.Target="https://evil.example/draft"
 	case "expired_intent": ctx.Now="2026-09-03T09:30:00Z"
+	case "approval_before_policy": s.Approval.ApprovedAt="2026-09-03T07:00:00Z"
 	}; _,got:=AuthorizeM09(s,ctx); if got!=c.Expected{t.Fatalf("expected %s got %s",c.Expected,got)} })}
 }
 func TestM09DurableResumeRevalidates(t *testing.T){s,ctx:=baseM09(); p:=filepath.Join(t.TempDir(),"state.json"); if e:=PersistM09State(p,s);e!=nil{t.Fatal(e)}; loaded,e:=LoadM09State(p);if e!=nil{t.Fatal(e)}; loaded.Policy.PolicyVersion="v2"; _,got:=AuthorizeM09(loaded,ctx);if got!="DENY_APPROVAL_MISMATCH"{t.Fatalf("resume must revalidate approval binding, got %s",got)}}
