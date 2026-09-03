@@ -19,8 +19,13 @@ required = [
     "lab/mission-runtime/cmd/demo/m11_test.go",
     "lab/mission-runtime/cmd/demo/m11_gate_test.go",
     "lab/mission-runtime/cmd/demo/m11_reconciliation_test.go",
+    "lab/mission-runtime/cmd/demo/production_activation.go",
+    "lab/mission-runtime/cmd/demo/trusted_cost_bound.go",
+    "contracts/effect-ref.schema.json",
+    "contracts/trusted-cost-bound.schema.json",
     "contracts/production-lease.schema.json",
     "contracts/production-lease-approval.schema.json",
+    "contracts/production-activation-record.schema.json",
     "contracts/production-health-snapshot.schema.json",
     "contracts/production-ledger.schema.json",
     "contracts/production-gate-decision.schema.json",
@@ -28,54 +33,110 @@ required = [
     "contracts/production-reconciliation-resolution.schema.json",
 ]
 for rel in required:
-    if not (ROOT / rel).exists(): errors.append(f"missing M11 file: {rel}")
+    if not (ROOT / rel).exists():
+        errors.append(f"missing M11 file: {rel}")
 for rel in [x for x in required if x.endswith(".json")]:
-    try: json.loads((ROOT / rel).read_text(encoding="utf-8"))
-    except Exception as exc: errors.append(f"invalid M11 JSON {rel}: {exc}")
+    try:
+        json.loads((ROOT / rel).read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"invalid M11 JSON {rel}: {exc}")
+
 mission = (ROOT / "missions/M11-production-closed-loop.md").read_text(encoding="utf-8")
-for marker in ["status: ready","minimum_evidence: E6","GOVERNED_PRODUCTION","RISK2","DEGRADE","STOP","auto_apply=false","3+ closed cycles"]:
-    if marker not in mission: errors.append(f"M11 mission marker missing: {marker}")
+for marker in [
+    "status: ready", "minimum_evidence: E6", "GOVERNED_PRODUCTION", "RISK2", "DEGRADE", "STOP",
+    "auto_apply=false", "3+ closed cycles", "ProductionActivationRecord", "TrustedCostBound", "MACHINE_EXECUTION",
+]:
+    if marker not in mission:
+        errors.append(f"M11 mission marker missing: {marker}")
+
 index = (ROOT / "missions/README.md").read_text(encoding="utf-8")
 line = next((x for x in index.splitlines() if x.startswith("| M11 |")), "")
-if "| ready |" not in line: errors.append("M11 mission index must be ready")
+if "| ready |" not in line:
+    errors.append("M11 mission index must be ready")
+
 lease = json.loads((ROOT / "contracts/production-lease.schema.json").read_text(encoding="utf-8"))
-if "RISK2" in lease["properties"]["allowed_risk_classes"]["items"]["enum"]: errors.append("ProductionLease must never delegate RISK2")
+if "RISK2" in lease["properties"]["allowed_risk_classes"]["items"]["enum"]:
+    errors.append("ProductionLease must never delegate RISK2")
+
 approval = (ROOT / "contracts/production-lease-approval.schema.json").read_text(encoding="utf-8")
-for marker in ["lease_hash","promotion_review_ref","source_canary_grant_id","source_canary_grant_version","source_canary_grant_hash","source_e5_refs","validated_risk_classes","reviewed_by","human","APPROVE_PRODUCTION_LEASE"]:
-    if marker not in approval: errors.append(f"M11 approval contract missing: {marker}")
+for marker in ["lease_hash", "promotion_review_ref", "source_canary_grant_id", "source_canary_grant_version", "source_canary_grant_hash", "source_e5_refs", "validated_risk_classes", "reviewed_by", "human", "APPROVE_PRODUCTION_LEASE"]:
+    if marker not in approval:
+        errors.append(f"M11 approval contract missing: {marker}")
+
+activation = json.loads((ROOT / "contracts/production-activation-record.schema.json").read_text(encoding="utf-8"))
+for marker in ["lease_id", "lease_version", "lease_hash", "activated_at"]:
+    if marker not in activation.get("required", []):
+        errors.append(f"M11 activation contract missing: {marker}")
+
 health = (ROOT / "contracts/production-health-snapshot.schema.json").read_text(encoding="utf-8")
-for marker in ["lease_hash","telemetry_complete","consecutive_failures","reconciliation_required","compliance_alert_count","oldest_pending_outcome_age_seconds","snapshot_hash"]:
-    if marker not in health: errors.append(f"M11 health contract missing: {marker}")
+for marker in ["lease_hash", "telemetry_complete", "consecutive_failures", "reconciliation_required", "compliance_alert_count", "oldest_pending_outcome_age_seconds", "snapshot_hash"]:
+    if marker not in health:
+        errors.append(f"M11 health contract missing: {marker}")
+
+cost = (ROOT / "contracts/trusted-cost-bound.schema.json").read_text(encoding="utf-8")
+for marker in ["cost_bound_id", "intent_hash", "max_cost_minor", "source_ref", "cost_bound_hash"]:
+    if marker not in cost:
+        errors.append(f"M11 trusted cost contract missing: {marker}")
+
 ledger = (ROOT / "contracts/production-ledger.schema.json").read_text(encoding="utf-8")
-for marker in ["control_mode","STOPPED","pending_execution_ids","outcome_links","consecutive_failures","reconciliation_required","reconciliation_resolution_ids"]:
-    if marker not in ledger: errors.append(f"M11 ledger contract missing: {marker}")
+for marker in ["control_mode", "STOPPED", "pending_execution_ids", "outcome_links", "consecutive_failures", "reconciliation_required", "reconciliation_resolution_ids"]:
+    if marker not in ledger:
+        errors.append(f"M11 ledger contract missing: {marker}")
+
 resolution = (ROOT / "contracts/production-reconciliation-resolution.schema.json").read_text(encoding="utf-8")
-for marker in ["resolution_id","execution_id","resolved_by","human","effect_state"]:
-    if marker not in resolution: errors.append(f"M11 reconciliation contract missing: {marker}")
+for marker in ["resolution_id", "execution_id", "resolved_by", "human", "effect_state"]:
+    if marker not in resolution:
+        errors.append(f"M11 reconciliation contract missing: {marker}")
+
 gate = (ROOT / "contracts/production-gate-decision.schema.json").read_text(encoding="utf-8")
-for marker in ["ALLOW_PRODUCTION","DEGRADE","STOP","REQUIRE_APPROVAL","WAIT","DENY","execution_authorized"]:
-    if marker not in gate: errors.append(f"M11 gate contract missing: {marker}")
+for marker in ["ALLOW_PRODUCTION", "DEGRADE", "STOP", "REQUIRE_APPROVAL", "WAIT", "DENY", "execution_authorized"]:
+    if marker not in gate:
+        errors.append(f"M11 gate contract missing: {marker}")
+
 auth = (ROOT / "contracts/execution-authorization.schema.json").read_text(encoding="utf-8")
 execution = (ROOT / "contracts/execution-record.schema.json").read_text(encoding="utf-8")
-for marker in ["GOVERNED_PRODUCTION","production_lease_hash","production_health_snapshot_hash","production_cost_bound_hash"]:
-    if marker not in auth: errors.append(f"M11 authorization linkage missing: {marker}")
-    if marker != "GOVERNED_PRODUCTION" and marker not in execution: errors.append(f"M11 execution linkage missing: {marker}")
-runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m11.go","m11_gate.go","m11_reconciliation.go"])
+for marker in ["GOVERNED_PRODUCTION", "production_lease_hash", "production_health_snapshot_hash", "production_cost_bound_hash"]:
+    if marker not in auth:
+        errors.append(f"M11 authorization linkage missing: {marker}")
+    if marker != "GOVERNED_PRODUCTION" and marker not in execution:
+        errors.append(f"M11 execution linkage missing: {marker}")
+
+runtime = "\n".join(
+    (ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8")
+    for name in ["m11.go", "m11_gate.go", "m11_reconciliation.go", "production_activation.go", "trusted_cost_bound.go"]
+)
 for marker in [
-    "EvaluateProductionGate","EnforceProductionGate","trustedCriticalProductionStop","AuthorizeProduction","InitializeProductionLedger","ExecuteProductionLocalSandbox",
-    "RecordProductionOutcome","ResolveProductionReconciliation","ResolveTrustedProductionReconciliation","DENY_RECONCILIATION_PROVENANCE",
-    "ValidateProductionClosedCycle","PROMOTION_RISK_NOT_VALIDATED","PROMOTION_SOURCE_MISMATCH","PROMOTION_E5_EVIDENCE_MISSING",
-    "RISK2_PER_ACTION_APPROVAL_REQUIRED","HEALTH_STALE","TELEMETRY_INCOMPLETE","COMPLIANCE_ALERT","FAILURE_THRESHOLD",
-    "OUTCOME_STALE","STICKY_STOP","STOP_LEDGER_MISSING","STOP_ACTIVATION_STATE_MISSING","DENY_OUTCOME_LINK",
-    "REJECT_AUTO_APPLY","GOVERNED_PRODUCTION",
+    "EvaluateProductionGate", "EnforceProductionGate", "trustedCriticalProductionStop", "AuthorizeProduction", "InitializeProductionLedger", "ExecuteProductionLocalSandbox",
+    "RecordProductionOutcome", "ResolveProductionReconciliation", "ResolveTrustedProductionReconciliation", "DENY_RECONCILIATION_PROVENANCE",
+    "ValidateProductionClosedCycle", "PROMOTION_RISK_NOT_VALIDATED", "PROMOTION_SOURCE_MISMATCH", "PROMOTION_E5_EVIDENCE_MISSING",
+    "RISK2_PER_ACTION_APPROVAL_REQUIRED", "HEALTH_STALE", "TELEMETRY_INCOMPLETE", "COMPLIANCE_ALERT", "FAILURE_THRESHOLD",
+    "OUTCOME_STALE", "STICKY_STOP", "STOP_LEDGER_MISSING", "STOP_ACTIVATION_STATE_MISSING", "DENY_OUTCOME_LINK",
+    "REJECT_AUTO_APPLY", "GOVERNED_PRODUCTION", "ProductionActivationRecord", "TrustedCostBound",
 ]:
-    if marker not in runtime: errors.append(f"M11 runtime marker missing: {marker}")
+    if marker not in runtime:
+        errors.append(f"M11 runtime marker missing: {marker}")
+
 cases = json.loads((ROOT / "evals/M11-production-closed-loop/cases.json").read_text(encoding="utf-8"))
-if len(cases) < 30: errors.append("M11 eval pack must contain at least 30 cases")
-for decision, reason in [("ALLOW_PRODUCTION","PRODUCTION_ELIGIBLE"),("REQUIRE_APPROVAL","RISK2_PER_ACTION_APPROVAL_REQUIRED"),("DEGRADE","HEALTH_STALE"),("DEGRADE","TELEMETRY_INCOMPLETE"),("STOP","COMPLIANCE_ALERT"),("STOP","FAILURE_THRESHOLD"),("STOP","RECONCILIATION_REQUIRED"),("STOP","OUTCOME_STALE"),("STOP","STICKY_STOP"),("WAIT","OUTCOME_BACKPRESSURE")]:
-    if not any(x.get("expected_decision")==decision and x.get("expected_reason")==reason for x in cases): errors.append(f"M11 eval missing {decision}/{reason}")
+if len(cases) < 30:
+    errors.append("M11 eval pack must contain at least 30 cases")
+for decision, reason in [
+    ("ALLOW_PRODUCTION", "PRODUCTION_ELIGIBLE"),
+    ("REQUIRE_APPROVAL", "RISK2_PER_ACTION_APPROVAL_REQUIRED"),
+    ("DEGRADE", "HEALTH_STALE"),
+    ("DEGRADE", "TELEMETRY_INCOMPLETE"),
+    ("STOP", "COMPLIANCE_ALERT"),
+    ("STOP", "FAILURE_THRESHOLD"),
+    ("STOP", "RECONCILIATION_REQUIRED"),
+    ("STOP", "OUTCOME_STALE"),
+    ("STOP", "STICKY_STOP"),
+    ("WAIT", "OUTCOME_BACKPRESSURE"),
+]:
+    if not any(x.get("expected_decision") == decision and x.get("expected_reason") == reason for x in cases):
+        errors.append(f"M11 eval missing {decision}/{reason}")
+
 if errors:
     print("M11 VALIDATION FAILED")
-    for error in errors: print(f"- {error}")
+    for error in errors:
+        print(f"- {error}")
     sys.exit(1)
 print("M11 VALIDATION PASS: production loop is finite, health-gated, stop-durable, recovery-reviewed and self-improvement-bounded")
