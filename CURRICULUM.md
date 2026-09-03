@@ -12,9 +12,10 @@
 Evidence (bằng chứng)
 → Deterministic Decision (quyết định tất định)
 → Grounded AI (AI dựa trên bằng chứng) khi cần
-→ ActionIntent (ý định hành động có cấu trúc)
-→ Deterministic Policy / Risk (chính sách / rủi ro tất định)
-→ Human Approval (phê duyệt của người) khi cần
+→ ActionIntent (ý định hành động dạng đề xuất, không tự có quyền)
+→ Deterministic Policy / Risk (chính sách / rủi ro tất định, không tự có quyền)
+→ Human Approval / Delegated Authority (phê duyệt / ủy quyền có giới hạn) khi cần
+→ ExecutionAuthorization (ủy quyền thực thi cụ thể)
 → Controlled Execution (thực thi có kiểm soát)
 → Outcome (kết quả)
 → Evaluation (đánh giá)
@@ -27,7 +28,9 @@ Các bất biến:
 ```text
 AI confidence (độ tin cậy AI) != execution permission (quyền thực thi)
 Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)
-Agent proposal (đề xuất của Agent) != authorized ActionIntent (ActionIntent đã được cấp quyền)
+Agent proposal (đề xuất của Agent) != authorized action (hành động đã được cấp quyền)
+ActionIntent.execution_authorized = false
+PolicyDecision.execution_authorized = false
 Tool result (kết quả tool) != trusted evidence (bằng chứng đáng tin)
 real evidence (bằng chứng thật) != automatic recommendation (khuyến nghị tự động)
 real != reliable != current != authoritative != complete
@@ -45,21 +48,23 @@ REALITY-FIRST != PUBLISH-FIRST
 
 ## 3. Trục Mission chính
 
-| Mission | Kết quả bàn giao | Bằng chứng tối thiểu | Trần quyền hạn |
-|---|---|---|---|
-| O00 | Safe synthetic walkthrough (mô phỏng tổng thể an toàn), không PASS | E0 | không side effect |
-| M00 | First Real Evidence Packet (gói bằng chứng thật đầu tiên) + Human DecisionPacket (gói quyết định do người lập) | E1 | người/read-only |
-| M01 | Smallest Deterministic Bot v0.1 (Bot tất định nhỏ nhất) | E0 + hỗ trợ E1 | A0 tất định, không hành động |
-| M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | E1/E3-ready | A0 tất định |
-| M03 | First Tracked Human Action + Outcome context (hành động thật đầu tiên do người làm + ngữ cảnh kết quả) | E2→E3 | người thực thi |
-| M04 | Grounded AI Advisor v0.4 (AI tư vấn dựa trên bằng chứng) | E3 | A1 tư vấn, không tool ghi |
-| M05 | First Reviewed Improvement (cải tiến đầu tiên có review) | E4 | A1 chỉ đề xuất |
-| M06 | Reliable Automatic Watcher (bộ theo dõi tự động chỉ đọc đáng tin) | E4 | tự động chỉ đọc |
-| M07 | Read-only Evidence Agent (Agent bằng chứng chỉ đọc) | E4 | A2-RO |
-| M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | E4 | A3-shadow |
-| M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | E4/E5-ready | hành động qua cổng phê duyệt |
-| M10 | Governed Canary (canary có quản trị) | E5 | tự động RISK0/RISK1 trong giới hạn; RISK2 cần phê duyệt |
-| M11 | Production Closed Loop (vòng kín production có quản trị) | E6 | production có quản trị |
+`Bằng chứng tối thiểu` là bằng chứng Mission hiện tại phải có. `Readiness target` (mục tiêu sẵn sàng) chỉ nói Mission phải chuẩn bị capability/contract cho mức bằng chứng sau; **readiness không phải evidence đã đạt**.
+
+| Mission | Kết quả bàn giao | Bằng chứng tối thiểu | Readiness target | Trần quyền hạn |
+|---|---|---|---|---|
+| O00 | Safe synthetic walkthrough (mô phỏng tổng thể an toàn), không PASS | E0 | — | không side effect |
+| M00 | First Real Evidence Packet (gói bằng chứng thật đầu tiên) + Human DecisionPacket (gói quyết định do người lập) | E1 | — | người/read-only |
+| M01 | Smallest Deterministic Bot v0.1 (Bot tất định nhỏ nhất) | E0 + hỗ trợ E1 | — | A0 tất định, không hành động |
+| M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | E1 | E3 | A0 tất định |
+| M03 | First Tracked Human Action + Outcome context (hành động thật đầu tiên do người làm + ngữ cảnh kết quả) | E2→E3 | — | người thực thi |
+| M04 | Grounded AI Advisor v0.4 (AI tư vấn dựa trên bằng chứng) | E3 | — | A1 tư vấn, không tool ghi |
+| M05 | First Reviewed Improvement (cải tiến đầu tiên có review) | E4 | — | A1 chỉ đề xuất |
+| M06 | Reliable Automatic Watcher (bộ theo dõi tự động chỉ đọc đáng tin) | E4 | — | tự động chỉ đọc |
+| M07 | Read-only Evidence Agent (Agent bằng chứng chỉ đọc) | E4 | — | A2-RO |
+| M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | E4 | — | A3-shadow |
+| M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | E4 | E5 | hành động qua cổng phê duyệt |
+| M10 | Governed Canary (canary có quản trị) | E5 | — | tự động RISK0/RISK1 trong giới hạn; RISK2 cần phê duyệt |
+| M11 | Production Closed Loop (vòng kín production có quản trị) | E6 | — | production có quản trị |
 
 ```text
 O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → M09 → M10 → M11
@@ -95,11 +100,12 @@ Các thẻ kiến thức đầu tiên:
 Mục tiêu bàn giao:
 
 ```text
-3+ public observations (quan sát công khai) có source + observed_at + access_method
+3+ public observations (quan sát công khai) có observation_id + source + observed_at + access_method
 → provenance/limitation (nguồn gốc/giới hạn) rõ
 → fact / estimate / assumption / unknown
-→ Human DecisionPacket
+→ Human DecisionPacket bind exact evidence_ids
 → state + reason + missing evidence + next measurement
+→ action = null
 → KHÔNG thực thi hành động bên ngoài
 ```
 
@@ -112,10 +118,10 @@ M00 — người/read-only (chỉ đọc)
 → M04–M05 — A1 tư vấn/chỉ đề xuất
 → M06 — tự động chỉ đọc
 → M07 — A2-RO
-→ M08 — A3-shadow (chạy bóng)
-→ M09 — thực thi qua cổng phê duyệt
-→ M10 — tự động hóa có quản trị trong giới hạn
-→ M11 — production có quản trị
+→ M08 — A3-shadow (chạy bóng; ActionIntent/PolicyDecision không tự có authority)
+→ M09 — thực thi qua per-action human approval
+→ M10 — tự động hóa có quản trị trong CanaryGrant giới hạn
+→ M11 — production có quản trị trong finite ProductionLease
 ```
 
 ## 7. Nguyên tắc triển khai
@@ -139,14 +145,24 @@ Semantics (ngữ nghĩa) của Mission không phụ thuộc vendor/framework. Te
 Từ M02 trở đi, learner không xây các demo rời. ID tham chiếu trong artifact phải resolve được về artifact trước đó khi Mission contract yêu cầu:
 
 ```text
-HistoryRecord / DecisionPacket
-→ ActionRecord
+Observation / HistoryRecord
+→ DecisionPacket
+→ ActionRecord (human) hoặc ActionIntent (proposal)
+→ ExecutionRecord khi có machine execution
+→ EffectRef(HUMAN_ACTION | MACHINE_EXECUTION)
 → OutcomeRecord
 → EvaluationRecord
 → ImprovementProposal
 → ReviewRecord
 → automated Observation
 → grounded Advisor/Agent output
+```
+
+`OutcomeRecord` và `EvaluationRecord` dùng `EffectRef` để không trộn human `action_id` với machine `execution_id`.
+
+```text
+HUMAN_ACTION     → effect_id = ActionRecord.action_id
+MACHINE_EXECUTION → effect_id = ExecutionRecord.execution_id
 ```
 
 Schema hợp lệ nhưng tham chiếu mồ côi không đủ để claim Reality/Operated PASS.
@@ -164,6 +180,12 @@ Schema hợp lệ nhưng tham chiếu mồ côi không đủ để claim Reality
 | E6 | production loop (vòng production) qua observation window + recovery + reviewed improvement |
 
 Sample (mẫu) không thể thay E1–E6. `real` chỉ mô tả origin (nguồn gốc); không tự chứng minh source đáng tin, hiện hành, có thẩm quyền hoặc đầy đủ.
+
+```text
+readiness_target = X
+!= evidence level X achieved
+!= permission to skip Reality/Operated proof
+```
 
 ## 10. Mô hình PASS
 
