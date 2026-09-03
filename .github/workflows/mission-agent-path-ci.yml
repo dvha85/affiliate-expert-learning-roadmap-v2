@@ -80,14 +80,21 @@ jobs:
           grep -q 'DENY_OUTCOME_LINK' lab/mission-runtime/cmd/demo/m10.go
           grep -q '"reviewed_by".*"const":"human"' contracts/production-lease.schema.json
           grep -q '"decision".*"const":"APPROVE_PRODUCTION_LEASE"' contracts/production-lease-approval.schema.json
+          grep -q '"source_canary_grant_id"' contracts/production-lease-approval.schema.json
+          grep -q '"source_e5_refs"' contracts/production-lease-approval.schema.json
           grep -q '"validated_risk_classes"' contracts/production-lease-approval.schema.json
           grep -q '"control_mode"' contracts/production-ledger.schema.json
+          grep -q '"reconciliation_resolution_ids"' contracts/production-ledger.schema.json
+          grep -q '"resolved_by".*"const":"human"' contracts/production-reconciliation-resolution.schema.json
           grep -q '"execution_authorized".*"const":false' contracts/production-gate-decision.schema.json
+          grep -q 'PROMOTION_SOURCE_MISMATCH' lab/mission-runtime/cmd/demo/m11.go
+          grep -q 'PROMOTION_E5_EVIDENCE_MISSING' lab/mission-runtime/cmd/demo/m11.go
           grep -q 'PROMOTION_RISK_NOT_VALIDATED' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'TELEMETRY_INCOMPLETE' lab/mission-runtime/cmd/demo/m11.go
           grep -q 'COMPLIANCE_ALERT' lab/mission-runtime/cmd/demo/m11.go
           grep -q 'FAILURE_THRESHOLD' lab/mission-runtime/cmd/demo/m11.go
           grep -q 'OUTCOME_STALE' lab/mission-runtime/cmd/demo/m11.go
           grep -q 'STICKY_STOP' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'WAIT_LEDGER_MISSING' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'DENY_OUTCOME_LINK' lab/mission-runtime/cmd/demo/m11.go
+          grep -q 'STOP_LEDGER_MISSING' lab/mission-runtime/cmd/demo/m11.go
+          grep -q 'ResolveProductionReconciliation' lab/mission-runtime/cmd/demo/m11.go
+          grep -q 'ValidateProductionClosedCycle' lab/mission-runtime/cmd/demo/m11.go
+          grep -q 'EnforceProductionGate' lab/mission-runtime/cmd/demo/m11_gate.go
