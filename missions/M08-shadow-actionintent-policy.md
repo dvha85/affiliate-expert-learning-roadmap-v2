@@ -9,7 +9,7 @@ runtime: lab/mission-runtime/
 eval_pack: evals/M08-shadow-policy/
 ---
 
-# Mission M08 — Shadow ActionIntent + Deterministic Policy
+# Mission M08 — Shadow ActionIntent + Deterministic Policy (ActionIntent chạy bóng + chính sách tất định)
 
 ## Contract bàn giao
 
