@@ -9,6 +9,7 @@ type m08EvalCase struct {
 	PolicyVersion       string             `json:"policy_version"`
 	KnownDecisionIDs    []string           `json:"known_decision_ids"`
 	KnownEvidenceIDs    []string           `json:"known_evidence_ids"`
+	KnownProposalIDs    []string           `json:"known_proposal_ids"`
 	AllowedHosts        []string           `json:"allowed_hosts"`
 	Mutation            string             `json:"mutation"`
 	SeenMode            string             `json:"seen_mode"`
@@ -39,7 +40,7 @@ func TestM08EvalPack(t *testing.T) {
 			}
 			ctx := ShadowPolicyContext{
 				PolicyVersion: c.PolicyVersion, Now: c.Now, KnownDecisionIDs: c.KnownDecisionIDs,
-				KnownEvidenceIDs: c.KnownEvidenceIDs, AllowedHosts: c.AllowedHosts,
+				KnownEvidenceIDs: c.KnownEvidenceIDs, KnownProposalIDs: c.KnownProposalIDs, AllowedHosts: c.AllowedHosts,
 				ActionRisk: map[string]string{"PREPARE_LOCAL_DRAFT": "RISK0", "UPDATE_DRAFT": "RISK1", "PUBLISH_CONTENT": "RISK2"},
 				SeenIdempotency: seen,
 			}
@@ -61,5 +62,12 @@ func TestM08HashStableAcrossEvidenceOrder(t *testing.T) {
 	b := ComputeShadowIntentHash(base)
 	if a != b {
 		t.Fatalf("canonical hash must ignore evidence ordering: %s != %s", a, b)
+	}
+}
+
+func TestM08HashFailsClosedOnNonJSONParameter(t *testing.T) {
+	intent := ShadowActionIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e1"}, ActionType: "UPDATE_DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"bad": make(chan int)}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k", ShadowOnly: true, DryRun: true}
+	if got := ComputeShadowIntentHash(intent); got != "" {
+		t.Fatalf("non-JSON parameters must not produce an intent hash: %s", got)
 	}
 }

@@ -33,6 +33,7 @@ type ShadowPolicyContext struct {
 	Now              string            `json:"now"`
 	KnownDecisionIDs []string          `json:"known_decision_ids"`
 	KnownEvidenceIDs []string          `json:"known_evidence_ids"`
+	KnownProposalIDs []string          `json:"known_proposal_ids"`
 	AllowedHosts     []string          `json:"allowed_hosts"`
 	ActionRisk       map[string]string `json:"action_risk"`
 	SeenIdempotency  map[string]string `json:"seen_idempotency"`
@@ -78,7 +79,10 @@ func ComputeShadowIntentHash(i ShadowActionIntent) string {
 		CreatedAt: i.CreatedAt, ExpiresAt: i.ExpiresAt, CorrelationID: i.CorrelationID,
 		IdempotencyKey: i.IdempotencyKey, ShadowOnly: i.ShadowOnly, DryRun: i.DryRun,
 	}
-	raw, _ := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
 	sum := sha256.Sum256(raw)
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
@@ -129,11 +133,6 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 		(i.ProposedBy != "human" && i.ProposedBy != "agent") {
 		return decision
 	}
-	if i.ProposedBy == "agent" && strings.TrimSpace(i.ProposalRef) == "" {
-		decision.Decision = "GET_MORE_DATA"
-		decision.Reason = "MISSING_PROPOSAL_LINK"
-		return decision
-	}
 	if !i.ShadowOnly || !i.DryRun {
 		decision.Reason = "LIVE_EXECUTION_FORBIDDEN"
 		return decision
@@ -142,6 +141,13 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 		decision.Reason = "TAMPERED_INTENT"
 		return decision
 	}
+
+	risk, ok := ctx.ActionRisk[i.ActionType]
+	if !ok || (risk != "RISK0" && risk != "RISK1" && risk != "RISK2") {
+		decision.Reason = "UNKNOWN_ACTION_POLICY"
+		return decision
+	}
+	decision.RiskClass = risk
 
 	now, errNow := time.Parse(time.RFC3339, ctx.Now)
 	created, errCreated := time.Parse(time.RFC3339, i.CreatedAt)
@@ -178,17 +184,17 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 			return decision
 		}
 	}
+	if i.ProposedBy == "agent" {
+		if strings.TrimSpace(i.ProposalRef) == "" || !stringSet(ctx.KnownProposalIDs)[i.ProposalRef] {
+			decision.Decision = "GET_MORE_DATA"
+			decision.Reason = "MISSING_PROPOSAL_LINK"
+			return decision
+		}
+	}
 	if !allowedHost(i.Target, ctx.AllowedHosts) {
 		decision.Reason = "TARGET_NOT_ALLOWED"
 		return decision
 	}
-
-	risk, ok := ctx.ActionRisk[i.ActionType]
-	if !ok || (risk != "RISK0" && risk != "RISK1" && risk != "RISK2") {
-		decision.Reason = "UNKNOWN_ACTION_POLICY"
-		return decision
-	}
-	decision.RiskClass = risk
 
 	if previousHash, seen := ctx.SeenIdempotency[i.IdempotencyKey]; seen {
 		if previousHash == i.IntentHash {
@@ -226,7 +232,7 @@ func demoM08Decision() ShadowPolicyDecision {
 	})
 	return EvaluateShadowPolicy(intent, ShadowPolicyContext{
 		PolicyVersion: "m08-v1", Now: "2026-09-03T02:00:00Z",
-		KnownDecisionIDs: []string{"decision-1"}, KnownEvidenceIDs: []string{"e1"}, AllowedHosts: []string{"example.com"},
+		KnownDecisionIDs: []string{"decision-1"}, KnownEvidenceIDs: []string{"e1"}, KnownProposalIDs: []string{"proposal-1"}, AllowedHosts: []string{"example.com"},
 		ActionRisk: map[string]string{"PREPARE_LOCAL_DRAFT": "RISK0", "UPDATE_DRAFT": "RISK1", "PUBLISH_CONTENT": "RISK2"},
 		SeenIdempotency: map[string]string{},
 	})

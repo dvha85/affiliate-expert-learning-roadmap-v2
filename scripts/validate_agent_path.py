@@ -74,7 +74,7 @@ for marker in [
     "DRY_RUN_ONLY","BROKEN_LINK","REJECT_MACHINE_EXECUTION","REJECT_WRITE_REQUEST","ABSTAIN_FUTURE",
     "REJECT_AUTO_APPLY","REJECT_WRITE_METHOD","REJECT_TOOL","REJECT_UNGROUNDED","NormalizeWatchObservation",
     "ValidateEvaluationRecord","ValidateReviewRecord","TAMPERED_INTENT","EXPIRED_INTENT","IDEMPOTENCY_COLLISION",
-    "POLICY_UNAVAILABLE","execution_authorized","SHADOW_POLICY_ALLOW",
+    "POLICY_UNAVAILABLE","execution_authorized","SHADOW_POLICY_ALLOW","KnownProposalIDs","UNKNOWN_ACTION_POLICY",
 ]:
     if marker not in runtime: errors.append(f"runtime safety/integration marker missing: {marker}")
 
@@ -122,8 +122,9 @@ for marker in ["intent_hash","idempotency_key","correlation_id","shadow_only","d
 for marker in ["intent_hash","policy_version","shadow_only","execution_authorized","HUMAN_REVIEW"]:
     if marker not in policy_schema: errors.append(f"M08 PolicyDecision contract missing: {marker}")
 m08_cases = json.loads((ROOT / "evals/M08-shadow-policy/cases.json").read_text(encoding="utf-8"))
-for expected_reason in ["SHADOW_POLICY_ALLOW","TAMPERED_INTENT","EXPIRED_INTENT","MISSING_DECISION_LINK","MISSING_EVIDENCE_LINK","DUPLICATE_INTENT","IDEMPOTENCY_COLLISION","POLICY_UNAVAILABLE"]:
+for expected_reason in ["SHADOW_POLICY_ALLOW","TAMPERED_INTENT","EXPIRED_INTENT","MISSING_DECISION_LINK","MISSING_EVIDENCE_LINK","MISSING_PROPOSAL_LINK","DUPLICATE_INTENT","IDEMPOTENCY_COLLISION","POLICY_UNAVAILABLE","UNKNOWN_ACTION_POLICY"]:
     if not any(c.get("expected_reason") == expected_reason for c in m08_cases): errors.append(f"M08 eval missing failure/boundary case: {expected_reason}")
+if not any(c.get("case_id") == "M08-E14-agent-proposal-ref-must-resolve" for c in m08_cases): errors.append("M08 eval must reject orphan Agent proposal_ref")
 
 if errors:
     print("AGENT PATH VALIDATION FAILED")
