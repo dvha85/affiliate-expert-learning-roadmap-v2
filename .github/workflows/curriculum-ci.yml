@@ -19,6 +19,7 @@ jobs:
           python-version: "3.12"
       - run: python scripts/validate_repo.py
       - run: python scripts/validate_artifact_spine.py
+      - run: python scripts/validate_continuity.py
       - run: python scripts/validate_language_policy.py
 
   evidence-and-safety:
@@ -53,6 +54,7 @@ jobs:
       - run: python -m compileall -q scripts
       - run: python scripts/validate_repo.py
       - run: python scripts/validate_artifact_spine.py
+      - run: python scripts/validate_continuity.py
       - run: python scripts/validate_language_policy.py
 
   deterministic-runtime:
