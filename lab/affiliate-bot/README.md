@@ -1,36 +1,62 @@
-# Affiliate Bot v0.1 — M01 deterministic learner runtime
+# Affiliate Bot — deterministic learner runtime
 
-Workspace duy nhất của **M01 — Smallest Deterministic Bot v0.1**.
+Workspace duy nhất cho **M01 — Smallest Deterministic Bot v0.1** và **M02 — Trustworthy History + Replay v0.2**.
 
-## Chạy
+## M01 baseline
 
 ```bash
 cd lab/affiliate-bot
-go test ./...
-go vet ./...
 go run ./cmd/bot
+go test ./...
 ```
-
-`go test` đọc trực tiếp executable eval pack tại `../../evals/M01-deterministic-bot/cases.json`.
 
 Fixture mặc định là `synthetic`; nó chỉ chứng minh behavior kỹ thuật.
 
-## Contract
-
 ```text
-canonical observations + formula_version
+known observations
 → deterministic formula + stable tie-break
-→ HUMAN_REVIEW > GET_MORE_DATA > RANK_SCENARIO
-→ reason + missing/invalid evidence
+→ RANK_SCENARIO | GET_MORE_DATA | HUMAN_REVIEW
 → NO external action
 ```
 
-Baseline cố ý yếu: `price × commission_rate`. Nó chưa xét conversion potential, audience fit, refund/cancel risk, competition, compliance và nhiều yếu tố business khác.
+Baseline cố ý yếu: `price × commission_rate`.
 
 ```text
-0 != missing
 real evidence != RECOMMEND
 RANK_SCENARIO != Approval != Execution
 ```
 
-M00 evidence thật cung cấp reality boundary; M01 không fabricate field và không biến provenance thật thành recommendation.
+## M02 history + replay
+
+Capture một immutable decision snapshot:
+
+```bash
+go run ./cmd/bot history capture data/history.jsonl data/sample-observations.json demo-1 2026-09-01T10:00:00Z 2026-09-03T10:00:00Z
+```
+
+Dừng process, chạy lại rồi query:
+
+```bash
+go run ./cmd/bot history list data/history.jsonl
+```
+
+Replay bằng `formula_version` đã record:
+
+```bash
+go run ./cmd/bot history replay data/history.jsonl
+```
+
+Replay states:
+
+```text
+MATCH        — same version + same input integrity + same result
+DRIFT        — same supported version nhưng result khác record
+UNREPLAYABLE — formula version không được registry hiện tại hỗ trợ
+```
+
+`input_hash` bảo vệ integrity của canonical input snapshot; nó không chứng minh input là market truth.
+
+```text
+replay MATCH != RECOMMEND
+history exists != execution permission
+```

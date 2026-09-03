@@ -7,7 +7,7 @@ Learner order được quyết định bởi `CURRICULUM.md` và Mission spine n
 | O00 | Safe synthetic walkthrough, không PASS | no side effect | orientation |
 | M00 | First Real Evidence Packet + Human DecisionPacket | human/read-only | ready |
 | M01 | Smallest Deterministic Bot v0.1 | A0 deterministic | ready |
-| M02 | Trustworthy History + Replay v0.2 | A0 deterministic | planned |
+| M02 | Trustworthy History + Replay v0.2 | A0 deterministic | ready |
 | M03 | First Tracked Human Action + Outcome context | human executes | planned |
 | M04 | Grounded AI Advisor v0.4 | A1 advisory | planned |
 | M05 | First Reviewed Improvement | A1 propose only | planned |
