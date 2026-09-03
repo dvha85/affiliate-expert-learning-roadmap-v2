@@ -11,21 +11,21 @@ import (
 )
 
 type ShadowActionIntent struct {
-	IntentID       string         `json:"intent_id"`
-	DecisionID     string         `json:"decision_id"`
-	EvidenceIDs    []string       `json:"evidence_ids"`
-	ActionType     string         `json:"action_type"`
-	Target         string         `json:"target"`
-	Parameters     map[string]any `json:"parameters"`
-	ProposedBy     string         `json:"proposed_by"`
-	ProposalRef    string         `json:"proposal_ref,omitempty"`
-	CreatedAt      string         `json:"created_at"`
-	ExpiresAt      string         `json:"expires_at"`
-	CorrelationID  string         `json:"correlation_id"`
-	IdempotencyKey string         `json:"idempotency_key"`
-	IntentHash     string         `json:"intent_hash"`
-	ShadowOnly     bool           `json:"shadow_only"`
-	DryRun         bool           `json:"dry_run"`
+	IntentID            string         `json:"intent_id"`
+	DecisionID          string         `json:"decision_id"`
+	EvidenceIDs         []string       `json:"evidence_ids"`
+	ActionType          string         `json:"action_type"`
+	Target              string         `json:"target"`
+	Parameters          map[string]any `json:"parameters"`
+	ProposedBy          string         `json:"proposed_by"`
+	ProposalRef         string         `json:"proposal_ref,omitempty"`
+	CreatedAt           string         `json:"created_at"`
+	ExpiresAt           string         `json:"expires_at"`
+	CorrelationID       string         `json:"correlation_id"`
+	IdempotencyKey      string         `json:"idempotency_key"`
+	IntentHash          string         `json:"intent_hash"`
+	IntentMode          string         `json:"intent_mode"`
+	ExecutionAuthorized bool           `json:"execution_authorized"`
 }
 
 type ShadowPolicyContext struct {
@@ -40,33 +40,33 @@ type ShadowPolicyContext struct {
 }
 
 type ShadowPolicyDecision struct {
-	PolicyVersion       string `json:"policy_version"`
-	IntentID            string `json:"intent_id"`
-	IntentHash          string `json:"intent_hash"`
-	Decision            string `json:"decision"`
-	RiskClass           string `json:"risk_class"`
-	Reason              string `json:"reason"`
-	ApprovalRequired    bool   `json:"approval_required"`
-	ShadowOnly          bool   `json:"shadow_only"`
-	ExecutionAuthorized bool   `json:"execution_authorized"`
-	PolicyCheckedAt     string `json:"policy_checked_at"`
+	PolicyVersion        string `json:"policy_version"`
+	IntentID             string `json:"intent_id"`
+	IntentHash           string `json:"intent_hash"`
+	Decision             string `json:"decision"`
+	RiskClass            string `json:"risk_class"`
+	Reason               string `json:"reason"`
+	PolicyReviewRequired bool   `json:"policy_review_required"`
+	PolicyMode           string `json:"policy_mode"`
+	ExecutionAuthorized  bool   `json:"execution_authorized"`
+	PolicyCheckedAt      string `json:"policy_checked_at"`
 }
 
 type intentHashPayload struct {
-	IntentID       string         `json:"intent_id"`
-	DecisionID     string         `json:"decision_id"`
-	EvidenceIDs    []string       `json:"evidence_ids"`
-	ActionType     string         `json:"action_type"`
-	Target         string         `json:"target"`
-	Parameters     map[string]any `json:"parameters"`
-	ProposedBy     string         `json:"proposed_by"`
-	ProposalRef    string         `json:"proposal_ref,omitempty"`
-	CreatedAt      string         `json:"created_at"`
-	ExpiresAt      string         `json:"expires_at"`
-	CorrelationID  string         `json:"correlation_id"`
-	IdempotencyKey string         `json:"idempotency_key"`
-	ShadowOnly     bool           `json:"shadow_only"`
-	DryRun         bool           `json:"dry_run"`
+	IntentID            string         `json:"intent_id"`
+	DecisionID          string         `json:"decision_id"`
+	EvidenceIDs         []string       `json:"evidence_ids"`
+	ActionType          string         `json:"action_type"`
+	Target              string         `json:"target"`
+	Parameters          map[string]any `json:"parameters"`
+	ProposedBy          string         `json:"proposed_by"`
+	ProposalRef         string         `json:"proposal_ref,omitempty"`
+	CreatedAt           string         `json:"created_at"`
+	ExpiresAt           string         `json:"expires_at"`
+	CorrelationID       string         `json:"correlation_id"`
+	IdempotencyKey      string         `json:"idempotency_key"`
+	IntentMode          string         `json:"intent_mode"`
+	ExecutionAuthorized bool           `json:"execution_authorized"`
 }
 
 func ComputeShadowIntentHash(i ShadowActionIntent) string {
@@ -77,7 +77,7 @@ func ComputeShadowIntentHash(i ShadowActionIntent) string {
 		ActionType: strings.ToUpper(strings.TrimSpace(i.ActionType)), Target: i.Target,
 		Parameters: i.Parameters, ProposedBy: i.ProposedBy, ProposalRef: i.ProposalRef,
 		CreatedAt: i.CreatedAt, ExpiresAt: i.ExpiresAt, CorrelationID: i.CorrelationID,
-		IdempotencyKey: i.IdempotencyKey, ShadowOnly: i.ShadowOnly, DryRun: i.DryRun,
+		IdempotencyKey: i.IdempotencyKey, IntentMode: i.IntentMode, ExecutionAuthorized: i.ExecutionAuthorized,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -88,8 +88,8 @@ func ComputeShadowIntentHash(i ShadowActionIntent) string {
 }
 
 func SealShadowActionIntent(i ShadowActionIntent) ShadowActionIntent {
-	i.ShadowOnly = true
-	i.DryRun = true
+	i.IntentMode = "PROPOSAL_ONLY"
+	i.ExecutionAuthorized = false
 	i.ActionType = strings.ToUpper(strings.TrimSpace(i.ActionType))
 	i.IntentHash = ComputeShadowIntentHash(i)
 	return i
@@ -120,7 +120,7 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 	decision := ShadowPolicyDecision{
 		PolicyVersion: ctx.PolicyVersion, IntentID: i.IntentID, IntentHash: i.IntentHash,
 		Decision: "DENY", RiskClass: "RISK2", Reason: "INVALID_INTENT",
-		ApprovalRequired: false, ShadowOnly: true, ExecutionAuthorized: false, PolicyCheckedAt: ctx.Now,
+		PolicyReviewRequired: false, PolicyMode: "NON_AUTHORIZING", ExecutionAuthorized: false, PolicyCheckedAt: ctx.Now,
 	}
 
 	if strings.TrimSpace(ctx.PolicyVersion) == "" {
@@ -133,8 +133,8 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 		(i.ProposedBy != "human" && i.ProposedBy != "agent") {
 		return decision
 	}
-	if !i.ShadowOnly || !i.DryRun {
-		decision.Reason = "LIVE_EXECUTION_FORBIDDEN"
+	if i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
+		decision.Reason = "INTENT_AUTHORITY_FORBIDDEN"
 		return decision
 	}
 	if i.IntentHash == "" || i.IntentHash != ComputeShadowIntentHash(i) {
@@ -213,11 +213,11 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 	case "RISK1":
 		decision.Decision = "HUMAN_REVIEW"
 		decision.Reason = "RISK1_REQUIRES_REVIEW"
-		decision.ApprovalRequired = true
+		decision.PolicyReviewRequired = true
 	case "RISK2":
 		decision.Decision = "HUMAN_REVIEW"
 		decision.Reason = "RISK2_REQUIRES_REVIEW"
-		decision.ApprovalRequired = true
+		decision.PolicyReviewRequired = true
 	}
 	return decision
 }
