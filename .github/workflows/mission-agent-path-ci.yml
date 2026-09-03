@@ -19,6 +19,7 @@ jobs:
       - name: Validate learner-operable mission path
         run: |
           python scripts/validate_agent_path.py
+          python scripts/validate_semantic_contracts.py
           python scripts/validate_m11.py
       - name: Validate Vietnamese-first learner language
         run: python scripts/validate_language_policy.py
@@ -46,6 +47,7 @@ jobs:
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
           go run ./cmd/demo M08 | grep -q 'SHADOW_POLICY_ALLOW'
+          go run ./cmd/demo M08 | grep -q '"policy_mode": "NON_AUTHORIZING"'
           go run ./cmd/demo M08 | grep -q '"execution_authorized": false'
           go run ./cmd/demo M09 | grep -q 'HUMAN_APPROVAL_REQUIRED'
           go run ./cmd/demo M09 | grep -q '"execution_mode": "APPROVED_LIVE"'
@@ -66,11 +68,18 @@ jobs:
       - name: Guard M03-M11 authority ceilings and linkage
         run: |
           grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
+          grep -q 'MACHINE_EXECUTION' contracts/effect-ref.schema.json
+          grep -q '"effect_ref"' contracts/outcome-record.schema.json
+          grep -q '"effect_ref"' contracts/evaluation-record.schema.json
+          grep -q 'PROPOSAL_ONLY' contracts/action-intent.schema.json
+          grep -q 'NON_AUTHORIZING' contracts/policy-decision.schema.json
           grep -q '"write_tool_requested"' contracts/advisor-output.schema.json
           grep -q '"auto_apply".*"const":false' contracts/improvement-proposal.schema.json
           grep -q '"reviewed_by".*"const":"human"' contracts/review-record.schema.json
           grep -q '"read_only".*"const":true' contracts/tool-registry.schema.json
           grep -q '"execution_authorized".*"const": false' contracts/policy-decision.schema.json
+          grep -q '"cost_bound_hash"' contracts/trusted-cost-bound.schema.json
+          test ! -e contracts/canary-cost-bound.schema.json
           grep -q 'APPROVED_LIVE' contracts/execution-authorization.schema.json
           grep -q 'GOVERNED_CANARY' contracts/execution-authorization.schema.json
           grep -q 'GOVERNED_PRODUCTION' contracts/execution-authorization.schema.json
@@ -80,6 +89,7 @@ jobs:
           grep -q 'DENY_OUTCOME_LINK' lab/mission-runtime/cmd/demo/m10.go
           grep -q '"reviewed_by".*"const":"human"' contracts/production-lease.schema.json
           grep -q '"decision".*"const":"APPROVE_PRODUCTION_LEASE"' contracts/production-lease-approval.schema.json
+          grep -q '"lease_hash"' contracts/production-activation-record.schema.json
           grep -q '"source_canary_grant_id"' contracts/production-lease-approval.schema.json
           grep -q '"source_e5_refs"' contracts/production-lease-approval.schema.json
           grep -q '"validated_risk_classes"' contracts/production-lease-approval.schema.json
