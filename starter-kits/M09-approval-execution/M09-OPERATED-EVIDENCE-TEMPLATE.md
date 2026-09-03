@@ -8,7 +8,7 @@
 - đường dẫn/phiên bản trạng thái đã lưu:
 - kết quả revalidation khi restart/resume:
 - ca kiểm kill switch:
-- ca mismatch hash/policy:
+- ca kiểm mismatch hash/policy:
 - ca executor/target không hợp lệ:
 - ca duplicate/idempotency:
 - ExecutionRecord + tham chiếu external/local sandbox:
