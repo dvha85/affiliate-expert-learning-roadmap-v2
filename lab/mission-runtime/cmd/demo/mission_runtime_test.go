@@ -45,7 +45,8 @@ func TestM06EvalPack(t *testing.T) {
 }
 func TestM06NormalizesCanonicalObservation(t *testing.T) {
 	r:=WatchRequest{Method:"GET",URL:"https://example.com/offer",AllowHosts:[]string{"example.com"},ObservedAt:"2026-09-03T01:00:00Z",CorrelationID:"c1",Body:"price=100"}
-	o,state:=NormalizeWatchObservation(r,"product-a"); if state!="NEW" { t.Fatalf("expected NEW got %s",state) }; if o.SubjectID=="" || o.SourceURL=="" || o.EvidenceKind!="real" || o.ClaimKind!="fact" || o.Limitation=="" || o.ContentHash=="" { t.Fatalf("not canonical enough: %+v",o) }
+	o,state:=NormalizeWatchObservation(r,"product-a"); if state!="NEW" { t.Fatalf("expected NEW got %s",state) }; if o.ObservationID=="" || o.SubjectID=="" || o.SourceURL=="" || o.EvidenceKind!="real" || o.ClaimKind!="fact" || o.Limitation=="" || o.ContentHash=="" { t.Fatalf("not canonical enough: %+v",o) }
+	second,_:=NormalizeWatchObservation(r,"product-a"); if second.ObservationID!=o.ObservationID { t.Fatalf("same observed content/correlation must keep deterministic observation id: %s != %s",o.ObservationID,second.ObservationID) }
 }
 
 func TestM07EvalPack(t *testing.T) {
