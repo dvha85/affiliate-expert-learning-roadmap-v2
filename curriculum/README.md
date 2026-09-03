@@ -28,6 +28,27 @@ M01–M11 hiện **authoring ready và learner-operable (sẵn sàng về nội 
 TRY → OBSERVE GAP → PULL SMALL KNOWLEDGE → BUILD/APPLY → TEST FAILURE CASE → SAVE EVIDENCE → EXPLAIN LIMITS → NEXT MEASUREMENT
 ```
 
+## Continuity Gate — một Bot, không phải chuỗi demo
+
+Từ M03 tới M11, checkpoint riêng của Mission **luôn đi kèm** `starter-kits/CONTINUITY-CHECKPOINT.md`.
+
+```text
+lab/affiliate-bot
+= learner baseline/continuity anchor
+
+lab/mission-runtime
+= conformance oracle/harness
+!= Bot thứ hai
+
+lab/n8n
+= adapter/orchestration reference
+!= canonical state owner
+```
+
+Reality/Operated PASS của M03–M11 phải ghi Integration Evidence: learner Bot version/commit, previous artifact refs, capability entrypoint, canonical contracts, conformance cases và authority ceiling. Chạy demo ở `lab/mission-runtime` một mình chỉ tạo Capability proof.
+
+Chi tiết: `docs/architecture/LEARNER-BOT-CONTINUITY.md`.
+
 ## Trục Mission
 
 ```text
@@ -42,7 +63,7 @@ Authority tăng dần; capability Mission sau không được vượt evidence/s
 M03: external action đầu tiên do human_only
 M04: AI advisory; không write tool
 M05: proposal + human review; không auto-apply
-M06: automatic read-only watcher
+M06: automatic read-only watcher; watcher cache != canonical history
 M07: read-only Agent; tool output untrusted
 M08: shadow ActionIntent + policy; ALLOW != execution permission
 M09: mỗi machine execution cần human ApprovalRecord

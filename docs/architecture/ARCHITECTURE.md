@@ -45,6 +45,14 @@ Sở hữu canonical evidence/history, deterministic decision/policy/risk, appro
 
 Sở hữu trigger/schedule/integration/retry/routing. Orchestrator không tự trở thành policy/approval/grant/lease authority và không tự clear STOP.
 
+Cache phục vụ orchestration/change detection vẫn chỉ là cache:
+
+```text
+n8n static data / watcher cache
+!= canonical history
+!= canonical approval/budget state
+```
+
 ### AgentRuntime
 
 Sở hữu unstructured research/reasoning/proposal trong permission ceiling. Agent không sở hữu truth, trusted cost/health, approval, CanaryGrant, ProductionLease hoặc authorization.
@@ -69,12 +77,33 @@ ImprovementProposal.auto_apply = false
 Automation may narrow/stop authority; it may not widen its own authority
 ```
 
-## 4. Implementation flexibility
+## 4. Learner system continuity
+
+Reference code được chia theo mục đích, nhưng learner system không được chia thành các demo độc lập:
+
+```text
+lab/affiliate-bot
+= M01/M02 reference baseline + continuity anchor
+
+lab/mission-runtime
+= O00/M03-M11 conformance oracle
+!= second Bot
+
+lab/n8n
+= adapter/orchestration reference
+!= canonical state owner
+```
+
+Từ M03 tới M11, Reality/Operated PASS phải có Integration Evidence chứng minh capability mới đã gắn vào cùng learner Bot/workspace, exact previous artifact refs resolve được và conformance failure cases đã được áp dụng.
+
+Canonical rule và mission matrix nằm ở `docs/architecture/LEARNER-BOT-CONTINUITY.md`; checklist dùng `starter-kits/CONTINUITY-CHECKPOINT.md`.
+
+## 5. Implementation flexibility
 
 Go là deterministic reference khi code giảm ambiguity. n8n có thể orchestration. OPA chỉ adopt khi policy complexity/parity gate biện minh. Temporal chỉ khi durability pain thật vượt persisted-state baseline. OpenTelemetry hỗ trợ telemetry/correlation nhưng không thay canonical audit/health authority.
 
-`lab/mission-runtime` là conformance/integration harness, không phải Bot thứ hai.
+Không copy M03–M11 reference runtime vào `lab/affiliate-bot` chỉ để tạo cảm giác continuity; duplication implementation sẽ tạo parity debt. Learner phải tích hợp capability vào system của mình còn `lab/mission-runtime` giữ vai trò test oracle độc lập.
 
-## 5. External action boundary
+## 6. External action boundary
 
 M03 human action → M08 shadow intent → M09 per-action approved execution → M10 governed canary → M11 finite governed production. `RISK2` không được auto ở M10/M11. Promotion, renewal, scope/budget/risk widening và recovery sau sticky STOP đều cần human governance path.

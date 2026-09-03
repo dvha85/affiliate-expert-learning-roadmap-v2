@@ -18,11 +18,13 @@ func EvaluateWatchRequest(r WatchRequest) string {
 	current:=contentHash(r.Body); if r.PreviousHash=="" { return "NEW" }; if r.PreviousHash==current { return "UNCHANGED" }; return "CHANGED"
 }
 
-type CanonicalObservation struct { SubjectID string `json:"subject_id"`; SourceURL string `json:"source_url"`; ObservedAt string `json:"observed_at"`; AccessMethod string `json:"access_method"`; EvidenceKind string `json:"evidence_kind"`; ClaimKind string `json:"claim_kind"`; State string `json:"state"`; Limitation string `json:"limitation"`; CorrelationID string `json:"correlation_id"`; ContentHash string `json:"content_hash"` }
+type CanonicalObservation struct { ObservationID string `json:"observation_id"`; SubjectID string `json:"subject_id"`; SourceURL string `json:"source_url"`; ObservedAt string `json:"observed_at"`; AccessMethod string `json:"access_method"`; EvidenceKind string `json:"evidence_kind"`; ClaimKind string `json:"claim_kind"`; State string `json:"state"`; Limitation string `json:"limitation"`; CorrelationID string `json:"correlation_id"`; ContentHash string `json:"content_hash"` }
 func NormalizeWatchObservation(r WatchRequest, subjectID string) (CanonicalObservation,string) {
 	state:=EvaluateWatchRequest(r); if state=="REJECT_WRITE_METHOD" || state=="REJECT_SOURCE" || state==missionInvalid { return CanonicalObservation{},state }
 	if strings.TrimSpace(subjectID)=="" { return CanonicalObservation{},missionInvalid }
-	return CanonicalObservation{SubjectID:subjectID,SourceURL:r.URL,ObservedAt:r.ObservedAt,AccessMethod:strings.ToUpper(r.Method),EvidenceKind:"real",ClaimKind:"fact",State:"observed",Limitation:"public read-only source; content hash detects change, not business truth",CorrelationID:r.CorrelationID,ContentHash:contentHash(r.Body)},state
+	hash:=contentHash(r.Body)
+	observationID:="obs-"+subjectID+"-"+r.CorrelationID+"-"+hash[:12]
+	return CanonicalObservation{ObservationID:observationID,SubjectID:subjectID,SourceURL:r.URL,ObservedAt:r.ObservedAt,AccessMethod:strings.ToUpper(r.Method),EvidenceKind:"real",ClaimKind:"fact",State:"observed",Limitation:"public read-only source; content hash detects change, not business truth",CorrelationID:r.CorrelationID,ContentHash:hash},state
 }
 
 type ToolSpec struct { Name string `json:"name"`; ReadOnly bool `json:"read_only"`; AllowedMethods []string `json:"allowed_methods"`; AllowedHosts []string `json:"allowed_hosts"` }
