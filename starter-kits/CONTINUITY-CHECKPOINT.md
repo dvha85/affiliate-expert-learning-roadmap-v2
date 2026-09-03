@@ -1,4 +1,4 @@
-# Continuity Checkpoint — M03→M11
+# Continuity Checkpoint — cổng kiểm tra tính liên tục M03→M11
 
 Checklist này áp dụng **bổ sung** cho checkpoint riêng của từng Mission từ M03 tới M11.
 
