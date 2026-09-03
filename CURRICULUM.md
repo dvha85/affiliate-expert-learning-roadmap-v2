@@ -48,13 +48,13 @@ REALITY-FIRST != PUBLISH-FIRST
 
 ## 3. Trục Mission chính
 
-`Bằng chứng tối thiểu` là bằng chứng Mission hiện tại phải có. `Readiness target` (mục tiêu sẵn sàng) chỉ nói Mission phải chuẩn bị capability/contract cho mức bằng chứng sau; **readiness không phải evidence đã đạt**.
+`Bằng chứng tối thiểu` là bằng chứng Mission hiện tại phải có. `Readiness target` (mục tiêu sẵn sàng) chỉ nói Mission phải chuẩn bị capability/contract cho mức bằng chứng sau; **readiness không phải evidence đã đạt**. Với M01, E0 chứng minh capability; Reality phải dùng lại E1 context thật từ M00 và không biến fixture thành E1.
 
 | Mission | Kết quả bàn giao | Bằng chứng tối thiểu | Readiness target | Trần quyền hạn |
 |---|---|---|---|---|
 | O00 | Safe synthetic walkthrough (mô phỏng tổng thể an toàn), không PASS | E0 | — | không side effect |
 | M00 | First Real Evidence Packet (gói bằng chứng thật đầu tiên) + Human DecisionPacket (gói quyết định do người lập) | E1 | — | người/read-only |
-| M01 | Smallest Deterministic Bot v0.1 (Bot tất định nhỏ nhất) | E0 + hỗ trợ E1 | — | A0 tất định, không hành động |
+| M01 | Smallest Deterministic Bot v0.1 (Bot tất định nhỏ nhất) | E0; Reality dùng E1 context từ M00 | — | A0 tất định, không hành động |
 | M02 | Trustworthy History + Replay v0.2 (lịch sử đáng tin + phát lại) | E1 | E3 | A0 tất định |
 | M03 | First Tracked Human Action + Outcome context (hành động thật đầu tiên do người làm + ngữ cảnh kết quả) | E2→E3 | — | người thực thi |
 | M04 | Grounded AI Advisor v0.4 (AI tư vấn dựa trên bằng chứng) | E3 | — | A1 tư vấn, không tool ghi |
