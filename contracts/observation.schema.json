@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "observation.schema.json",
+  "title": "Observation",
+  "type": "object",
+  "required": ["subject_id", "source_url", "observed_at", "access_method", "evidence_kind", "claim_kind", "limitation"],
+  "properties": {
+    "subject_id": {"type": "string", "minLength": 1},
+    "source_url": {"type": "string", "format": "uri"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "access_method": {"type": "string", "minLength": 1},
+    "evidence_kind": {"enum": ["real", "synthetic"]},
+    "use_context": {"enum": ["test", "replay"]},
+    "claim_kind": {"enum": ["fact", "estimate", "assumption", "unknown"]},
+    "value": {},
+    "state": {"enum": ["observed", "missing", "pending", "not_yet_observable", "inconclusive"]},
+    "limitation": {"type": "string"}
+  },
+  "additionalProperties": true
+}
