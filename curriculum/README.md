@@ -8,10 +8,11 @@
 2. `M00.1 → M00.2 → M00.3`.
 3. Hoàn thành evidence/artifact của M00 trước khi sang M01.
 4. Khi M00 PASS: `M01.1 → M01.2 → M01.3 → M01.4`.
+5. Khi M01 PASS: `M02.1 → M02.2 → M02.3 → M02.4`.
 
-M01 đã **authoring ready**, nhưng điều này không bỏ qua M00 learner gate.
+M01 và M02 đã **authoring ready**, nhưng trạng thái này không bỏ qua learner gate của Mission trước. Learner hiện tại vẫn học theo progress evidence thực tế, không theo độ xa mà repo đã author.
 
-M02 đang được author theo path dự kiến `M02.1 → M02.2 → M02.3 → M02.4`, nhưng vẫn là **planned** cho tới khi lesson + starter + executable eval/runtime + CI gate cùng PASS. Khi M02 chuyển `ready`, learner chỉ được vào M02 sau M01 PASS.
+M02 `ready` chỉ được khôi phục sau corrective planned gate có executable eval/runtime PASS; điều này không tạo learner M01/M02 PASS tự động.
 
 ## Learner loop
 
