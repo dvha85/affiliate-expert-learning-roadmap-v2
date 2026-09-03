@@ -1,0 +1,78 @@
+[
+  {
+    "case_id": "M01-E01-synthetic-rank",
+    "purpose_vi": "Fixture hợp lệ phải tạo ranking deterministic.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.08,"currency":"USD","evidence_kind":"synthetic"},
+      {"product_id":"b","product_name":"B","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"synthetic"}
+    ],
+    "expected_state": "RANK_SCENARIO",
+    "expected_ranked_product_ids": ["b", "a"]
+  },
+  {
+    "case_id": "M01-E02-real-is-not-recommend",
+    "purpose_vi": "Evidence thật không tự tạo quyền khuyến nghị/hành động.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"real"}
+    ],
+    "expected_state": "RANK_SCENARIO",
+    "expected_ranked_product_ids": ["a"]
+  },
+  {
+    "case_id": "M01-E03-missing-price",
+    "purpose_vi": "null/missing price phải yêu cầu thêm dữ liệu.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":null,"commission_rate":0.10,"currency":"USD","evidence_kind":"synthetic"}
+    ],
+    "expected_state": "GET_MORE_DATA",
+    "expected_ranked_product_ids": []
+  },
+  {
+    "case_id": "M01-E04-zero-not-missing",
+    "purpose_vi": "Giá trị 0 quan sát được không được đổi thành missing.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":0,"commission_rate":0,"currency":"USD","evidence_kind":"synthetic"}
+    ],
+    "expected_state": "RANK_SCENARIO",
+    "expected_ranked_product_ids": ["a"]
+  },
+  {
+    "case_id": "M01-E05-mixed-origin",
+    "purpose_vi": "Trộn real và synthetic trong cùng ranking context cần human review.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"real"},
+      {"product_id":"b","product_name":"B","price":100,"commission_rate":0.08,"currency":"USD","evidence_kind":"synthetic"}
+    ],
+    "expected_state": "HUMAN_REVIEW",
+    "expected_ranked_product_ids": ["a", "b"]
+  },
+  {
+    "case_id": "M01-E06-currency-conflict",
+    "purpose_vi": "Hai currency khác nhau không được so sánh score trực tiếp.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"synthetic"},
+      {"product_id":"b","product_name":"B","price":100,"commission_rate":0.10,"currency":"EUR","evidence_kind":"synthetic"}
+    ],
+    "expected_state": "HUMAN_REVIEW",
+    "expected_ranked_product_ids": ["a", "b"]
+  },
+  {
+    "case_id": "M01-E07-conflict-dominates-missing",
+    "purpose_vi": "Identity conflict phải giữ HUMAN_REVIEW ngay cả khi đồng thời thiếu field.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"real"},
+      {"product_id":"a","product_name":"A duplicate","price":null,"commission_rate":0.10,"currency":"USD","evidence_kind":"real"}
+    ],
+    "expected_state": "HUMAN_REVIEW",
+    "expected_ranked_product_ids": ["a"]
+  },
+  {
+    "case_id": "M01-E08-invalid-evidence-kind",
+    "purpose_vi": "test/replay không phải evidence origin và không được dùng thay real/synthetic.",
+    "observations": [
+      {"product_id":"a","product_name":"A","price":100,"commission_rate":0.10,"currency":"USD","evidence_kind":"replay"}
+    ],
+    "expected_state": "GET_MORE_DATA",
+    "expected_ranked_product_ids": ["a"]
+  }
+]

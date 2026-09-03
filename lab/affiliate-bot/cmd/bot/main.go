@@ -1,107 +1,183 @@
 package main
 
 import (
-    "encoding/json"
-    "fmt"
-    "os"
-    "sort"
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+)
+
+const (
+	formulaVersion   = "commission-per-order/v1"
+	stateRank        = "RANK_SCENARIO"
+	stateGetMoreData = "GET_MORE_DATA"
+	stateHumanReview = "HUMAN_REVIEW"
 )
 
 type Observation struct {
-    ProductID      string   `json:"product_id"`
-    ProductName    string   `json:"product_name"`
-    Price          *float64 `json:"price"`
-    CommissionRate *float64 `json:"commission_rate"`
-    Currency       string   `json:"currency"`
-    EvidenceKind   string   `json:"evidence_kind"`
+	ProductID      string   `json:"product_id"`
+	ProductName    string   `json:"product_name"`
+	Price          *float64 `json:"price"`
+	CommissionRate *float64 `json:"commission_rate"`
+	Currency       string   `json:"currency"`
+	EvidenceKind   string   `json:"evidence_kind"`
 }
 
 type Ranked struct {
-    ProductName string
-    Score       float64
+	ProductID   string  `json:"product_id"`
+	ProductName string  `json:"product_name"`
+	Score       float64 `json:"score"`
 }
 
 type Result struct {
-    State           string
-    Ranked          []Ranked
-    MissingEvidence []string
-    EvidenceMode    string
+	FormulaVersion  string   `json:"formula_version"`
+	State           string   `json:"state"`
+	Ranked          []Ranked `json:"ranked"`
+	MissingEvidence []string `json:"missing_evidence"`
+	Reasons         []string `json:"reasons"`
+	EvidenceMode    string   `json:"evidence_mode"`
 }
 
 func evaluate(records []Observation) Result {
-    result := Result{State: "RANK_SCENARIO"}
-    if len(records) == 0 {
-        result.State = "GET_MORE_DATA"
-        result.MissingEvidence = append(result.MissingEvidence, "không có observation")
-        return result
-    }
+	result := Result{FormulaVersion: formulaVersion, State: stateRank, EvidenceMode: "unknown"}
+	if len(records) == 0 {
+		result.State = stateGetMoreData
+		result.MissingEvidence = append(result.MissingEvidence, "không có observation")
+		result.Reasons = append(result.Reasons, "không thể xếp hạng khi chưa có input")
+		return result
+	}
 
-    kinds := map[string]bool{}
-    currencies := map[string]bool{}
-    seen := map[string]bool{}
+	kinds := map[string]bool{}
+	currencies := map[string]bool{}
+	seen := map[string]bool{}
+	needsData := false
+	needsReview := false
 
-    for _, r := range records {
-        if r.ProductID == "" || r.ProductName == "" {
-            result.State = "GET_MORE_DATA"
-            result.MissingEvidence = append(result.MissingEvidence, "thiếu identity")
-            continue
-        }
-        if seen[r.ProductID] {
-            result.State = "HUMAN_REVIEW"
-        }
-        seen[r.ProductID] = true
-        kinds[r.EvidenceKind] = true
-        currencies[r.Currency] = true
-        if r.Price == nil || r.CommissionRate == nil {
-            result.State = "GET_MORE_DATA"
-            result.MissingEvidence = append(result.MissingEvidence, r.ProductID+": thiếu price/commission_rate")
-            continue
-        }
-        result.Ranked = append(result.Ranked, Ranked{ProductName: r.ProductName, Score: *r.Price * *r.CommissionRate})
-    }
+	for _, r := range records {
+		id := strings.TrimSpace(r.ProductID)
+		name := strings.TrimSpace(r.ProductName)
+		currency := strings.TrimSpace(r.Currency)
+		kind := strings.TrimSpace(r.EvidenceKind)
 
-    if len(kinds) == 1 {
-        for k := range kinds {
-            result.EvidenceMode = k
-        }
-    } else {
-        result.EvidenceMode = "mixed"
-        result.State = "HUMAN_REVIEW"
-    }
-    if len(currencies) > 1 {
-        result.State = "HUMAN_REVIEW"
-    }
+		if id == "" || name == "" {
+			needsData = true
+			result.MissingEvidence = append(result.MissingEvidence, "thiếu product_id hoặc product_name")
+			continue
+		}
+		if seen[id] {
+			needsReview = true
+			result.Reasons = append(result.Reasons, id+": product_id bị lặp; cần kiểm tra identity")
+		}
+		seen[id] = true
 
-    sort.SliceStable(result.Ranked, func(i, j int) bool {
-        if result.Ranked[i].Score == result.Ranked[j].Score {
-            return result.Ranked[i].ProductName < result.Ranked[j].ProductName
-        }
-        return result.Ranked[i].Score > result.Ranked[j].Score
-    })
-    return result
+		switch kind {
+		case "real", "synthetic":
+			kinds[kind] = true
+		default:
+			needsData = true
+			result.MissingEvidence = append(result.MissingEvidence, id+": evidence_kind phải là real hoặc synthetic")
+		}
+
+		if currency == "" {
+			needsData = true
+			result.MissingEvidence = append(result.MissingEvidence, id+": thiếu currency")
+		} else {
+			currencies[currency] = true
+		}
+
+		validNumeric := true
+		if r.Price == nil {
+			needsData = true
+			validNumeric = false
+			result.MissingEvidence = append(result.MissingEvidence, id+": thiếu price")
+		} else if *r.Price < 0 {
+			needsData = true
+			validNumeric = false
+			result.MissingEvidence = append(result.MissingEvidence, id+": price không được âm")
+		}
+
+		if r.CommissionRate == nil {
+			needsData = true
+			validNumeric = false
+			result.MissingEvidence = append(result.MissingEvidence, id+": thiếu commission_rate")
+		} else if *r.CommissionRate < 0 || *r.CommissionRate > 1 {
+			needsData = true
+			validNumeric = false
+			result.MissingEvidence = append(result.MissingEvidence, id+": commission_rate phải nằm trong [0,1]")
+		}
+
+		if validNumeric {
+			result.Ranked = append(result.Ranked, Ranked{ProductID: id, ProductName: name, Score: *r.Price * *r.CommissionRate})
+		}
+	}
+
+	if len(kinds) == 1 {
+		for kind := range kinds {
+			result.EvidenceMode = kind
+		}
+	} else if len(kinds) > 1 {
+		result.EvidenceMode = "mixed"
+		needsReview = true
+		result.Reasons = append(result.Reasons, "đang trộn real và synthetic evidence trong cùng ranking context")
+	}
+
+	if len(currencies) > 1 {
+		needsReview = true
+		result.Reasons = append(result.Reasons, "currency không đồng nhất; score chưa so sánh được trực tiếp")
+	}
+
+	sort.Slice(result.Ranked, func(i, j int) bool {
+		if result.Ranked[i].Score != result.Ranked[j].Score {
+			return result.Ranked[i].Score > result.Ranked[j].Score
+		}
+		if result.Ranked[i].ProductName != result.Ranked[j].ProductName {
+			return result.Ranked[i].ProductName < result.Ranked[j].ProductName
+		}
+		return result.Ranked[i].ProductID < result.Ranked[j].ProductID
+	})
+
+	switch {
+	case needsReview:
+		result.State = stateHumanReview
+	case needsData:
+		result.State = stateGetMoreData
+		result.Reasons = append(result.Reasons, "input còn thiếu hoặc không hợp lệ; cần bổ sung trước khi tin vào ranking")
+	default:
+		result.State = stateRank
+		result.Reasons = append(result.Reasons, "baseline chỉ xếp hạng scenario bằng price × commission_rate")
+	}
+	return result
 }
 
 func main() {
-    path := "data/sample-observations.json"
-    if len(os.Args) > 1 {
-        path = os.Args[1]
-    }
-    raw, err := os.ReadFile(path)
-    if err != nil {
-        panic(err)
-    }
-    var records []Observation
-    if err := json.Unmarshal(raw, &records); err != nil {
-        panic(err)
-    }
-    result := evaluate(records)
+	path := "data/sample-observations.json"
+	if len(os.Args) > 1 {
+		path = os.Args[1]
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	var records []Observation
+	if err := json.Unmarshal(raw, &records); err != nil {
+		panic(err)
+	}
+	result := evaluate(records)
 
-    fmt.Println("Affiliate Bot v0.1 — deterministic baseline")
-    fmt.Printf("Evidence mode: %s\n", result.EvidenceMode)
-    for i, item := range result.Ranked {
-        fmt.Printf("%d. %s | score=%.2f\n", i+1, item.ProductName, item.Score)
-    }
-    fmt.Printf("Decision state: %s\n", result.State)
-    fmt.Println("Baseline limitation: score hiện chỉ dùng price × commission_rate; chưa chứng minh product tốt nhất cho Affiliate.")
-    fmt.Println("Authority boundary: real evidence không tự nâng RANK_SCENARIO thành RECOMMEND; output không phải approval hay execution permission.")
+	fmt.Println("Affiliate Bot v0.1 — deterministic baseline")
+	fmt.Printf("Phiên bản công thức (Formula version): %s\n", result.FormulaVersion)
+	fmt.Printf("Loại bằng chứng (Evidence mode): %s\n", result.EvidenceMode)
+	for i, item := range result.Ranked {
+		fmt.Printf("%d. %s [%s] | điểm (score)=%.2f\n", i+1, item.ProductName, item.ProductID, item.Score)
+	}
+	fmt.Printf("Trạng thái quyết định (Decision state): %s\n", result.State)
+	for _, reason := range result.Reasons {
+		fmt.Printf("- Lý do (Reason): %s\n", reason)
+	}
+	for _, missing := range result.MissingEvidence {
+		fmt.Printf("- Bằng chứng còn thiếu/không hợp lệ (Missing/invalid evidence): %s\n", missing)
+	}
+	fmt.Println("Giới hạn baseline: score hiện chỉ dùng price × commission_rate; chưa chứng minh product tốt nhất cho Affiliate.")
+	fmt.Println("Authority boundary: real evidence không tự nâng RANK_SCENARIO thành RECOMMEND; output không phải approval hay execution permission.")
 }
