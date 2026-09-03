@@ -1,0 +1,26 @@
+[
+  {
+    "product_id": "A",
+    "product_name": "Product A",
+    "price": 100,
+    "commission_rate": 0.08,
+    "currency": "USD",
+    "evidence_kind": "synthetic"
+  },
+  {
+    "product_id": "B",
+    "product_name": "Product B",
+    "price": 120,
+    "commission_rate": 0.08,
+    "currency": "USD",
+    "evidence_kind": "synthetic"
+  },
+  {
+    "product_id": "C",
+    "product_name": "Product C",
+    "price": 80,
+    "commission_rate": 0.10,
+    "currency": "USD",
+    "evidence_kind": "synthetic"
+  }
+]
