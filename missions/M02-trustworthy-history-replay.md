@@ -1,7 +1,7 @@
 ---
 mission_id: M02
 title: Trustworthy History + Replay v0.2
-status: planned
+status: ready
 requires_missions: [M01]
 minimum_evidence: E1 + replayable local history
 authority: A0 deterministic
@@ -93,9 +93,9 @@ Nếu `input_hash` không còn khớp hoặc record hỏng, đó là **integrity
 
 `UNREPLAYABLE` phải được báo rõ; không được tự động chạy formula mới rồi gọi đó là replay thành công.
 
-## Ship target
+## Ready evidence của repo
 
-M02 hoàn chỉnh khi repo có:
+M02 chỉ được chuyển từ `planned` sang `ready` sau khi repo có đủ:
 
 - lesson cards M02.1–M02.4;
 - `HistoryRecord` machine contract;
@@ -105,7 +105,7 @@ M02 hoàn chỉnh khi repo có:
 - restart proof;
 - CI bảo vệ M01 regression + M02 replay semantics.
 
-Trong authoring, Mission phải giữ `planned`. Chỉ chuyển `ready` sau khi toàn bộ asset trên tồn tại và CI của chính PR PASS.
+Corrective authoring gate ngày 2026-09-03 đã chạy khi M02 còn `planned` và đạt cả bốn CI jobs trước khi file này được đổi sang `ready`. `ready` là trạng thái authoring của repo, không phải learner PASS.
 
 ## Reality boundary
 
