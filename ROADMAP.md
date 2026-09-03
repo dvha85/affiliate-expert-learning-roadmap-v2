@@ -1,4 +1,4 @@
-# Roadmap — Affiliate Intelligence Bot v2
+# Lộ trình — Affiliate Intelligence Bot v2
 
 `CURRICULUM.md` là nguồn có thẩm quyền. File này chỉ là bản tóm tắt dễ đọc của trục Mission chính.
 
