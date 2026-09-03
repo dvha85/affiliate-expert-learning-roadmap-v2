@@ -1,0 +1,10 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"improvement-proposal.schema.json",
+  "title":"ImprovementProposal",
+  "type":"object",
+  "required":["proposal_id","evaluation_ids","current_version","proposed_version","change_summary","expected_benefit","rollback","auto_apply"],
+  "properties":{
+    "proposal_id":{"type":"string","minLength":1},"evaluation_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"current_version":{"type":"string","minLength":1},"proposed_version":{"type":"string","minLength":1},"change_summary":{"type":"string","minLength":1},"expected_benefit":{"type":"string","minLength":1},"risks":{"type":"array","items":{"type":"string"}},"rollback":{"type":"string","minLength":1},"auto_apply":{"const":false}
+  },"additionalProperties":false
+}

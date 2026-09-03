@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"action-record.schema.json",
+  "title":"ActionRecord",
+  "type":"object",
+  "required":["action_id","decision_id","action_type","target","performed_by","performed_at","measurement_window_end","compliance_reviewed"],
+  "properties":{
+    "action_id":{"type":"string","minLength":1},"decision_id":{"type":"string","minLength":1},"action_type":{"type":"string","minLength":1},"target":{"type":"string","minLength":1},
+    "performed_by":{"const":"human"},"performed_at":{"type":"string","format":"date-time"},"measurement_window_end":{"type":"string","format":"date-time"},"compliance_reviewed":{"type":"boolean"}
+  },"additionalProperties":false
+}
