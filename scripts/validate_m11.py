@@ -15,7 +15,10 @@ required = [
     "evals/M11-production-closed-loop/cases.json",
     "lab/mission-runtime/cmd/demo/m11.go",
     "lab/mission-runtime/cmd/demo/m11_gate.go",
+    "lab/mission-runtime/cmd/demo/m11_reconciliation.go",
     "lab/mission-runtime/cmd/demo/m11_test.go",
+    "lab/mission-runtime/cmd/demo/m11_gate_test.go",
+    "lab/mission-runtime/cmd/demo/m11_reconciliation_test.go",
     "contracts/production-lease.schema.json",
     "contracts/production-lease-approval.schema.json",
     "contracts/production-health-snapshot.schema.json",
@@ -46,6 +49,9 @@ for marker in ["lease_hash","telemetry_complete","consecutive_failures","reconci
 ledger = (ROOT / "contracts/production-ledger.schema.json").read_text(encoding="utf-8")
 for marker in ["control_mode","STOPPED","pending_execution_ids","outcome_links","consecutive_failures","reconciliation_required","reconciliation_resolution_ids"]:
     if marker not in ledger: errors.append(f"M11 ledger contract missing: {marker}")
+resolution = (ROOT / "contracts/production-reconciliation-resolution.schema.json").read_text(encoding="utf-8")
+for marker in ["resolution_id","execution_id","resolved_by","human","effect_state"]:
+    if marker not in resolution: errors.append(f"M11 reconciliation contract missing: {marker}")
 gate = (ROOT / "contracts/production-gate-decision.schema.json").read_text(encoding="utf-8")
 for marker in ["ALLOW_PRODUCTION","DEGRADE","STOP","REQUIRE_APPROVAL","WAIT","DENY","execution_authorized"]:
     if marker not in gate: errors.append(f"M11 gate contract missing: {marker}")
@@ -54,13 +60,14 @@ execution = (ROOT / "contracts/execution-record.schema.json").read_text(encoding
 for marker in ["GOVERNED_PRODUCTION","production_lease_hash","production_health_snapshot_hash","production_cost_bound_hash"]:
     if marker not in auth: errors.append(f"M11 authorization linkage missing: {marker}")
     if marker != "GOVERNED_PRODUCTION" and marker not in execution: errors.append(f"M11 execution linkage missing: {marker}")
-runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m11.go","m11_gate.go"])
+runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m11.go","m11_gate.go","m11_reconciliation.go"])
 for marker in [
-    "EvaluateProductionGate","EnforceProductionGate","AuthorizeProduction","InitializeProductionLedger","ExecuteProductionLocalSandbox",
-    "RecordProductionOutcome","ResolveProductionReconciliation","ValidateProductionClosedCycle","PROMOTION_RISK_NOT_VALIDATED",
-    "PROMOTION_SOURCE_MISMATCH","PROMOTION_E5_EVIDENCE_MISSING","RISK2_PER_ACTION_APPROVAL_REQUIRED","HEALTH_STALE",
-    "TELEMETRY_INCOMPLETE","COMPLIANCE_ALERT","FAILURE_THRESHOLD","OUTCOME_STALE","STICKY_STOP","STOP_LEDGER_MISSING",
-    "STOP_ACTIVATION_STATE_MISSING","DENY_OUTCOME_LINK","REJECT_AUTO_APPLY","GOVERNED_PRODUCTION",
+    "EvaluateProductionGate","EnforceProductionGate","trustedCriticalProductionStop","AuthorizeProduction","InitializeProductionLedger","ExecuteProductionLocalSandbox",
+    "RecordProductionOutcome","ResolveProductionReconciliation","ResolveTrustedProductionReconciliation","DENY_RECONCILIATION_PROVENANCE",
+    "ValidateProductionClosedCycle","PROMOTION_RISK_NOT_VALIDATED","PROMOTION_SOURCE_MISMATCH","PROMOTION_E5_EVIDENCE_MISSING",
+    "RISK2_PER_ACTION_APPROVAL_REQUIRED","HEALTH_STALE","TELEMETRY_INCOMPLETE","COMPLIANCE_ALERT","FAILURE_THRESHOLD",
+    "OUTCOME_STALE","STICKY_STOP","STOP_LEDGER_MISSING","STOP_ACTIVATION_STATE_MISSING","DENY_OUTCOME_LINK",
+    "REJECT_AUTO_APPLY","GOVERNED_PRODUCTION",
 ]:
     if marker not in runtime: errors.append(f"M11 runtime marker missing: {marker}")
 cases = json.loads((ROOT / "evals/M11-production-closed-loop/cases.json").read_text(encoding="utf-8"))
