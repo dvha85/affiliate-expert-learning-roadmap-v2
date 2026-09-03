@@ -7,7 +7,7 @@
 - [ ] kill switch được kiểm ngay trước side effect.
 - [ ] executor/action/target đều nằm trong allowlist/profile.
 - [ ] idempotency key không thể tạo successful side effect lần hai.
-- [ ] policy/approval mismatch fail closed.
+- [ ] mismatch policy/approval phải fail closed (đóng an toàn).
 - [ ] uncertain outcome không auto-retry mù.
 - [ ] ExecutionRecord resolve tới authorization/approval/intent.
 - [ ] bounded auto-action chưa được mở; M10 mới có authority đó.
