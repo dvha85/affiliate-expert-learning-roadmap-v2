@@ -10,3 +10,5 @@
 8. Lưu operated evidence dưới `learner/M07/`.
 
 Không commit secret/API key. Agent proposal không phải authorized ActionIntent.
+
+Ghi chú: blueprint chỉ mở quyền đọc; mọi quyền hành động có hậu quả vẫn thuộc các Mission sau.
