@@ -18,7 +18,7 @@
 
 `BOOT.0` và `BOOT.1` là onboarding/tooling credit (kết quả làm quen môi trường/công cụ), không thay thế evidence hay Mission PASS. O00 chỉ là bản đồ hệ thống bằng synthetic data (dữ liệu mô phỏng).
 
-M01–M07 hiện **authoring ready (sẵn sàng về nội dung)**: có lesson, Mission contract, starter, executable eval/runtime và CI guard. Trạng thái này không bỏ qua learner gate của Mission trước và không tự tạo Reality/Operated PASS.
+M01–M07 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**: có lesson, Mission contract, starter/checkpoints/evidence template, executable eval/runtime và CI guard. M06/M07 có workflow n8n thực tế nhưng learner vẫn phải cấu hình nguồn/credential an toàn và tự tạo Reality/Operated evidence.
 
 ## Vòng học của learner
 
@@ -41,12 +41,14 @@ O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → 
 
 Authority (quyền hạn) tăng dần. Capability (năng lực) của Mission sau không được dùng để vượt evidence/safety gate của Mission trước.
 
+Từ M02 trở đi, ID trong artifact phải resolve được về artifact trước đó khi contract yêu cầu. Schema-valid nhưng provenance bị đứt không tạo Reality/Operated PASS.
+
 ## Boundary quan trọng từ M03–M07
 
 ```text
 M03: external action đầu tiên do human_only thực hiện
 M04: AI tư vấn dựa trên evidence; không write tool
-M05: improvement chỉ đề xuất + review; không auto-apply
-M06: automation tự động nhưng chỉ GET/HEAD trên allowlist
+M05: evaluation → proposal → human review; không auto-apply
+M06: automation tự động nhưng chỉ GET/HEAD trên allowlist, normalize về canonical Observation
 M07: Agent + tool nhưng vẫn read-only; tool output là untrusted data
 ```

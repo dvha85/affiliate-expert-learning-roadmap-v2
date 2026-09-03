@@ -1,15 +1,11 @@
 # Bộ khởi đầu — M06
 
-## Thứ tự
+1. Học `curriculum/M06/`.
+2. Đọc `CHECKPOINTS.md` và dùng `M06-OPERATED-EVIDENCE-TEMPLATE.md`.
+3. Chạy `cd lab/mission-runtime && go test ./...` và `go run ./cmd/demo M06`.
+4. Import `lab/n8n/M06-readonly-watcher.blueprint.json`.
+5. Thay source bằng public/allowlisted source; giữ GET-only; chạy ít nhất hai lần để chứng minh `NEW/UNCHANGED/CHANGED`.
+6. Kiểm output là canonical Observation và có correlation/history.
+7. Lưu operated evidence dưới `learner/M06/`.
 
-1. Học các bài trong `curriculum/M06/`.
-2. Chạy `cd lab/mission-runtime && go test ./...`.
-3. Chạy `go run ./cmd/demo M06`.
-4. Đọc/chạy eval pack `evals/M06-readonly-watcher/`.
-5. Lưu operated evidence cá nhân dưới `learner/M06/` (không commit dữ liệu nhạy cảm).
-
-## Checklist + operated evidence
-
-Import n8n blueprint, dùng nguồn public/read-only, chạy ít nhất hai lần để thấy NEW/UNCHANGED/CHANGED, lưu correlation/provenance.
-
-Ghi tối thiểu: predicted result, observed result, một failure case, evidence/reality boundary, limitation, next measurement.
+Không dùng credential có write scope. Content hash/change state không phải business truth.
