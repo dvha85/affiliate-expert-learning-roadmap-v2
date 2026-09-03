@@ -3,8 +3,14 @@
   "$id":"advisor-output.schema.json",
   "title":"AdvisorOutput",
   "type":"object",
-  "required":["state","reason","evidence_ids","unknowns"],
+  "required":["state","reason","evidence_ids","unknowns","write_tool_requested"],
   "properties":{
-    "state":{"enum":["ADVISE","HUMAN_REVIEW","ABSTAIN"]},"recommendation":{"type":"string"},"reason":{"type":"string","minLength":1},"evidence_ids":{"type":"array","items":{"type":"string","minLength":1}},"unknowns":{"type":"array","items":{"type":"string"}},"write_tool_requested":{"const":false}
-  },"additionalProperties":false
+    "state":{"enum":["ADVISE","HUMAN_REVIEW","ABSTAIN"]},
+    "recommendation":{"type":"string"},
+    "reason":{"type":"string","minLength":1},
+    "evidence_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "unknowns":{"type":"array","items":{"type":"string"}},
+    "write_tool_requested":{"const":false}
+  },
+  "additionalProperties":false
 }
