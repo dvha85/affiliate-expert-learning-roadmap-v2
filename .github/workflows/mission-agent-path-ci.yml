@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
       - name: Validate mission-specific semantic plug-ins
         run: |
-          python scripts/validate_agent_path.py
+          python scripts/validate_agent_semantics.py
           python scripts/validate_semantic_contracts.py
           python scripts/validate_m11.py
 

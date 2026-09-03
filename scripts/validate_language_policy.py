@@ -9,6 +9,7 @@ EXACT_FILES = [
     ROOT / "CURRICULUM.md",
     ROOT / "ROADMAP.md",
     ROOT / "PROGRESS.md",
+    ROOT / "lab/n8n/COMPATIBILITY.md",
 ]
 GLOB_ROOTS = [
     ROOT / "curriculum",

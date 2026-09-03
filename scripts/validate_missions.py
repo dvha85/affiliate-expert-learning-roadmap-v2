@@ -1,13 +1,13 @@
 """Validate the complete learner-path structure from missions/manifest.json.
 
 Mission-specific validators deliberately own semantic assertions. This script
-owns only the single canonical O00 → M11 spine and common ready assets.
+owns only the single canonical O00 → M11 spine, structural assets and runtime
+roles.
 """
 
 from pathlib import Path
 import json
 import sys
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "missions/manifest.json"
@@ -25,8 +25,8 @@ except Exception as exc:
     print(f"MISSION STRUCTURE VALIDATION FAILED\n- invalid missions/manifest.json: {exc}")
     sys.exit(1)
 
-if manifest.get("schema_version") != 1:
-    fail("manifest schema_version must be 1")
+if manifest.get("schema_version") != 2:
+    fail("manifest schema_version must be 2")
 if manifest.get("spine") != EXPECTED_SPINE:
     fail(f"manifest spine must be exactly {' → '.join(EXPECTED_SPINE)}")
 
@@ -48,7 +48,10 @@ for mission in missions:
     for key in ("contract", "curriculum", "status"):
         if not mission.get(key):
             fail(f"{mid} manifest missing {key}")
-    for key in ("contract", "curriculum", "starter", "eval", "template"):
+    for key in (
+        "contract", "curriculum", "starter", "eval", "template",
+        "learner_runtime", "conformance_runtime", "orchestration_blueprint",
+    ):
         rel = mission.get(key)
         if rel and not (ROOT / rel).exists():
             fail(f"{mid} {key} asset missing: {rel}")
@@ -66,10 +69,34 @@ for mission in missions:
         if contract.exists() and "status: ready" not in contract.read_text(encoding="utf-8"):
             fail(f"{mid} ready Mission contract must declare status: ready")
 
+by_id = {mission.get("id"): mission for mission in missions if isinstance(mission, dict)}
+if "learner_runtime" in by_id.get("O00", {}):
+    fail("O00 is orientation only and must not declare learner_runtime")
+if not by_id.get("O00", {}).get("conformance_runtime"):
+    fail("O00 must declare conformance_runtime")
+for mid in ("M01", "M02"):
+    if not by_id.get(mid, {}).get("learner_runtime"):
+        fail(f"{mid} must declare learner_runtime")
+    if by_id.get(mid, {}).get("conformance_runtime"):
+        fail(f"{mid} must not route learner execution through mission-runtime")
+for number in range(3, 12):
+    mid = f"M{number:02d}"
+    if not by_id.get(mid, {}).get("learner_runtime"):
+        fail(f"{mid} must declare learner_runtime continuity anchor")
+    if not by_id.get(mid, {}).get("conformance_runtime"):
+        fail(f"{mid} must declare conformance_runtime separately")
+for mid in ("M06", "M07"):
+    if not by_id.get(mid, {}).get("orchestration_blueprint"):
+        fail(f"{mid} must declare orchestration_blueprint")
+
+m01 = (ROOT / by_id.get("M01", {}).get("contract", "")).read_text(encoding="utf-8")
+if "minimum_evidence: E0" not in m01 or "reality_context: E1" not in m01:
+    fail("M01 must separate E0 capability evidence from E1 reality context")
+
 if errors:
     print("MISSION STRUCTURE VALIDATION FAILED")
     for error in errors:
         print(f"- {error}")
     sys.exit(1)
 
-print("MISSION STRUCTURE VALIDATION PASS: manifest owns one O00 → M11 structural spine; semantic validators are plug-ins")
+print("MISSION STRUCTURE VALIDATION PASS: manifest owns one O00 → M11 structural spine and explicit runtime roles")
