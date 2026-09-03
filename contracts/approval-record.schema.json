@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "approval-record.schema.json",
+  "title": "ApprovalRecord",
+  "type": "object",
+  "required": ["approval_id","intent_id","intent_hash","policy_version","decision","approved_by","approver_id","approved_at","expires_at","correlation_id","one_time"],
+  "properties": {
+    "approval_id": {"type":"string","minLength":1},
+    "intent_id": {"type":"string","minLength":1},
+    "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "policy_version": {"type":"string","minLength":1},
+    "decision": {"enum":["APPROVE","REJECT"]},
+    "approved_by": {"const":"human"},
+    "approver_id": {"type":"string","minLength":1},
+    "approved_at": {"type":"string","format":"date-time"},
+    "expires_at": {"type":"string","format":"date-time"},
+    "correlation_id": {"type":"string","minLength":1},
+    "one_time": {"const":true}
+  },
+  "additionalProperties": false
+}

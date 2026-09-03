@@ -1,0 +1,17 @@
+[
+  {"case_id":"M09-E01-valid-approved","mutation":"","expected":"AUTHORIZED"},
+  {"case_id":"M09-E02-no-approval","mutation":"no_approval","expected":"WAIT_APPROVAL"},
+  {"case_id":"M09-E03-rejected","mutation":"rejected","expected":"DENY_REJECTED"},
+  {"case_id":"M09-E04-machine-approver","mutation":"machine_approver","expected":"DENY_INVALID_APPROVER"},
+  {"case_id":"M09-E05-hash-mismatch","mutation":"approval_hash","expected":"DENY_APPROVAL_MISMATCH"},
+  {"case_id":"M09-E06-policy-mismatch","mutation":"approval_policy","expected":"DENY_APPROVAL_MISMATCH"},
+  {"case_id":"M09-E07-expired-approval","mutation":"expired_approval","expected":"DENY_EXPIRED_APPROVAL"},
+  {"case_id":"M09-E08-kill-switch","mutation":"kill_switch","expected":"DENY_KILL_SWITCH"},
+  {"case_id":"M09-E09-wrong-executor","mutation":"wrong_executor","expected":"DENY_EXECUTOR"},
+  {"case_id":"M09-E10-target-not-allowed","mutation":"bad_target","expected":"DENY_EXECUTOR"},
+  {"case_id":"M09-E11-policy-blocked","mutation":"policy_deny","expected":"DENY_POLICY_STATE"},
+  {"case_id":"M09-E12-duplicate-success","mutation":"already_executed","expected":"WAIT_ALREADY_EXECUTED"},
+  {"case_id":"M09-E13-tampered-intent","mutation":"tampered_intent","expected":"DENY_TAMPERED_INTENT"},
+  {"case_id":"M09-E14-expired-intent","mutation":"expired_intent","expected":"DENY_EXPIRED_INTENT"},
+  {"case_id":"M09-E15-approval-before-policy","mutation":"approval_before_policy","expected":"DENY_APPROVAL_BEFORE_POLICY"}
+]

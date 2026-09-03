@@ -13,5 +13,6 @@ Các schema trong thư mục này mô tả boundary máy đọc của hệ thố
 - M06: watcher phải normalize về canonical `Observation`; read-only/change-detection semantics được bảo vệ bằng runtime/eval.
 - M07: `ToolRegistry` chỉ cho read-only tools/methods/hosts; tool output luôn là untrusted data.
 - M08: `ActionIntent` + `PolicyDecision` được activate ở **shadow only**; exact intent binding/hash/expiry/idempotency/linkage phải được kiểm và `execution_authorized=false` luôn bắt buộc.
+- M09: `ApprovalRecord` + `ExecutionAuthorization` + `ExecutionRecord`; approval phải do người tạo, bind đúng `intent_hash` + `policy_version`, one-time + expiry; authorization chỉ được tạo sau revalidation và executor/kill-switch/idempotency gate.
 
-Contract tồn tại **không tự cấp authority** cho Mission trước hoặc sau. `ALLOW` trong M08 không phải execution permission. Schema-valid reference nhưng không resolve được provenance không đủ cho Reality/Operated PASS.
+Contract tồn tại **không tự cấp authority** cho Mission trước hoặc sau. `ALLOW` trong M08 không phải execution permission. `ApprovalRecord` cũng không tự là execution: M09 phải deterministic revalidate rồi mới tạo `ExecutionAuthorization`. Schema-valid reference nhưng không resolve được provenance không đủ cho Reality/Operated PASS.

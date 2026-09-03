@@ -37,10 +37,19 @@ Observation / Evidence ───────────────► Normaliz
      DENY / WAIT / GET_MORE_DATA / HUMAN_REVIEW           ALLOW
                                                             │
                                                             ▼
-                                                  Approval khi required
+                                               ApprovalRecord (M09)
                                                             │
                                                             ▼
-                                                  Controlled Execution
+                                      deterministic revalidation + kill switch
+                                                            │
+                                                            ▼
+                                           ExecutionAuthorization
+                                                            │
+                                                            ▼
+                                               Controlled Executor
+                                                            │
+                                                            ▼
+                                                ExecutionRecord
                                                             │
                                                             ▼
                          Outcome → Evaluation → Reviewed Improvement
@@ -59,17 +68,18 @@ Sở hữu contract/behavior của:
 - canonical history/replay;
 - deterministic decision states;
 - `DecisionPacket`, `ActionRecord`, `OutcomeRecord`, `EvaluationRecord`, `ImprovementProposal`, `ReviewRecord`, `ActionIntent`, `PolicyDecision`;
+- `ApprovalRecord`, `ExecutionAuthorization`, `ExecutionRecord` từ M09;
 - risk/authorization semantics;
 - audit/correlation invariants;
 - cross-artifact linkage khi contract yêu cầu.
 
 ### Orchestration
 
-Sở hữu trigger/schedule/integration/retry/approval routing và bounded execution plumbing. Orchestrator không tự trở thành policy authority. n8n output phải map về canonical contract thay vì tạo data model song song.
+Sở hữu trigger/schedule/integration/retry/approval routing và bounded execution plumbing. Orchestrator không tự trở thành policy authority hoặc approver. n8n output phải map về canonical contract thay vì tạo data model song song.
 
 ### AgentRuntime
 
-Sở hữu unstructured research/reasoning/proposal trong permission ceiling. Agent không sở hữu truth hoặc authorization. Tool output là untrusted data cho tới khi qua deterministic validation/grounding.
+Sở hữu unstructured research/reasoning/proposal trong permission ceiling. Agent không sở hữu truth, approval hoặc authorization. Tool output là untrusted data cho tới khi qua deterministic validation/grounding.
 
 ## 3. Invariants
 
@@ -79,9 +89,13 @@ AI confidence != execution permission
 Tool result != trusted evidence
 Agent proposal != authorized ActionIntent
 Schema-valid reference != resolved provenance
+ApprovalRecord != ExecutionAuthorization
+Persisted workflow state != permission
 Deterministic Policy unavailable/invalid/unverified
 → no consequential execution
 ```
+
+Từ M09, resume/retry phải revalidate exact intent hash, policy version, human approval, expiry, executor profile, idempotency và kill switch ngay trước side effect.
 
 ## 4. Implementation flexibility
 
@@ -95,4 +109,4 @@ Go là deterministic reference/fallback khi code làm behavior rõ hơn. Visual 
 
 ## 5. External action boundary
 
-External action đầu tiên ở M03 và do human thực hiện. Machine ActionIntent bắt đầu shadow ở M08. Machine execution chỉ mở ở M09 qua deterministic policy + approval khi required; bounded auto-action bắt đầu M10.
+External action đầu tiên ở M03 và do human thực hiện. Machine ActionIntent bắt đầu shadow ở M08. Machine execution chỉ mở ở M09 qua human approval + deterministic revalidation + controlled executor. Bounded auto-action không cần approval từng lần chỉ bắt đầu ở M10 trong phạm vi policy cho phép; M09 không được dùng để vượt gate này.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "execution-authorization.schema.json",
+  "title": "ExecutionAuthorization",
+  "type": "object",
+  "required": ["authorization_id","intent_id","intent_hash","policy_version","approval_id","executor_id","authorized_at","expires_at","idempotency_key","correlation_id","execution_mode","execution_authorized"],
+  "properties": {
+    "authorization_id": {"type":"string","minLength":1},
+    "intent_id": {"type":"string","minLength":1},
+    "intent_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "policy_version": {"type":"string","minLength":1},
+    "approval_id": {"type":"string","minLength":1},
+    "executor_id": {"type":"string","minLength":1},
+    "authorized_at": {"type":"string","format":"date-time"},
+    "expires_at": {"type":"string","format":"date-time"},
+    "idempotency_key": {"type":"string","minLength":1},
+    "correlation_id": {"type":"string","minLength":1},
+    "execution_mode": {"const":"APPROVED_LIVE"},
+    "execution_authorized": {"const":true}
+  },
+  "additionalProperties": false
+}

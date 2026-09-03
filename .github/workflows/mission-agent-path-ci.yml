@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/mission-runtime/go.mod
-      - name: O00 and M03-M08 executable eval packs
+      - name: O00 and M03-M09 executable eval packs
         working-directory: lab/mission-runtime
         run: go test ./...
       - name: Vet mission runtime
@@ -45,12 +45,16 @@ jobs:
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
           go run ./cmd/demo M08 | grep -q 'SHADOW_POLICY_ALLOW'
           go run ./cmd/demo M08 | grep -q '"execution_authorized": false'
+          go run ./cmd/demo M09 | grep -q 'HUMAN_APPROVAL_REQUIRED'
+          go run ./cmd/demo M09 | grep -q '"execution_mode": "APPROVED_LIVE"'
+          go run ./cmd/demo M09 | grep -q '"execution_authorized": true'
+          go run ./cmd/demo M09 | grep -q '"side_effect_state": "PERFORMED"'
 
   safety-and-linkage-boundaries:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Guard M03-M08 authority ceilings and linkage
+      - name: Guard M03-M09 authority ceilings and linkage
         run: |
           grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
           grep -q '"write_tool_requested"' contracts/advisor-output.schema.json
@@ -68,3 +72,13 @@ jobs:
           grep -q 'TAMPERED_INTENT' lab/mission-runtime/cmd/demo/m08.go
           grep -q 'IDEMPOTENCY_COLLISION' lab/mission-runtime/cmd/demo/m08.go
           grep -q 'POLICY_UNAVAILABLE' lab/mission-runtime/cmd/demo/m08.go
+          grep -q '"approved_by".*"const":"human"' contracts/approval-record.schema.json
+          grep -q '"one_time".*"const":true' contracts/approval-record.schema.json
+          grep -q '"execution_mode".*"const":"APPROVED_LIVE"' contracts/execution-authorization.schema.json
+          grep -q '"execution_authorized".*"const":true' contracts/execution-authorization.schema.json
+          grep -q 'RECONCILIATION_REQUIRED' contracts/execution-record.schema.json
+          grep -q 'DENY_POLICY_REVALIDATION' lab/mission-runtime/cmd/demo/m09.go
+          grep -q 'DENY_KILL_SWITCH' lab/mission-runtime/cmd/demo/m09.go
+          grep -q 'WAIT_APPROVAL_CONSUMED' lab/mission-runtime/cmd/demo/m09.go
+          grep -q 'WAIT_RECONCILIATION' lab/mission-runtime/cmd/demo/m09.go
+          grep -q 'PersistM09State' lab/mission-runtime/cmd/demo/m09.go
