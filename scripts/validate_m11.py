@@ -14,6 +14,7 @@ required = [
     "starter-kits/M11-production-loop/M11-OPERATED-EVIDENCE-TEMPLATE.md",
     "evals/M11-production-closed-loop/cases.json",
     "lab/mission-runtime/cmd/demo/m11.go",
+    "lab/mission-runtime/cmd/demo/m11_gate.go",
     "lab/mission-runtime/cmd/demo/m11_test.go",
     "contracts/production-lease.schema.json",
     "contracts/production-lease-approval.schema.json",
@@ -21,6 +22,7 @@ required = [
     "contracts/production-ledger.schema.json",
     "contracts/production-gate-decision.schema.json",
     "contracts/production-cycle-record.schema.json",
+    "contracts/production-reconciliation-resolution.schema.json",
 ]
 for rel in required:
     if not (ROOT / rel).exists(): errors.append(f"missing M11 file: {rel}")
@@ -36,13 +38,13 @@ if "| ready |" not in line: errors.append("M11 mission index must be ready")
 lease = json.loads((ROOT / "contracts/production-lease.schema.json").read_text(encoding="utf-8"))
 if "RISK2" in lease["properties"]["allowed_risk_classes"]["items"]["enum"]: errors.append("ProductionLease must never delegate RISK2")
 approval = (ROOT / "contracts/production-lease-approval.schema.json").read_text(encoding="utf-8")
-for marker in ["lease_hash","source_e5_refs","validated_risk_classes","reviewed_by","human","APPROVE_PRODUCTION_LEASE"]:
+for marker in ["lease_hash","promotion_review_ref","source_canary_grant_id","source_canary_grant_version","source_canary_grant_hash","source_e5_refs","validated_risk_classes","reviewed_by","human","APPROVE_PRODUCTION_LEASE"]:
     if marker not in approval: errors.append(f"M11 approval contract missing: {marker}")
 health = (ROOT / "contracts/production-health-snapshot.schema.json").read_text(encoding="utf-8")
 for marker in ["lease_hash","telemetry_complete","consecutive_failures","reconciliation_required","compliance_alert_count","oldest_pending_outcome_age_seconds","snapshot_hash"]:
     if marker not in health: errors.append(f"M11 health contract missing: {marker}")
 ledger = (ROOT / "contracts/production-ledger.schema.json").read_text(encoding="utf-8")
-for marker in ["control_mode","STOPPED","pending_execution_ids","outcome_links","consecutive_failures","reconciliation_required"]:
+for marker in ["control_mode","STOPPED","pending_execution_ids","outcome_links","consecutive_failures","reconciliation_required","reconciliation_resolution_ids"]:
     if marker not in ledger: errors.append(f"M11 ledger contract missing: {marker}")
 gate = (ROOT / "contracts/production-gate-decision.schema.json").read_text(encoding="utf-8")
 for marker in ["ALLOW_PRODUCTION","DEGRADE","STOP","REQUIRE_APPROVAL","WAIT","DENY","execution_authorized"]:
@@ -52,8 +54,14 @@ execution = (ROOT / "contracts/execution-record.schema.json").read_text(encoding
 for marker in ["GOVERNED_PRODUCTION","production_lease_hash","production_health_snapshot_hash","production_cost_bound_hash"]:
     if marker not in auth: errors.append(f"M11 authorization linkage missing: {marker}")
     if marker != "GOVERNED_PRODUCTION" and marker not in execution: errors.append(f"M11 execution linkage missing: {marker}")
-runtime = (ROOT / "lab/mission-runtime/cmd/demo/m11.go").read_text(encoding="utf-8")
-for marker in ["EvaluateProductionGate","AuthorizeProduction","ExecuteProductionLocalSandbox","RecordProductionOutcome","PROMOTION_RISK_NOT_VALIDATED","RISK2_PER_ACTION_APPROVAL_REQUIRED","HEALTH_STALE","TELEMETRY_INCOMPLETE","COMPLIANCE_ALERT","FAILURE_THRESHOLD","OUTCOME_STALE","STICKY_STOP","WAIT_LEDGER_MISSING","DENY_OUTCOME_LINK","GOVERNED_PRODUCTION"]:
+runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m11.go","m11_gate.go"])
+for marker in [
+    "EvaluateProductionGate","EnforceProductionGate","AuthorizeProduction","InitializeProductionLedger","ExecuteProductionLocalSandbox",
+    "RecordProductionOutcome","ResolveProductionReconciliation","ValidateProductionClosedCycle","PROMOTION_RISK_NOT_VALIDATED",
+    "PROMOTION_SOURCE_MISMATCH","PROMOTION_E5_EVIDENCE_MISSING","RISK2_PER_ACTION_APPROVAL_REQUIRED","HEALTH_STALE",
+    "TELEMETRY_INCOMPLETE","COMPLIANCE_ALERT","FAILURE_THRESHOLD","OUTCOME_STALE","STICKY_STOP","STOP_LEDGER_MISSING",
+    "STOP_ACTIVATION_STATE_MISSING","DENY_OUTCOME_LINK","REJECT_AUTO_APPLY","GOVERNED_PRODUCTION",
+]:
     if marker not in runtime: errors.append(f"M11 runtime marker missing: {marker}")
 cases = json.loads((ROOT / "evals/M11-production-closed-loop/cases.json").read_text(encoding="utf-8"))
 if len(cases) < 30: errors.append("M11 eval pack must contain at least 30 cases")
@@ -63,4 +71,4 @@ if errors:
     print("M11 VALIDATION FAILED")
     for error in errors: print(f"- {error}")
     sys.exit(1)
-print("M11 VALIDATION PASS: production loop is finite, health-gated, stop-safe and review-bounded")
+print("M11 VALIDATION PASS: production loop is finite, health-gated, stop-durable, recovery-reviewed and self-improvement-bounded")
