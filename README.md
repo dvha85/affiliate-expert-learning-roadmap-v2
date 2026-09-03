@@ -8,8 +8,9 @@ Repo chính để học và xây một **Affiliate Intelligence Bot tiến hóa 
 
 1. Đọc `CURRICULUM.md` — authority duy nhất về Mission sequence, evidence, autonomy và PASS.
 2. Đọc `curriculum/README.md` — learner path hiện hành.
-3. Nếu chưa từng chạy/test Bot, học `BOOT.1`.
-4. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
+3. Nếu bắt đầu từ máy chưa chuẩn bị môi trường, học `BOOT.0`.
+4. Nếu chưa từng chạy/sửa/test Bot, học `BOOT.1`.
+5. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
 
 ## Canonical progression
 
@@ -37,6 +38,7 @@ Decision != Approval != Execution
 Agent proposal != authorized ActionIntent
 Tool result != trusted evidence
 real evidence != automatic recommendation
+real != reliable != current != authoritative != complete
 ```
 
 ## Technology principle

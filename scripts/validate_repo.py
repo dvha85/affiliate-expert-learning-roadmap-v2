@@ -6,6 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED = [
     "README.md", "CURRICULUM.md", "ROADMAP.md", "curriculum/README.md",
+    "curriculum/BOOT/BOOT.0-environment-basics.md",
+    "curriculum/BOOT/BOOT.1-run-change-test.md",
     "curriculum/M00/M00.1-affiliate-intelligence-objective.md",
     "curriculum/M00/M00.2-evidence-uncertainty.md",
     "curriculum/M00/M00.3-decision-approval-execution.md",
@@ -41,13 +43,25 @@ for rel in REQUIRED:
 
 curriculum = (ROOT / "CURRICULUM.md").read_text(encoding="utf-8")
 for marker in [
-    "M00 | First Real Evidence Packet", "M01 | Smallest Deterministic Bot v0.1",
+    "BOOT.0", "M00 | First Real Evidence Packet", "M01 | Smallest Deterministic Bot v0.1",
     "M02 | Trustworthy History + Replay v0.2", "M03 | First Tracked Human Action",
     "M07 | Read-only Evidence Agent", "M11 | Production Closed Loop",
     "Decision != Approval != Execution", "Tool result != trusted evidence",
+    "real != reliable != current != authoritative != complete",
+    "CURRENT IMPLEMENTATION LIMIT != FUNDAMENTAL SYSTEM LAW",
 ]:
     if marker not in curriculum:
         errors.append(f"curriculum marker missing: {marker}")
+
+m00_2 = (ROOT / "curriculum/M00/M00.2-evidence-uncertainty.md").read_text(encoding="utf-8")
+for marker in ["real != reliable", "pending", "not_yet_observable", "inconclusive", "source_authority_or_role"]:
+    if marker not in m00_2:
+        errors.append(f"M00.2 foundation marker missing: {marker}")
+
+m01_2 = (ROOT / "curriculum/M01/M01.2-missing-zero-invalid.md").read_text(encoding="utf-8")
+for marker in ["pending", "not_yet_observable", "inconclusive", "CURRENT IMPLEMENTATION LIMIT"]:
+    if marker not in m01_2:
+        errors.append(f"M01.2 must preserve M00 missing-state semantics: {marker}")
 
 for path in (ROOT / "contracts").glob("*.json"):
     try:
@@ -131,4 +145,4 @@ if errors:
         print(f"- {error}")
     sys.exit(1)
 
-print("VALIDATION PASS: clean v2 authority, M00/M01 delivery and corrective M02 ready gate are consistent")
+print("VALIDATION PASS: clean v2 authority, beginner onboarding, M00/M01 semantics and corrective M02 ready gate are consistent")

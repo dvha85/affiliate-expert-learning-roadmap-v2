@@ -30,6 +30,7 @@ Decision != Approval != Execution
 Agent proposal != authorized ActionIntent
 Tool result != trusted evidence
 real evidence != automatic recommendation
+real != reliable != current != authoritative != complete
 ```
 
 ## 2. Reality-First nhưng không Publish-First
@@ -69,6 +70,7 @@ Mỗi Mission chỉ tăng một lớp capability/authority chính. Không dùng 
 Learner-facing lesson dùng ID theo Mission:
 
 ```text
+BOOT.0
 BOOT.1
 M00.1
 M00.2
@@ -76,7 +78,7 @@ M00.3
 M01.1 ...
 ```
 
-Numeric lesson inventory của repo lịch sử không được migrate thành learner path. Knowledge có giá trị chỉ được đưa sang khi được pull bởi Mission cụ thể.
+`BOOT.0`/`BOOT.1` là onboarding/tooling, không phải Mission PASS gate. Numeric lesson inventory của repo lịch sử không được migrate thành learner path. Knowledge có giá trị chỉ được đưa sang khi được pull bởi Mission cụ thể.
 
 ## 5. M00 — First Real Evidence Packet
 
@@ -91,7 +93,8 @@ Knowledge cards đầu tiên:
 Ship target:
 
 ```text
-3+ public observations có source + observed_at
+3+ public observations có source + observed_at + access method
+→ provenance/limitation rõ
 → fact / estimate / assumption / unknown
 → Human DecisionPacket
 → state + reason + missing evidence + next measurement
@@ -121,6 +124,7 @@ NO-CODE WHEN AUDITABLE
 CODE WHEN IT REDUCES AMBIGUITY OR FAILURE SURFACE
 AGENT WHEN DETERMINISTIC LOGIC IS NOT ENOUGH
 AUTOMATION ONLY AFTER EVIDENCE + POLICY + AUDIT + RECOVERY
+CURRENT IMPLEMENTATION LIMIT != FUNDAMENTAL SYSTEM LAW
 ```
 
 Mission semantics không phụ thuộc vendor/framework. Technology profile có thể đổi mà không đổi authority ceiling.
@@ -130,14 +134,14 @@ Mission semantics không phụ thuộc vendor/framework. Technology profile có 
 | Level | Bằng chứng |
 |---|---|
 | E0 | synthetic/test/replay; chỉ chứng minh plumbing/behavior |
-| E1 | public observation thật có source + observed_at + access method |
+| E1 | public observation thật có source + observed_at + access method + limitation/provenance |
 | E2 | human external action thật có ActionRecord |
 | E3 | outcome/analytics/export thật, kể cả observed value = 0 |
 | E4 | Decision → Action → Outcome → Evaluation → reviewed proposal |
 | E5 | bounded governed canary có policy/audit/kill switch |
 | E6 | production loop qua observation window + recovery + reviewed improvement |
 
-Sample không thể thay E1–E6.
+Sample không thể thay E1–E6. `real` chỉ mô tả origin; không tự chứng minh source reliable/current/authoritative/complete.
 
 ## 9. PASS model
 
