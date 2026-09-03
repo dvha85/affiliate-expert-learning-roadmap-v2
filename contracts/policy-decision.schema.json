@@ -3,15 +3,31 @@
   "$id": "policy-decision.schema.json",
   "title": "PolicyDecision",
   "type": "object",
-  "required": ["policy_version", "action_id", "decision", "risk_class", "reason"],
+  "required": [
+    "policy_version", "intent_id", "intent_hash", "decision", "risk_class", "reason",
+    "approval_required", "shadow_only", "execution_authorized", "policy_checked_at"
+  ],
   "properties": {
     "policy_version": {"type": "string", "minLength": 1},
-    "action_id": {"type": "string", "minLength": 1},
+    "intent_id": {"type": "string", "minLength": 1},
+    "intent_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "decision": {"enum": ["ALLOW", "DENY", "WAIT", "GET_MORE_DATA", "HUMAN_REVIEW"]},
     "risk_class": {"enum": ["RISK0", "RISK1", "RISK2"]},
     "reason": {"type": "string", "minLength": 1},
     "approval_required": {"type": "boolean"},
+    "shadow_only": {"const": true},
+    "execution_authorized": {"const": false},
     "policy_checked_at": {"type": "string", "format": "date-time"}
   },
-  "additionalProperties": true
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "HUMAN_REVIEW"}}, "required": ["decision"]},
+      "then": {"properties": {"approval_required": {"const": true}}}
+    },
+    {
+      "if": {"properties": {"decision": {"enum": ["ALLOW", "DENY", "WAIT", "GET_MORE_DATA"]}}, "required": ["decision"]},
+      "then": {"properties": {"approval_required": {"const": false}}}
+    }
+  ],
+  "additionalProperties": false
 }
