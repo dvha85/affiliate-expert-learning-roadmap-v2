@@ -17,10 +17,11 @@
 11. Khi M06 PASS: `M07.1 → M07.2 → M07.3`.
 12. Khi M07 PASS: `M08.1 → M08.2 → M08.3`.
 13. Khi M08 PASS: `M09.1 → M09.2 → M09.3`.
+14. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
 
 `BOOT.0` và `BOOT.1` là onboarding/tooling credit (kết quả làm quen môi trường/công cụ), không thay thế evidence hay Mission PASS. O00 chỉ là bản đồ hệ thống bằng synthetic data (dữ liệu mô phỏng).
 
-M01–M09 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**: có lesson, Mission contract, starter/checkpoints/evidence template, executable eval/runtime và CI guard. M06/M07 có workflow n8n thực tế nhưng learner vẫn phải cấu hình nguồn/credential an toàn và tự tạo Reality/Operated evidence. M08 chỉ chạy policy ở shadow mode. M09 mở machine execution đầu tiên nhưng mọi execution đều phải qua human approval; reference executor mặc định là local sandbox bị giới hạn và không tự tạo E5.
+M01–M10 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**: có lesson, Mission contract, starter/checkpoints/evidence template, executable eval/runtime và CI guard. M06/M07 có workflow n8n thực tế nhưng learner vẫn phải cấu hình nguồn/credential an toàn và tự tạo Reality/Operated evidence. M08 chỉ chạy policy ở shadow mode. M09 mở machine execution đầu tiên nhưng mọi execution đều phải qua human approval từng lần. M10 mở bounded auto-action đầu tiên bằng human-approved `CanaryGrant`; `RISK2` vẫn phải per-action approval và sandbox PASS không tự tạo E5.
 
 ## Vòng học của learner
 
@@ -45,7 +46,7 @@ Authority (quyền hạn) tăng dần. Capability (năng lực) của Mission sa
 
 Từ M02 trở đi, ID trong artifact phải resolve được về artifact trước đó khi contract yêu cầu. Schema-valid nhưng provenance bị đứt không tạo Reality/Operated PASS.
 
-## Boundary quan trọng từ M03–M09
+## Boundary quan trọng từ M03–M10
 
 ```text
 M03: external action đầu tiên do human_only thực hiện
@@ -55,4 +56,5 @@ M06: automation tự động nhưng chỉ GET/HEAD trên allowlist, normalize v�
 M07: Agent + tool nhưng vẫn read-only; tool output là untrusted data
 M08: ActionIntent + policy chỉ shadow; ALLOW != execution permission; execution_authorized=false
 M09: mọi machine execution cần human ApprovalRecord + deterministic revalidation + controlled executor; không bounded auto-action
+M10: human-approved CanaryGrant cho RISK0/RISK1 trong scope/budget/rate/outcome giới hạn; RISK2 không auto
 ```

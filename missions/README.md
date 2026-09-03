@@ -15,7 +15,7 @@ Thứ tự học được quyết định bởi `CURRICULUM.md`.
 | M07 | Read-only Evidence Agent (Agent bằng chứng chỉ đọc) | A2-RO | ready |
 | M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | A3-shadow | ready |
 | M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | qua cổng phê duyệt | ready |
-| M10 | Governed Canary (canary có quản trị) | tự động RISK0/RISK1 trong giới hạn | planned |
+| M10 | Governed Canary (canary có quản trị) | tự động RISK0/RISK1 trong grant giới hạn; RISK2 phê duyệt từng lần | ready |
 | M11 | Production Closed Loop (vòng kín production có quản trị) | production có quản trị | planned |
 
 ```text
@@ -26,4 +26,4 @@ O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → 
 
 `ready` **không** có nghĩa người học đã PASS. Learner PASS phụ thuộc evidence thật, cross-artifact linkage và operated result theo Mission contract.
 
-M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài. M08 dùng deterministic Go reference để learner quan sát exact binding/fail-closed semantics; OPA chưa phải dependency mặc định. M09 dùng persisted state + controlled local sandbox executor để chứng minh approval/restart/idempotency/kill-switch semantics; live adapter hoặc Temporal không phải mặc định và sandbox PASS không tự tạo E5.
+M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài. M08 dùng deterministic Go reference để learner quan sát exact binding/fail-closed semantics; OPA chưa phải dependency mặc định. M09 dùng persisted state + controlled local sandbox executor để chứng minh approval/restart/idempotency/kill-switch semantics. M10 thêm human-approved `CanaryGrant` + durable budget/rate/outcome ledger; local sandbox chỉ chứng minh Capability, không tự tạo E5.

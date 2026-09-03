@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canary-grant-approval.schema.json",
+  "title": "CanaryGrantApproval",
+  "type": "object",
+  "required": ["approval_ref","grant_id","grant_version","grant_hash","decision","approved_by","approver_id","approved_at"],
+  "properties": {
+    "approval_ref": {"type":"string","minLength":1},
+    "grant_id": {"type":"string","minLength":1},
+    "grant_version": {"type":"string","minLength":1},
+    "grant_hash": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "decision": {"const":"APPROVE"},
+    "approved_by": {"const":"human"},
+    "approver_id": {"type":"string","minLength":1},
+    "approved_at": {"type":"string","format":"date-time"}
+  },
+  "additionalProperties": false
+}
