@@ -71,6 +71,15 @@ func canonicalObservations(in []Observation) []Observation {
 	return out
 }
 
+func canonicalEvidenceIDs(observations []Observation) []string {
+	canonical := canonicalObservations(observations)
+	ids := make([]string, 0, len(canonical))
+	for _, observation := range canonical {
+		ids = append(ids, observation.ObservationID)
+	}
+	return ids
+}
+
 func inputHash(observations []Observation) (string, error) {
 	encoded, err := json.Marshal(canonicalObservations(observations))
 	if err != nil {
@@ -78,6 +87,48 @@ func inputHash(observations []Observation) (string, error) {
 	}
 	sum := sha256.Sum256(encoded)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func validateCanonicalHistoryObservation(observation Observation, asOfTime time.Time) error {
+	if strings.TrimSpace(observation.ObservationID) == "" {
+		return errors.New("observation_id is required for M02 history")
+	}
+	if strings.TrimSpace(observation.SubjectID) == "" {
+		return fmt.Errorf("subject_id is required for %s", observation.ObservationID)
+	}
+	if strings.TrimSpace(observation.ProductID) == "" {
+		return fmt.Errorf("product_id is required for %s", observation.ObservationID)
+	}
+	if observation.SubjectID != observation.ProductID {
+		return fmt.Errorf("subject_id must equal product_id in M02 learner runtime for %s", observation.ObservationID)
+	}
+	if strings.TrimSpace(observation.SourceURL) == "" && strings.TrimSpace(observation.SourceRef) == "" {
+		return fmt.Errorf("source_url or source_ref is required for %s", observation.ObservationID)
+	}
+	if strings.TrimSpace(observation.AccessMethod) == "" {
+		return fmt.Errorf("access_method is required for %s", observation.ObservationID)
+	}
+	switch observation.ClaimKind {
+	case "fact", "estimate", "assumption", "unknown":
+	default:
+		return fmt.Errorf("claim_kind is invalid for %s", observation.ObservationID)
+	}
+	switch observation.State {
+	case "observed", "missing", "pending", "not_yet_observable", "inconclusive":
+	default:
+		return fmt.Errorf("state is invalid for %s", observation.ObservationID)
+	}
+	if strings.TrimSpace(observation.Limitation) == "" {
+		return fmt.Errorf("limitation is required for %s", observation.ObservationID)
+	}
+	observedTime, err := time.Parse(time.RFC3339, observation.ObservedAt)
+	if err != nil {
+		return fmt.Errorf("invalid observed_at for %s: %w", observation.ObservationID, err)
+	}
+	if observedTime.After(asOfTime) {
+		return fmt.Errorf("as_of cannot be before observed_at for %s", observation.ObservationID)
+	}
+	return nil
 }
 
 func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observation) (HistoryRecord, error) {
@@ -93,15 +144,8 @@ func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observat
 	}
 	seenObservationIDs := map[string]bool{}
 	for _, observation := range observations {
-		if strings.TrimSpace(observation.ObservationID) == "" {
-			return HistoryRecord{}, errors.New("observation_id is required for M02 history")
-		}
-		observedTime, err := time.Parse(time.RFC3339, observation.ObservedAt)
-		if err != nil {
-			return HistoryRecord{}, fmt.Errorf("invalid observed_at for %s: %w", observation.ObservationID, err)
-		}
-		if observedTime.After(asOfTime) {
-			return HistoryRecord{}, fmt.Errorf("as_of cannot be before observed_at for %s", observation.ObservationID)
+		if err := validateCanonicalHistoryObservation(observation, asOfTime); err != nil {
+			return HistoryRecord{}, err
 		}
 		if seenObservationIDs[observation.ObservationID] {
 			return HistoryRecord{}, fmt.Errorf("duplicate observation_id %s in one history record", observation.ObservationID)
@@ -115,6 +159,8 @@ func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observat
 		return HistoryRecord{}, err
 	}
 	decision := evaluate(canonical)
+	decision.DecisionID = recordID
+	decision.EvidenceIDs = canonicalEvidenceIDs(canonical)
 	return HistoryRecord{
 		RecordID:       recordID,
 		AsOf:           asOf,
@@ -143,22 +189,22 @@ func validateHistoryRecord(record HistoryRecord) error {
 	if record.RecordedResult.FormulaVersion != record.FormulaVersion {
 		return errors.New("record formula_version must match recorded decision formula_version")
 	}
+	if record.RecordedResult.DecisionID != record.RecordID {
+		return errors.New("recorded decision_id must equal record_id in M02 learner runtime")
+	}
 	seenObservationIDs := map[string]bool{}
 	for _, observation := range record.Observations {
-		if strings.TrimSpace(observation.ObservationID) == "" {
-			return errors.New("observation_id is required for M02 history")
-		}
-		observedTime, err := time.Parse(time.RFC3339, observation.ObservedAt)
-		if err != nil {
-			return fmt.Errorf("invalid observed_at for %s: %w", observation.ObservationID, err)
-		}
-		if observedTime.After(asOfTime) {
-			return fmt.Errorf("as_of cannot be before observed_at for %s", observation.ObservationID)
+		if err := validateCanonicalHistoryObservation(observation, asOfTime); err != nil {
+			return err
 		}
 		if seenObservationIDs[observation.ObservationID] {
 			return fmt.Errorf("duplicate observation_id %s in one history record", observation.ObservationID)
 		}
 		seenObservationIDs[observation.ObservationID] = true
+	}
+	expectedEvidenceIDs := canonicalEvidenceIDs(record.Observations)
+	if !reflect.DeepEqual(record.RecordedResult.EvidenceIDs, expectedEvidenceIDs) {
+		return errors.New("recorded evidence_ids must exactly match canonical observation_ids")
 	}
 	hash, err := inputHash(record.Observations)
 	if err != nil {
@@ -257,6 +303,8 @@ func Replay(record HistoryRecord) ReplayReport {
 		return ReplayReport{RecordID: record.RecordID, State: replayUnreplayable, Reason: "formula_version không được runtime hiện tại hỗ trợ"}
 	}
 	actual := evaluate(record.Observations)
+	actual.DecisionID = record.RecordID
+	actual.EvidenceIDs = canonicalEvidenceIDs(record.Observations)
 	if reflect.DeepEqual(actual, record.RecordedResult) {
 		return ReplayReport{RecordID: record.RecordID, State: replayMatch, Reason: "same input + same formula_version tái tạo cùng decision"}
 	}
