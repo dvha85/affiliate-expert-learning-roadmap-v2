@@ -3,11 +3,11 @@
   "$id":"evaluation-record.schema.json",
   "title":"EvaluationRecord",
   "type":"object",
-  "required":["evaluation_id","decision_id","action_id","outcome_ids","evaluated_at","result","evidence_ids","limitations"],
+  "required":["evaluation_id","decision_id","effect_ref","outcome_ids","evaluated_at","result","evidence_ids","limitations"],
   "properties":{
     "evaluation_id":{"type":"string","minLength":1},
     "decision_id":{"type":"string","minLength":1},
-    "action_id":{"type":"string","minLength":1},
+    "effect_ref":{"$ref":"effect-ref.schema.json"},
     "outcome_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1},"uniqueItems":true},
     "evaluated_at":{"type":"string","format":"date-time"},
     "result":{"enum":["SUPPORTED","NOT_SUPPORTED","INCONCLUSIVE","NEEDS_MORE_DATA"]},
