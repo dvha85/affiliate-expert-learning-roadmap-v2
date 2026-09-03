@@ -7,6 +7,9 @@
 1. `BOOT.1` nếu chưa từng chạy/sửa/test Bot.
 2. `M00.1 → M00.2 → M00.3`.
 3. Hoàn thành evidence/artifact của M00 trước khi sang M01.
+4. Khi M00 PASS: `M01.1 → M01.2 → M01.3 → M01.4`.
+
+M01 đã **authoring ready**, nhưng điều này không bỏ qua M00 learner gate.
 
 ## Learner loop
 

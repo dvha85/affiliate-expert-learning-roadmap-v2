@@ -27,13 +27,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Validate clean authority and contracts
-        run: python scripts/validate_repo.py
+      - run: python scripts/validate_repo.py
       - name: Guard consequential boundaries
         run: |
           grep -q "Decision != Approval != Execution" CURRICULUM.md
           grep -q "Tool result != trusted evidence" CURRICULUM.md
           grep -q "real evidence != automatic recommendation" CURRICULUM.md
+          grep -q "real evidence != RECOMMEND" lab/affiliate-bot/README.md
+          grep -q '"M01-E07-conflict-dominates-missing"' evals/M01-deterministic-bot/cases.json
 
   python-regression:
     name: python-regression
@@ -54,9 +55,12 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
-      - name: Go test
+      - name: Go test including M01 eval pack
         working-directory: lab/affiliate-bot
         run: go test ./...
+      - name: Go vet
+        working-directory: lab/affiliate-bot
+        run: go vet ./...
       - name: Run deterministic baseline
         working-directory: lab/affiliate-bot
         run: go run ./cmd/bot
