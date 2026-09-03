@@ -1,18 +1,18 @@
 # M09 Bằng chứng đã vận hành
 
-- Decision/Evidence chain đã dùng:
+- Chuỗi Decision/Evidence đã dùng:
 - `intent_id` + `intent_hash`:
-- policy version + policy state:
-- `approval_id` + human approver + approved/expires time:
-- `authorization_id` + executor profile:
-- persisted state path/version:
-- restart/resume revalidation result:
-- kill-switch case:
-- hash/policy mismatch case:
-- wrong executor/target case:
-- duplicate/idempotency case:
-- ExecutionRecord + external/local sandbox ref:
-- proof side effect chỉ xảy ra sau approval:
-- failure/recovery/reconciliation note:
+- phiên bản policy + trạng thái policy:
+- `approval_id` + người phê duyệt + thời điểm phê duyệt/hết hạn:
+- `authorization_id` + hồ sơ executor:
+- đường dẫn/phiên bản trạng thái đã lưu:
+- kết quả revalidation khi restart/resume:
+- ca kiểm kill switch:
+- ca mismatch hash/policy:
+- ca executor/target không hợp lệ:
+- ca duplicate/idempotency:
+- ExecutionRecord + tham chiếu external/local sandbox:
+- bằng chứng side effect chỉ xảy ra sau approval:
+- ghi chú failure/recovery/reconciliation (lỗi/phục hồi/đối soát):
 - limitation (giới hạn):
 - next measurement (phép đo tiếp theo):
