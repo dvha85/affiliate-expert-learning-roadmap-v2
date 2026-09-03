@@ -1,7 +1,7 @@
 ---
 mission_id: M02
 title: Trustworthy History + Replay v0.2
-status: ready
+status: planned
 requires_missions: [M01]
 minimum_evidence: E1 + replayable local history
 authority: A0 deterministic
@@ -42,7 +42,7 @@ observation_id = một observation cụ thể của subject đó
 record_id      = một decision/history snapshot cụ thể
 ```
 
-Không dùng product name làm stable identity và không tái sử dụng một `observation_id` cho nội dung khác.
+Không dùng product name làm stable identity và không tái sử dụng một `observation_id` cho nội dung khác. Cùng `observation_id` nhưng canonical content khác là conflict, không phải một observation mới.
 
 ### Time
 
@@ -52,7 +52,7 @@ ingested_at = khi Bot nhận/lưu record
 as_of       = thời điểm decision context được đánh giá
 ```
 
-Ba timestamp này có vai trò khác nhau. Arrival order không được giả làm world-time order.
+Ba timestamp này có vai trò khác nhau. Arrival order không được giả làm world-time order. Một decision record cũng không được có `as_of` sớm hơn observation mà nó tuyên bố đã sử dụng.
 
 ### Append-only history
 
@@ -68,7 +68,7 @@ same record_id + different canonical content
 → reject / human review
 ```
 
-Valid late/out-of-order record vẫn phải được preserve; query/report sort theo `as_of`, không theo thứ tự dòng trong file.
+Valid late/out-of-order record vẫn phải được preserve; query/report sort theo parsed `as_of`, không theo thứ tự dòng trong file hay `ingested_at`.
 
 ### Replay
 
@@ -89,6 +89,8 @@ known version + different result → DRIFT
 unknown/retired version → UNREPLAYABLE
 ```
 
+Nếu `input_hash` không còn khớp hoặc record hỏng, đó là **integrity failure trước replay**, không phải replay state thứ tư. Record phải fail closed và không được báo `MATCH`/`DRIFT` giả.
+
 `UNREPLAYABLE` phải được báo rõ; không được tự động chạy formula mới rồi gọi đó là replay thành công.
 
 ## Ship target
@@ -98,10 +100,12 @@ M02 hoàn chỉnh khi repo có:
 - lesson cards M02.1–M02.4;
 - `HistoryRecord` machine contract;
 - append/read/query/replay path trong `lab/affiliate-bot`;
-- executable eval pack cho duplicate/conflict/out-of-order/corruption/replay drift;
+- executable eval pack cho duplicate/conflict/out-of-order/corruption/integrity/replay drift;
 - starter/checkpoint + private operated-evidence template;
 - restart proof;
 - CI bảo vệ M01 regression + M02 replay semantics.
+
+Trong authoring, Mission phải giữ `planned`. Chỉ chuyển `ready` sau khi toàn bộ asset trên tồn tại và CI của chính PR PASS.
 
 ## Reality boundary
 
@@ -140,9 +144,10 @@ Decision != Approval != Execution
 
 ### Capability
 - append-only history không overwrite evidence;
-- exact duplicate idempotent, conflict fail rõ;
-- corrupt/truncated JSONL fail closed;
-- out-of-order record được preserve và query theo `as_of`;
+- immutable snapshot không đổi khi caller mutate object sau capture;
+- exact duplicate idempotent, record/observation identity conflict fail rõ;
+- corrupt/truncated JSONL và hash tamper fail closed;
+- out-of-order record được preserve và query theo parsed `as_of`;
 - replay phân biệt `MATCH`, `DRIFT`, `UNREPLAYABLE`;
 - M01 regression vẫn PASS.
 
@@ -151,7 +156,7 @@ Decision != Approval != Execution
 
 ### Operated
 - learner đã append, restart, query, replay và rerun cùng history/version để chứng minh output deterministic;
-- learner explain-back được `observed_at != ingested_at != as_of` và giới hạn của replay.
+- learner explain-back được `observed_at != ingested_at != as_of`, integrity failure và giới hạn của replay.
 
 ## Result
 

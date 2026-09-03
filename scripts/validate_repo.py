@@ -18,19 +18,20 @@ REQUIRED = [
     "curriculum/M02/M02.3-versioned-replay-drift.md",
     "curriculum/M02/M02.4-restart-query-operated-proof.md",
     "missions/README.md", "missions/M00-first-real-evidence-packet.md",
-    "missions/M01-smallest-deterministic-bot.md",
-    "missions/M02-trustworthy-history-replay.md",
+    "missions/M01-smallest-deterministic-bot.md", "missions/M02-trustworthy-history-replay.md",
     "starter-kits/M01-deterministic-bot/CHECKPOINTS.md",
     "starter-kits/M01-deterministic-bot/M01-OPERATED-EVIDENCE-TEMPLATE.md",
+    "starter-kits/M02-history-replay/README.md",
     "starter-kits/M02-history-replay/CHECKPOINTS.md",
     "starter-kits/M02-history-replay/M02-OPERATED-EVIDENCE-TEMPLATE.md",
     "evals/M01-deterministic-bot/cases.json",
-    "evals/M02-history-replay/cases.json",
+    "evals/M02-history-replay/README.md", "evals/M02-history-replay/cases.json",
     "docs/architecture/ARCHITECTURE.md", "docs/technology/TECHNOLOGY-PROFILE.md",
     "contracts/observation.schema.json", "contracts/decision-packet.schema.json",
     "contracts/history-record.schema.json", "contracts/action-intent.schema.json",
     "contracts/policy-decision.schema.json",
     "lab/affiliate-bot/cmd/bot/history.go", "lab/affiliate-bot/cmd/bot/history_test.go",
+    "lab/affiliate-bot/data/m02-sample-observations.json",
 ]
 
 errors = []
@@ -65,12 +66,27 @@ def validate_eval(path_str, minimum, prefix):
             errors.append(f"{prefix} eval case_id must be non-empty")
         if len(ids) != len(set(ids)):
             errors.append(f"{prefix} eval case_id values must be unique")
+        return cases
     except Exception as exc:
         errors.append(f"invalid {prefix} eval pack: {exc}")
+        return []
 
 
 validate_eval("evals/M01-deterministic-bot/cases.json", 8, "M01")
-validate_eval("evals/M02-history-replay/cases.json", 8, "M02")
+m02_cases = validate_eval("evals/M02-history-replay/cases.json", 12, "M02")
+m02_ids = {case.get("case_id") for case in m02_cases}
+for required_case in [
+    "M02-E01-out-of-order-query",
+    "M02-E07-input-hash-tamper",
+    "M02-E10-canonical-hash-order-invariant",
+    "M02-E11-as-of-before-observed",
+    "M02-E12-observation-id-reuse-conflict",
+]:
+    if required_case not in m02_ids:
+        errors.append(f"M02 required eval case missing: {required_case}")
+for case in m02_cases:
+    if not case.get("mode"):
+        errors.append(f"M02 eval case must declare executable mode: {case.get('case_id')}")
 
 m01 = (ROOT / "missions/M01-smallest-deterministic-bot.md").read_text(encoding="utf-8")
 for marker in ["status: ready", "starter-kits/M01-deterministic-bot/", "evals/M01-deterministic-bot/", "lab/affiliate-bot/"]:
@@ -79,17 +95,27 @@ for marker in ["status: ready", "starter-kits/M01-deterministic-bot/", "evals/M0
 
 m02 = (ROOT / "missions/M02-trustworthy-history-replay.md").read_text(encoding="utf-8")
 for marker in [
-    "status: ready", "starter-kits/M02-history-replay/", "evals/M02-history-replay/",
+    "status: planned", "starter-kits/M02-history-replay/", "evals/M02-history-replay/",
     "MATCH | DRIFT | UNREPLAYABLE", "observed_at", "ingested_at", "as_of",
+    "integrity failure", "CI",
 ]:
     if marker not in m02:
-        errors.append(f"M02 ready contract missing marker: {marker}")
+        errors.append(f"M02 planned authoring contract missing marker: {marker}")
+
+mission_index = (ROOT / "missions/README.md").read_text(encoding="utf-8")
+if "| M02 | Trustworthy History + Replay v0.2 | A0 deterministic | planned |" not in mission_index:
+    errors.append("M02 mission index must remain planned before CI gate")
 
 history_schema = json.loads((ROOT / "contracts/history-record.schema.json").read_text(encoding="utf-8"))
 history_required = set(history_schema.get("required", []))
 for field in ["record_id", "as_of", "ingested_at", "formula_version", "input_hash", "observations", "recorded_result"]:
     if field not in history_required:
         errors.append(f"HistoryRecord required field missing: {field}")
+obs_schema = history_schema.get("properties", {}).get("observations", {}).get("items", {})
+obs_required = set(obs_schema.get("required", []))
+for field in ["observation_id", "product_id", "observed_at", "evidence_kind"]:
+    if field not in obs_required:
+        errors.append(f"HistoryRecord observation required field missing: {field}")
 
 for forbidden in [
     ROOT / "lessons" / "V2-LESSON-MAP.json",
@@ -105,4 +131,4 @@ if errors:
         print(f"- {error}")
     sys.exit(1)
 
-print("VALIDATION PASS: clean v2 authority and M00/M01/M02 delivery assets are consistent")
+print("VALIDATION PASS: clean v2 authority, M00/M01 delivery and complete M02 planned authoring gate are consistent")

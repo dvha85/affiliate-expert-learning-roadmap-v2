@@ -24,15 +24,19 @@ Append commands/results:
 History count before restart:
 History count after restart:
 Evidence that old record was not overwritten:
+Evidence snapshot did not change after source object/file handling:
 ```
 
 ## Failure cases
 
 ```text
 Exact duplicate result:
-Conflict result:
+Same record_id conflict result:
+Same observation_id + different content result:
 Out-of-order result:
 Corrupt-line result:
+Hash-tamper result:
+as_of-before-observed_at result:
 ```
 
 ## Replay
@@ -40,7 +44,8 @@ Corrupt-line result:
 ```text
 Formula version:
 Input hash verified? yes/no
-Replay state: MATCH | DRIFT | UNREPLAYABLE
+Integrity gate: PASS | ERROR
+Replay state if integrity PASS: MATCH | DRIFT | UNREPLAYABLE
 Rerun same result? yes/no
 ```
 
@@ -48,9 +53,11 @@ Rerun same result? yes/no
 
 ```text
 What replay MATCH proves:
-What it does NOT prove:
+What replay MATCH does NOT prove:
 Why formula_version must be preserved:
 Why observed_at != ingested_at != as_of:
+Why integrity failure is not DRIFT:
+Why input_hash is integrity evidence, not market truth:
 Why history/replay gives no execution permission:
 Next measurement:
 ```
