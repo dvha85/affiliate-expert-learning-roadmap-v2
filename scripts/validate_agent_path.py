@@ -70,8 +70,8 @@ for marker in [
     "DRY_RUN_ONLY","BROKEN_LINK","REJECT_MACHINE_EXECUTION","REJECT_WRITE_REQUEST","ABSTAIN_FUTURE","REJECT_AUTO_APPLY",
     "REJECT_WRITE_METHOD","REJECT_TOOL","REJECT_UNGROUNDED","NormalizeWatchObservation","ValidateEvaluationRecord","ValidateReviewRecord",
     "TAMPERED_INTENT","EXPIRED_INTENT","IDEMPOTENCY_COLLISION","POLICY_UNAVAILABLE","execution_authorized","SHADOW_POLICY_ALLOW",
-    "KnownProposalIDs","UNKNOWN_ACTION_POLICY","WAIT_APPROVAL","DENY_INVALID_APPROVER","DENY_APPROVAL_MISMATCH","DENY_APPROVAL_BEFORE_POLICY","DENY_KILL_SWITCH",
-    "WAIT_ALREADY_EXECUTED","PersistM09State","LoadM09State","ExecuteLocalSandbox","AllowedExecutorIDs",
+    "KnownProposalIDs","UNKNOWN_ACTION_POLICY","WAIT_APPROVAL","DENY_INVALID_APPROVER","DENY_APPROVAL_MISMATCH","DENY_APPROVAL_BEFORE_POLICY","DENY_POLICY_REVALIDATION","DENY_KILL_SWITCH",
+    "WAIT_ALREADY_EXECUTED","WAIT_APPROVAL_CONSUMED","WAIT_RECONCILIATION","PersistM09State","LoadM09State","ExecuteLocalSandbox","AllowedExecutorIDs","APPROVED_LIVE",
 ]:
     if marker not in runtime: errors.append(f"runtime safety/integration marker missing: {marker}")
 
@@ -104,13 +104,13 @@ m08_cases=json.loads((ROOT/"evals/M08-shadow-policy/cases.json").read_text(encod
 for reason in ["SHADOW_POLICY_ALLOW","TAMPERED_INTENT","EXPIRED_INTENT","MISSING_DECISION_LINK","MISSING_EVIDENCE_LINK","MISSING_PROPOSAL_LINK","DUPLICATE_INTENT","IDEMPOTENCY_COLLISION","POLICY_UNAVAILABLE","UNKNOWN_ACTION_POLICY"]:
     if not any(c.get("expected_reason")==reason for c in m08_cases): errors.append(f"M08 eval missing failure/boundary case: {reason}")
 
-# M09 approval/execution semantics: human-only, exact binding, one-time, fail closed, no auto-action.
+# M09 approval/execution semantics: human-only, exact binding, durable one-time/idempotency, fail closed, no auto-action.
 approval=(ROOT/"contracts/approval-record.schema.json").read_text(encoding="utf-8");auth=(ROOT/"contracts/execution-authorization.schema.json").read_text(encoding="utf-8");execution=(ROOT/"contracts/execution-record.schema.json").read_text(encoding="utf-8")
 for marker in ["approved_by","human","approver_id","intent_hash","policy_version","one_time","expires_at"]:
     if marker not in approval: errors.append(f"M09 ApprovalRecord missing: {marker}")
-for marker in ["approval_id","executor_id","execution_authorized","idempotency_key","intent_hash"]:
+for marker in ["approval_id","executor_id","execution_authorized","idempotency_key","intent_hash","execution_mode","APPROVED_LIVE"]:
     if marker not in auth: errors.append(f"M09 ExecutionAuthorization missing: {marker}")
-for marker in ["authorization_id","approval_id","side_effect_performed","status","intent_hash"]:
+for marker in ["authorization_id","approval_id","idempotency_key","side_effect_state","RECONCILIATION_REQUIRED","UNKNOWN","status","intent_hash"]:
     if marker not in execution: errors.append(f"M09 ExecutionRecord missing: {marker}")
 m09_cases=json.loads((ROOT/"evals/M09-approval-execution/cases.json").read_text(encoding="utf-8"))
 for expected in ["AUTHORIZED","WAIT_APPROVAL","DENY_REJECTED","DENY_INVALID_APPROVER","DENY_APPROVAL_MISMATCH","DENY_APPROVAL_BEFORE_POLICY","DENY_EXPIRED_APPROVAL","DENY_KILL_SWITCH","DENY_EXECUTOR","DENY_POLICY_STATE","WAIT_ALREADY_EXECUTED","DENY_TAMPERED_INTENT","DENY_EXPIRED_INTENT"]:
