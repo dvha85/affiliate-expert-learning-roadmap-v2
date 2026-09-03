@@ -38,4 +38,8 @@ Capability PASS (năng lực đạt)
 → Mission PASS
 ```
 
+`ready` của nội dung nghĩa là lesson + mission contract + starter/checkpoints + executable eval/runtime + CI guard đã đủ để learner tự thực hành. Blueprint/placeholder chỉ minh họa không đủ để gọi Mission learner-operable ready.
+
+Từ M02 trở đi, artifact phải nối được với artifact trước đó; ID mồ côi không được dùng để claim Reality/Operated PASS.
+
 Technology (công nghệ) không quyết định thứ tự học. Go/n8n/Agent/MCP/Temporal/OPA chỉ được đưa vào khi Mission hiện tại có nhu cầu và adoption gate (cổng áp dụng) đạt.

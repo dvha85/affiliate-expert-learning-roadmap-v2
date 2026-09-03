@@ -22,6 +22,8 @@ Thứ tự học được quyết định bởi `CURRICULUM.md`.
 O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → M09 → M10 → M11
 ```
 
-`ready` nghĩa là lesson + starter + executable eval/runtime cần thiết đã được soạn và CI bảo vệ. Nó **không** có nghĩa người học đã PASS. Learner PASS phụ thuộc evidence thật và operated result theo Mission contract.
+`ready` nghĩa là lesson + Mission contract + starter README + checkpoints + operated-evidence template + executable eval/runtime + CI guard đã được soạn. Với Mission có orchestration/Agent, blueprint phải thực sự chứa capability learner cần vận hành; placeholder không đủ để gọi `ready`.
 
-M06/M07 có n8n blueprint để học orchestration/Agent nhưng CI kiểm authority boundary bằng `lab/mission-runtime` offline, không cần API key hay dịch vụ ngoài.
+`ready` **không** có nghĩa người học đã PASS. Learner PASS phụ thuộc evidence thật, cross-artifact linkage và operated result theo Mission contract.
+
+M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài.

@@ -98,10 +98,8 @@ Mục tiêu bàn giao:
 3+ public observations (quan sát công khai) có source + observed_at + access_method
 → provenance/limitation (nguồn gốc/giới hạn) rõ
 → fact / estimate / assumption / unknown
-  (sự thật được hỗ trợ / ước tính / giả định / chưa biết)
-→ Human DecisionPacket (gói quyết định do người lập)
+→ Human DecisionPacket
 → state + reason + missing evidence + next measurement
-  (trạng thái + lý do + bằng chứng thiếu + phép đo tiếp theo)
 → KHÔNG thực thi hành động bên ngoài
 ```
 
@@ -124,27 +122,36 @@ M00 — người/read-only (chỉ đọc)
 
 ```text
 DETERMINISTIC CORE FIRST != CODE FIRST
-(ưu tiên lõi tất định != ưu tiên viết code trước)
-
 NO-CODE WHEN AUDITABLE
-(không cần code khi vẫn kiểm toán được)
-
 CODE WHEN IT REDUCES AMBIGUITY OR FAILURE SURFACE
-(dùng code khi nó giảm mơ hồ hoặc bề mặt lỗi)
-
 AGENT WHEN DETERMINISTIC LOGIC IS NOT ENOUGH
-(dùng Agent khi logic tất định không đủ)
-
-AUTOMATION ONLY AFTER EVIDENCE + POLICY + AUDIT + RECOVERY
-(chỉ tự động hóa sau khi có bằng chứng + chính sách + kiểm toán + phục hồi)
-
+READ-ONLY AUTOMATION MAY START AT M06 UNDER A BOUNDED SAFE PROFILE
+(tự động hóa chỉ đọc có thể bắt đầu ở M06 dưới hồ sơ an toàn bị giới hạn)
+CONSEQUENTIAL / WRITE AUTOMATION ONLY AFTER EVIDENCE + POLICY + AUDIT + RECOVERY
+(chỉ tự động hóa ghi/có hậu quả sau khi có bằng chứng + chính sách + kiểm toán + phục hồi)
 CURRENT IMPLEMENTATION LIMIT != FUNDAMENTAL SYSTEM LAW
-(giới hạn triển khai hiện tại != quy luật nền tảng của hệ thống)
 ```
 
 Semantics (ngữ nghĩa) của Mission không phụ thuộc vendor/framework. Technology Profile (hồ sơ công nghệ) có thể đổi mà không đổi trần quyền hạn.
 
-## 8. Thang bằng chứng thực tế
+## 8. Tính liên tục của artifact
+
+Từ M02 trở đi, learner không xây các demo rời. ID tham chiếu trong artifact phải resolve được về artifact trước đó khi Mission contract yêu cầu:
+
+```text
+HistoryRecord / DecisionPacket
+→ ActionRecord
+→ OutcomeRecord
+→ EvaluationRecord
+→ ImprovementProposal
+→ ReviewRecord
+→ automated Observation
+→ grounded Advisor/Agent output
+```
+
+Schema hợp lệ nhưng tham chiếu mồ côi không đủ để claim Reality/Operated PASS.
+
+## 9. Thang bằng chứng thực tế
 
 | Mức | Bằng chứng |
 |---|---|
@@ -158,7 +165,7 @@ Semantics (ngữ nghĩa) của Mission không phụ thuộc vendor/framework. Te
 
 Sample (mẫu) không thể thay E1–E6. `real` chỉ mô tả origin (nguồn gốc); không tự chứng minh source đáng tin, hiện hành, có thẩm quyền hoặc đầy đủ.
 
-## 9. Mô hình PASS
+## 10. Mô hình PASS
 
 Mission chỉ PASS khi contract của Mission đạt các lớp áp dụng:
 
@@ -170,7 +177,7 @@ Capability (năng lực)
 
 `draft`, `ready`, CI xanh hoặc fixture PASS không tự tạo Reality PASS.
 
-## 10. Thứ tự thẩm quyền trong repo v2
+## 11. Thứ tự thẩm quyền trong repo v2
 
 1. `CURRICULUM.md` — thứ tự/bằng chứng/quyền hạn/PASS.
 2. `curriculum/` — đường học hiện hành.

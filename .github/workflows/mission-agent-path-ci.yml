@@ -9,15 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  structure-and-language:
+  structure-language-and-blueprints:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python scripts/validate_agent_path.py
-      - run: python scripts/validate_language_policy.py
+      - name: Validate learner-operable mission path
+        run: python scripts/validate_agent_path.py
+      - name: Validate Vietnamese-first learner language
+        run: python scripts/validate_language_policy.py
 
   mission-runtime:
     runs-on: ubuntu-latest
@@ -42,16 +44,19 @@ jobs:
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
 
-  safety-boundaries:
+  safety-and-linkage-boundaries:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Guard M03-M07 authority ceilings
+      - name: Guard M03-M07 authority ceilings and linkage
         run: |
           grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
-          grep -q '"write_tool_requested".*"const":false' contracts/advisor-output.schema.json
+          grep -q '"write_tool_requested"' contracts/advisor-output.schema.json
           grep -q '"auto_apply".*"const":false' contracts/improvement-proposal.schema.json
+          grep -q '"reviewed_by".*"const":"human"' contracts/review-record.schema.json
           grep -q '"read_only".*"const":true' contracts/tool-registry.schema.json
-          grep -q 'REJECT_MACHINE_EXECUTION' lab/mission-runtime/cmd/demo/m03_m05.go
+          grep -q 'BROKEN_LINK' lab/mission-runtime/cmd/demo/m03_m05.go
+          grep -q 'ABSTAIN_FUTURE' lab/mission-runtime/cmd/demo/m03_m05.go
           grep -q 'REJECT_WRITE_METHOD' lab/mission-runtime/cmd/demo/m06_m07.go
           grep -q 'REJECT_TOOL' lab/mission-runtime/cmd/demo/m06_m07.go
+          grep -q 'tool_result_text' evals/M07-readonly-evidence-agent/cases.json

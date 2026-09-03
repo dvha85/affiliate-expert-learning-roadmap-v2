@@ -1,0 +1,16 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"review-record.schema.json",
+  "title":"ReviewRecord",
+  "type":"object",
+  "required":["review_id","proposal_id","reviewed_by","reviewed_at","decision","reason"],
+  "properties":{
+    "review_id":{"type":"string","minLength":1},
+    "proposal_id":{"type":"string","minLength":1},
+    "reviewed_by":{"const":"human"},
+    "reviewed_at":{"type":"string","format":"date-time"},
+    "decision":{"enum":["APPROVE_FOR_MANUAL_CHANGE","REJECT","REQUEST_CHANGES"]},
+    "reason":{"type":"string","minLength":1}
+  },
+  "additionalProperties":false
+}
