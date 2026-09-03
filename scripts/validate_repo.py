@@ -79,11 +79,11 @@ for marker in ["status: ready", "starter-kits/M01-deterministic-bot/", "evals/M0
 
 m02 = (ROOT / "missions/M02-trustworthy-history-replay.md").read_text(encoding="utf-8")
 for marker in [
-    "status: planned", "starter-kits/M02-history-replay/", "evals/M02-history-replay/",
+    "status: ready", "starter-kits/M02-history-replay/", "evals/M02-history-replay/",
     "MATCH | DRIFT | UNREPLAYABLE", "observed_at", "ingested_at", "as_of",
 ]:
     if marker not in m02:
-        errors.append(f"M02 authoring contract missing marker: {marker}")
+        errors.append(f"M02 ready contract missing marker: {marker}")
 
 history_schema = json.loads((ROOT / "contracts/history-record.schema.json").read_text(encoding="utf-8"))
 history_required = set(history_schema.get("required", []))
@@ -105,4 +105,4 @@ if errors:
         print(f"- {error}")
     sys.exit(1)
 
-print("VALIDATION PASS: clean v2 authority, M00/M01 delivery and M02 planned authoring assets are consistent")
+print("VALIDATION PASS: clean v2 authority and M00/M01/M02 delivery assets are consistent")
