@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/mission-runtime/go.mod
-      - name: O00 and M03-M07 executable eval packs
+      - name: O00 and M03-M08 executable eval packs
         working-directory: lab/mission-runtime
         run: go test ./...
       - name: Vet mission runtime
@@ -43,12 +43,14 @@ jobs:
           go run ./cmd/demo M05 | grep -q 'REVIEW_REQUIRED'
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
+          go run ./cmd/demo M08 | grep -q 'SHADOW_POLICY_ALLOW'
+          go run ./cmd/demo M08 | grep -q '"execution_authorized": false'
 
   safety-and-linkage-boundaries:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Guard M03-M07 authority ceilings and linkage
+      - name: Guard M03-M08 authority ceilings and linkage
         run: |
           grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
           grep -q '"write_tool_requested"' contracts/advisor-output.schema.json
@@ -60,3 +62,9 @@ jobs:
           grep -q 'REJECT_WRITE_METHOD' lab/mission-runtime/cmd/demo/m06_m07.go
           grep -q 'REJECT_TOOL' lab/mission-runtime/cmd/demo/m06_m07.go
           grep -q 'tool_result_text' evals/M07-readonly-evidence-agent/cases.json
+          grep -q '"shadow_only".*"const": true' contracts/action-intent.schema.json
+          grep -q '"dry_run".*"const": true' contracts/action-intent.schema.json
+          grep -q '"execution_authorized".*"const": false' contracts/policy-decision.schema.json
+          grep -q 'TAMPERED_INTENT' lab/mission-runtime/cmd/demo/m08.go
+          grep -q 'IDEMPOTENCY_COLLISION' lab/mission-runtime/cmd/demo/m08.go
+          grep -q 'POLICY_UNAVAILABLE' lab/mission-runtime/cmd/demo/m08.go

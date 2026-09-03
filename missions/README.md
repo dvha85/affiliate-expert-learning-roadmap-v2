@@ -13,7 +13,7 @@ Thứ tự học được quyết định bởi `CURRICULUM.md`.
 | M05 | First Reviewed Improvement (cải tiến đầu tiên có review) | A1 chỉ đề xuất | ready |
 | M06 | Reliable Automatic Watcher (bộ theo dõi tự động chỉ đọc đáng tin) | tự động chỉ đọc | ready |
 | M07 | Read-only Evidence Agent (Agent bằng chứng chỉ đọc) | A2-RO | ready |
-| M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | A3-shadow | planned |
+| M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | A3-shadow | ready |
 | M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | qua cổng phê duyệt | planned |
 | M10 | Governed Canary (canary có quản trị) | tự động RISK0/RISK1 trong giới hạn | planned |
 | M11 | Production Closed Loop (vòng kín production có quản trị) | production có quản trị | planned |
@@ -26,4 +26,4 @@ O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → 
 
 `ready` **không** có nghĩa người học đã PASS. Learner PASS phụ thuộc evidence thật, cross-artifact linkage và operated result theo Mission contract.
 
-M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài.
+M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài. M08 dùng deterministic Go reference để learner quan sát exact binding/fail-closed semantics; OPA chưa phải dependency mặc định.
