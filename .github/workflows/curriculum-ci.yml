@@ -1,0 +1,62 @@
+name: Curriculum CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  curriculum:
+    name: curriculum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python scripts/validate_repo.py
+
+  evidence-and-safety:
+    name: evidence-and-safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Validate clean authority and contracts
+        run: python scripts/validate_repo.py
+      - name: Guard consequential boundaries
+        run: |
+          grep -q "Decision != Approval != Execution" CURRICULUM.md
+          grep -q "Tool result != trusted evidence" CURRICULUM.md
+          grep -q "real evidence != automatic recommendation" CURRICULUM.md
+
+  python-regression:
+    name: python-regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m compileall -q scripts
+      - run: python scripts/validate_repo.py
+
+  deterministic-runtime:
+    name: deterministic-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+      - name: Go test
+        working-directory: lab/affiliate-bot
+        run: go test ./...
+      - name: Run deterministic baseline
+        working-directory: lab/affiliate-bot
+        run: go run ./cmd/bot
