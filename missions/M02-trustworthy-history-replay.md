@@ -138,7 +138,7 @@ Nếu restart làm mất history, M02 chưa đạt Operated.
 - `as_of < observed_at` → reject;
 - timestamp invalid → reject;
 - `input_hash` mismatch → integrity failure;
-- corrupt JSONL → fail closed;
+- JSONL bị hỏng (corrupt) → fail closed (đóng an toàn);
 - unsupported `formula_version` → `UNREPLAYABLE`, không silent fallback;
 - cùng canonical input nhưng observation order khác → cùng hash;
 - replay result khác recorded result cùng version → `DRIFT`.
@@ -147,8 +147,8 @@ Nếu restart làm mất history, M02 chưa đạt Operated.
 
 ### Capability (năng lực)
 
-- executable eval M02 PASS;
-- Go tests/vet PASS;
+- bộ eval M02 có thể chạy (executable eval) phải PASS;
+- kiểm thử Go và `go vet` phải PASS;
 - capture/list/replay hoạt động qua restart;
 - history fail closed với tamper/corruption/version unknown.
 
