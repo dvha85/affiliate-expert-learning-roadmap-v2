@@ -12,6 +12,6 @@ Các schema trong thư mục này mô tả boundary máy đọc của hệ thố
 - M05: `EvaluationRecord` + `ImprovementProposal` + `ReviewRecord`; proposal versioned, reviewable, rollbackable, `auto_apply=false`.
 - M06: watcher phải normalize về canonical `Observation`; read-only/change-detection semantics được bảo vệ bằng runtime/eval.
 - M07: `ToolRegistry` chỉ cho read-only tools/methods/hosts; tool output luôn là untrusted data.
-- `ActionIntent`/`PolicyDecision` được định nghĩa sớm nhưng chỉ activate từ M08+ theo curriculum.
+- M08: `ActionIntent` + `PolicyDecision` được activate ở **shadow only**; exact intent binding/hash/expiry/idempotency/linkage phải được kiểm và `execution_authorized=false` luôn bắt buộc.
 
-Contract tồn tại **không tự cấp authority** cho Mission trước. Schema-valid reference nhưng không resolve được provenance không đủ cho Reality/Operated PASS.
+Contract tồn tại **không tự cấp authority** cho Mission trước hoặc sau. `ALLOW` trong M08 không phải execution permission. Schema-valid reference nhưng không resolve được provenance không đủ cho Reality/Operated PASS.

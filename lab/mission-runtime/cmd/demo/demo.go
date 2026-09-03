@@ -14,7 +14,7 @@ type missionDemoEnvelope struct {
 
 func runMissionDemo(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: mission-demo O00|M03|M04|M05|M06|M07")
+		return errors.New("usage: mission-demo O00|M03|M04|M05|M06|M07|M08")
 	}
 	id := strings.ToUpper(args[0])
 	var result any
@@ -31,6 +31,8 @@ func runMissionDemo(args []string) error {
 		result = EvaluateWatchRequest(WatchRequest{Method: "GET", URL: "https://example.com/offer", AllowHosts: []string{"example.com"}, ObservedAt: "2026-09-03T01:00:00Z", CorrelationID: "c1", Body: "price=100"})
 	case "M07":
 		result = EvaluateAgentProposal(AgentProposal{State: "PROPOSE", EvidenceIDs: []string{"e1"}, ToolCalls: []AgentToolCall{{ToolName: "public_http", Method: "GET", Target: "https://example.com/offer"}}}, []ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}}}, []string{"e1"})
+	case "M08":
+		result = demoM08Decision()
 	default:
 		return fmt.Errorf("unknown mission %s", id)
 	}

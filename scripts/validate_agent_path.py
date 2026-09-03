@@ -12,6 +12,8 @@ required = [
     "lab/mission-runtime/cmd/demo/main.go",
     "lab/mission-runtime/cmd/demo/m03_m05.go",
     "lab/mission-runtime/cmd/demo/m06_m07.go",
+    "lab/mission-runtime/cmd/demo/m08.go",
+    "lab/mission-runtime/cmd/demo/m08_test.go",
     "lab/mission-runtime/cmd/demo/mission_runtime_test.go",
     "lab/n8n/M06-readonly-watcher.blueprint.json",
     "lab/n8n/M07-readonly-evidence-agent.blueprint.json",
@@ -22,31 +24,29 @@ required = [
     "contracts/improvement-proposal.schema.json",
     "contracts/review-record.schema.json",
     "contracts/tool-registry.schema.json",
+    "contracts/action-intent.schema.json",
+    "contracts/policy-decision.schema.json",
 ]
-for mission in range(3, 8):
+starter_names = {
+    "M03": "tracked-human-action",
+    "M04": "grounded-ai-advisor",
+    "M05": "reviewed-improvement",
+    "M06": "readonly-watcher",
+    "M07": "readonly-evidence-agent",
+    "M08": "shadow-policy",
+}
+for mission in range(3, 9):
     mid = f"M{mission:02d}"
     required.extend([
-        f"starter-kits/{mid}-" + {
-            "M03": "tracked-human-action",
-            "M04": "grounded-ai-advisor",
-            "M05": "reviewed-improvement",
-            "M06": "readonly-watcher",
-            "M07": "readonly-evidence-agent",
-        }[mid] + "/CHECKPOINTS.md",
-        f"starter-kits/{mid}-" + {
-            "M03": "tracked-human-action",
-            "M04": "grounded-ai-advisor",
-            "M05": "reviewed-improvement",
-            "M06": "readonly-watcher",
-            "M07": "readonly-evidence-agent",
-        }[mid] + f"/{mid}-OPERATED-EVIDENCE-TEMPLATE.md",
+        f"starter-kits/{mid}-{starter_names[mid]}/CHECKPOINTS.md",
+        f"starter-kits/{mid}-{starter_names[mid]}/{mid}-OPERATED-EVIDENCE-TEMPLATE.md",
     ])
 
 for rel in required:
     if not (ROOT / rel).exists():
         errors.append(f"missing required file: {rel}")
 
-for mission in range(3, 8):
+for mission in range(3, 9):
     mid = f"M{mission:02d}"
     if not (ROOT / "curriculum" / mid).is_dir(): errors.append(f"missing curriculum directory: {mid}")
     if not any((ROOT / "missions").glob(f"{mid}-*.md")): errors.append(f"missing mission contract: {mid}")
@@ -56,22 +56,25 @@ for mission in range(3, 8):
 json_files = [
     "contracts/action-record.schema.json","contracts/outcome-record.schema.json","contracts/advisor-output.schema.json",
     "contracts/evaluation-record.schema.json","contracts/improvement-proposal.schema.json","contracts/review-record.schema.json",
-    "contracts/tool-registry.schema.json","lab/n8n/M06-readonly-watcher.blueprint.json","lab/n8n/M07-readonly-evidence-agent.blueprint.json",
+    "contracts/tool-registry.schema.json","contracts/action-intent.schema.json","contracts/policy-decision.schema.json",
+    "lab/n8n/M06-readonly-watcher.blueprint.json","lab/n8n/M07-readonly-evidence-agent.blueprint.json",
+    "evals/M08-shadow-policy/cases.json",
 ]
 for rel in json_files:
     try: json.loads((ROOT / rel).read_text(encoding="utf-8"))
     except Exception as exc: errors.append(f"invalid JSON {rel}: {exc}")
 
 mission_index = (ROOT / "missions/README.md").read_text(encoding="utf-8")
-for mid in ["M03","M04","M05","M06","M07"]:
+for mid in ["M03","M04","M05","M06","M07","M08"]:
     line = next((line for line in mission_index.splitlines() if line.startswith(f"| {mid} |")), "")
     if "| ready |" not in line: errors.append(f"{mid} must be ready in mission index")
 
-runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m03_m05.go","m06_m07.go"])
+runtime = "\n".join((ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8") for name in ["m03_m05.go","m06_m07.go","m08.go"])
 for marker in [
     "DRY_RUN_ONLY","BROKEN_LINK","REJECT_MACHINE_EXECUTION","REJECT_WRITE_REQUEST","ABSTAIN_FUTURE",
     "REJECT_AUTO_APPLY","REJECT_WRITE_METHOD","REJECT_TOOL","REJECT_UNGROUNDED","NormalizeWatchObservation",
-    "ValidateEvaluationRecord","ValidateReviewRecord",
+    "ValidateEvaluationRecord","ValidateReviewRecord","TAMPERED_INTENT","EXPIRED_INTENT","IDEMPOTENCY_COLLISION",
+    "POLICY_UNAVAILABLE","execution_authorized","SHADOW_POLICY_ALLOW",
 ]:
     if marker not in runtime: errors.append(f"runtime safety/integration marker missing: {marker}")
 
@@ -111,8 +114,19 @@ if len(injection) < 2: errors.append("M07 must include prompt-injection reject a
 if any(not c.get("tool_result_text") for c in injection): errors.append("M07 prompt-injection cases must pass malicious tool text to the evaluator")
 if not any(c.get("expected") == "REJECT_TOOL" for c in injection): errors.append("M07 prompt injection must test attempted authority escalation")
 
+# M08 must activate exact shadow ActionIntent + deterministic PolicyDecision semantics without execution authority.
+action_schema = (ROOT / "contracts/action-intent.schema.json").read_text(encoding="utf-8")
+policy_schema = (ROOT / "contracts/policy-decision.schema.json").read_text(encoding="utf-8")
+for marker in ["intent_hash","idempotency_key","correlation_id","shadow_only","dry_run","evidence_ids"]:
+    if marker not in action_schema: errors.append(f"M08 ActionIntent contract missing: {marker}")
+for marker in ["intent_hash","policy_version","shadow_only","execution_authorized","HUMAN_REVIEW"]:
+    if marker not in policy_schema: errors.append(f"M08 PolicyDecision contract missing: {marker}")
+m08_cases = json.loads((ROOT / "evals/M08-shadow-policy/cases.json").read_text(encoding="utf-8"))
+for expected_reason in ["SHADOW_POLICY_ALLOW","TAMPERED_INTENT","EXPIRED_INTENT","MISSING_DECISION_LINK","MISSING_EVIDENCE_LINK","DUPLICATE_INTENT","IDEMPOTENCY_COLLISION","POLICY_UNAVAILABLE"]:
+    if not any(c.get("expected_reason") == expected_reason for c in m08_cases): errors.append(f"M08 eval missing failure/boundary case: {expected_reason}")
+
 if errors:
     print("AGENT PATH VALIDATION FAILED")
     for error in errors: print(f"- {error}")
     sys.exit(1)
-print("AGENT PATH VALIDATION PASS: O00 and M03-M07 are learner-operable, linked and authority-bounded")
+print("AGENT PATH VALIDATION PASS: O00 and M03-M08 are learner-operable, linked and authority-bounded")
