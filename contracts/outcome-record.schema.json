@@ -3,9 +3,14 @@
   "$id":"outcome-record.schema.json",
   "title":"OutcomeRecord",
   "type":"object",
-  "required":["outcome_id","action_id","observed_at","status","metrics","source_ref"],
+  "required":["outcome_id","effect_ref","observed_at","status","metrics","source_ref"],
   "properties":{
-    "outcome_id":{"type":"string","minLength":1},"action_id":{"type":"string","minLength":1},"observed_at":{"type":"string","format":"date-time"},
-    "status":{"enum":["PENDING","VALID","CANCELLED","REFUNDED","PAID","NO_OBSERVED_OUTCOME"]},"metrics":{"type":"object","additionalProperties":{"type":"number","minimum":0}},"source_ref":{"type":"string","minLength":1}
-  },"additionalProperties":false
+    "outcome_id":{"type":"string","minLength":1},
+    "effect_ref":{"$ref":"effect-ref.schema.json"},
+    "observed_at":{"type":"string","format":"date-time"},
+    "status":{"enum":["PENDING","VALID","CANCELLED","REFUNDED","PAID","NO_OBSERVED_OUTCOME"]},
+    "metrics":{"type":"object","additionalProperties":{"type":"number","minimum":0}},
+    "source_ref":{"type":"string","minLength":1}
+  },
+  "additionalProperties":false
 }

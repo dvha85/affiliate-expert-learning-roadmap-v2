@@ -3,19 +3,19 @@ package main
 import "testing"
 
 type m08EvalCase struct {
-	CaseID              string             `json:"case_id"`
-	Intent              ShadowActionIntent `json:"intent"`
-	Now                 string             `json:"now"`
-	PolicyVersion       string             `json:"policy_version"`
-	KnownDecisionIDs    []string           `json:"known_decision_ids"`
-	KnownEvidenceIDs    []string           `json:"known_evidence_ids"`
-	KnownProposalIDs    []string           `json:"known_proposal_ids"`
-	AllowedHosts        []string           `json:"allowed_hosts"`
-	Mutation            string             `json:"mutation"`
-	SeenMode            string             `json:"seen_mode"`
-	ExpectedDecision    string             `json:"expected_decision"`
-	ExpectedRisk        string             `json:"expected_risk"`
-	ExpectedReason      string             `json:"expected_reason"`
+	CaseID           string             `json:"case_id"`
+	Intent           ShadowActionIntent `json:"intent"`
+	Now              string             `json:"now"`
+	PolicyVersion    string             `json:"policy_version"`
+	KnownDecisionIDs []string           `json:"known_decision_ids"`
+	KnownEvidenceIDs []string           `json:"known_evidence_ids"`
+	KnownProposalIDs []string           `json:"known_proposal_ids"`
+	AllowedHosts     []string           `json:"allowed_hosts"`
+	Mutation         string             `json:"mutation"`
+	SeenMode         string             `json:"seen_mode"`
+	ExpectedDecision string             `json:"expected_decision"`
+	ExpectedRisk     string             `json:"expected_risk"`
+	ExpectedReason   string             `json:"expected_reason"`
 }
 
 func TestM08EvalPack(t *testing.T) {
@@ -26,10 +26,10 @@ func TestM08EvalPack(t *testing.T) {
 			switch c.Mutation {
 			case "target_after_seal":
 				intent.Target = "https://evil.example/publish"
-			case "shadow_off_after_seal":
-				intent.ShadowOnly = false
-			case "dry_run_off_after_seal":
-				intent.DryRun = false
+			case "intent_authority_after_seal":
+				intent.ExecutionAuthorized = true
+			case "intent_mode_after_seal":
+				intent.IntentMode = "LIVE"
 			}
 			seen := map[string]string{}
 			switch c.SeenMode {
@@ -48,15 +48,15 @@ func TestM08EvalPack(t *testing.T) {
 			if got.Decision != c.ExpectedDecision || got.RiskClass != c.ExpectedRisk || got.Reason != c.ExpectedReason {
 				t.Fatalf("expected %s/%s/%s got %s/%s/%s", c.ExpectedDecision, c.ExpectedRisk, c.ExpectedReason, got.Decision, got.RiskClass, got.Reason)
 			}
-			if !got.ShadowOnly || got.ExecutionAuthorized {
-				t.Fatalf("M08 must never authorize execution: %+v", got)
+			if got.PolicyMode != "NON_AUTHORIZING" || got.ExecutionAuthorized {
+				t.Fatalf("M08 policy must remain non-authorizing: %+v", got)
 			}
 		})
 	}
 }
 
 func TestM08HashStableAcrossEvidenceOrder(t *testing.T) {
-	base := ShadowActionIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e2", "e1"}, ActionType: "UPDATE_DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"b": 2, "a": 1}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k", ShadowOnly: true, DryRun: true}
+	base := SealShadowActionIntent(ShadowActionIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e2", "e1"}, ActionType: "UPDATE_DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"b": 2, "a": 1}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k"})
 	a := ComputeShadowIntentHash(base)
 	base.EvidenceIDs = []string{"e1", "e2"}
 	b := ComputeShadowIntentHash(base)
@@ -66,7 +66,7 @@ func TestM08HashStableAcrossEvidenceOrder(t *testing.T) {
 }
 
 func TestM08HashFailsClosedOnNonJSONParameter(t *testing.T) {
-	intent := ShadowActionIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e1"}, ActionType: "UPDATE_DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"bad": make(chan int)}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k", ShadowOnly: true, DryRun: true}
+	intent := SealShadowActionIntent(ShadowActionIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e1"}, ActionType: "UPDATE_DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"bad": make(chan int)}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k"})
 	if got := ComputeShadowIntentHash(intent); got != "" {
 		t.Fatalf("non-JSON parameters must not produce an intent hash: %s", got)
 	}

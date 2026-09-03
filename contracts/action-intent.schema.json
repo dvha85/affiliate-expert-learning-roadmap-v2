@@ -6,7 +6,7 @@
   "required": [
     "intent_id", "decision_id", "evidence_ids", "action_type", "target", "parameters",
     "proposed_by", "created_at", "expires_at", "correlation_id", "idempotency_key",
-    "intent_hash", "shadow_only", "dry_run"
+    "intent_hash", "intent_mode", "execution_authorized"
   ],
   "properties": {
     "intent_id": {"type": "string", "minLength": 1},
@@ -22,8 +22,8 @@
     "correlation_id": {"type": "string", "minLength": 1},
     "idempotency_key": {"type": "string", "minLength": 1},
     "intent_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "shadow_only": {"const": true},
-    "dry_run": {"const": true}
+    "intent_mode": {"const": "PROPOSAL_ONLY"},
+    "execution_authorized": {"const": false}
   },
   "allOf": [
     {

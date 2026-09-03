@@ -1,10 +1,12 @@
 # M11 checkpoints — điểm kiểm production closed loop
 
+- [ ] `ActionIntent.intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`; `PolicyDecision.policy_mode=NON_AUTHORIZING`.
 - [ ] `ProductionLeaseApproval` bind exact `lease_hash` + source CanaryGrant ID/version/hash + source E5 refs + validated risk classes (tham chiếu E5 nguồn + lớp rủi ro đã xác nhận).
 - [ ] `ProductionLease` hữu hạn theo expiry/budget/rate/cost/outcome; không wildcard và không `RISK2`.
 - [ ] RISK1 chỉ production khi E5 promotion approval đã validate RISK1.
-- [ ] Production ledger được activation (kích hoạt) có chủ đích trước executor; executor không tự tạo lại ledger bị mất.
-- [ ] Trusted cost bound bind exact intent; Agent cost hint không sở hữu budget.
+- [ ] Canonical `ProductionActivationRecord` bind exact lease ID/version/hash và được tạo trước executor.
+- [ ] Activation record đã tồn tại không cho phép tự tạo lại ledger bị mất/reset budget.
+- [ ] `TrustedCostBound` bind exact intent; Agent cost hint không sở hữu budget.
 - [ ] Trusted health snapshot bind exact lease hash và có freshness limit tính từ `observed_at`.
 - [ ] `DEGRADE` = read-only/no side effect (chỉ đọc/không có tác động bên ngoài).
 - [ ] Critical STOP (dừng nghiêm trọng) thắng DEGRADE và lỗi policy thông thường khi nguồn STOP đã được xác thực.
@@ -12,14 +14,15 @@
 - [ ] `STOP` được persist ngay tại gate enforcement và vẫn sticky sau restart.
 - [ ] Human reconciliation resolution (kết luận đối soát của người) phải resolve từ trusted control-plane record; dữ liệu chỉ có `resolved_by=human` chưa đủ.
 - [ ] Reconciliation có thể sửa accounting/effect truth nhưng không resume lease cũ.
-- [ ] Resume sau STOP cần human-reviewed lease version mới + activation mới; không auto-clear.
+- [ ] Resume sau STOP cần human-reviewed lease version mới + `ProductionActivationRecord` mới; không auto-clear.
 - [ ] Executor reload durable ledger + revalidate lease/policy/health/cost/budget ngay trước side effect.
 - [ ] Unknown side effect → reconciliation + STOP; không retry mù.
-- [ ] Outcome bind đúng execution trước khi release backpressure; outcome thật vẫn có thể được ghi sau STOP.
+- [ ] Outcome bind `effect_ref.effect_kind=MACHINE_EXECUTION` + exact execution ID trước khi release backpressure; outcome thật vẫn có thể được ghi sau STOP.
+- [ ] Evaluation dùng cùng exact `EffectRef` với Outcome; mismatch không được gọi là closed cycle.
 - [ ] `ProductionGateDecision.execution_authorized=false`.
 - [ ] Chỉ `ExecutionAuthorization(execution_mode=GOVERNED_PRODUCTION)` mở execution cụ thể.
 - [ ] Có 3+ real closed cycles qua observation window cho E6.
-- [ ] Có executable linkage: Observation → Decision/Intent → Gate/Auth → Execution → Outcome → Evaluation → ImprovementProposal → Human ReviewRecord.
+- [ ] Có executable linkage: Observation → Decision/Intent → Gate/Auth → Execution → EffectRef → Outcome → Evaluation → ImprovementProposal → Human ReviewRecord.
 - [ ] `ImprovementProposal.auto_apply=false`; proposal không tự sửa policy/lease/budget/credential/tool permission.
 - [ ] Policy/lease/budget/credential/tool permission không tự widen.
 - [ ] `PROGRESS.md` chỉ đổi khi learner thực sự có E6 evidence.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "canary-cost-bound.schema.json",
-  "title": "CanaryCostBound",
+  "$id": "trusted-cost-bound.schema.json",
+  "title": "TrustedCostBound",
   "type": "object",
   "required": ["cost_bound_id","intent_id","intent_hash","max_cost_minor","currency","source_ref","observed_at","expires_at","correlation_id","hash_version","cost_bound_hash"],
   "properties": {

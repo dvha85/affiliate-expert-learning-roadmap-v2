@@ -17,20 +17,22 @@ Một canary chain (chuỗi canary) thật:
 
 ```text
 Decision/Evidence
-→ ActionIntent
-→ fresh deterministic PolicyDecision
+→ ActionIntent(PROPOSAL_ONLY, execution_authorized=false)
+→ fresh deterministic PolicyDecision(NON_AUTHORIZING)
 → human CanaryGrantApproval(exact grant_hash)
 → CanaryGrant
-→ trusted CanaryCostBound(exact intent_hash)
+→ trusted TrustedCostBound(exact intent_hash)
 → CanaryLedger(exact grant_hash)
 → CanaryGateDecision
 → ExecutionAuthorization(execution_mode=GOVERNED_CANARY)
 → controlled ExecutionRecord
-→ real OutcomeRecord linked to exact execution_id
+→ real OutcomeRecord(effect_ref=MACHINE_EXECUTION/exact execution_id)
 → reviewed grant decision
 ```
 
-Grant phải bind exact policy version + exact human approval + hash + time/scope/executor + total/rate/cost/outcome budgets. Cost budget dùng trusted `CanaryCostBound`, không tin estimate do Agent/ActionIntent tự khai báo. `CanaryGateDecision.execution_authorized=false`; chỉ `ExecutionAuthorization` riêng mới cấp quyền cho một execution cụ thể.
+Grant phải bind exact policy version + exact human approval + hash + time/scope/executor + total/rate/cost/outcome budgets. Cost budget dùng trusted `TrustedCostBound`, không tin estimate do Agent/ActionIntent tự khai báo. `CanaryGateDecision.execution_authorized=false`; chỉ `ExecutionAuthorization` riêng mới cấp quyền cho một execution cụ thể.
+
+`PolicyDecision.policy_review_required` không thay per-action approval semantics. Canary gate mới quyết định `per_action_approval_required`; `ApprovalRecord`/grant governance vẫn là authority artifact riêng.
 
 ## Authority ceiling
 
@@ -39,7 +41,7 @@ Grant phải bind exact policy version + exact human approval + hash + time/scop
 - `RISK2`: luôn rời canary auto path sang per-action human approval; M10 không được tự chạy RISK2.
 - Agent/orchestrator không tự tạo/đổi/renew grant, không tự tăng budget, không tự tạo trusted cost bound và không tự clear reconciliation state.
 - Mất durable ledger sau khi đã có execution/spend phải fail closed; không reset budget từ RAM.
-- Outcome chỉ release backpressure khi bind đúng pending `execution_id`.
+- Outcome chỉ release backpressure khi `effect_ref.effect_kind=MACHINE_EXECUTION` và bind đúng pending `execution_id`.
 
 ## PASS
 
