@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-reconciliation-resolution.schema.json",
+  "title":"ProductionReconciliationResolution",
+  "type":"object",
+  "required":["resolution_id","lease_id","lease_version","lease_hash","execution_id","resolved_by","resolver_id","resolved_at","effect_state","reason"],
+  "properties":{
+    "resolution_id":{"type":"string","minLength":1},
+    "lease_id":{"type":"string","minLength":1},
+    "lease_version":{"type":"string","minLength":1},
+    "lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "execution_id":{"type":"string","minLength":1},
+    "resolved_by":{"const":"human"},
+    "resolver_id":{"type":"string","minLength":1},
+    "resolved_at":{"type":"string","format":"date-time"},
+    "effect_state":{"enum":["PERFORMED","NOT_PERFORMED"]},
+    "reason":{"type":"string","minLength":1}
+  },
+  "additionalProperties":false
+}
