@@ -16,14 +16,25 @@ const (
 )
 
 type Observation struct {
-	ObservationID  string   `json:"observation_id,omitempty"`
-	ProductID      string   `json:"product_id"`
-	ProductName    string   `json:"product_name"`
-	Price          *float64 `json:"price"`
-	CommissionRate *float64 `json:"commission_rate"`
-	Currency       string   `json:"currency"`
-	EvidenceKind   string   `json:"evidence_kind"`
-	ObservedAt     string   `json:"observed_at,omitempty"`
+	ObservationID          string   `json:"observation_id,omitempty"`
+	SubjectID              string   `json:"subject_id,omitempty"`
+	SourceURL              string   `json:"source_url,omitempty"`
+	SourceRef              string   `json:"source_ref,omitempty"`
+	ObservedAt             string   `json:"observed_at,omitempty"`
+	AccessMethod           string   `json:"access_method,omitempty"`
+	EvidenceKind           string   `json:"evidence_kind"`
+	UseContext             string   `json:"use_context,omitempty"`
+	ClaimKind              string   `json:"claim_kind,omitempty"`
+	State                  string   `json:"state,omitempty"`
+	SourceAuthorityOrRole  string   `json:"source_authority_or_role,omitempty"`
+	TransformationOrMethod string   `json:"transformation_or_method,omitempty"`
+	CorrelationID          string   `json:"correlation_id,omitempty"`
+	Limitation             string   `json:"limitation,omitempty"`
+	ProductID              string   `json:"product_id"`
+	ProductName            string   `json:"product_name"`
+	Price                  *float64 `json:"price"`
+	CommissionRate         *float64 `json:"commission_rate"`
+	Currency               string   `json:"currency"`
 }
 
 type Ranked struct {
@@ -33,6 +44,8 @@ type Ranked struct {
 }
 
 type Result struct {
+	DecisionID      string   `json:"decision_id,omitempty"`
+	EvidenceIDs     []string `json:"evidence_ids,omitempty"`
 	FormulaVersion  string   `json:"formula_version"`
 	State           string   `json:"state"`
 	Ranked          []Ranked `json:"ranked"`

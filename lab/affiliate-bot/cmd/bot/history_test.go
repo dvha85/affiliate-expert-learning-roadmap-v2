@@ -11,18 +11,63 @@ import (
 )
 
 func historyObservation(id, product, name string, price, rate float64, at string) Observation {
-	return Observation{ObservationID: id, ProductID: product, ProductName: name, Price: f(price), CommissionRate: f(rate), Currency: "USD", EvidenceKind: "synthetic", ObservedAt: at}
+	return Observation{
+		ObservationID: id,
+		SubjectID: product,
+		SourceRef: "fixture:history-test",
+		ObservedAt: at,
+		AccessMethod: "local_fixture",
+		EvidenceKind: "synthetic",
+		UseContext: "test",
+		ClaimKind: "assumption",
+		State: "observed",
+		Limitation: "Synthetic history test fixture; not market truth.",
+		ProductID: product,
+		ProductName: name,
+		Price: f(price),
+		CommissionRate: f(rate),
+		Currency: "USD",
+	}
 }
 
 func TestHistoryRecordDeepCopiesInput(t *testing.T) {
 	price := 100.0
-	observations := []Observation{{ObservationID: "o1", ProductID: "p", ProductName: "P", Price: &price, CommissionRate: f(0.1), Currency: "USD", EvidenceKind: "synthetic", ObservedAt: "2026-09-01T00:00:00Z"}}
+	observation := historyObservation("o1", "p", "P", 100, 0.1, "2026-09-01T00:00:00Z")
+	observation.Price = &price
+	observations := []Observation{observation}
 	record, err := NewHistoryRecord("r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", observations)
 	if err != nil { t.Fatal(err) }
 	price = 999
 	observations[0].ProductName = "mutated"
 	if *record.Observations[0].Price != 100 || record.Observations[0].ProductName != "P" {
 		t.Fatalf("history snapshot changed after caller mutation: %#v", record.Observations[0])
+	}
+}
+
+func TestHistoryDecisionEvidenceLinkage(t *testing.T) {
+	record, err := NewHistoryRecord("decision-1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{
+		historyObservation("obs-b", "b", "B", 120, 0.08, "2026-09-01T00:00:00Z"),
+		historyObservation("obs-a", "a", "A", 100, 0.1, "2026-09-01T00:00:00Z"),
+	})
+	if err != nil { t.Fatal(err) }
+	if record.RecordedResult.DecisionID != record.RecordID {
+		t.Fatalf("decision linkage missing: %#v", record.RecordedResult)
+	}
+	if !reflect.DeepEqual(record.RecordedResult.EvidenceIDs, []string{"obs-a", "obs-b"}) {
+		t.Fatalf("expected canonical evidence ids, got %v", record.RecordedResult.EvidenceIDs)
+	}
+	tampered := record
+	tampered.RecordedResult.EvidenceIDs = []string{"obs-a", "ghost"}
+	if err := validateHistoryRecord(tampered); err == nil || !strings.Contains(err.Error(), "evidence_ids") {
+		t.Fatalf("expected evidence linkage failure, got %v", err)
+	}
+}
+
+func TestHistoryRejectsNonCanonicalObservation(t *testing.T) {
+	bad := historyObservation("o1", "p", "P", 100, 0.1, "2026-09-01T00:00:00Z")
+	bad.SubjectID = ""
+	if _, err := NewHistoryRecord("r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{bad}); err == nil || !strings.Contains(err.Error(), "subject_id") {
+		t.Fatalf("expected canonical identity failure, got %v", err)
 	}
 }
 
@@ -88,8 +133,23 @@ type m02EvalCase struct {
 	RawLine string `json:"raw_line"`
 }
 
+func canonicalizeEvalFixture(in []Observation) []Observation {
+	out := make([]Observation, len(in))
+	for i, observation := range in {
+		out[i] = cloneObservation(observation)
+		if out[i].SubjectID == "" { out[i].SubjectID = out[i].ProductID }
+		if out[i].SourceURL == "" && out[i].SourceRef == "" { out[i].SourceRef = "fixture:m02-eval" }
+		if out[i].AccessMethod == "" { out[i].AccessMethod = "local_fixture" }
+		if out[i].ClaimKind == "" { out[i].ClaimKind = "assumption" }
+		if out[i].State == "" { out[i].State = "observed" }
+		if out[i].Limitation == "" { out[i].Limitation = "Synthetic M02 eval fixture; not market truth." }
+		if out[i].UseContext == "" { out[i].UseContext = "test" }
+	}
+	return out
+}
+
 func recordFromSpec(spec historyRecordSpec) (HistoryRecord, error) {
-	record, err := NewHistoryRecord(spec.RecordID, spec.AsOf, spec.IngestedAt, spec.Observations)
+	record, err := NewHistoryRecord(spec.RecordID, spec.AsOf, spec.IngestedAt, canonicalizeEvalFixture(spec.Observations))
 	if err != nil { return HistoryRecord{}, err }
 	if spec.FormulaOverride != "" {
 		record.FormulaVersion = spec.FormulaOverride

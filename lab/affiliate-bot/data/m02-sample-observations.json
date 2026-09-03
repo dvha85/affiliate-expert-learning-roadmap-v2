@@ -1,22 +1,36 @@
 [
   {
     "observation_id": "obs-a-1",
+    "subject_id": "A",
+    "source_ref": "fixture:m02-sample-observations",
+    "access_method": "local_fixture",
+    "claim_kind": "assumption",
+    "state": "observed",
+    "limitation": "Synthetic M02 fixture; proves history/replay behavior, not market truth.",
     "product_id": "A",
     "product_name": "Product A",
     "price": 100,
     "commission_rate": 0.08,
     "currency": "USD",
     "evidence_kind": "synthetic",
+    "use_context": "test",
     "observed_at": "2026-09-01T00:00:00Z"
   },
   {
     "observation_id": "obs-b-1",
+    "subject_id": "B",
+    "source_ref": "fixture:m02-sample-observations",
+    "access_method": "local_fixture",
+    "claim_kind": "assumption",
+    "state": "observed",
+    "limitation": "Synthetic M02 fixture; proves history/replay behavior, not market truth.",
     "product_id": "B",
     "product_name": "Product B",
     "price": 120,
     "commission_rate": 0.08,
     "currency": "USD",
     "evidence_kind": "synthetic",
+    "use_context": "test",
     "observed_at": "2026-09-01T00:00:00Z"
   }
 ]

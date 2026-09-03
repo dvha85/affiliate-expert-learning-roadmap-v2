@@ -3,18 +3,28 @@
   "$id": "observation.schema.json",
   "title": "Observation",
   "type": "object",
-  "required": ["subject_id", "source_url", "observed_at", "access_method", "evidence_kind", "claim_kind", "limitation"],
+  "required": ["observation_id", "subject_id", "observed_at", "access_method", "evidence_kind", "claim_kind", "state", "limitation"],
   "properties": {
+    "observation_id": {"type": "string", "minLength": 1},
     "subject_id": {"type": "string", "minLength": 1},
     "source_url": {"type": "string", "format": "uri"},
+    "source_ref": {"type": "string", "minLength": 1},
     "observed_at": {"type": "string", "format": "date-time"},
     "access_method": {"type": "string", "minLength": 1},
     "evidence_kind": {"enum": ["real", "synthetic"]},
     "use_context": {"enum": ["test", "replay"]},
     "claim_kind": {"enum": ["fact", "estimate", "assumption", "unknown"]},
     "value": {},
+    "attributes": {"type": "object"},
     "state": {"enum": ["observed", "missing", "pending", "not_yet_observable", "inconclusive"]},
-    "limitation": {"type": "string"}
+    "source_authority_or_role": {"type": "string"},
+    "transformation_or_method": {"type": "string"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "limitation": {"type": "string", "minLength": 1}
   },
+  "anyOf": [
+    {"required": ["source_url"]},
+    {"required": ["source_ref"]}
+  ],
   "additionalProperties": true
 }

@@ -1,26 +1,53 @@
 [
   {
+    "observation_id": "m01-obs-a",
+    "subject_id": "A",
+    "source_ref": "fixture:m01-sample-observations",
+    "observed_at": "2026-09-01T00:00:00Z",
+    "access_method": "local_fixture",
+    "evidence_kind": "synthetic",
+    "use_context": "test",
+    "claim_kind": "assumption",
+    "state": "observed",
+    "limitation": "Synthetic M01 fixture; proves deterministic behavior, not market truth.",
     "product_id": "A",
     "product_name": "Product A",
     "price": 100,
     "commission_rate": 0.08,
-    "currency": "USD",
-    "evidence_kind": "synthetic"
+    "currency": "USD"
   },
   {
+    "observation_id": "m01-obs-b",
+    "subject_id": "B",
+    "source_ref": "fixture:m01-sample-observations",
+    "observed_at": "2026-09-01T00:00:00Z",
+    "access_method": "local_fixture",
+    "evidence_kind": "synthetic",
+    "use_context": "test",
+    "claim_kind": "assumption",
+    "state": "observed",
+    "limitation": "Synthetic M01 fixture; proves deterministic behavior, not market truth.",
     "product_id": "B",
     "product_name": "Product B",
     "price": 120,
     "commission_rate": 0.08,
-    "currency": "USD",
-    "evidence_kind": "synthetic"
+    "currency": "USD"
   },
   {
+    "observation_id": "m01-obs-c",
+    "subject_id": "C",
+    "source_ref": "fixture:m01-sample-observations",
+    "observed_at": "2026-09-01T00:00:00Z",
+    "access_method": "local_fixture",
+    "evidence_kind": "synthetic",
+    "use_context": "test",
+    "claim_kind": "assumption",
+    "state": "observed",
+    "limitation": "Synthetic M01 fixture; proves deterministic behavior, not market truth.",
     "product_id": "C",
     "product_name": "Product C",
     "price": 80,
     "commission_rate": 0.10,
-    "currency": "USD",
-    "evidence_kind": "synthetic"
+    "currency": "USD"
   }
 ]
