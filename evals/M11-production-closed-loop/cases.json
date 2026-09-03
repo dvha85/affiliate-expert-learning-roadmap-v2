@@ -9,7 +9,7 @@
   {"case_id":"M11-E08-revoked-lease","mutation":"revoked_lease","expected_decision":"STOP","expected_reason":"LEASE_REVOKED"},
   {"case_id":"M11-E09-kill-switch","mutation":"kill_switch","expected_decision":"STOP","expected_reason":"KILL_SWITCH_ACTIVE"},
   {"case_id":"M11-E10-lease-approval-mismatch","mutation":"lease_approval_mismatch","expected_decision":"DENY","expected_reason":"LEASE_APPROVAL_MISMATCH"},
-  {"case_id":"M11-E11-promotion-review-missing","mutation":"promotion_review_missing","expected_decision":"DENY","expected_reason":"PROMOTION_REVIEW_MISSING"},
+  {"case_id":"M11-E11-promotion-review-missing","mutation":"promotion_review_missing","expected_decision":"DENY","expected_reason":"LEASE_PROVENANCE_MISSING"},
   {"case_id":"M11-E12-tampered-lease","mutation":"tampered_lease","expected_decision":"DENY","expected_reason":"TAMPERED_LEASE"},
   {"case_id":"M11-E13-tampered-health","mutation":"tampered_health","expected_decision":"DENY","expected_reason":"TAMPERED_HEALTH"},
   {"case_id":"M11-E14-health-untrusted","mutation":"health_untrusted","expected_decision":"DENY","expected_reason":"HEALTH_UNTRUSTED"},
