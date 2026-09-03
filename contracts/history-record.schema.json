@@ -14,11 +14,12 @@
       "type": "array",
       "minItems": 1,
       "items": {
+        "type": "object",
+        "required": ["observation_id", "subject_id", "product_id", "product_name", "price", "commission_rate", "currency", "observed_at", "access_method", "evidence_kind", "claim_kind", "state", "limitation"],
         "allOf": [
           {"$ref": "observation.schema.json"},
           {
             "type": "object",
-            "required": ["product_id", "product_name", "price", "commission_rate", "currency"],
             "properties": {
               "product_id": {"type": "string", "minLength": 1},
               "product_name": {"type": "string", "minLength": 1},
