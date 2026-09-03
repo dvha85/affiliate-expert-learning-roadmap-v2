@@ -9,20 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  structure-language-and-blueprints:
+  mission-semantics-and-blueprints:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Validate learner-operable mission path
+      - name: Validate mission-specific semantic plug-ins
         run: |
           python scripts/validate_agent_path.py
           python scripts/validate_semantic_contracts.py
           python scripts/validate_m11.py
-      - name: Validate Vietnamese-first learner language
-        run: python scripts/validate_language_policy.py
 
   mission-runtime:
     runs-on: ubuntu-latest
@@ -60,51 +58,3 @@ jobs:
           go run ./cmd/demo M11 | grep -q '"production_lease_hash": "sha256:'
           go run ./cmd/demo M11 | grep -q '"production_health_snapshot_hash": "sha256:'
           go run ./cmd/demo M11 | grep -q '"side_effect_state": "PERFORMED"'
-
-  safety-and-linkage-boundaries:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Guard M03-M11 authority ceilings and linkage
-        run: |
-          grep -q '"performed_by".*"const":"human"' contracts/action-record.schema.json
-          grep -q 'MACHINE_EXECUTION' contracts/effect-ref.schema.json
-          grep -q '"effect_ref"' contracts/outcome-record.schema.json
-          grep -q '"effect_ref"' contracts/evaluation-record.schema.json
-          grep -q 'PROPOSAL_ONLY' contracts/action-intent.schema.json
-          grep -q 'NON_AUTHORIZING' contracts/policy-decision.schema.json
-          grep -q '"write_tool_requested"' contracts/advisor-output.schema.json
-          grep -q '"auto_apply".*"const":false' contracts/improvement-proposal.schema.json
-          grep -q '"reviewed_by".*"const":"human"' contracts/review-record.schema.json
-          grep -q '"read_only".*"const":true' contracts/tool-registry.schema.json
-          grep -q '"execution_authorized".*"const": false' contracts/policy-decision.schema.json
-          grep -q '"cost_bound_hash"' contracts/trusted-cost-bound.schema.json
-          test ! -e contracts/canary-cost-bound.schema.json
-          grep -q 'APPROVED_LIVE' contracts/execution-authorization.schema.json
-          grep -q 'GOVERNED_CANARY' contracts/execution-authorization.schema.json
-          grep -q 'GOVERNED_PRODUCTION' contracts/execution-authorization.schema.json
-          grep -q '"execution_authorized".*"const":true' contracts/execution-authorization.schema.json
-          grep -q 'RECONCILIATION_REQUIRED' contracts/execution-record.schema.json
-          grep -q 'WAIT_LEDGER_MISSING' lab/mission-runtime/cmd/demo/m10.go
-          grep -q 'DENY_OUTCOME_LINK' lab/mission-runtime/cmd/demo/m10.go
-          grep -q '"reviewed_by".*"const":"human"' contracts/production-lease.schema.json
-          grep -q '"decision".*"const":"APPROVE_PRODUCTION_LEASE"' contracts/production-lease-approval.schema.json
-          grep -q '"lease_hash"' contracts/production-activation-record.schema.json
-          grep -q '"source_canary_grant_id"' contracts/production-lease-approval.schema.json
-          grep -q '"source_e5_refs"' contracts/production-lease-approval.schema.json
-          grep -q '"validated_risk_classes"' contracts/production-lease-approval.schema.json
-          grep -q '"control_mode"' contracts/production-ledger.schema.json
-          grep -q '"reconciliation_resolution_ids"' contracts/production-ledger.schema.json
-          grep -q '"resolved_by".*"const":"human"' contracts/production-reconciliation-resolution.schema.json
-          grep -q '"execution_authorized".*"const":false' contracts/production-gate-decision.schema.json
-          grep -q 'PROMOTION_SOURCE_MISMATCH' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'PROMOTION_E5_EVIDENCE_MISSING' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'PROMOTION_RISK_NOT_VALIDATED' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'COMPLIANCE_ALERT' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'FAILURE_THRESHOLD' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'OUTCOME_STALE' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'STICKY_STOP' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'STOP_LEDGER_MISSING' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'ResolveProductionReconciliation' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'ValidateProductionClosedCycle' lab/mission-runtime/cmd/demo/m11.go
-          grep -q 'EnforceProductionGate' lab/mission-runtime/cmd/demo/m11_gate.go

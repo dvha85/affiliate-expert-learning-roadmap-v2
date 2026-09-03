@@ -2,6 +2,10 @@
 
 Thứ tự học được quyết định bởi `CURRICULUM.md`.
 
+`missions/manifest.json` là chỉ mục machine-readable duy nhất cho structural
+spine O00→M11. `scripts/validate_missions.py` kiểm common assets/path; các
+validator khác là semantic plug-ins theo boundary, không sở hữu một spine riêng.
+
 | Mission | Kết quả | Quyền hạn | Trạng thái |
 |---|---|---|---|
 | O00 | Safe synthetic walkthrough (mô phỏng tổng thể an toàn), không PASS | không side effect | ready orientation |

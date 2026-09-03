@@ -19,8 +19,9 @@ Mọi tool chỉ được adopt khi giải quyết bottleneck đã quan sát đ�
 | Capability | Primary/reference | Candidate/comparison | Earliest meaningful Mission | Default |
 |---|---|---|---|---|
 | Deterministic core | contracts + Go reference | visual rule engine; OPA later | M01 / M08+ | Go/reference first when it reduces ambiguity |
-| Orchestration | n8n | Windmill | M06 | n8n primary |
-| AgentRuntime | n8n AI Agent visual-first | OpenAI Agents SDK; Microsoft Agent Framework; Hermes Agent; Google ADK watchlist | M07 | reuse current runtime first |
+| Orchestration | n8n | Windmill | M06 | n8n primary, compatibility-smoke required |
+| AgentRuntime | n8n AI Agent visual-first | OpenAI Agents SDK; Microsoft Agent Framework; Google ADK watchlist | M07 | reuse current runtime first |
+| Autonomous-agent reference | none | Hermes Agent (experimental) | none by default | Safe Profile adapter only |
 | Tool boundary | explicit Tool Registry | MCP | M07 | MCP preferred interoperability candidate |
 | Browser acquisition | HTTP/API/manual | Playwright | M06 | browser only when required |
 | Observability | correlation/audit contract | OpenTelemetry | M06 | adopt across runtime boundaries |
@@ -61,7 +62,7 @@ Automatic read-only watcher. n8n là orchestration reference. OpenTelemetry đư
 
 ### M07
 
-Read-only Evidence Agent. Ưu tiên n8n AI Agent nếu runtime hiện có đáp ứng Safe Profile. MCP là tool interoperability candidate với allowlist, least privilege, timeout/audit và tool output untrusted. OpenAI Agents SDK, Microsoft Agent Framework, Hermes Agent hoặc Google ADK chỉ compare khi có measured bottleneck/use case rõ.
+Read-only Evidence Agent. Ưu tiên n8n AI Agent nếu runtime hiện có đáp ứng Safe Profile. MCP là tool interoperability candidate với allowlist, least privilege, timeout/audit và tool output untrusted. OpenAI Agents SDK, Microsoft Agent Framework hoặc Google ADK chỉ compare khi có measured bottleneck/use case rõ. Hermes Agent là experimental autonomous-agent reference, không phải default runtime candidate.
 
 ### M08
 
@@ -278,3 +279,39 @@ issue/spec
 ```
 
 Agent-authored code không được auto-merge consequential policy/runtime changes chỉ vì CI xanh hoặc model confidence cao.
+
+## 15. n8n compatibility admission
+
+n8n vẫn là orchestration reference ở M06/M07, nhưng blueprint JSON/node type
+không tự chứng minh engine compatibility. `lab/n8n/COMPATIBILITY.md` là ledger
+chuẩn cho node versions, import smoke, execution smoke và upgrade review.
+
+```text
+JSON/node type valid != import succeeds != execution semantics preserved
+```
+
+Mỗi engine upgrade phải chạy import + execution smoke trước activation. HTTP
+Request Tool, AI Agent, credential behavior, node migration và static-data
+behavior là các boundary phải review. Chỉ ghi `tested_n8n_version` sau run thật;
+hiện ledger ghi `UNVERIFIED` để tránh claim testing chưa có bằng chứng.
+
+## 16. Hermes Agent
+
+Hermes Agent là **experimental autonomous-agent reference**, không phải generic
+AgentRuntime candidate. Một agent có memory/skills learning loop, scheduled
+jobs hoặc terminal/browser capability có tension trực tiếp với authority model
+của roadmap.
+
+Chỉ đánh giá qua Safe Profile adapter khi tất cả điều kiện đúng:
+
+```text
+explicit read-only Tool Registry
++ deterministic validation + canonical audit mapping
++ no skill/policy/authority self-update
++ no autonomous credential widening or scheduled consequential action
++ same contracts/eval/failure cases as current M07 baseline
+```
+
+Không dùng Hermes để tự cập nhật skill, policy, authority, canonical state hay
+production activation. Nếu không chứng minh được các guard này, giữ nó ngoài
+default comparison/adoption path.

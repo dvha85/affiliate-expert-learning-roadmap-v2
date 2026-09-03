@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "description": "Canonical structural index for the O00 → M11 learner path. Semantic rules remain in mission-specific validators.",
+  "spine": ["O00", "M00", "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09", "M10", "M11"],
+  "missions": [
+    {"id": "O00", "contract": "missions/O00-safe-synthetic-walkthrough.md", "curriculum": "curriculum/O00", "eval": "evals/O00-safe-walkthrough/cases.json", "status": "ready orientation"},
+    {"id": "M00", "contract": "missions/M00-first-real-evidence-packet.md", "curriculum": "curriculum/M00", "template": "templates/M00-EVIDENCE-PACKET.md", "status": "ready"},
+    {"id": "M01", "contract": "missions/M01-smallest-deterministic-bot.md", "curriculum": "curriculum/M01", "starter": "starter-kits/M01-deterministic-bot", "eval": "evals/M01-deterministic-bot/cases.json", "status": "ready"},
+    {"id": "M02", "contract": "missions/M02-trustworthy-history-replay.md", "curriculum": "curriculum/M02", "starter": "starter-kits/M02-history-replay", "eval": "evals/M02-history-replay/cases.json", "status": "ready"},
+    {"id": "M03", "contract": "missions/M03-first-tracked-human-action-outcome.md", "curriculum": "curriculum/M03", "starter": "starter-kits/M03-tracked-human-action", "eval": "evals/M03-tracked-human-action/cases.json", "status": "ready"},
+    {"id": "M04", "contract": "missions/M04-grounded-ai-advisor.md", "curriculum": "curriculum/M04", "starter": "starter-kits/M04-grounded-ai-advisor", "eval": "evals/M04-grounded-ai-advisor/cases.json", "status": "ready"},
+    {"id": "M05", "contract": "missions/M05-reviewed-improvement.md", "curriculum": "curriculum/M05", "starter": "starter-kits/M05-reviewed-improvement", "eval": "evals/M05-reviewed-improvement/cases.json", "status": "ready"},
+    {"id": "M06", "contract": "missions/M06-readonly-watcher.md", "curriculum": "curriculum/M06", "starter": "starter-kits/M06-readonly-watcher", "eval": "evals/M06-readonly-watcher/cases.json", "status": "ready"},
+    {"id": "M07", "contract": "missions/M07-readonly-evidence-agent.md", "curriculum": "curriculum/M07", "starter": "starter-kits/M07-readonly-evidence-agent", "eval": "evals/M07-readonly-evidence-agent/cases.json", "status": "ready"},
+    {"id": "M08", "contract": "missions/M08-shadow-actionintent-policy.md", "curriculum": "curriculum/M08", "starter": "starter-kits/M08-shadow-policy", "eval": "evals/M08-shadow-policy/cases.json", "status": "ready"},
+    {"id": "M09", "contract": "missions/M09-durable-approval-controlled-executor.md", "curriculum": "curriculum/M09", "starter": "starter-kits/M09-approval-execution", "eval": "evals/M09-approval-execution/cases.json", "status": "ready"},
+    {"id": "M10", "contract": "missions/M10-governed-canary.md", "curriculum": "curriculum/M10", "starter": "starter-kits/M10-governed-canary", "eval": "evals/M10-governed-canary/cases.json", "status": "ready"},
+    {"id": "M11", "contract": "missions/M11-production-closed-loop.md", "curriculum": "curriculum/M11", "starter": "starter-kits/M11-production-loop", "eval": "evals/M11-production-closed-loop/cases.json", "status": "ready"}
+  ]
+}

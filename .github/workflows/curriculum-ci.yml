@@ -9,29 +9,20 @@ permissions:
   contents: read
 
 jobs:
-  curriculum:
-    name: curriculum
+  structure-language-and-foundations:
+    name: structure-language-and-foundations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - run: python scripts/validate_missions.py
       - run: python scripts/validate_repo.py
       - run: python scripts/validate_artifact_spine.py
       - run: python scripts/validate_continuity.py
       - run: python scripts/validate_language_policy.py
 
-  evidence-and-safety:
-    name: evidence-and-safety
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - run: python scripts/validate_repo.py
-      - run: python scripts/validate_language_policy.py
       - name: Guard consequential boundaries
         run: |
           grep -q "Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)" CURRICULUM.md
@@ -43,19 +34,7 @@ jobs:
           grep -q '"M02-E12-observation-id-reuse-conflict"' evals/M02-history-replay/cases.json
           grep -q "replay MATCH != business truth" lab/affiliate-bot/README.md
 
-  python-regression:
-    name: python-regression
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
       - run: python -m compileall -q scripts
-      - run: python scripts/validate_repo.py
-      - run: python scripts/validate_artifact_spine.py
-      - run: python scripts/validate_continuity.py
-      - run: python scripts/validate_language_policy.py
 
   deterministic-runtime:
     name: deterministic-runtime
