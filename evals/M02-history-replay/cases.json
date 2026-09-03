@@ -1,0 +1,10 @@
+[
+  {"case_id":"M02-E01-exact-duplicate","kind":"duplicate","expected":"EXACT_DUPLICATE"},
+  {"case_id":"M02-E02-conflicting-duplicate","kind":"conflict","expected":"CONFLICT"},
+  {"case_id":"M02-E03-out-of-order","kind":"out_of_order","expected":"ORDER_BY_AS_OF"},
+  {"case_id":"M02-E04-replay-match","kind":"replay_match","expected":"MATCH"},
+  {"case_id":"M02-E05-replay-drift","kind":"replay_drift","expected":"DRIFT"},
+  {"case_id":"M02-E06-unknown-formula","kind":"unknown_formula","expected":"UNREPLAYABLE"},
+  {"case_id":"M02-E07-input-hash-mismatch","kind":"hash_mismatch","expected":"INTEGRITY_ERROR"},
+  {"case_id":"M02-E08-corrupt-jsonl","kind":"corrupt_history","expected":"ERROR"}
+]

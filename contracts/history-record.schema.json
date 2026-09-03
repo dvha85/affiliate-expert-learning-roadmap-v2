@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "history-record.schema.json",
+  "title": "HistoryRecord",
+  "type": "object",
+  "required": ["record_id", "as_of", "ingested_at", "formula_version", "input_hash", "observations", "recorded_result"],
+  "properties": {
+    "record_id": {"type": "string", "minLength": 1},
+    "as_of": {"type": "string", "format": "date-time"},
+    "ingested_at": {"type": "string", "format": "date-time"},
+    "formula_version": {"type": "string", "minLength": 1},
+    "input_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "observations": {"type": "array", "minItems": 1},
+    "recorded_result": {"type": "object"}
+  },
+  "additionalProperties": false
+}
