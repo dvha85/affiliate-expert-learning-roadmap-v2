@@ -35,9 +35,27 @@
     "execution_authorized":{"const":true}
   },
   "allOf": [
-    {"if":{"properties":{"execution_mode":{"const":"APPROVED_LIVE"}},"required":["execution_mode"]},"then":{"required":["approval_id"],"not":{"anyOf":[{"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]},{"required":["production_lease_id"]},{"required":["production_gate_id"]}]}}},
-    {"if":{"properties":{"execution_mode":{"const":"GOVERNED_CANARY"}},"required":["execution_mode"]},"then":{"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["production_lease_id"]},{"required":["production_gate_id"]}]}}},
-    {"if":{"properties":{"execution_mode":{"const":"GOVERNED_PRODUCTION"}},"required":["execution_mode"]},"then":{"required":["production_lease_id","production_lease_version","production_lease_hash","production_gate_id","production_health_snapshot_id","production_health_snapshot_hash","production_cost_bound_id","production_cost_bound_hash","production_cost_bound_minor"],"not":{"anyOf":[{"required":["approval_id"]},{"required":["canary_grant_id"]},{"required":["canary_gate_id"]}]}}}
+    {
+      "if":{"properties":{"execution_mode":{"const":"APPROVED_LIVE"}},"required":["execution_mode"]},
+      "then":{"required":["approval_id"],"not":{"anyOf":[
+        {"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]},
+        {"required":["production_lease_id"]},{"required":["production_lease_version"]},{"required":["production_lease_hash"]},{"required":["production_gate_id"]},{"required":["production_health_snapshot_id"]},{"required":["production_health_snapshot_hash"]},{"required":["production_cost_bound_id"]},{"required":["production_cost_bound_hash"]},{"required":["production_cost_bound_minor"]}
+      ]}}
+    },
+    {
+      "if":{"properties":{"execution_mode":{"const":"GOVERNED_CANARY"}},"required":["execution_mode"]},
+      "then":{"required":["canary_grant_id","canary_grant_version","canary_grant_hash","canary_gate_id","canary_cost_bound_id","canary_cost_bound_hash","canary_cost_bound_minor"],"not":{"anyOf":[
+        {"required":["approval_id"]},
+        {"required":["production_lease_id"]},{"required":["production_lease_version"]},{"required":["production_lease_hash"]},{"required":["production_gate_id"]},{"required":["production_health_snapshot_id"]},{"required":["production_health_snapshot_hash"]},{"required":["production_cost_bound_id"]},{"required":["production_cost_bound_hash"]},{"required":["production_cost_bound_minor"]}
+      ]}}
+    },
+    {
+      "if":{"properties":{"execution_mode":{"const":"GOVERNED_PRODUCTION"}},"required":["execution_mode"]},
+      "then":{"required":["production_lease_id","production_lease_version","production_lease_hash","production_gate_id","production_health_snapshot_id","production_health_snapshot_hash","production_cost_bound_id","production_cost_bound_hash","production_cost_bound_minor"],"not":{"anyOf":[
+        {"required":["approval_id"]},
+        {"required":["canary_grant_id"]},{"required":["canary_grant_version"]},{"required":["canary_grant_hash"]},{"required":["canary_gate_id"]},{"required":["canary_cost_bound_id"]},{"required":["canary_cost_bound_hash"]},{"required":["canary_cost_bound_minor"]}
+      ]}}
+    }
   ],
   "additionalProperties": false
 }
