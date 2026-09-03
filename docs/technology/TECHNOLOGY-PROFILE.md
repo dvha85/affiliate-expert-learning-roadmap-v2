@@ -20,7 +20,7 @@ Mọi tool chỉ được adopt khi giải quyết bottleneck đã quan sát đ�
 |---|---|---|---|---|
 | Deterministic core | contracts + Go reference | visual rule engine; OPA later | M01 / M08+ | Go/reference first when it reduces ambiguity |
 | Orchestration | n8n | Windmill | M06 | n8n primary |
-| AgentRuntime | n8n AI Agent visual-first | OpenAI Agents SDK; Hermes Agent | M07 | reuse current runtime first |
+| AgentRuntime | n8n AI Agent visual-first | OpenAI Agents SDK; Microsoft Agent Framework; Hermes Agent; Google ADK watchlist | M07 | reuse current runtime first |
 | Tool boundary | explicit Tool Registry | MCP | M07 | MCP preferred interoperability candidate |
 | Browser acquisition | HTTP/API/manual | Playwright | M06 | browser only when required |
 | Observability | correlation/audit contract | OpenTelemetry | M06 | adopt across runtime boundaries |
@@ -61,7 +61,7 @@ Automatic read-only watcher. n8n là orchestration reference. OpenTelemetry đư
 
 ### M07
 
-Read-only Evidence Agent. Ưu tiên n8n AI Agent nếu runtime hiện có đáp ứng Safe Profile. MCP là tool interoperability candidate với allowlist, least privilege, timeout/audit và tool output untrusted. OpenAI Agents SDK/Hermes chỉ compare khi có measured bottleneck.
+Read-only Evidence Agent. Ưu tiên n8n AI Agent nếu runtime hiện có đáp ứng Safe Profile. MCP là tool interoperability candidate với allowlist, least privilege, timeout/audit và tool output untrusted. OpenAI Agents SDK, Microsoft Agent Framework, Hermes Agent hoặc Google ADK chỉ compare khi có measured bottleneck/use case rõ.
 
 ### M08
 
@@ -88,9 +88,11 @@ correlation_id mapping exists
 + sampling cannot remove mandatory audit
 ```
 
-OpenTelemetry Go hiện có traces và metrics stable; logs còn beta tại review 2026-09-03.
+OpenTelemetry Go traces và metrics đang stable. Logs API/SDK đã lên release candidate `v1.47.0-rc.1` ngày 2026-08-31; vẫn chưa nên coi là stable v1 compatibility cho tới khi feedback period hoàn tất và bản stable được phát hành.
 
-Official ref: https://opentelemetry.io/docs/languages/go/
+Official refs:
+- https://opentelemetry.io/docs/languages/go/
+- https://opentelemetry.io/blog/2026/go-logs-api-sdk-rc/
 
 ## 5. MCP
 
@@ -136,7 +138,45 @@ Official refs:
 - https://openai.github.io/openai-agents-python/human_in_the_loop/
 - https://openai.github.io/openai-agents-python/mcp/
 
-## 7. Langfuse
+## 7. Microsoft Agent Framework
+
+Comparison candidate cho code-first Agent/workflow, đặc biệt đáng theo dõi vì có Go SDK public preview. Tài liệu hiện tại cho Go có graph workflow, tool approval/HITL và checkpoint/request patterns; một số capability vẫn preview hoặc chưa parity đầy đủ giữa ngôn ngữ.
+
+Gate:
+
+```text
+Go feature needed is actually available
++ preview risk accepted
++ same contracts/eval/safe profile
++ approval binds to exact tool/action intent
++ checkpoint/resume revalidates policy/approval
++ measured benefit over n8n/OpenAI Agents SDK baseline
+```
+
+Không adopt chỉ vì framework có workflow graph. Deterministic domain/policy semantics vẫn thuộc Core.
+
+Official refs:
+- https://learn.microsoft.com/en-us/agent-framework/get-started/
+- https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/
+- https://learn.microsoft.com/en-us/agent-framework/workflows/human-in-the-loop
+
+## 8. Google ADK 2.0 watchlist
+
+ADK 2.0 nhấn mạnh tách deterministic workflow execution khỏi phần reasoning mở của Agent và đã công bố workflow support cho Go. Đây là hướng kiến trúc phù hợp với repo nhưng chưa cần đưa vào learner path mặc định.
+
+Watch/adoption gate:
+
+```text
+clear use case not served well by current runtime
++ Go workflow feature maturity verified
++ same deterministic boundaries
++ same HITL/tool permission model
++ measurable operational/developer benefit
+```
+
+Official ref: https://developers.googleblog.com/en/why-we-built-adk-20/
+
+## 9. Langfuse
 
 Optional backend cho traces/experiments/evaluation. Langfuse hiện hỗ trợ experiments qua OpenTelemetry.
 
@@ -160,7 +200,7 @@ Official refs:
 - https://langfuse.com/docs/evaluation/overview
 - https://langfuse.com/docs/evaluation/experiments/experiments-via-opentelemetry
 
-## 8. Playwright
+## 10. Playwright
 
 Controlled browser acquisition candidate. Dùng khi source public cần browser rendering/interaction mà HTTP/API đơn giản không đủ.
 
@@ -174,7 +214,7 @@ Gate:
 
 Official ref: https://playwright.dev/docs/browsers
 
-## 9. OPA
+## 11. OPA
 
 OPA là general-purpose policy engine tách policy decision khỏi enforcement. Phù hợp khi policy complexity vượt simple rules/visual table.
 
@@ -194,7 +234,7 @@ Official refs:
 - https://www.openpolicyagent.org/docs
 - https://www.openpolicyagent.org/docs/integration
 
-## 10. Windmill
+## 12. Windmill
 
 Comparison orchestrator khi cần code-friendly scripts/Git sync hoặc operational model khác. Windmill hiện hỗ trợ bidirectional Git sync trong các cấu hình được tài liệu hóa.
 
@@ -211,7 +251,7 @@ same contracts + same authority ceiling
 
 Official ref: https://www.windmill.dev/docs/advanced/git_sync
 
-## 11. Temporal
+## 13. Temporal
 
 Durable execution candidate cho M09+ khi có real long-running wait/resume/recovery pain. Không thêm chỉ vì workflow có approval.
 
@@ -224,7 +264,7 @@ Gate:
 
 Official ref: https://docs.temporal.io/
 
-## 12. Development Agent
+## 14. Development Agent
 
 Coding agent/Codex/Copilot/Claude thuộc development plane, không thuộc runtime authority.
 
