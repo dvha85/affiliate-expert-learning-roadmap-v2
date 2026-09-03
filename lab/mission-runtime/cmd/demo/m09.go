@@ -31,13 +31,15 @@ func AuthorizeM09(state M09State, ctx M09Context) (ExecutionAuthorization, strin
 	i, p := state.Intent, state.Policy
 	if i.IntentHash=="" || i.IntentHash!=ComputeShadowIntentHash(i) { return ExecutionAuthorization{}, "DENY_TAMPERED_INTENT" }
 	now, e1:=time.Parse(time.RFC3339,ctx.Now); ie, e2:=time.Parse(time.RFC3339,i.ExpiresAt); if e1!=nil||e2!=nil||!ie.After(now) { return ExecutionAuthorization{}, "DENY_EXPIRED_INTENT" }
-	if p.IntentID!=i.IntentID || p.IntentHash!=i.IntentHash || p.PolicyVersion=="" || (p.Decision!="ALLOW" && p.Decision!="HUMAN_REVIEW") { return ExecutionAuthorization{}, "DENY_POLICY_STATE" }
+	policyChecked,ePolicy:=time.Parse(time.RFC3339,p.PolicyCheckedAt)
+	if p.IntentID!=i.IntentID || p.IntentHash!=i.IntentHash || p.PolicyVersion=="" || ePolicy!=nil || policyChecked.After(now) || (p.Decision!="ALLOW" && p.Decision!="HUMAN_REVIEW") { return ExecutionAuthorization{}, "DENY_POLICY_STATE" }
 	if state.Approval==nil { return ExecutionAuthorization{}, "WAIT_APPROVAL" }
 	a:=*state.Approval
 	if a.ApprovedBy!="human" || strings.TrimSpace(a.ApproverID)=="" || !a.OneTime { return ExecutionAuthorization{}, "DENY_INVALID_APPROVER" }
 	if a.Decision=="REJECT" { return ExecutionAuthorization{}, "DENY_REJECTED" }; if a.Decision!="APPROVE" { return ExecutionAuthorization{}, "DENY_INVALID_APPROVER" }
 	if a.IntentID!=i.IntentID || a.IntentHash!=i.IntentHash || a.PolicyVersion!=p.PolicyVersion || a.CorrelationID!=i.CorrelationID { return ExecutionAuthorization{}, "DENY_APPROVAL_MISMATCH" }
 	aa,e3:=time.Parse(time.RFC3339,a.ApprovedAt); ae,e4:=time.Parse(time.RFC3339,a.ExpiresAt); if e3!=nil||e4!=nil||aa.After(now)||!ae.After(now)||!ae.After(aa) { return ExecutionAuthorization{}, "DENY_EXPIRED_APPROVAL" }
+	if aa.Before(policyChecked) { return ExecutionAuthorization{}, "DENY_APPROVAL_BEFORE_POLICY" }
 	if ctx.KillSwitch { return ExecutionAuthorization{}, "DENY_KILL_SWITCH" }
 	if !containsFold(ctx.AllowedExecutorIDs,ctx.Executor.ExecutorID) || !executorAllows(ctx.Executor,i) { return ExecutionAuthorization{}, "DENY_EXECUTOR" }
 	if ctx.AlreadySucceeded[i.IdempotencyKey] { return ExecutionAuthorization{}, "WAIT_ALREADY_EXECUTED" }
