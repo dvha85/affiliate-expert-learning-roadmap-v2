@@ -1,0 +1,20 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+dist/
+build/
+.tmp/
+.vscode/
+.idea/
+
+# Learner/private evidence
+workspace/
+artifacts/private/
+artifacts/raw/
+secrets/
+
+# Go
+lab/affiliate-bot/bin/
