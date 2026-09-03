@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "action-intent.schema.json",
+  "title": "ActionIntent",
+  "type": "object",
+  "required": ["action_id", "decision_id", "action_type", "target", "parameters", "created_at"],
+  "properties": {
+    "action_id": {"type": "string", "minLength": 1},
+    "decision_id": {"type": "string", "minLength": 1},
+    "action_type": {"type": "string", "minLength": 1},
+    "target": {"type": "string", "minLength": 1},
+    "parameters": {"type": "object"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "dry_run": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}
