@@ -7,63 +7,65 @@ authority: human/read-only
 external_side_effects: false
 ---
 
-# Mission M00 — First Real Evidence Packet
+# Mission M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên)
 
-## Ship target
+## Mục tiêu bàn giao
 
 ```text
-3+ public observations E1
+3+ public observations E1 (quan sát công khai thật)
 → classify fact / estimate / assumption / unknown
-→ Human DecisionPacket
+  (phân loại sự thật được hỗ trợ / ước tính / giả định / chưa biết)
+→ Human DecisionPacket (gói quyết định do người lập)
 → state + reason + missing evidence + next measurement
-→ NO external execution
+  (trạng thái + lý do + bằng chứng thiếu + phép đo tiếp theo)
+→ KHÔNG thực thi hành động bên ngoài
 ```
 
-## Required lessons
+## Các bài bắt buộc
 
 - `curriculum/M00/M00.1-affiliate-intelligence-objective.md`
 - `curriculum/M00/M00.2-evidence-uncertainty.md`
 - `curriculum/M00/M00.3-decision-approval-execution.md`
 
-## Evidence bundle
+## Gói bằng chứng
 
-Mỗi observation tối thiểu có `source_url`, `observed_at`, `access_method`, claim/value, `claim_kind`, limitation.
+Mỗi observation (quan sát) tối thiểu có `source_url`, `observed_at`, `access_method`, claim/value (phát biểu/giá trị), `claim_kind`, limitation (giới hạn).
 
 Human DecisionPacket tối thiểu có:
 
 ```text
-question
-supported_facts
-assumptions
-unknowns
+question: câu hỏi cần quyết định
+supported_facts: các fact được bằng chứng hỗ trợ
+assumptions: các giả định
+unknowns: điều chưa biết
 decision_state: RANK_SCENARIO | GET_MORE_DATA | HUMAN_REVIEW
-reason
-missing_evidence
-next_measurement
+reason: lý do
+missing_evidence: bằng chứng còn thiếu
+next_measurement: phép đo tiếp theo
 action: null
 ```
 
-## Failure cases
+## Các ca lỗi
 
-- placeholder URL được gọi là E1;
-- assumption ghi thành fact;
-- missing đổi thành observed zero;
-- sample/synthetic được gọi là market reality;
-- real provenance tự nâng output thành `RECOMMEND`;
-- DecisionPacket tạo external action.
+- URL placeholder (giữ chỗ) được gọi là E1;
+- assumption (giả định) ghi thành fact (sự thật được hỗ trợ);
+- missing (thiếu) đổi thành observed zero (đã quan sát bằng 0);
+- sample/synthetic (mẫu/mô phỏng) được gọi là market reality (thực tế thị trường);
+- real provenance (nguồn gốc thật) tự nâng output thành `RECOMMEND`;
+- DecisionPacket tạo external action (hành động bên ngoài).
 
 ## PASS
 
-### Capability
-- tạo evidence packet có provenance/uncertainty đúng;
-- tạo Human DecisionPacket có reason/missing evidence/next measurement.
+### Capability (năng lực)
+- tạo evidence packet (gói bằng chứng) có provenance/uncertainty (nguồn gốc/bất định) đúng;
+- tạo Human DecisionPacket có reason/missing evidence/next measurement (lý do/bằng chứng thiếu/phép đo tiếp theo).
 
-### Reality
+### Reality (thực tế)
 - có ít nhất 3 public observations E1 thật; nếu không thể, ghi `BLOCKED_EXTERNAL` và chưa PASS Reality.
 
-### Operated
-- packet/version đủ rõ để M01 dùng làm context cho deterministic baseline.
+### Operated (đã tự vận hành chứng minh)
+- packet/version (gói/phiên bản) đủ rõ để M01 dùng làm context (ngữ cảnh) cho deterministic baseline (mốc tất định).
 
-## Result
+## Kết quả
 
-`pre-bot`: market truth/context có trước; Bot v0.1 bắt đầu ở M01.
+`pre-bot` (giai đoạn trước Bot): market truth/context (sự thật/ngữ cảnh thị trường) có trước; Bot v0.1 bắt đầu ở M01.
