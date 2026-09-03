@@ -8,7 +8,7 @@
 - Action type + risk class (loại hành động + lớp rủi ro):
 - Vì sao impact thấp/reversible (tác động thấp/có thể đảo ngược):
 
-## 2. Human CanaryGrant + approval binding
+## 2. CanaryGrant do người phê duyệt + ràng buộc approval
 
 - ID/version/hash của grant:
 - ID của `CanaryGrantApproval` / `approval_ref`:
@@ -21,12 +21,12 @@
 - Chi phí tối đa theo đơn vị nhỏ + currency (tiền tệ):
 - Số outcome tối đa còn chờ:
 
-## 3. Trusted CanaryCostBound
+## 3. Trusted CanaryCostBound (giới hạn chi phí đáng tin)
 
-- CostBound ID/hash:
+- ID/hash của CostBound:
 - Intent ID/hash được bind:
-- Max cost minor + currency:
-- Source ref + observed_at + expires_at:
+- Chi phí trần theo đơn vị nhỏ + currency (tiền tệ):
+- Tham chiếu nguồn + `observed_at` + `expires_at`:
 - Bằng chứng source nằm trong deterministic/control-plane registry:
 - Có chứng minh estimate do Agent/ActionIntent tự khai báo không thể thay cost bound không?:
 
@@ -58,12 +58,12 @@
 
 ## 7. Failure evidence (bằng chứng ca lỗi)
 
-- Test approval_ref đúng nhưng grant_hash sai:
-- Test trusted cost-bound thiếu/tampered/expired:
-- Test Agent cost hint thấp hơn trusted cost bound:
+- Test `approval_ref` đúng nhưng `grant_hash` sai:
+- Test trusted cost-bound (giới hạn chi phí đáng tin) bị thiếu/sửa/hết hạn:
+- Test Agent cost hint (gợi ý chi phí) thấp hơn trusted cost bound:
 - Test rate/budget (tần suất/ngân sách):
-- Test durable ledger missing/reset:
-- Test outcome sai execution link:
+- Test mất/reset durable ledger (sổ bền vững):
+- Test outcome liên kết sai execution:
 - Test duplicate/idempotency (lặp/chống lặp):
 - Test kill/revoke (dừng/thu hồi):
 - Test unknown-effect/reconciliation (tác động chưa xác định/đối soát):
