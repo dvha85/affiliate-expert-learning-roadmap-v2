@@ -3,8 +3,11 @@
 Thứ tự học được quyết định bởi `CURRICULUM.md`.
 
 `missions/manifest.json` là chỉ mục machine-readable duy nhất cho structural
-spine O00→M11. `scripts/validate_missions.py` kiểm common assets/path; các
-validator khác là semantic plug-ins theo boundary, không sở hữu một spine riêng.
+spine O00→M11. Manifest cũng phân biệt rõ `learner_runtime`,
+`conformance_runtime` và `orchestration_blueprint` để không gọi
+`lab/mission-runtime` là Bot thứ hai. `scripts/validate_missions.py` kiểm common
+assets/path/runtime roles; các validator khác là semantic plug-ins theo
+boundary, không sở hữu một spine riêng.
 
 | Mission | Kết quả | Quyền hạn | Trạng thái |
 |---|---|---|---|
