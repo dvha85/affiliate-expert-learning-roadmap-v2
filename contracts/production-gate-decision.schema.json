@@ -1,0 +1,31 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-gate-decision.schema.json",
+  "title":"ProductionGateDecision",
+  "type":"object",
+  "required":["gate_id","lease_id","lease_version","lease_hash","intent_id","intent_hash","policy_version","risk_class","health_snapshot_id","health_snapshot_hash","cost_bound_id","cost_bound_hash","cost_bound_minor","decision","reason","evaluated_at","executions_total_before","executions_in_window_before","cost_minor_total_before","pending_outcomes_before","execution_authorized"],
+  "properties":{
+    "gate_id":{"type":"string","minLength":1},
+    "lease_id":{"type":"string","minLength":1},
+    "lease_version":{"type":"string","minLength":1},
+    "lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "intent_id":{"type":"string","minLength":1},
+    "intent_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "policy_version":{"type":"string","minLength":1},
+    "risk_class":{"enum":["RISK0","RISK1","RISK2"]},
+    "health_snapshot_id":{"type":"string","minLength":1},
+    "health_snapshot_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "cost_bound_id":{"type":"string","minLength":1},
+    "cost_bound_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "cost_bound_minor":{"type":"integer","minimum":0},
+    "decision":{"enum":["ALLOW_PRODUCTION","DEGRADE","STOP","REQUIRE_APPROVAL","WAIT","DENY"]},
+    "reason":{"type":"string","minLength":1},
+    "evaluated_at":{"type":"string","format":"date-time"},
+    "executions_total_before":{"type":"integer","minimum":0},
+    "executions_in_window_before":{"type":"integer","minimum":0},
+    "cost_minor_total_before":{"type":"integer","minimum":0},
+    "pending_outcomes_before":{"type":"integer","minimum":0},
+    "execution_authorized":{"const":false}
+  },
+  "additionalProperties":false
+}

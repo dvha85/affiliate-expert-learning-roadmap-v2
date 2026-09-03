@@ -16,14 +16,12 @@ Thứ tự học được quyết định bởi `CURRICULUM.md`.
 | M08 | Shadow ActionIntent + Policy (ActionIntent chạy bóng + chính sách) | A3-shadow | ready |
 | M09 | Durable Approval + Controlled Executor (phê duyệt bền vững + bộ thực thi có kiểm soát) | qua cổng phê duyệt | ready |
 | M10 | Governed Canary (canary có quản trị) | tự động RISK0/RISK1 trong grant giới hạn; RISK2 phê duyệt từng lần | ready |
-| M11 | Production Closed Loop (vòng kín production có quản trị) | production có quản trị | planned |
+| M11 | Production Closed Loop (vòng kín production có quản trị) | finite production lease cho RISK0/RISK1; RISK2 phê duyệt từng lần | ready |
 
 ```text
 O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → M09 → M10 → M11
 ```
 
-`ready` nghĩa là lesson + Mission contract + starter README + checkpoints + operated-evidence template + executable eval/runtime + CI guard đã được soạn. Với Mission có orchestration/Agent, blueprint phải thực sự chứa capability learner cần vận hành; placeholder không đủ để gọi `ready`.
+`ready` nghĩa là lesson + Mission contract + starter README + checkpoints + operated-evidence template + executable eval/runtime + CI guard đã được soạn. `ready` **không** có nghĩa người học đã PASS; learner PASS phụ thuộc evidence thật và operated result.
 
-`ready` **không** có nghĩa người học đã PASS. Learner PASS phụ thuộc evidence thật, cross-artifact linkage và operated result theo Mission contract.
-
-M06/M07 có n8n workflow để learner vận hành thật; CI kiểm authority/linkage bằng `lab/mission-runtime` offline và kiểm cấu trúc blueprint mà không cần API key hay dịch vụ ngoài. M08 dùng deterministic Go reference để learner quan sát exact binding/fail-closed semantics; OPA chưa phải dependency mặc định. M09 dùng persisted state + controlled local sandbox executor để chứng minh approval/restart/idempotency/kill-switch semantics. M10 thêm human-approved `CanaryGrant` + durable budget/rate/outcome ledger; local sandbox chỉ chứng minh Capability, không tự tạo E5.
+M06/M07 có n8n workflow để learner vận hành thật. M08 chỉ shadow. M09 dùng human approval từng execution. M10 dùng human-approved CanaryGrant + durable canary ledger. M11 dùng finite human-reviewed ProductionLease + trusted health/cost + sticky STOP; local sandbox/CI chỉ chứng minh Capability, không tự tạo E6.

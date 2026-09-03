@@ -1,0 +1,29 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-ledger.schema.json",
+  "title":"ProductionLedger",
+  "type":"object",
+  "required":["lease_id","lease_version","lease_hash","control_mode","window_started_at","executions_total","executions_in_window","cost_minor_total","pending_outcomes","pending_execution_ids","successful_idempotency_keys","outcome_links","consecutive_failures","reconciliation_required","reconciliation_resolution_ids","updated_at"],
+  "properties":{
+    "lease_id":{"type":"string","minLength":1},
+    "lease_version":{"type":"string","minLength":1},
+    "lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "control_mode":{"enum":["NORMAL","STOPPED"]},
+    "stop_reason":{"type":"string"},
+    "window_started_at":{"type":"string","format":"date-time"},
+    "executions_total":{"type":"integer","minimum":0},
+    "executions_in_window":{"type":"integer","minimum":0},
+    "cost_minor_total":{"type":"integer","minimum":0},
+    "pending_outcomes":{"type":"integer","minimum":0},
+    "pending_execution_ids":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "successful_idempotency_keys":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "outcome_links":{"type":"array","items":{"type":"object","required":["outcome_id","execution_id","observed_at"],"properties":{"outcome_id":{"type":"string","minLength":1},"execution_id":{"type":"string","minLength":1},"observed_at":{"type":"string","format":"date-time"}},"additionalProperties":false}},
+    "consecutive_failures":{"type":"integer","minimum":0},
+    "reconciliation_required":{"type":"boolean"},
+    "reconciliation_resolution_ids":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "last_execution_at":{"type":"string","format":"date-time"},
+    "last_outcome_at":{"type":"string","format":"date-time"},
+    "updated_at":{"type":"string","format":"date-time"}
+  },
+  "additionalProperties":false
+}

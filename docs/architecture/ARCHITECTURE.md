@@ -2,7 +2,7 @@
 
 ## 1. Architecture authority
 
-Curriculum quyết định **khi nào** capability/authority được mở. Architecture này quyết định **ranh giới hệ thống**; vendor/framework không sở hữu semantics.
+Curriculum quyết định **khi nào** capability/authority được mở. Architecture quyết định **ranh giới hệ thống**; vendor/framework không sở hữu semantics.
 
 ```text
 Read-only Watcher / Agent (M06/M07)
@@ -13,56 +13,41 @@ Read-only Watcher / Agent (M06/M07)
 → DecisionPacket / Grounded AI Advisor
 → ActionIntent (M08+)
 → Deterministic Policy / Risk
-→ DENY / WAIT / GET_MORE_DATA / HUMAN_REVIEW / ALLOW
 
-M09 path:
-Human ApprovalRecord
-→ deterministic revalidation + kill switch
-→ ExecutionAuthorization(APPROVED_LIVE)
-→ Controlled Executor
-→ ExecutionRecord
+M09:
+Human ApprovalRecord → revalidation → ExecutionAuthorization(APPROVED_LIVE) → Executor → ExecutionRecord
 
-M10 path:
-Human-approved CanaryGrant
-+ CanaryLedger
+M10:
+Human-approved CanaryGrant + CanaryLedger + trusted cost
 → CanaryGateDecision
-  ALLOW_CANARY | REQUIRE_APPROVAL | WAIT | DENY
-→ ExecutionAuthorization(GOVERNED_CANARY) only when ALLOW_CANARY
-→ Controlled Executor reloads durable ledger + revalidates grant/policy/scope/budget/kill switch
-→ ExecutionRecord
-→ OutcomeRecord
-→ ledger backpressure release
+→ ExecutionAuthorization(GOVERNED_CANARY)
+→ Executor → ExecutionRecord → OutcomeRecord
 
-→ Outcome → Evaluation → Reviewed Improvement
+M11:
+E5 promotion review → ProductionLeaseApproval → finite ProductionLease
++ trusted ProductionHealthSnapshot + trusted cost + durable ProductionLedger
+→ ProductionGateDecision
+  ALLOW_PRODUCTION | DEGRADE | STOP | REQUIRE_APPROVAL | WAIT | DENY
+→ ExecutionAuthorization(GOVERNED_PRODUCTION) only when ALLOW_PRODUCTION
+→ Executor reloads durable state + revalidates exact lease/policy/health/cost/budget/kill switch
+→ ExecutionRecord → OutcomeRecord → EvaluationRecord
+→ ImprovementProposal(auto_apply=false) → Human ReviewRecord
+↺
 ```
-
-M03 là ngoại lệ có chủ đích trước machine `ActionIntent`: người thực hiện external action thật, hệ thống chỉ ghi/validate `ActionRecord` và `OutcomeRecord`.
 
 ## 2. Ownership
 
 ### Deterministic Domain / Governance Core
 
-Sở hữu contract/behavior của:
-
-- evidence schema và validation;
-- identity/provenance/freshness;
-- canonical history/replay;
-- deterministic decision states;
-- `DecisionPacket`, `ActionRecord`, `OutcomeRecord`, `EvaluationRecord`, `ImprovementProposal`, `ReviewRecord`, `ActionIntent`, `PolicyDecision`;
-- `ApprovalRecord`, `ExecutionAuthorization`, `ExecutionRecord` từ M09;
-- `CanaryGrant`, `CanaryLedger`, `CanaryGateDecision` từ M10;
-- risk/authorization semantics;
-- budget/rate/outcome-backpressure semantics;
-- audit/correlation invariants;
-- cross-artifact linkage khi contract yêu cầu.
+Sở hữu canonical evidence/history, deterministic decision/policy/risk, approval/authorization, CanaryGrant/ProductionLease semantics, trusted cost/health bindings, budget/rate/outcome backpressure, sticky STOP/reconciliation, audit/correlation và cross-artifact linkage.
 
 ### Orchestration
 
-Sở hữu trigger/schedule/integration/retry/approval routing và bounded execution plumbing. Orchestrator không tự trở thành policy authority, approver hoặc grant authority. n8n output phải map về canonical contract thay vì tạo data model song song.
+Sở hữu trigger/schedule/integration/retry/routing. Orchestrator không tự trở thành policy/approval/grant/lease authority và không tự clear STOP.
 
 ### AgentRuntime
 
-Sở hữu unstructured research/reasoning/proposal trong permission ceiling. Agent không sở hữu truth, approval, CanaryGrant hoặc authorization. Tool output là untrusted data cho tới khi qua deterministic validation/grounding.
+Sở hữu unstructured research/reasoning/proposal trong permission ceiling. Agent không sở hữu truth, trusted cost/health, approval, CanaryGrant, ProductionLease hoặc authorization.
 
 ## 3. Invariants
 
@@ -74,28 +59,22 @@ Agent proposal != authorized ActionIntent
 Schema-valid reference != resolved provenance
 ApprovalRecord != ExecutionAuthorization
 CanaryGrant != blanket approval
-CanaryGateDecision != ExecutionAuthorization
-Persisted workflow state != permission
+ProductionLease != infinite authority
+GateDecision != ExecutionAuthorization
 Budget check without atomic reservation != safe budget enforcement
-UNKNOWN side effect → RECONCILIATION_REQUIRED → no automatic retry
-Deterministic Policy unavailable/invalid/unverified
-→ no consequential execution
+DEGRADE = read-only / no side effect
+STOP = sticky until human-reviewed recovery/new lease version
+UNKNOWN side effect → RECONCILIATION_REQUIRED → STOP → no automatic retry
+ImprovementProposal.auto_apply = false
+Automation may narrow/stop authority; it may not widen its own authority
 ```
-
-Từ M09, resume/retry phải revalidate exact intent hash, policy version, approval/authority source, expiry, executor profile, idempotency và kill switch ngay trước side effect.
-
-Từ M10, executor còn phải reload durable `CanaryLedger` và revalidate exact `CanaryGrant` hash/version, revocation, scope, total/rate/cost budget và outcome backpressure. `RISK2` không được đi qua `GOVERNED_CANARY`.
 
 ## 4. Implementation flexibility
 
-```text
-DETERMINISTIC CORE FIRST != CODE FIRST
-```
+Go là deterministic reference khi code giảm ambiguity. n8n có thể orchestration. OPA chỉ adopt khi policy complexity/parity gate biện minh. Temporal chỉ khi durability pain thật vượt persisted-state baseline. OpenTelemetry hỗ trợ telemetry/correlation nhưng không thay canonical audit/health authority.
 
-Go là deterministic reference/fallback khi code làm behavior rõ hơn. Visual rule engine hoặc OPA có thể implement deterministic semantics nếu parity/version/audit/fail-closed gate đạt. n8n có thể orchestration. Temporal chỉ có ý nghĩa khi durability pain thực tế vượt baseline. Agent runtime có thể thay đổi mà không đổi authority model.
-
-`lab/mission-runtime` là conformance/integration harness (bộ kiểm tương thích/tích hợp), không phải một Bot thứ hai thay thế `lab/affiliate-bot`. Mission sau phải reuse canonical contracts/history hoặc chứng minh adapter rõ ràng.
+`lab/mission-runtime` là conformance/integration harness, không phải Bot thứ hai.
 
 ## 5. External action boundary
 
-External action đầu tiên ở M03 và do human thực hiện. Machine ActionIntent bắt đầu shadow ở M08. Machine execution chỉ mở ở M09 qua human approval + deterministic revalidation + controlled executor. Bounded auto-action không cần approval từng lần chỉ bắt đầu ở M10 và chỉ trong human-approved `CanaryGrant` có scope/budget/time/risk nhỏ; `RISK2` vẫn quay về phê duyệt từng hành động. M11 mới là production closed loop có quản trị.
+M03 human action → M08 shadow intent → M09 per-action approved execution → M10 governed canary → M11 finite governed production. `RISK2` không được auto ở M10/M11. Promotion, renewal, scope/budget/risk widening và recovery sau sticky STOP đều cần human governance path.

@@ -4,10 +4,10 @@
 
 ## Bắt đầu
 
-1. `BOOT.0` nếu máy chưa có environment/tooling (môi trường/công cụ) tối thiểu hoặc chưa quen terminal/Git/Go.
+1. `BOOT.0` nếu máy chưa có environment/tooling tối thiểu.
 2. `BOOT.1` nếu chưa từng chạy/sửa/test Bot.
-3. Chạy `O00.1` để nhìn toàn hệ thống bằng dữ liệu mô phỏng; O00 chỉ orientation (định hướng), không tạo PASS.
-4. `M00.1 → M00.2 → M00.3`, hoàn thành evidence/artifact của M00 trước M01.
+3. Chạy `O00.1` để nhìn toàn hệ thống bằng dữ liệu mô phỏng; O00 không tạo PASS.
+4. `M00.1 → M00.2 → M00.3`.
 5. Khi M00 PASS: `M01.1 → M01.2 → M01.3 → M01.4`.
 6. Khi M01 PASS: `M02.1 → M02.2 → M02.3 → M02.4`.
 7. Khi M02 PASS: `M03.1 → M03.2 → M03.3`.
@@ -18,22 +18,14 @@
 12. Khi M07 PASS: `M08.1 → M08.2 → M08.3`.
 13. Khi M08 PASS: `M09.1 → M09.2 → M09.3`.
 14. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
+15. Khi M10 PASS: `M11.1 → M11.2 → M11.3`.
 
-`BOOT.0` và `BOOT.1` là onboarding/tooling credit (kết quả làm quen môi trường/công cụ), không thay thế evidence hay Mission PASS. O00 chỉ là bản đồ hệ thống bằng synthetic data (dữ liệu mô phỏng).
-
-M01–M10 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**: có lesson, Mission contract, starter/checkpoints/evidence template, executable eval/runtime và CI guard. M06/M07 có workflow n8n thực tế nhưng learner vẫn phải cấu hình nguồn/credential an toàn và tự tạo Reality/Operated evidence. M08 chỉ chạy policy ở shadow mode. M09 mở machine execution đầu tiên nhưng mọi execution đều phải qua human approval từng lần. M10 mở bounded auto-action đầu tiên bằng human-approved `CanaryGrant`; `RISK2` vẫn phải per-action approval và sandbox PASS không tự tạo E5.
+M01–M11 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**. M08 chỉ shadow; M09 machine execution cần approval từng lần; M10 mở governed canary; M11 mở finite production lease với trusted health/cost, DEGRADE read-only và sticky STOP. CI/sandbox không tự tạo Reality/Operated PASS.
 
 ## Vòng học của learner
 
 ```text
-TRY (thử)
-→ OBSERVE GAP (quan sát khoảng thiếu)
-→ PULL 1–3 SMALL KNOWLEDGE CARDS (lấy 1–3 thẻ kiến thức nhỏ)
-→ BUILD / APPLY (xây / áp dụng)
-→ TEST FAILURE CASE (kiểm thử ca lỗi)
-→ SAVE EVIDENCE (lưu bằng chứng)
-→ EXPLAIN LIMITS (giải thích giới hạn)
-→ NEXT MEASUREMENT (phép đo tiếp theo)
+TRY → OBSERVE GAP → PULL SMALL KNOWLEDGE → BUILD/APPLY → TEST FAILURE CASE → SAVE EVIDENCE → EXPLAIN LIMITS → NEXT MEASUREMENT
 ```
 
 ## Trục Mission
@@ -42,19 +34,18 @@ TRY (thử)
 O00 → M00 → M01 → M02 → M03 → M04 → M05 → M06 → M07 → M08 → M09 → M10 → M11
 ```
 
-Authority (quyền hạn) tăng dần. Capability (năng lực) của Mission sau không được dùng để vượt evidence/safety gate của Mission trước.
+Authority tăng dần; capability Mission sau không được vượt evidence/safety gate Mission trước.
 
-Từ M02 trở đi, ID trong artifact phải resolve được về artifact trước đó khi contract yêu cầu. Schema-valid nhưng provenance bị đứt không tạo Reality/Operated PASS.
-
-## Boundary quan trọng từ M03–M10
+## Boundary quan trọng M03–M11
 
 ```text
-M03: external action đầu tiên do human_only thực hiện
-M04: AI tư vấn dựa trên evidence; không write tool
-M05: evaluation → proposal → human review; không auto-apply
-M06: automation tự động nhưng chỉ GET/HEAD trên allowlist, normalize về canonical Observation
-M07: Agent + tool nhưng vẫn read-only; tool output là untrusted data
-M08: ActionIntent + policy chỉ shadow; ALLOW != execution permission; execution_authorized=false
-M09: mọi machine execution cần human ApprovalRecord + deterministic revalidation + controlled executor; không bounded auto-action
-M10: human-approved CanaryGrant cho RISK0/RISK1 trong scope/budget/rate/outcome giới hạn; RISK2 không auto
+M03: external action đầu tiên do human_only
+M04: AI advisory; không write tool
+M05: proposal + human review; không auto-apply
+M06: automatic read-only watcher
+M07: read-only Agent; tool output untrusted
+M08: shadow ActionIntent + policy; ALLOW != execution permission
+M09: mỗi machine execution cần human ApprovalRecord
+M10: CanaryGrant cho bounded RISK0/RISK1; RISK2 không auto
+M11: finite ProductionLease + trusted health/cost + sticky STOP + reviewed improvement; không self-widen authority
 ```
