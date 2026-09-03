@@ -26,6 +26,9 @@ type ShadowActionIntent struct {
 	IntentHash          string         `json:"intent_hash"`
 	IntentMode          string         `json:"intent_mode"`
 	ExecutionAuthorized bool           `json:"execution_authorized"`
+	// Internal compatibility aliases for M09-M11 runtime code. They are not canonical JSON fields.
+	ShadowOnly bool `json:"-"`
+	DryRun     bool `json:"-"`
 }
 
 type ShadowPolicyContext struct {
@@ -50,6 +53,9 @@ type ShadowPolicyDecision struct {
 	PolicyMode           string `json:"policy_mode"`
 	ExecutionAuthorized  bool   `json:"execution_authorized"`
 	PolicyCheckedAt      string `json:"policy_checked_at"`
+	// Internal compatibility aliases for M09-M11 runtime code. They are not canonical JSON fields.
+	ApprovalRequired bool `json:"-"`
+	ShadowOnly       bool `json:"-"`
 }
 
 type intentHashPayload struct {
@@ -90,6 +96,8 @@ func ComputeShadowIntentHash(i ShadowActionIntent) string {
 func SealShadowActionIntent(i ShadowActionIntent) ShadowActionIntent {
 	i.IntentMode = "PROPOSAL_ONLY"
 	i.ExecutionAuthorized = false
+	i.ShadowOnly = true
+	i.DryRun = true
 	i.ActionType = strings.ToUpper(strings.TrimSpace(i.ActionType))
 	i.IntentHash = ComputeShadowIntentHash(i)
 	return i
@@ -121,6 +129,7 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 		PolicyVersion: ctx.PolicyVersion, IntentID: i.IntentID, IntentHash: i.IntentHash,
 		Decision: "DENY", RiskClass: "RISK2", Reason: "INVALID_INTENT",
 		PolicyReviewRequired: false, PolicyMode: "NON_AUTHORIZING", ExecutionAuthorized: false, PolicyCheckedAt: ctx.Now,
+		ApprovalRequired: false, ShadowOnly: true,
 	}
 
 	if strings.TrimSpace(ctx.PolicyVersion) == "" {
@@ -214,10 +223,12 @@ func EvaluateShadowPolicy(i ShadowActionIntent, ctx ShadowPolicyContext) ShadowP
 		decision.Decision = "HUMAN_REVIEW"
 		decision.Reason = "RISK1_REQUIRES_REVIEW"
 		decision.PolicyReviewRequired = true
+		decision.ApprovalRequired = true
 	case "RISK2":
 		decision.Decision = "HUMAN_REVIEW"
 		decision.Reason = "RISK2_REQUIRES_REVIEW"
 		decision.PolicyReviewRequired = true
+		decision.ApprovalRequired = true
 	}
 	return decision
 }
