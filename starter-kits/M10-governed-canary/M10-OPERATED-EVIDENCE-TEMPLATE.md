@@ -2,55 +2,55 @@
 
 ## 1. Bối cảnh thật
 
-- Decision/Evidence refs:
-- ActionIntent ID/hash:
-- Target/account:
-- Action type + risk class:
-- Vì sao impact thấp/reversible (có thể đảo ngược):
+- Tham chiếu Decision/Evidence:
+- ID/hash của ActionIntent:
+- Target/account (đích/tài khoản):
+- Action type + risk class (loại hành động + lớp rủi ro):
+- Vì sao impact thấp/reversible (tác động thấp/có thể đảo ngược):
 
 ## 2. Human CanaryGrant
 
-- Grant ID/version/hash:
-- Trusted approval_ref + approver:
-- Policy version:
-- Validity window:
-- Allowed risk/action/host/executor:
-- Max executions total / per window:
-- Max cost minor + currency:
-- Max pending outcomes:
+- ID/version/hash của grant:
+- `approval_ref` đáng tin + người phê duyệt:
+- Policy version (phiên bản chính sách):
+- Validity window (khoảng hiệu lực):
+- Risk/action/host/executor được phép:
+- Số execution tối đa tổng / mỗi window:
+- Chi phí tối đa theo đơn vị nhỏ + currency (tiền tệ):
+- Số outcome tối đa còn chờ:
 
 ## 3. Preflight (kiểm trước)
 
-- Kill switch test evidence:
-- Atomic reservation/idempotency proof:
-- Credential/compliance review:
-- Recovery/reconciliation procedure:
+- Bằng chứng test kill switch (công tắc dừng):
+- Bằng chứng atomic reservation/idempotency (giữ chỗ nguyên tử/chống lặp):
+- Review credential/compliance (thông tin xác thực/tuân thủ):
+- Quy trình recovery/reconciliation (phục hồi/đối soát):
 
 ## 4. Canary execution thật
 
-- CanaryGateDecision ID + decision/reason:
-- ExecutionAuthorization ID/mode:
-- ExecutionRecord ID/status/side-effect state:
-- External reference:
-- Ledger before/after:
+- ID + decision/reason của CanaryGateDecision:
+- ID/mode của ExecutionAuthorization:
+- ID/status/side-effect state của ExecutionRecord:
+- External reference (tham chiếu bên ngoài):
+- Ledger trước/sau:
 
 ## 5. Outcome thật
 
-- OutcomeRecord ID/source/observed_at:
+- ID/source/observed_at của OutcomeRecord:
 - Outcome đã resolve đúng execution chưa?:
-- Pending outcome trước/sau:
+- Pending outcome (kết quả còn chờ) trước/sau:
 
-## 6. Failure evidence
+## 6. Failure evidence (bằng chứng ca lỗi)
 
-- Rate/budget test:
-- Duplicate/idempotency test:
-- Kill/revoke test:
-- Unknown-effect/reconciliation test:
-- Bằng chứng RISK2 không auto:
+- Test rate/budget (tần suất/ngân sách):
+- Test duplicate/idempotency (lặp/chống lặp):
+- Test kill/revoke (dừng/thu hồi):
+- Test unknown-effect/reconciliation (tác động chưa xác định/đối soát):
+- Bằng chứng RISK2 không auto (không tự động):
 
 ## 7. Review sau canary
 
 - KEEP / NARROW / REVOKE / NEW_GRANT_VERSION:
 - Lý do:
-- Measurement tiếp theo:
-- Có tăng exposure không? Nếu có, evidence nào biện minh?:
+- Measurement tiếp theo (phép đo tiếp theo):
+- Có tăng exposure (mức phơi nhiễm) không? Nếu có, evidence nào biện minh?:
