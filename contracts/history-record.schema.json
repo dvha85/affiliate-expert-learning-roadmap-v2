@@ -10,8 +10,38 @@
     "ingested_at": {"type": "string", "format": "date-time"},
     "formula_version": {"type": "string", "minLength": 1},
     "input_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "observations": {"type": "array", "minItems": 1},
-    "recorded_result": {"type": "object"}
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["observation_id", "product_id", "product_name", "price", "commission_rate", "currency", "evidence_kind", "observed_at"],
+        "properties": {
+          "observation_id": {"type": "string", "minLength": 1},
+          "product_id": {"type": "string", "minLength": 1},
+          "product_name": {"type": "string", "minLength": 1},
+          "price": {"type": ["number", "null"], "minimum": 0},
+          "commission_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+          "currency": {"type": "string"},
+          "evidence_kind": {"enum": ["real", "synthetic"]},
+          "observed_at": {"type": "string", "format": "date-time"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "recorded_result": {
+      "type": "object",
+      "required": ["formula_version", "state", "ranked", "missing_evidence", "reasons", "evidence_mode"],
+      "properties": {
+        "formula_version": {"type": "string", "minLength": 1},
+        "state": {"enum": ["RANK_SCENARIO", "GET_MORE_DATA", "HUMAN_REVIEW"]},
+        "ranked": {"type": "array"},
+        "missing_evidence": {"type": ["array", "null"]},
+        "reasons": {"type": ["array", "null"]},
+        "evidence_mode": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
   },
   "additionalProperties": false
 }

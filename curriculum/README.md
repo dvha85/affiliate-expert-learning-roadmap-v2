@@ -12,6 +12,8 @@
 
 M01 và M02 đã **authoring ready**, nhưng trạng thái này không bỏ qua learner gate của Mission trước. Learner hiện tại vẫn học theo progress evidence thực tế, không theo độ xa mà repo đã author.
 
+M02 `ready` chỉ được khôi phục sau corrective planned gate có executable eval/runtime PASS; điều này không tạo learner M01/M02 PASS tự động.
+
 ## Learner loop
 
 ```text

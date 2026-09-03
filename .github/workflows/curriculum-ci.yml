@@ -35,8 +35,9 @@ jobs:
           grep -q "real evidence != automatic recommendation" CURRICULUM.md
           grep -q "real evidence != RECOMMEND" lab/affiliate-bot/README.md
           grep -q '"M01-E07-conflict-dominates-missing"' evals/M01-deterministic-bot/cases.json
-          grep -q '"M02-E06-unknown-formula"' evals/M02-history-replay/cases.json
-          grep -q "replay MATCH != RECOMMEND" lab/affiliate-bot/README.md
+          grep -q '"M02-E07-input-hash-tamper"' evals/M02-history-replay/cases.json
+          grep -q '"M02-E12-observation-id-reuse-conflict"' evals/M02-history-replay/cases.json
+          grep -q "replay MATCH != business truth" lab/affiliate-bot/README.md
 
   python-regression:
     name: python-regression
@@ -57,7 +58,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
-      - name: Go test including M01 and M02 eval packs
+      - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
       - name: Go vet
@@ -70,6 +71,6 @@ jobs:
         working-directory: lab/affiliate-bot
         run: |
           rm -f /tmp/m02-history.jsonl
-          go run ./cmd/bot history capture /tmp/m02-history.jsonl data/sample-observations.json ci-demo 2026-09-01T10:00:00Z 2026-09-03T10:00:00Z
+          go run ./cmd/bot history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
           go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
           go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
