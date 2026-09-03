@@ -14,25 +14,29 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "required": ["observation_id", "product_id", "product_name", "price", "commission_rate", "currency", "evidence_kind", "observed_at"],
-        "properties": {
-          "observation_id": {"type": "string", "minLength": 1},
-          "product_id": {"type": "string", "minLength": 1},
-          "product_name": {"type": "string", "minLength": 1},
-          "price": {"type": ["number", "null"], "minimum": 0},
-          "commission_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-          "currency": {"type": "string"},
-          "evidence_kind": {"enum": ["real", "synthetic"]},
-          "observed_at": {"type": "string", "format": "date-time"}
-        },
-        "additionalProperties": false
+        "allOf": [
+          {"$ref": "observation.schema.json"},
+          {
+            "type": "object",
+            "required": ["product_id", "product_name", "price", "commission_rate", "currency"],
+            "properties": {
+              "product_id": {"type": "string", "minLength": 1},
+              "product_name": {"type": "string", "minLength": 1},
+              "price": {"type": ["number", "null"], "minimum": 0},
+              "commission_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+              "currency": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        ]
       }
     },
     "recorded_result": {
       "type": "object",
-      "required": ["formula_version", "state", "ranked", "missing_evidence", "reasons", "evidence_mode"],
+      "required": ["decision_id", "evidence_ids", "formula_version", "state", "ranked", "missing_evidence", "reasons", "evidence_mode"],
       "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "evidence_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "formula_version": {"type": "string", "minLength": 1},
         "state": {"enum": ["RANK_SCENARIO", "GET_MORE_DATA", "HUMAN_REVIEW"]},
         "ranked": {"type": "array"},
