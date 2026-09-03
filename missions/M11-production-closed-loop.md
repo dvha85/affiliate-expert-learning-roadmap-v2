@@ -36,13 +36,13 @@ E5 reviewed promotion
 - `RISK0`: có thể auto trong lease hợp lệ.
 - `RISK1`: chỉ auto nếu lease cho phép **và** human promotion approval xác nhận đã có E5 cho RISK1.
 - `RISK2`: luôn per-action human approval; không đi qua `GOVERNED_PRODUCTION`.
-- `DEGRADE`: read-only/no side effect.
-- `STOP`: sticky; lease cũ không tự resume.
-- Agent/orchestrator không tự create/renew/widen lease, policy, budget, credentials hoặc clear STOP/reconciliation.
-- Improvement có thể được tự đề xuất nhưng `auto_apply=false`; authority-changing change cần human review + version mới.
+- `DEGRADE`: read-only/no side effect (chỉ đọc/không có tác động bên ngoài).
+- `STOP`: sticky (dính trạng thái); lease cũ không tự resume.
+- Agent/orchestrator không tự create/renew/widen grant, policy, budget, credentials hoặc clear STOP/reconciliation.
+- Improvement có thể được tự đề xuất nhưng `auto_apply=false`; thay đổi authority cần human review + version mới.
 
 ## PASS
 
-Capability: eval/runtime/local sandbox PASS.
+Capability (năng lực): eval/runtime/local sandbox PASS.
 
-Reality + Operated: E6 production thật qua observation window có 3+ closed cycles, exact lease promotion từ E5, durable state/restart, trusted health/cost inputs, kill-switch + auto-stop/degrade drill, recovery bằng reviewed lease/version mới, real outcomes, Evaluation → reviewed ImprovementProposal và audit chứng minh không có self-widening authority. Sandbox/CI không tự tạo E6.
+Reality + Operated: có E6 production thật qua observation window với 3+ closed cycles, exact lease promotion từ E5, durable state/restart, trusted health/cost inputs, kill-switch + auto-stop/degrade drill, recovery bằng reviewed lease/version mới, real outcomes, Evaluation → reviewed ImprovementProposal và audit chứng minh không có self-widening authority. Sandbox/CI không tự tạo E6.

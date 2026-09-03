@@ -1,11 +1,11 @@
 # M11 checkpoints — điểm kiểm production closed loop
 
-- [ ] `ProductionLeaseApproval` bind exact `lease_hash` + source E5 refs + validated risk classes.
+- [ ] `ProductionLeaseApproval` bind exact `lease_hash` + source E5 refs + validated risk classes (tham chiếu E5 nguồn + lớp rủi ro đã xác nhận).
 - [ ] `ProductionLease` hữu hạn theo expiry/budget/rate/cost/outcome; không wildcard và không `RISK2`.
 - [ ] RISK1 chỉ production khi E5 promotion approval đã validate RISK1.
 - [ ] Trusted cost bound bind exact intent; Agent cost hint không sở hữu budget.
 - [ ] Trusted health snapshot bind exact lease hash và có freshness limit.
-- [ ] `DEGRADE` = read-only/no side effect.
+- [ ] `DEGRADE` = read-only/no side effect (chỉ đọc/không có tác động bên ngoài).
 - [ ] Compliance/reconciliation/failure/outcome-age/kill/revoke tạo `STOP`.
 - [ ] `STOP` được persist và vẫn sticky sau restart.
 - [ ] Resume sau STOP cần human-reviewed lease version mới; không auto-clear.
