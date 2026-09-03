@@ -53,6 +53,8 @@ jobs:
           go run ./cmd/demo M10 | grep -q '"decision": "ALLOW_CANARY"'
           go run ./cmd/demo M10 | grep -q '"execution_authorized": false'
           go run ./cmd/demo M10 | grep -q '"execution_mode": "GOVERNED_CANARY"'
+          go run ./cmd/demo M10 | grep -q '"canary_grant_hash": "sha256:'
+          go run ./cmd/demo M10 | grep -q '"canary_cost_bound_hash": "sha256:'
           go run ./cmd/demo M10 | grep -q '"side_effect_state": "PERFORMED"'
 
   safety-and-linkage-boundaries:
@@ -89,9 +91,19 @@ jobs:
           grep -q 'WAIT_RECONCILIATION' lab/mission-runtime/cmd/demo/m09.go
           grep -q 'PersistM09State' lab/mission-runtime/cmd/demo/m09.go
           grep -q '"approved_by".*"const":"human"' contracts/canary-grant.schema.json
+          grep -q '"grant_hash"' contracts/canary-grant-approval.schema.json
+          grep -q '"intent_hash"' contracts/canary-cost-bound.schema.json
+          grep -q '"grant_hash"' contracts/canary-ledger.schema.json
+          grep -q '"pending_execution_ids"' contracts/canary-ledger.schema.json
+          grep -q '"outcome_links"' contracts/canary-ledger.schema.json
           grep -q '"allowed_risk_classes"' contracts/canary-grant.schema.json
           grep -q '"execution_authorized".*"const":false' contracts/canary-gate-decision.schema.json
           grep -q 'RISK2_PER_ACTION_APPROVAL_REQUIRED' lab/mission-runtime/cmd/demo/m10.go
+          grep -q 'GRANT_APPROVAL_MISMATCH' lab/mission-runtime/cmd/demo/m10.go
+          grep -q 'GOVERNANCE_INPUTS_UNAVAILABLE' lab/mission-runtime/cmd/demo/m10.go
+          grep -q 'COST_BOUND_UNTRUSTED' lab/mission-runtime/cmd/demo/m10.go
+          grep -q 'WAIT_LEDGER_MISSING' lab/mission-runtime/cmd/demo/m10.go
+          grep -q 'DENY_OUTCOME_LINK' lab/mission-runtime/cmd/demo/m10.go
           grep -q 'OUTCOME_BACKPRESSURE' lab/mission-runtime/cmd/demo/m10.go
           grep -q 'RECONCILIATION_REQUIRED' lab/mission-runtime/cmd/demo/m10.go
           grep -q 'GRANT_REVOKED' lab/mission-runtime/cmd/demo/m10.go
