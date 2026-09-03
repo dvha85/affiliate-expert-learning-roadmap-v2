@@ -3,7 +3,8 @@ mission_id: M02
 title: Trustworthy History + Replay v0.2
 status: ready
 requires_missions: [M01]
-minimum_evidence: E1 + replayable local history
+minimum_evidence: E1
+readiness_target: E3
 authority: A0 deterministic
 external_side_effects: false
 runtime: lab/affiliate-bot/
@@ -30,6 +31,16 @@ M01 canonical input (đầu vào chuẩn hóa)
 → replay bằng đúng formula version (phát lại bằng đúng phiên bản công thức)
 → MATCH | DRIFT | UNREPLAYABLE
 → KHÔNG có hành động bên ngoài
+```
+
+## Evidence semantics (ngữ nghĩa bằng chứng)
+
+`minimum_evidence: E1` là mức bằng chứng tối thiểu để M02 nối với reality của M00/M01. `readiness_target: E3` chỉ nói history model phải **sẵn sàng tiếp nhận outcome thật ở Mission sau**; nó không có nghĩa M02 đã có hoặc được claim E3.
+
+```text
+readiness_target: E3
+!= E3 evidence achieved
+!= M03 PASS
 ```
 
 ## Contract (hợp đồng) cốt lõi
@@ -78,97 +89,80 @@ Replay không có nghĩa “chạy code hiện tại lên dữ liệu cũ” m�
 
 ```text
 formula_version: phiên bản công thức
-canonical input snapshot: ảnh chụp đầu vào chuẩn hóa
-input_hash: mã băm đầu vào
-recorded decision: quyết định đã ghi nhận
+input_hash: hash của canonical input snapshot
+recorded_result: decision đã lưu
 ```
 
-Replay dùng version registry (sổ đăng ký phiên bản) của deterministic core (lõi tất định):
+Replay dùng đúng implementation tương ứng với `formula_version` nếu runtime còn hỗ trợ:
 
 ```text
-known version + same result → MATCH
-(phiên bản đã biết + cùng kết quả → MATCH)
+same version + same canonical input integrity + same result
+→ MATCH
 
-known version + different result → DRIFT
-(phiên bản đã biết + kết quả khác → DRIFT)
+same version + same input nhưng result khác
+→ DRIFT
 
-unknown/retired version → UNREPLAYABLE
-(phiên bản không biết/đã ngừng hỗ trợ → UNREPLAYABLE)
+version không còn implementation tương ứng
+→ UNREPLAYABLE
 ```
 
-Nếu `input_hash` không còn khớp hoặc record hỏng, đó là **integrity failure (lỗi toàn vẹn) trước replay**, không phải replay state (trạng thái phát lại) thứ tư. Record phải fail closed (đóng an toàn khi lỗi) và không được báo `MATCH`/`DRIFT` giả.
+`UNREPLAYABLE` trung thực hơn việc lén dùng công thức mới để giả vờ tái tạo decision cũ.
 
-`UNREPLAYABLE` phải được báo rõ; không được tự động chạy formula mới rồi gọi đó là replay thành công.
+### Integrity (toàn vẹn) trước replay
 
-## Bằng chứng để repo đạt trạng thái `ready`
+`input_hash` phải được kiểm trước khi gọi record là replayable. Nếu observation bị sửa sau khi capture, record là integrity failure (lỗi toàn vẹn), không phải một replay bình thường.
 
-M02 chỉ được chuyển từ `planned` sang `ready` sau khi repo có đủ:
+Hash canonical phải ổn định trước ordering (thứ tự) không có ý nghĩa. Cùng tập input semantic nhưng order khác không được tạo hash khác chỉ vì serializer (bộ tuần tự hóa) nhận mảng theo thứ tự khác.
 
-- lesson cards (thẻ bài học) M02.1–M02.4;
-- `HistoryRecord` machine contract (hợp đồng máy đọc được);
-- append/read/query/replay path (luồng nối thêm/đọc/truy vấn/phát lại) trong `lab/affiliate-bot`;
-- executable eval pack (bộ ca đánh giá có thể chạy) cho duplicate/conflict/out-of-order/corruption/integrity/replay drift;
-- starter/checkpoint (bộ khởi đầu/điểm kiểm tra) + private operated-evidence template (mẫu bằng chứng vận hành riêng tư);
-- restart proof (bằng chứng qua khởi động lại);
-- CI bảo vệ M01 regression (hồi quy) + M02 replay semantics (ngữ nghĩa phát lại).
+## Query/restart
 
-Corrective authoring gate (cổng hiệu chỉnh khi soạn nội dung) ngày 2026-09-03 đã chạy khi M02 còn `planned` và đạt cả bốn CI jobs trước khi file này được đổi sang `ready`. `ready` là trạng thái authoring (soạn nội dung) của repo, không phải learner PASS.
-
-## Ranh giới Reality (thực tế)
-
-Minimum reality (mức thực tế tối thiểu) của learner PASS:
+M02 phải chứng minh data không chỉ tồn tại trong RAM:
 
 ```text
-ít nhất 1 product_id thật
-+ hai E1 observations ở observed_at khác nhau
-+ cùng stable identity (định danh ổn định)
-+ history vẫn đọc được sau process restart (khởi động lại tiến trình)
+capture
+→ stop process
+→ start process mới
+→ load append-only history
+→ query theo as_of
+→ replay
 ```
 
-`UNCHANGED` là outcome (kết quả) hợp lệ. Không cần thị trường phải thay đổi để PASS.
+Nếu restart làm mất history, M02 chưa đạt Operated.
 
-Nếu t2 không quan sát được, ghi missing/access limitation (thiếu/giới hạn truy cập) trung thực; không copy last-known value (giá trị biết gần nhất) và gọi đó là observation mới.
+## Các failure case bắt buộc
 
-Synthetic fixtures (dữ liệu kiểm thử mô phỏng) chỉ chứng minh failure/replay behavior (hành vi lỗi/phát lại), không thay E1 reality.
-
-## Safety / authority ceiling (an toàn / trần quyền hạn)
-
-M02 vẫn là local deterministic processing (xử lý tất định cục bộ):
-
-- không tự scrape/login (thu thập web/đăng nhập);
-- không publish/message/spend (đăng/gửi/chi tiền);
-- không n8n/Agent tự thu thập dữ liệu;
-- không external side effect (tác động bên ngoài);
-- history/replay không tạo Approval (phê duyệt) hoặc Execution permission (quyền thực thi).
-
-```text
-replay MATCH != business truth
-(MATCH khi phát lại != sự thật kinh doanh)
-
-history exists != permission to act
-(có lịch sử != có quyền hành động)
-
-Decision (quyết định) != Approval (phê duyệt) != Execution (thực thi)
-```
+- duplicate `record_id` cùng nội dung → idempotent, không append lại;
+- duplicate `record_id` khác nội dung → conflict;
+- cùng `observation_id` bị tái sử dụng với nội dung khác → conflict;
+- record đến muộn/out-of-order vẫn query đúng theo `as_of`;
+- `as_of < observed_at` → reject;
+- timestamp invalid → reject;
+- `input_hash` mismatch → integrity failure;
+- corrupt JSONL → fail closed;
+- unsupported `formula_version` → `UNREPLAYABLE`, không silent fallback;
+- cùng canonical input nhưng observation order khác → cùng hash;
+- replay result khác recorded result cùng version → `DRIFT`.
 
 ## PASS
 
 ### Capability (năng lực)
-- append-only history không overwrite evidence (lịch sử chỉ nối thêm không ghi đè bằng chứng);
-- immutable snapshot (ảnh chụp bất biến) không đổi khi caller (bên gọi) sửa object sau capture;
-- exact duplicate idempotent (bản sao chính xác lặp lại an toàn), conflict về record/observation identity báo lỗi rõ;
-- JSONL corrupt/truncated (hỏng/cụt) và hash tamper (sửa mã băm) phải fail closed;
-- out-of-order record được giữ lại và query theo `as_of` đã parse;
-- replay phân biệt `MATCH`, `DRIFT`, `UNREPLAYABLE`;
-- M01 regression vẫn PASS.
+
+- executable eval M02 PASS;
+- Go tests/vet PASS;
+- capture/list/replay hoạt động qua restart;
+- history fail closed với tamper/corruption/version unknown.
 
 ### Reality (thực tế)
-- có ít nhất hai E1 observations của cùng stable subject (đối tượng ổn định) ở hai thời điểm quan sát khác nhau, hoặc blocker (điểm chặn) được ghi trung thực.
+
+- nối ít nhất một HistoryRecord với E1 context thật từ Mission trước;
+- không gọi fixture synthetic là market history thật.
 
 ### Operated (đã tự vận hành chứng minh)
-- người học đã append, restart, query, replay và rerun (nối thêm, khởi động lại, truy vấn, phát lại và chạy lại) cùng history/version để chứng minh output deterministic;
-- người học explain-back (tự giải thích lại) được `observed_at != ingested_at != as_of`, integrity failure và giới hạn của replay.
 
-## Kết quả
+- learner tự capture, restart, query, replay;
+- tự gây một failure case và giải thích được vì sao fail;
+- lưu operated evidence + limitation.
 
-Bot v0.2 có trustworthy local history + deterministic replay (lịch sử cục bộ đáng tin + phát lại tất định). Authority (quyền hạn) vẫn A0, không có external action.
+## Corrective authoring gate (cổng hoàn thiện nội dung)
+
+Mission M02 chỉ được gọi `ready` khi lesson, starter, operated template, executable eval và runtime tests cùng tồn tại. `ready` là trạng thái authoring, không phải learner PASS.
