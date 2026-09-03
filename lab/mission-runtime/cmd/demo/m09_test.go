@@ -63,6 +63,7 @@ func TestM09EvalPack(t *testing.T) {
 				s.Intent.IntentHash = ComputeShadowIntentHash(s.Intent)
 				s.Policy.IntentHash = s.Intent.IntentHash
 				s.Approval.IntentHash = s.Intent.IntentHash
+				ctx.PolicyContext.AllowedHosts = []string{"evil.example"}
 			case "policy_deny":
 				s.Policy.Decision = "DENY"
 			case "already_executed":
