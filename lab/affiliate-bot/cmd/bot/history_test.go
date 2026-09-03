@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"testing"
 )
@@ -56,7 +55,11 @@ func TestCorruptHistoryFailsClosed(t *testing.T) {
 	if _, err := LoadHistory(path); err == nil { t.Fatal("corrupt history must fail closed") }
 }
 
-type m02EvalCase struct { CaseID, Kind, Expected string }
+type m02EvalCase struct {
+	CaseID   string `json:"case_id"`
+	Kind     string `json:"kind"`
+	Expected string `json:"expected"`
+}
 
 func TestM02EvalPackCoverage(t *testing.T) {
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -73,5 +76,5 @@ func TestM02EvalPackCoverage(t *testing.T) {
 		if seen[tc.CaseID] { t.Fatalf("duplicate case id %s", tc.CaseID) }
 		seen[tc.CaseID] = true
 	}
-	if !reflect.DeepEqual(len(seen), len(cases)) { t.Fatal("eval case coverage mismatch") }
+	if len(seen) != len(cases) { t.Fatal("eval case coverage mismatch") }
 }
