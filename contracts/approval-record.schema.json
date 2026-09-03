@@ -3,7 +3,7 @@
   "$id": "approval-record.schema.json",
   "title": "ApprovalRecord",
   "type": "object",
-  "required": ["approval_id","intent_id","intent_hash","policy_version","decision","approved_by","approved_at","expires_at","correlation_id","one_time"],
+  "required": ["approval_id","intent_id","intent_hash","policy_version","decision","approved_by","approver_id","approved_at","expires_at","correlation_id","one_time"],
   "properties": {
     "approval_id": {"type":"string","minLength":1},
     "intent_id": {"type":"string","minLength":1},
