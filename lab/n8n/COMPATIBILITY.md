@@ -6,8 +6,8 @@ Blueprint JSON hợp lệ chỉ chứng minh cấu trúc file. Khả năng impor
 
 | Blueprint | Node | `typeVersion` đang khai báo |
 |---|---|---|
-| M06 | Schedule Trigger / Set / HTTP Request / Code | 1.2 / 3.4 / 4.2 / 2 |
-| M07 | AI Agent / OpenAI Chat Model / HTTP Request Tool / Code | 3.1 / 1.2 / 1.2 / 2 |
+| M06 | Schedule Trigger (bộ kích hoạt lịch) / Set (gán dữ liệu) / HTTP Request (yêu cầu HTTP) / Code (mã) | 1.2 / 3.4 / 4.2 / 2 |
+| M07 | AI Agent (Agent AI) / OpenAI Chat Model (mô hình chat OpenAI) / HTTP Request Tool (tool yêu cầu HTTP) / Code (mã) | 3.1 / 1.2 / 1.2 / 2 |
 
 Các version trên là version được lưu trong blueprint, **không phải tuyên bố rằng đó là version mới nhất hoặc đã được test trên engine hiện hành**.
 
