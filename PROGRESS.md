@@ -5,11 +5,10 @@ Repo v2 bắt đầu theo trục Mission mới. File này chỉ ghi **tiến đ�
 ## Trạng thái học v2 hiện tại
 
 - Trạng thái: **IN PROGRESS (đang học)**
-- Mission hiện tại: **chưa có — đang ở lớp orientation (định hướng)**
-- Bài đã hoàn thành trong repo v2: **BOOT.0 — PASS; BOOT.1 — PASS**
-- Bài tiếp theo: **O00.1 — Safe System Walkthrough (đi một vòng hệ thống an toàn)**
-- Tài liệu tham khảo trước bài mới: **`curriculum/BOOT/BOOT-REFERENCE.md`**
-- Sau O00.1: **M00.1 → M00.2 → M00.3**
+- Mission hiện tại: **M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên), chưa bắt đầu Reality evidence (bằng chứng thực tế)**
+- Bài đã hoàn thành trong repo v2: **BOOT.0 — PASS; BOOT.1 — PASS; O00.1 — ORIENTATION COMPLETED (hoàn thành định hướng)**
+- Bài tiếp theo: **M00.1 — Affiliate Intelligence Bot đang tối ưu điều gì?**
+- Tài liệu tham khảo BOOT: **`curriculum/BOOT/BOOT-REFERENCE.md`**
 - Trạng thái Reality (thực tế) của M00: **chưa bắt đầu**
 
 ## Evidence học tập cho BOOT
@@ -40,6 +39,39 @@ Learner đã:
 
 BOOT.1 PASS chỉ xác nhận tooling/test semantics capability (năng lực công cụ/ngữ nghĩa kiểm thử); không tạo E1, M00 PASS hoặc quyền automation.
 
+## O00.1 — ORIENTATION COMPLETED
+
+Learner đã chạy:
+
+```bash
+cd lab/mission-runtime
+go run ./cmd/demo O00
+```
+
+và quan sát được chuỗi artifact (đối tượng dữ liệu):
+
+```text
+Observation
+→ DecisionPacket
+→ AdvisorOutput
+→ ActionIntent
+→ PolicyDecision
+→ ApprovalReview
+→ ExecutionRecord
+→ OutcomeRecord
+→ EvaluationRecord
+```
+
+Learner đã giải thích được các boundary (ranh giới) chính:
+
+- `Observation (quan sát)` là dữ liệu/sự kiện được ghi nhận, **không phải recommendation (khuyến nghị)**;
+- `DecisionPacket (gói quyết định)` là quyết định/kết luận dựa trên evidence (bằng chứng);
+- `ActionIntent = PROPOSAL_ONLY (chỉ là đề xuất)` nghĩa là Bot **chưa có execution permission (quyền thực thi)**;
+- `ExecutionRecord = DRY_RUN_ONLY (chỉ chạy mô phỏng)` nghĩa là execution (thực thi) chỉ được mô phỏng và không tạo hành động thật; dry-run/live execution là trục khác với synthetic/real evidence;
+- `external_side_effects=false (không có tác động bên ngoài)` nghĩa là runtime (chương trình khi chạy) **đã thực sự chạy**, nhưng không publish (đăng), send (gửi), spend (chi tiền), mutate account (sửa tài khoản) hoặc gọi write API (API ghi) ra hệ thống bên ngoài.
+
+O00.1 chỉ hoàn thành orientation (định hướng). Nó dùng synthetic data (dữ liệu mô phỏng), không tạo E1 evidence, Reality PASS, Mission PASS hoặc quyền automation.
+
 ## Kết quả từ repo lịch sử
 
 - `BOOT.1 — Chạy, sửa và kiểm thử Bot`: learner từng có **historical PASS credit (kết quả PASS lịch sử có thể được công nhận)**, nhưng hiện learner đã **thực sự học lại và PASS BOOT.1 trong repo v2**, nên không cần dùng historical credit cho trạng thái hiện tại.
@@ -50,8 +82,7 @@ BOOT.1 PASS chỉ xác nhận tooling/test semantics capability (năng lực cô
 ```text
 BOOT.0 PASS
 → BOOT.1 PASS
-→ đọc BOOT-REFERENCE nếu cần ôn tập
-→ O00.1
+→ O00.1 ORIENTATION COMPLETED
 → M00.1
 → M00.2
 → M00.3
