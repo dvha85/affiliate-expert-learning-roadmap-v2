@@ -1,6 +1,6 @@
 # Technology Profile — current implementation reference
 
-**Last reviewed:** 2026-09-03  
+**Last reviewed:** 2026-09-04  
 **Status:** Reference/adoption guide, không phải curriculum authority.
 
 ## 1. Rule chung
@@ -26,6 +26,7 @@ Mọi tool chỉ được adopt khi giải quyết bottleneck đã quan sát đ�
 | Browser acquisition | HTTP/API/manual | Playwright | M06 | browser only when required |
 | Observability | correlation/audit contract | OpenTelemetry | M06 | adopt across runtime boundaries |
 | AI eval backend | repo fixtures/evals | Langfuse | M04 | optional after repo baseline |
+| Local AI inference | external AI API remains valid baseline | LM Studio + Qwen3.8-27B MLX 4-bit on learner Mac | M04+ when AI is introduced | local-first candidate for development/eval, not required |
 | Policy engine | deterministic rules/contracts | OPA | M08/M09 | adopt on real policy complexity |
 | Durable workflow | n8n + canonical persisted state | Temporal | M09 | only on real durability pain |
 | Orchestration alternative | n8n | Windmill | M06+ | compare only on measured ops benefit |
@@ -51,6 +52,8 @@ Human external action + measurement context. Không machine-execute.
 ### M04
 
 Grounded AI advisory. Langfuse có thể hỗ trợ experiment/eval sau khi repo fixture/eval baseline tồn tại; Langfuse score không trở thành evidence hoặc policy input mặc định.
+
+Local AI có thể bắt đầu được đánh giá từ M04 trở đi. Với learner machine hiện tại (MacBook Air M2, 24 GB unified memory), baseline khuyến nghị là LM Studio + Qwen3.8-27B MLX 4-bit, context 8K mặc định và 16K khi cần. Đây là development/eval profile, không phải curriculum requirement. Xem `docs/technology/LOCAL-AI-RUNTIME.md`.
 
 ### M05
 
@@ -315,3 +318,11 @@ explicit read-only Tool Registry
 Không dùng Hermes để tự cập nhật skill, policy, authority, canonical state hay
 production activation. Nếu không chứng minh được các guard này, giữ nó ngoài
 default comparison/adoption path.
+
+## 17. Local AI runtime
+
+Chi tiết baseline cho LM Studio, Qwen3.8-27B, MLX 4-bit, context sizing, RAM/thermal constraints, tool boundary và lộ trình local → always-on được giữ tại:
+
+- `docs/technology/LOCAL-AI-RUNTIME.md`
+
+Local AI là inference choice (lựa chọn suy luận), không phải authority model. Đổi model/runtime không được thay đổi contract, policy, approval hay Mission ceiling.
