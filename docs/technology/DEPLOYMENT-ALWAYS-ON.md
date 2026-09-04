@@ -2,6 +2,8 @@
 
 **Status:** implementation/deployment guidance (hướng dẫn triển khai), không phải curriculum authority (thẩm quyền chương trình học).
 
+> Local learner/development AI profile (cấu hình AI local cho người học/phát triển): xem `docs/technology/LOCAL-AI-RUNTIME.md`.
+
 ## 1. Nguyên tắc chính
 
 ```text
@@ -41,6 +43,8 @@ External AI API
 ```
 
 Không self-host LLM (tự lưu trữ mô hình ngôn ngữ lớn) chỉ vì Bot chạy 24/7. Self-host model chỉ được cân nhắc khi có bottleneck/use case (điểm nghẽn/trường hợp sử dụng) đo được về privacy (riêng tư), latency (độ trễ), cost (chi phí), availability (khả dụng) hoặc model control (kiểm soát mô hình), và phải tính riêng CPU/RAM/GPU, model lifecycle (vòng đời mô hình) và security burden (gánh nặng bảo mật).
+
+Với learner machine hiện tại là **MacBook Air M2, 24 GB unified memory**, LM Studio + Qwen3.8-27B MLX 4-bit được xem là development/prototype profile (cấu hình phát triển/nguyên mẫu), **không phải production inference host 24/7**. Xem `docs/technology/LOCAL-AI-RUNTIME.md`.
 
 ## 4. Baseline triển khai đơn giản
 
