@@ -6,19 +6,20 @@
 
 1. `BOOT.0` nếu máy chưa có environment/tooling tối thiểu.
 2. `BOOT.1` nếu chưa từng chạy/sửa/test Bot.
-3. Chạy `O00.1` để nhìn toàn hệ thống bằng dữ liệu mô phỏng; O00 không tạo PASS.
-4. `M00.1 → M00.2 → M00.3`.
-5. Khi M00 PASS: `M01.1 → M01.2 → M01.3 → M01.4`.
-6. Khi M01 PASS: `M02.1 → M02.2 → M02.3 → M02.4`.
-7. Khi M02 PASS: `M03.1 → M03.2 → M03.3`.
-8. Khi M03 PASS: `M04.1 → M04.2 → M04.3`.
-9. Khi M04 PASS: `M05.1 → M05.2 → M05.3`.
-10. Khi M05 PASS: `M06.1 → M06.2 → M06.3`.
-11. Khi M06 PASS: `M07.1 → M07.2 → M07.3`.
-12. Khi M07 PASS: `M08.1 → M08.2 → M08.3`.
-13. Khi M08 PASS: `M09.1 → M09.2 → M09.3`.
-14. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
-15. Khi M10 PASS: `M11.1 → M11.2 → M11.3`.
+3. Sau BOOT.0/BOOT.1, có thể đọc `curriculum/BOOT/BOOT-REFERENCE.md` để ôn lại environment, runtime, test semantics, intentional FAIL và giới hạn của test evidence. Đây là tài liệu tham khảo, không phải bài học/PASS gate mới.
+4. Chạy `O00.1` để nhìn toàn hệ thống bằng dữ liệu mô phỏng; O00 không tạo PASS.
+5. `M00.1 → M00.2 → M00.3`.
+6. Khi M00 PASS: `M01.1 → M01.2 → M01.3 → M01.4`.
+7. Khi M01 PASS: `M02.1 → M02.2 → M02.3 → M02.4`.
+8. Khi M02 PASS: `M03.1 → M03.2 → M03.3`.
+9. Khi M03 PASS: `M04.1 → M04.2 → M04.3`.
+10. Khi M04 PASS: `M05.1 → M05.2 → M05.3`.
+11. Khi M05 PASS: `M06.1 → M06.2 → M06.3`.
+12. Khi M06 PASS: `M07.1 → M07.2 → M07.3`.
+13. Khi M07 PASS: `M08.1 → M08.2 → M08.3`.
+14. Khi M08 PASS: `M09.1 → M09.2 → M09.3`.
+15. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
+16. Khi M10 PASS: `M11.1 → M11.2 → M11.3`.
 
 M01–M11 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**. M08 chỉ shadow; M09 machine execution cần approval từng lần; M10 mở governed canary; M11 mở finite production lease với trusted health/cost, DEGRADE read-only và sticky STOP. CI/sandbox không tự tạo Reality/Operated PASS.
 
