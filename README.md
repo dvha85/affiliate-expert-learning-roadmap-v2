@@ -71,6 +71,20 @@ Tool thay đổi != Curriculum thay đổi
 
 Go, n8n, MCP, OpenTelemetry, Langfuse, Playwright, OpenAI Agents SDK, Hermes Agent, Windmill, Temporal, OPA và rule engine chỉ được áp dụng khi giải quyết bottleneck (điểm nghẽn) đã quan sát được và không vượt authority ceiling (trần quyền hạn) của Mission.
 
+## Triển khai 24/7
+
+VPS/server **không phải điều kiện tiên quyết để học**. Local-first (ưu tiên chạy trên máy cá nhân) được dùng cho giai đoạn đầu; always-on runtime (runtime luôn hoạt động) bắt đầu có ý nghĩa từ M06 khi có automatic read-only watcher (bộ theo dõi tự động chỉ đọc), và trở nên quan trọng hơn ở M09–M11.
+
+```text
+24/7 availability (khả dụng 24/7)
+!=
+24/7 authority (quyền hành động 24/7)
+```
+
+AI model cũng không mặc định phải self-host (tự lưu trữ) trên VPS; có thể dùng external AI API (API AI bên ngoài) trong khi VPS chạy Go Bot, n8n, canonical state (trạng thái chuẩn), policy (chính sách), worker và monitoring (giám sát).
+
+Chi tiết: `docs/technology/DEPLOYMENT-ALWAYS-ON.md`.
+
 ## Chính sách repo
 
 Repo v2 không mang lớp compatibility/migration (tương thích/chuyển đổi) từ repo cũ. Legacy syllabus, numeric lesson map, Mission trùng lặp, migration script và runtime lịch sử chỉ tồn tại ở repo lịch sử.
