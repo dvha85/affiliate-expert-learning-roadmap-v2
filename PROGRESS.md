@@ -5,11 +5,11 @@ Repo v2 bắt đầu theo trục Mission mới. File này chỉ ghi **tiến đ�
 ## Trạng thái học v2 hiện tại
 
 - Trạng thái: **IN PROGRESS (đang học)**
-- Mission hiện tại: **M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên), chưa bắt đầu Reality evidence (bằng chứng thực tế)**
-- Bài đã hoàn thành trong repo v2: **BOOT.0 — PASS; BOOT.1 — PASS; O00.1 — ORIENTATION COMPLETED (hoàn thành định hướng)**
-- Bài tiếp theo: **M00.1 — Affiliate Intelligence Bot đang tối ưu điều gì?**
+- Mission hiện tại: **M00 — First Real Evidence Packet (gói bằng chứng thật đầu tiên)**
+- Bài đã hoàn thành trong repo v2: **BOOT.0 — PASS; BOOT.1 — PASS; O00.1 — ORIENTATION COMPLETED (hoàn thành định hướng); M00.1 — PASS**
+- Bài tiếp theo: **M00.2 — Evidence, uncertainty và missing data (bằng chứng, bất định và dữ liệu còn thiếu)**
 - Tài liệu tham khảo BOOT: **`curriculum/BOOT/BOOT-REFERENCE.md`**
-- Trạng thái Reality (thực tế) của M00: **chưa bắt đầu**
+- Trạng thái Reality (thực tế) của M00: **chưa PASS — chưa có đủ real public observations (quan sát công khai thật) theo yêu cầu M00**
 
 ## Evidence học tập cho BOOT
 
@@ -72,6 +72,69 @@ Learner đã giải thích được các boundary (ranh giới) chính:
 
 O00.1 chỉ hoàn thành orientation (định hướng). Nó dùng synthetic data (dữ liệu mô phỏng), không tạo E1 evidence, Reality PASS, Mission PASS hoặc quyền automation.
 
+## M00.1 — PASS
+
+### Context (bối cảnh) xuyên suốt M00 đã chốt
+
+```text
+Audience (nhóm mục tiêu):
+Freelancer / remote worker tại Việt Nam.
+
+Problem (vấn đề):
+Làm việc lâu bằng laptop/MacBook trên bàn nhỏ; cần một giải pháp gọn,
+rẻ và phù hợp để nâng laptop khi làm việc.
+
+Offer/category (sản phẩm/danh mục):
+Giá đỡ laptop nhôm gấp gọn, điều chỉnh độ cao, phân khúc giá rẻ.
+
+Market Question (câu hỏi thị trường):
+Trong các giá đỡ laptop nhôm gấp gọn giá rẻ có thể quan sát công khai,
+offer nào đáng để tiếp tục nghiên cứu như một cơ hội Affiliate cho
+freelancer/remote worker Việt Nam?
+```
+
+Decision (quyết định) ở M00 chỉ hỗ trợ các trạng thái kiểu:
+
+```text
+CONTINUE_RESEARCH (tiếp tục nghiên cứu)
+GET_MORE_DATA (cần thêm dữ liệu)
+```
+
+không phải:
+
+```text
+BUY
+PUBLISH
+RECOMMEND
+EXECUTE
+```
+
+### Learner notes (ghi chú người học)
+
+Learner đã hiểu và giải thích được:
+
+1. `price × commission_rate (giá × tỷ lệ hoa hồng)` chỉ là **weak scenario (kịch bản yếu)** vì chưa phản ánh đầy đủ demand (nhu cầu), conversion rate (tỷ lệ chuyển đổi), valid-order rate (tỷ lệ đơn hợp lệ), chi phí, rủi ro, competition (cạnh tranh), product–audience fit (độ phù hợp sản phẩm–nhóm mục tiêu) và các yếu tố quyết định khác.
+2. `order (đơn hàng) != valid order (đơn hợp lệ) != payment (tiền thực nhận)` vì order có thể bị hủy, hoàn, không đủ điều kiện hoặc không được attribution (ghi nhận nguồn Affiliate); valid order là phần đơn được xác nhận hợp lệ; payment còn phụ thuộc trạng thái hoa hồng, điều chỉnh và lịch/điều kiện thanh toán của nền tảng.
+3. Một offer có số bán hoặc commission (hoa hồng) cao nhất vẫn chưa đủ để gọi là **best affiliate opportunity (cơ hội Affiliate tốt nhất)** nếu nó không phù hợp với audience (nhóm mục tiêu) hoặc có conversion, rủi ro, competition, seller quality (chất lượng người bán) hay expected value (giá trị kỳ vọng) kém hơn.
+
+Mental model (mô hình tư duy) đã chốt:
+
+```text
+highest commission rate (tỷ lệ hoa hồng cao nhất)
+!= best affiliate opportunity (cơ hội Affiliate tốt nhất)
+
+local metric (chỉ số cục bộ)
+!= final business outcome (kết quả kinh doanh cuối)
+
+DATA/EVIDENCE (dữ liệu/bằng chứng)
+> OPINION (ý kiến)
+
+EXPECTED VALUE (giá trị kỳ vọng)
+> COMMISSION RATE (tỷ lệ hoa hồng) khi đánh giá cơ hội tổng thể
+```
+
+M00.1 PASS là knowledge/decision framing PASS (PASS về hiểu biết và định khung quyết định). Nó **chưa tạo Reality PASS cho M00**, vì real public observations (quan sát công khai thật) và provenance (nguồn gốc/truy vết bằng chứng) sẽ được làm tiếp ở M00.2.
+
 ## Kết quả từ repo lịch sử
 
 - `BOOT.1 — Chạy, sửa và kiểm thử Bot`: learner từng có **historical PASS credit (kết quả PASS lịch sử có thể được công nhận)**, nhưng hiện learner đã **thực sự học lại và PASS BOOT.1 trong repo v2**, nên không cần dùng historical credit cho trạng thái hiện tại.
@@ -83,7 +146,7 @@ O00.1 chỉ hoàn thành orientation (định hướng). Nó dùng synthetic dat
 BOOT.0 PASS
 → BOOT.1 PASS
 → O00.1 ORIENTATION COMPLETED
-→ M00.1
+→ M00.1 PASS
 → M00.2
 → M00.3
 → M00 PASS
