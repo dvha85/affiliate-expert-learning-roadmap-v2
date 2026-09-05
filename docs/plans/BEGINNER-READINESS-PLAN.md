@@ -68,7 +68,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; reviewer: chủ repo (chờ review BR-03a); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; reviewer: chủ repo (chờ review [PR #22 — BR-03a](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/22)); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
@@ -152,6 +152,8 @@ Liên quan phát hiện 7, 8.
 Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output thực của runtime được kiểm bằng schema tương ứng; fixture history hiện tại vẫn replay hoặc có quyết định chuyển đổi rõ.
 
 #### BR-03a — Advisor boundary (IN_REVIEW; item cha chưa hoàn thành)
+
+- PR: [#22](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/22); code/tests commit `274e60676533fe3fd05f7630e4b0dd70331c8068`. [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/22/checks).
 
 - Baseline `1e94ec5`: `TestAdvisorRejectsEmptyReason` FAIL vì nhận SUPPORTED thay vì INVALID_SCHEMA; sau sửa PASS.
 - Đã thêm raw JSON boundary cho M04, giữ required/null/duplicate/unknown information trước typed decode; enum/type/unique IDs/reason/constant false được kiểm. Guard typed không thay raw boundary. Test snapshot canonical schema buộc review khi schema đổi; đây là validator riêng cho M04, không phải engine schema tổng quát.
