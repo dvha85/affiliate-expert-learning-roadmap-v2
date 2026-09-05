@@ -164,6 +164,8 @@ Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output 
 
 #### BR-03b — History schema + DecisionPacket adapter (IN_REVIEW)
 
+- [PR #24](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24); commit triển khai `a9d80726b1f66f1de42d652db89b1a1e161e1464`; [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24/checks).
+
 - Baseline: `eacbd27`. Người thực hiện: Codex; reviewer: chủ repo, chờ review. [Thiết kế/mapping](../architecture/M02-DECISION-ADAPTER.md); [schema runtime](../../contracts/README.md).
 - Package contracts nhúng schema canonical, pin jsonschema/v6 v6.0.2 và go.sum; format assertions bật, không tải schema ngoài. Compile schema không thay việc nối runtime từng Mission (BR-03c).
 - Capture/load/append M02 kiểm raw schema + field exact/duplicate/unsupported trước semantic ID/hash/time checks. Context xuất packet bắt buộc tường minh, không tự tạo fact; packet phải qua canonical schema và history phải replay=MATCH.
