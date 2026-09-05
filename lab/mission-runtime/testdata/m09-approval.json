@@ -1,0 +1,1 @@
+{"approval_id":"syn-approval","intent_id":"syn-i","intent_hash":"sha256:687bc9894622b0eea1d025fd8c1bb17af051184eca718a2863ec0ed5ac3b06e6","policy_version":"test-v1","decision":"APPROVE","approved_by":"human","approver_id":"synthetic-reviewer-not-authenticated","approved_at":"2026-09-03T02:05:00Z","expires_at":"2026-09-03T02:50:00Z","correlation_id":"syn-c","one_time":true}

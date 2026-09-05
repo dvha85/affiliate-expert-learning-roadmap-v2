@@ -1,0 +1,1 @@
+{"policy_version":"test-v1","intent_id":"syn-i","intent_hash":"sha256:687bc9894622b0eea1d025fd8c1bb17af051184eca718a2863ec0ed5ac3b06e6","decision":"ALLOW","risk_class":"RISK0","reason":"SHADOW_POLICY_ALLOW","policy_review_required":false,"policy_mode":"NON_AUTHORIZING","execution_authorized":false,"policy_checked_at":"2026-09-03T02:00:00Z"}

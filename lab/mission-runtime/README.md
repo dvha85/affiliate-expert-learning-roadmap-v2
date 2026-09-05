@@ -39,6 +39,10 @@ M07: [m07-check offline](../../docs/architecture/M07-JSON-BOUNDARY.md) kiểm pr
 
 M08: [m08-check](../../docs/architecture/M08-JSON-BOUNDARY.md), raw schema trước policy, không seal lại hash/quyền. Exit 0 có thể chứa DENY/WAIT; không execute.
 
+## Kiểm M09 từ file (BR-03c.6)
+
+M09 có [m09-check](../../docs/architecture/M09-JSON-BOUNDARY.md) audit năm file lịch sử, chỉ xuất CONSISTENT_UNVERIFIED với execution_permitted=false. Không gọi AuthorizeM09/executor hoặc xác thực approver từ một chuỗi JSON.
+
 ## Kiểm AdvisorOutput từ file (BR-03a)
 
 Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:

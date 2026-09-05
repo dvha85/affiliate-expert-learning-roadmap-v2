@@ -20,6 +20,8 @@ Một chuỗi `ActionIntent → PolicyDecision → ApprovalRecord → ExecutionA
 
 ## Authority ceiling
 
+[m09-check](../docs/architecture/M09-JSON-BOUNDARY.md) chỉ audit JSON; output không cấp execution permission. ApprovalRecord đúng schema chưa chứng minh human approval đáng tin; runtime vẫn phải revalidate policy/ledger/provenance và executor.
+
 Mọi machine execution ở M09 đều cần human approval hợp lệ. Agent/orchestrator không tự approve. `ALLOW` của policy không tự cấp execution. Không mở bounded auto-action; đó là M10.
 
 ## Evidence semantics (ngữ nghĩa bằng chứng)

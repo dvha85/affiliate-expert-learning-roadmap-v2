@@ -1,5 +1,7 @@
 # M09 Bằng chứng đã vận hành
 
+- Audit m09-check (tách khỏi proof thật): input refs, summary/rejection; nguồn tin cậy xác thực approver và trạng thái consume vẫn phải ghi riêng:
+
 - Chuỗi Decision/Evidence đã dùng:
 - `intent_id` + `intent_hash`:
 - phiên bản policy + trạng thái policy:

@@ -46,6 +46,8 @@ Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket 
 
 ## Phần còn lại của BR-03
 
+BR-03c.5 đã merge #32 `9aae6ad`, 4/4 checks PASS. BR-03c.6 M09 đang triển khai: [schema/file audit](M09-JSON-BOUNDARY.md), Codex thực hiện/chủ repo chưa review, nhánh `codex/br-03c-m09-boundary`; chỉ profile APPROVED_LIVE, không thay Load/Persist/Authorize/Execute hoặc tạo trusted approval. Các artifact runtime persistence chưa nối vẫn mở.
+
 BR-03c.4 đã merge #31 `d759fc0`, 4/4 CI PASS. BR-03c.5 M08 đang triển khai: [boundary](M08-JSON-BOUNDARY.md), Codex/chủ repo chưa review, nhánh `codex/br-03c-m08-boundary`; không seal lại, không executor/store.
 
 BR-03c.3 đã review/merge #30 `891562a`, CI 4/4 PASS. BR-03c.4 M07: [boundary](M07-JSON-BOUNDARY.md), nhánh `codex/br-03c-m07-boundary`, Codex thực hiện/chủ repo chưa review; canonical registry toàn mảng, proposal shape local, không model/network/store.

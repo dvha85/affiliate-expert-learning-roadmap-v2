@@ -1,5 +1,7 @@
 # M09 Checkpoints
 
+- [ ] Đã thử m09-check với schema sai/hash sai/ID sai/window sai; CONSISTENT_UNVERIFIED không được dùng làm execution permission hoặc one-time replay proof.
+
 - [ ] ApprovalRecord do người tạo và bind đúng `intent_hash` + `policy_version`.
 - [ ] approval có expiry, one-time và correlation rõ.
 - [ ] Agent/orchestrator không thể tự approve.
