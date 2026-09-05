@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07/BR-06a đã merge; BR-03c.1 đã review, chờ CI sau cập nhật main tại PR #28; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-06a (#27) và BR-03c.1 (#28) đã merge; BR-03c.2 M05 IN_REVIEW tại PR #29; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -72,10 +72,10 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge; BR-03c.1 IN_REVIEW [PR #28](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/28), reviewer chủ repo (chưa review); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b/c.1 đã merge (#28 `d89a04c`); BR-03c.2 M05 IN_REVIEW [PR #29](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/29), reviewer chủ repo chưa review; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
-| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; reviewer: chủ repo (chưa review); BR-06a IN_REVIEW [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27); [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
+| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
@@ -143,6 +143,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 - Rollback: revert PR BR-02 nếu được merge; lưu ý việc đó đưa lỗi kết luận sớm trở lại.
 
 ### BR-03 — Output đúng schema trước semantic validation
+
+BR-03c.2: Codex thực hiện, reviewer chủ repo chưa review, nhánh `codex/br-03c-m05-boundary`; [phạm vi/evidence M05](../architecture/M05-JSON-BOUNDARY.md). Nối raw EvaluationRecord/ImprovementProposal/ReviewRecord và chuỗi M03 vào CLI chỉ đọc; không apply/persist. BR-03c.1 đã merge `d89a04c` sau review, giải quyết conflict kế hoạch với #27 và chạy lại tests/vet/validators; 4/4 checks PASS trên head `1f4c5bc`. #27 merge trước tại `09a2f50`. Những đoạn chờ review/merge trước đó là lịch sử.
 
 BR-03c.1: Codex thực hiện, reviewer chủ repo (chưa review), nhánh `codex/br-03c-m03-boundary`; [thiết kế/evidence](../architecture/M03-JSON-BOUNDARY.md). Phạm vi raw M03 action/outcome + CLI read-only + raw eval + output schema; không sửa alias M11 hoặc triển khai store. BR-03c tổng thể vẫn IN_PROGRESS, không DONE chỉ từ M03.
 

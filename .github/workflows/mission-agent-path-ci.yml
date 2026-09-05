@@ -44,6 +44,7 @@ jobs:
           go run ./cmd/demo M04 | grep -q 'SUPPORTED'
           go run ./cmd/demo advisor-check testdata/m04-advisor-output.json testdata/m04-evidence.json 2026-09-03T01:00:00Z 24 | grep -q 'SUPPORTED'
           go run ./cmd/demo M05 | grep -q 'REVIEW_REQUIRED'
+          go run ./cmd/demo m05-check testdata/m03-action.json testdata/m05-outcomes.json testdata/m05-evaluations.json testdata/m05-proposal.json testdata/m05-review.json | grep -q '"execution_authorized":false'
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
           go run ./cmd/demo M08 | grep -q 'SHADOW_POLICY_ALLOW'

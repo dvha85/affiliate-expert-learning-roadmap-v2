@@ -6,6 +6,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "m05-check" {
+		if err := runM05Check(os.Stdout, os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "m03-check" {
 		if err := runM03Check(os.Stdout, os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)

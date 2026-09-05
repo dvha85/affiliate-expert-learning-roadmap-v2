@@ -230,6 +230,7 @@ type EvaluationRecord struct {
 	Result       string    `json:"result"`
 	EvidenceIDs  []string  `json:"evidence_ids"`
 	Limitations  []string  `json:"limitations"`
+	Notes        *string   `json:"notes,omitempty"`
 	// Internal alias used by pre-cleanup M11 reference code; never serialized as canonical JSON.
 	ActionID string `json:"-"`
 }
@@ -240,7 +241,7 @@ type ImprovementProposal struct {
 	ProposedVersion string   `json:"proposed_version"`
 	ChangeSummary   string   `json:"change_summary"`
 	ExpectedBenefit string   `json:"expected_benefit"`
-	Risks           []string `json:"risks"`
+	Risks           []string `json:"risks,omitempty"`
 	Rollback        string   `json:"rollback"`
 	AutoApply       bool     `json:"auto_apply"`
 }

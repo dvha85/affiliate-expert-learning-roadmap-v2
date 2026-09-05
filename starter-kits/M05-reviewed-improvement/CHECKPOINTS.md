@@ -4,6 +4,8 @@
 - [ ] ImprovementProposal tham chiếu evaluation IDs có thật.
 - [ ] current/proposed version khác nhau và có rollback.
 - [ ] `auto_apply=false`.
+- [ ] JSON schema kiểm trước semantic bằng m05-check; đã thử required/null/auto-apply và broken link, ghi lỗi mà không sửa expected.
+- [ ] Outcome/evaluation ID không trùng; evaluation không trước outcome, review không trước evaluation; VALID không thay decision review hoặc cấp execution.
 - [ ] ReviewRecord do human tạo và liên kết đúng proposal.
 - [ ] một result không bị overfit thành thay đổi lớn.
 - [ ] Reality + Operated evidence đã lưu.

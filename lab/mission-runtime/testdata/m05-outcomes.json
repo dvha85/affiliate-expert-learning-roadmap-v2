@@ -1,0 +1,3 @@
+[
+  {"outcome_id":"syn-o","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"syn-a"},"observed_at":"2026-09-10T10:00:00+07:00","status":"NO_OBSERVED_OUTCOME","metrics":{"valid_orders":0},"source_ref":"synthetic-report"}
+]
