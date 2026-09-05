@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/BR-04 đã merge; BR-03b chờ review, BR-03c chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/BR-04 đã merge; BR-03b/BR-05/BR-07 chờ review theo thứ tự PR #24 → #25 → #26; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -72,7 +72,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [quickstart](../../curriculum/BOOT/QUICKSTART.md); [evidence](evidence/BR-05-QUICKSTART.md) |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
-| BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | TODO | Chưa phân công |
+| BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); nhánh kế tiếp BR-05 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | TODO | Chưa phân công |
@@ -225,12 +225,18 @@ Nghiệm thu: một case đi từ link đến báo cáo được review; mỗi m
 
 Liên quan phát hiện 1, 11.
 
-- [ ] Thêm bài ngắn gắn trực tiếp bot: struct và JSON tag, array/map, pointer/null, hàm, error, đọc file và test assertion.
-- [ ] Một bài chỉnh input rồi đọc error; một bài thêm field hoặc hàm normalize nhỏ.
-- [ ] Mỗi bài có phiên bản trước/sau, vị trí chỉnh, lệnh chạy và lỗi cố ý.
-- [ ] Cho biết bài nào là prerequisite của adapter M03/M04/M06.
+- [x] Thêm bài ngắn gắn trực tiếp bot: struct và JSON tag, array/map, pointer/null, hàm, error, đọc file và test assertion.
+- [x] Một bài chỉnh input rồi đọc error; một bài thêm field clicks và hàm normalize nhỏ.
+- [x] Mỗi bài có phiên bản trước/sau, vị trí chỉnh, lệnh chạy và lỗi cố ý; source giữ bản trước để học viên tự viết thay đổi.
+- [x] Cho biết bài nào là prerequisite của adapter M03/M04/M06.
 
 Nghiệm thu: học viên tự sửa được một adapter nhỏ và viết test phân biệt null/0; không chỉ chép toàn bộ solution mà không hiểu input/output.
+
+Triển khai BR-07: [GO-JSON-PRACTICE](../../curriculum/BOOT/GO-JSON-PRACTICE.md), package `lab/affiliate-bot/internal/learning` trong cùng module (không phải Bot/platform adapter thứ hai). Fixtures synthetic, chưa là OutcomeRecord; không đổi production behavior. Go tests/vet toàn affiliate-bot và 8 validators PASS. Tests 4 nhóm kiểm null/absent/0/1, input lỗi/type/negative/unknown/duplicate, normalize status và đọc fixture. Bài học yêu cầu tự dự đoán, tạo lỗi, thêm Clicks kèm test trước/sau và explain-back; chưa có learner pilot độc lập nên giữ IN_REVIEW, không ghi PROGRESS hoặc claim năng lực học viên từ CI. PR phụ thuộc BR-05 (#25), sau BR-03b (#24).
+
+Smoke bài tập trong bản sao tạm riêng: bài A đổi valid_orders từ 0 sang string "0" làm TestCommittedReportFixture FAIL với cannot unmarshal string into int. Bài B thêm TestClicksExercise trước code hỗ trợ làm FAIL unknown field clicks; sau khi thêm pointer field, guard số âm, metric có điều kiện và đổi test unknown cũ sang typo_clicks, full tests PASS (gồm clicks null/absent/0/-1/string). Không đưa solution sau bài B vào source mẫu; source vẫn để học viên tự thực hành, không sửa file cá nhân để chạy probe.
+
+[PR #26](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/26), base nhánh BR-05 (#25), commit triển khai `36e47f1f054399512a708b70253592b3ca56be03`; [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/26/checks). Review/merge thứ tự #24 → #25 → #26 và đổi base về main sau khi PR trước đã merge; không gộp ngược để né review dependency.
 
 ## 7. Đợt C — Cùng một bot từ M00 đến M05
 
