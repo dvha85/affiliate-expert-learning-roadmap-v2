@@ -1,5 +1,7 @@
 # Mission Runtime — conformance harness cho O00 và M03–M11
 
+M11 có [m11-chain-check](../../docs/architecture/M11-CHAIN-AUDIT.md) audit bundle lịch sử, không execute hoặc resume.
+
 M11 có [m11-check](../../docs/architecture/M11-JSON-BOUNDARY.md) kiểm từng artifact, không xác thực provenance/chain và không cấp quyền execute.
 
 M10 bổ sung [m10-chain-check](../../docs/architecture/M10-CHAIN-AUDIT.md): audit chín file có pre-gate ledger; không cấp quyền execute.

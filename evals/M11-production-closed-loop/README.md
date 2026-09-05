@@ -1,5 +1,7 @@
 # Eval M11 — Production Closed Loop (vòng production có quản trị)
 
+[BR-03c.8b chain audit](../../docs/architecture/M11-CHAIN-AUDIT.md) bổ sung tests bundle, pre/post ledger, cycle/review và resolved-stop. PASS không thay trusted production authority hoặc E6 evidence.
+
 BR-03c.8 thêm [bài kiểm raw JSON từng artifact](../../docs/architecture/M11-JSON-BOUNDARY.md); PASS không thay kiểm toàn chain, STOP/recovery hoặc live evidence.
 
 Eval kiểm production authority (quyền production) chứ không chỉ happy path (đường chạy thuận lợi).

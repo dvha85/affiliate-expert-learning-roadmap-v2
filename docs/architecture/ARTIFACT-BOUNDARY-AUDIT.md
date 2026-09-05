@@ -2,6 +2,8 @@
 
 ## Phạm vi đã triển khai
 
+BR-03c.8 đã merge #36 `fa9b9db`. [BR-03c.8b M11 chain audit](M11-CHAIN-AUDIT.md) kiểm issuance/cycle và profile resolved-stop chưa commit ledger, với snapshot rõ ràng; không xác thực provenance hoặc tích hợp trusted persistence/executor. BR-03 tổng thể còn mở.
+
 BR-03c.7b đã merge #35 `07c1b8a`. [BR-03c.8 M11 artifact boundary](M11-JSON-BOUNDARY.md) kiểm 11 loại file riêng, lease/health hash, time và ledger self-consistency. Full chain M11 và trusted persistence/executor chưa tích hợp.
 
 BR-03c.7 đã merge #34 `1d6594c`. [BR-03c.7b M10 chain audit](M10-CHAIN-AUDIT.md) nối chín artifact qua ID/hash/scope/time/pre-gate ledger/budget; vẫn unverified, không nối trusted persistence/executor và chưa chuyển M11.
