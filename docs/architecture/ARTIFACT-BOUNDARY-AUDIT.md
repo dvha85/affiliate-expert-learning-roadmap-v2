@@ -2,6 +2,8 @@
 
 ## Phạm vi đã triển khai
 
+BR-03c.7b đã merge #35 `07c1b8a`. [BR-03c.8 M11 artifact boundary](M11-JSON-BOUNDARY.md) kiểm 11 loại file riêng, lease/health hash, time và ledger self-consistency. Full chain M11 và trusted persistence/executor chưa tích hợp.
+
 BR-03c.7 đã merge #34 `1d6594c`. [BR-03c.7b M10 chain audit](M10-CHAIN-AUDIT.md) nối chín artifact qua ID/hash/scope/time/pre-gate ledger/budget; vẫn unverified, không nối trusted persistence/executor và chưa chuyển M11.
 
 BR-03c.6 M09 đã review/merge #33 tại `6fce165`, CI 4/4 PASS. BR-03c.7 bổ sung [M10 artifact boundary](M10-JSON-BOUNDARY.md): bảy profile schema/strict decode, hash/time và ledger self-consistency; ledger output rỗng dùng array. Chưa audit full chain hoặc tích hợp trusted runtime/persistence. BR-03 tổng thể chưa hoàn thành.

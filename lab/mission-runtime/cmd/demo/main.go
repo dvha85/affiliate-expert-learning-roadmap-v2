@@ -6,6 +6,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "m11-check" {
+		if err := runM11Check(os.Stdout, os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "m10-chain-check" {
 		if err := runM10ChainCheck(os.Stdout, os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
