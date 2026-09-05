@@ -1,5 +1,7 @@
 # BR-03c.7b — Audit chain M10 chỉ đọc
 
+Trạng thái IN_REVIEW tại [PR #35](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/35), commit triển khai `9dbd9a0`. [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/35/checks). Chưa merge.
+
 Kiểm local: tests/vet ba module, 8 Python validators, 10 Python regressions và diff check PASS. Tests CLI dùng chín file synthetic trong thư mục tạm, xác nhận summary không cấp quyền và input không thay đổi. CI cần kiểm theo head PR riêng.
 
 #34 đã review/merge `1d6594c`, CI 4/4 PASS trên head `732cb71`, tests/vet mission-runtime PASS. Bài này nối các boundary của #34 với intent/policy M08; không thay `m10-check` kiểm từng file.
