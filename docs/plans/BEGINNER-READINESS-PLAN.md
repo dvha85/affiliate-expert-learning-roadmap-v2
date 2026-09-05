@@ -66,7 +66,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
-| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); nhánh `codex/br-01-ci-contract-alignment`; [evidence](#br-01--bằng-chứng-triển-khai) |
+| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20); [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | TODO | Chưa phân công |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
@@ -105,6 +105,7 @@ Nghiệm thu: 8 validator chạy độc lập đều exit 0; template action non
 #### BR-01 — Bằng chứng triển khai
 
 - Ngày: 05/09/2026. Người thực hiện: Codex. Reviewer: chủ repo, chưa review.
+- PR triển khai: [#20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20), nhánh `codex/br-01-ci-contract-alignment`; commit code/tests: `4eb51e0adca0753836ea83f78837ac6ee6b99fc0`. Trạng thái CI theo từng commit xem tại [Checks của PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20/checks).
 - Baseline: `8db79ebff7fa275329d5b8dae3923171db42fdac` (main sau PR #19). Chạy lại tại local: 7/8 validator exit 0; `validate_artifact_spine.py` exit 1 vì marker ``action: `null` `` không nhận key được bọc backtick. CI PR #19: job `structure-language-and-foundations` lỗi ở validator này, ba job còn lại PASS.
 - Sau sửa tại local (Python 3.9.6): cả 8 validator exit 0; 10 regression tests PASS; `git diff --check` exit 0. Kết quả GitHub Actions của PR triển khai cần kiểm riêng, không suy từ local PASS.
 - Lệnh tái hiện: `python3 -m unittest discover -s scripts/tests -v`; `for script in scripts/validate_*.py; do python3 "$script" || exit 1; done`; `git diff --check`.
