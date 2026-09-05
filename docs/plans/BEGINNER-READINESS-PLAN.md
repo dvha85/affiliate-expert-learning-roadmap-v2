@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/BR-04 đã merge; BR-03b/BR-05/BR-07 chờ review theo thứ tự PR #24 → #25 → #26; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07 đã merge; BR-06a đang triển khai bản trung lập, BR-06b chờ chương trình/kênh; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -64,15 +64,17 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 ## 4. Bảng theo dõi
 
+Cập nhật sau review: PR #24 → #25 → #26 đã merge đúng thứ tự tại `9102f00`, `f438028`, `ccf6c79`; 4/4 checks mỗi head PASS, tests/vet ba module, 8 validators và 10 Python regressions PASS. BR-05/BR-07 DONE ở phạm vi tài liệu/bài tập đã review; installer trên máy trắng, Windows và năng lực học viên chưa được xác minh, tiếp tục theo dõi ở BR-16. Các đoạn “IN_REVIEW/chờ merge” trong bằng chứng triển khai cũ bên dưới là lịch sử trước lần cập nhật này.
+
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a đã merge; BR-03b chờ chủ repo review; BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge (#22/#24); BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
-| BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [quickstart](../../curriculum/BOOT/QUICKSTART.md); [evidence](evidence/BR-05-QUICKSTART.md) |
-| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
-| BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); nhánh kế tiếp BR-05 |
+| BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
+| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; reviewer: chủ repo (chưa review); BR-06a nhánh `codex/br-06-manual-affiliate-loop`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
+| BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | TODO | Chưa phân công |
@@ -162,7 +164,9 @@ Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output 
 - [Audit artifact và quyết định bảo toàn M02](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) ghi BR-03b/c còn TODO. Không đánh dấu DONE chỉ vì M04 PASS.
 - Chủ repo xác nhận chưa có chương trình affiliate: BR-04/BR-06 sẽ dùng fixture trung lập, chưa có platform/operated proof; không tự đăng ký chương trình hoặc chọn kênh đăng thay chủ repo.
 
-#### BR-03b — History schema + DecisionPacket adapter (IN_REVIEW)
+#### BR-03b — History schema + DecisionPacket adapter (đã merge)
+
+Review và merge PR #24 tại `9102f00` theo yêu cầu chủ repo; 4/4 head checks PASS. Các mô tả chờ review bên dưới là lịch sử triển khai, không phải trạng thái hiện tại. BR-03c vẫn TODO.
 
 - [PR #24](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24); commit triển khai `a9d80726b1f66f1de42d652db89b1a1e161e1464`; [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24/checks).
 
@@ -211,6 +215,14 @@ Triển khai BR-05: [quickstart](../../curriculum/BOOT/QUICKSTART.md), [smoke/ev
 ### BR-06 — Một vòng affiliate thủ công có số liệu
 
 Liên quan phát hiện 2.
+
+Tách phạm vi để không dùng fixture thay live proof:
+
+- BR-06a: bản trung lập [MANUAL-AFFILIATE-LOOP](../product/MANUAL-AFFILIATE-LOOP.md), [fixture](../../examples/affiliate-manual/manual-loop.json), test `TestManualAffiliateFixture` trong contracts. Người thực hiện Codex; reviewer chủ repo (chưa review); nhánh `codex/br-06-manual-affiliate-loop`. Không có importer/runtime mới.
+- BR-06b: chương trình/kênh cụ thể, màn hình export và case thật — BLOCKED vì chủ repo xác nhận chưa có chương trình. Không tự tạo account hoặc hành động ngoài hệ thống.
+- Test kiểm canonical action/outcome schemas và mapping fixture, thêm 7 mutation regressions: missing→0, zero trước end, orphan action, update sai, field lạ, số âm, duplicate snapshot. Đây không phải semantic runtime M03 hoặc proof affiliate.
+- Kiểm local BR-06a: tests/vet ba module PASS, 8 validators và 10 Python regressions PASS; diff check PASS. Test fixture được job `deterministic-runtime` hiện hữu chạy qua `go test ./...` trong contracts. Không suy trạng thái CI từ kết quả local.
+- Checklist gốc dưới đây giữ mở cho nghiệm thu đầy đủ trên chương trình đã chọn. BR-10 có thể dùng fixture trung lập nhưng không được claim live proof.
 
 - [ ] Hướng dẫn dùng chương trình được chốt: điều kiện tài khoản, mở sản phẩm/offer, tạo link chính thức và kiểm link thuộc tài khoản đúng.
 - [ ] Giải thích campaign/sub-ID hoặc cơ chế tương đương chỉ khi chương trình hỗ trợ; không giả định UTM thay thế affiliate attribution.
