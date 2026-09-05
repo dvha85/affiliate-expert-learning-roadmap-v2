@@ -134,3 +134,5 @@ Hoàn tất vòng BOOT khi bạn chỉ được repo/module, chạy baseline/tes
 Bảo trì có thể dùng [Python 3](https://www.python.org/downloads/) chạy `python3 scripts/smoke_quickstart.py` từ root (Windows tham khảo `py -3 scripts/smoke_quickstart.py`). Script tạo clone/cache tạm, chạy vòng run/test/FAIL/fix/O00, kiểm working tree sạch rồi dọn đúng thư mục tạm; không sửa clone nguồn. Python không cần để chỉ chạy Bot, nhưng CI validators dùng Python 3.12.
 
 [Evidence và phạm vi nền tảng](../../docs/plans/evidence/BR-05-QUICKSTART.md) phân biệt clone sạch/cache rỗng với máy trắng chưa cài công cụ. Chưa có pilot người mới độc lập thì không claim onboarding hoàn chỉnh trên mọi OS.
+
+Sau khi BOOT ổn định, dùng [bài Go/JSON BR-07](GO-JSON-PRACTICE.md) để luyện pointer/null, map lookup, đọc file/error và viết test trước khi mở rộng adapter; đây là tài liệu hỗ trợ, không thay thứ tự Mission.
