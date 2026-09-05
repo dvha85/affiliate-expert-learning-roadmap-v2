@@ -1,5 +1,7 @@
 # M10 checkpoints — điểm kiểm canary có quản trị
 
+- [ ] Chạy [m10-check](../../docs/architecture/M10-JSON-BOUNDARY.md) và giải thích vì sao `ARTIFACT_VALID_UNVERIFIED` không xác thực chain, provenance hoặc quyền execute.
+
 - [ ] `ActionIntent.intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`; intent không tự biến thành live authority.
 - [ ] `PolicyDecision.policy_mode=NON_AUTHORIZING`; `policy_review_required` không bị dùng thay execution approval.
 - [ ] `CanaryGrantApproval` do người tạo bind đúng `grant_id/version/hash`; không chỉ kiểm `approval_ref` có tồn tại.

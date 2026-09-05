@@ -57,6 +57,7 @@ jobs:
           go run ./cmd/demo m09-check testdata/m08-intent.json testdata/m09-policy.json testdata/m09-approval.json testdata/m09-authorization.json testdata/m09-execution.json | grep -q '"result":"CONSISTENT_UNVERIFIED"'
           go run ./cmd/demo M09 | grep -q '"execution_mode": "APPROVED_LIVE"'
           go run ./cmd/demo M10 | grep -q '"execution_mode": "GOVERNED_CANARY"'
+          go run ./cmd/demo m10-check approval testdata/m10-approval.json | grep -q '"result":"ARTIFACT_VALID_UNVERIFIED"'
           go run ./cmd/demo M10 | grep -q '"side_effect_state": "PERFORMED"'
           go run ./cmd/demo M11 | grep -q 'GOVERNED_PRODUCTION'
           go run ./cmd/demo M11 | grep -q '"decision": "ALLOW_PRODUCTION"'

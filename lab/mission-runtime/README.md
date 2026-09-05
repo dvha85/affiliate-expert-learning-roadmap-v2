@@ -1,5 +1,7 @@
 # Mission Runtime — conformance harness cho O00 và M03–M11
 
+M10 có [bài kiểm JSON từng artifact](../../docs/architecture/M10-JSON-BOUNDARY.md): `m10-check KIND FILE.json`, chỉ đọc, không xác thực provenance/chain và không cấp quyền execute.
+
 Runtime offline để chứng minh boundary/semantics của các Mission mà không cần API key, n8n instance hay dịch vụ bên ngoài.
 
 ```bash
