@@ -144,6 +144,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 ### BR-03 — Output đúng schema trước semantic validation
 
+BR-03c.5 M08: Codex thực hiện, chủ repo chưa review; nhánh `codex/br-03c-m08-boundary`, [phạm vi/evidence](../architecture/M08-JSON-BOUNDARY.md). #31 đã review và merge `d759fc0`, CI 4/4 trên head `0fca001`, tests/vet mission-runtime PASS. Các trạng thái chờ merge cũ là lịch sử. BR-03 tổng thể còn mở.
+
 BR-03c.4 M07 đang triển khai: Codex, reviewer chủ repo chưa review, nhánh `codex/br-03c-m07-boundary`; [phạm vi/evidence](../architecture/M07-JSON-BOUNDARY.md). #30 đã review và merge `891562a`, 4/4 CI trên head `72ba4e8`, tests/vet mission-runtime PASS. Không thấy lỗi chặn trong phạm vi normalizer offline; ID/provenance không áp dụng migration store. Các trạng thái cũ bên dưới là lịch sử.
 
 BR-03c.3: Codex thực hiện, reviewer chủ repo chưa review, nhánh `codex/br-03c-m06-boundary`; [M06 boundary/evidence](../architecture/M06-JSON-BOUNDARY.md). #29 đã review và merge `7a0f6c4`, 4/4 checks PASS trên head `50f3200`; tests/vet M03–M11 PASS. M06 chỉ schema/profile/normalizer offline, không thay BR-13/14. Các trạng thái chờ review trước đó bên dưới là lịch sử.

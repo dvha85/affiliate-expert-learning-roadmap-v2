@@ -1,5 +1,7 @@
 # Eval pack — M08 Shadow ActionIntent + Deterministic Policy
 
+BR-03c.5 thêm [boundary file](../../docs/architecture/M08-JSON-BOUNDARY.md) và tests input/output schema. Typed eval cũ vẫn seal fixture; CLI mới không seal lại input. Không gọi typed eval là raw conformance.
+
 Eval này chứng minh capability (năng lực) và authority boundary (ranh giới quyền hạn) của M08 bằng dữ liệu offline.
 
 Các nhóm ca kiểm thử:

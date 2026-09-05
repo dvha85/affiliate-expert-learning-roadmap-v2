@@ -1,5 +1,7 @@
 # Bộ khởi đầu — M08
 
+[m08-check](../../docs/architecture/M08-JSON-BOUNDARY.md) kiểm JSON và hash đã gửi, không tự seal lại. ALLOW của shadow không cấp execution; đọc policy result dù exit 0.
+
 1. Học `curriculum/M08/M08.1 → M08.2 → M08.3`.
 2. Đọc `CHECKPOINTS.md` và dùng `M08-OPERATED-EVIDENCE-TEMPLATE.md`.
 3. Chạy `cd lab/mission-runtime && go test ./...` và `go run ./cmd/demo M08`.
