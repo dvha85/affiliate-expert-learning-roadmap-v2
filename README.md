@@ -8,7 +8,7 @@ Repo chính để học và xây một **Affiliate Intelligence Bot tiến hóa 
 
 1. Đọc `CURRICULUM.md` — nguồn có thẩm quyền duy nhất về thứ tự Mission, bằng chứng, mức tự động hóa và mô hình PASS.
 2. Đọc `curriculum/README.md` — đường học hiện hành cho người học.
-3. Nếu bắt đầu từ máy chưa chuẩn bị môi trường, học `BOOT.0`.
+3. Nếu bắt đầu từ máy chưa chuẩn bị môi trường, dùng [Quickstart từng lệnh](curriculum/BOOT/QUICKSTART.md) cùng `BOOT.0`.
 4. Nếu chưa từng chạy/sửa/test Bot, học `BOOT.1`.
 5. Chạy `O00.1` để nhìn toàn bộ vòng hệ thống bằng dữ liệu synthetic (mô phỏng); O00 chỉ orientation (định hướng), không tạo PASS.
 6. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
