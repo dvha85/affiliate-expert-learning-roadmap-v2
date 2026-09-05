@@ -15,6 +15,8 @@ eval_pack: evals/M03-tracked-human-action/
 
 `ActionRecord` + `OutcomeRecord`: hành động bên ngoài chỉ do người thực hiện, có measurement window (cửa sổ đo lường) và compliance review (rà soát tuân thủ).
 
+`NO_OBSERVED_OUTCOME` chỉ được nhận tại/sau `measurement_window_end`; trước đó vẫn có thể ghi `PENDING` hoặc trạng thái giao dịch thực sự đã quan sát, không tự kết luận cả window. Kiểm `ValidateActionOutcomeLink` cùng ActionRecord, không chỉ kiểm OutcomeRecord riêng. Báo cáo cập nhật thêm record có ID mới và cùng `effect_ref`, giữ bằng chứng cũ theo M03.2.
+
 ## Authority ceiling
 
 Chỉ người thực hiện external action; máy chỉ validate/record.

@@ -153,6 +153,11 @@ func ValidateActionOutcomeLink(a HumanActionRecord, o OutcomeRecord) string {
 	if observed.Before(performed) {
 		return "OUTCOME_BEFORE_ACTION"
 	}
+	// Absence is a window-level conclusion; interim transaction observations are not.
+	windowEnd, _ := time.Parse(time.RFC3339, a.MeasurementWindowEnd)
+	if o.Status == "NO_OBSERVED_OUTCOME" && observed.Before(windowEnd) {
+		return "MEASUREMENT_WINDOW_OPEN"
+	}
 	return missionValid
 }
 
