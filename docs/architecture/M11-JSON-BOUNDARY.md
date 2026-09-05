@@ -1,5 +1,7 @@
 # BR-03c.8 — M11: kiểm từng artifact production
 
+Trạng thái IN_REVIEW tại [PR #36](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/36), commit triển khai `df4b67a`. [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/36/checks). Chưa merge.
+
 Evidence local: tests/vet ba module, 8 Python validators, 10 Python regressions và diff check PASS. Smoke CLI activation trả ARTIFACT_VALID_UNVERIFIED với ba flag false. CI cần kiểm trên head PR riêng.
 
 #35 đã review/merge `07c1b8a`, CI 4/4 PASS trên head `7568f59`, tests/vet mission-runtime PASS. Bài M11 này chỉ kiểm từng artifact; chưa kiểm liên kết toàn chain.
