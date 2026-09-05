@@ -1,0 +1,61 @@
+{
+  "synthetic": true,
+  "format_version": "br06-intermediate-v1",
+  "limitation": "Entirely synthetic; no platform account, posting, attribution or payout proof.",
+  "action": {
+    "action_id": "syn-act-01",
+    "decision_id": "syn-dec-01",
+    "action_type": "SYNTHETIC_MANUAL_MEASUREMENT",
+    "target": "https://example.invalid/synthetic-post",
+    "performed_by": "human",
+    "performed_at": "2026-09-03T11:00:00+07:00",
+    "measurement_window_end": "2026-09-10T11:00:00+07:00",
+    "compliance_reviewed": false
+  },
+  "reports": [
+    {
+      "snapshot_id": "syn-report-01",
+      "source_ref": "synthetic:br06/report-01",
+      "action_id": "syn-act-01",
+      "period_start": "2026-09-03T11:00:00+07:00",
+      "period_end": "2026-09-10T11:00:00+07:00",
+      "observed_at": "2026-09-03T12:00:00+07:00",
+      "status": "PENDING",
+      "clicks": 0,
+      "valid_orders": null,
+      "commission_paid_vnd": null,
+      "supersedes": null
+    },
+    {
+      "snapshot_id": "syn-report-02",
+      "source_ref": "synthetic:br06/report-02",
+      "action_id": "syn-act-01",
+      "period_start": "2026-09-03T11:00:00+07:00",
+      "period_end": "2026-09-10T11:00:00+07:00",
+      "observed_at": "2026-09-10T11:00:00+07:00",
+      "status": "NO_OBSERVED_OUTCOME",
+      "clicks": 0,
+      "valid_orders": 0,
+      "commission_paid_vnd": null,
+      "supersedes": "syn-report-01"
+    },
+    {
+      "snapshot_id": "syn-report-03",
+      "source_ref": "synthetic:br06/report-03",
+      "action_id": "syn-act-01",
+      "period_start": "2026-09-03T11:00:00+07:00",
+      "period_end": "2026-09-10T11:00:00+07:00",
+      "observed_at": "2026-09-12T11:00:00+07:00",
+      "status": "PAID",
+      "clicks": null,
+      "valid_orders": 1,
+      "commission_paid_vnd": 12500,
+      "supersedes": "syn-report-02"
+    }
+  ],
+  "outcomes": [
+    {"outcome_id":"syn-out-01","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"syn-act-01"},"observed_at":"2026-09-03T12:00:00+07:00","status":"PENDING","metrics":{"clicks":0},"source_ref":"synthetic:br06/report-01"},
+    {"outcome_id":"syn-out-02","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"syn-act-01"},"observed_at":"2026-09-10T11:00:00+07:00","status":"NO_OBSERVED_OUTCOME","metrics":{"clicks":0,"valid_orders":0},"source_ref":"synthetic:br06/report-02"},
+    {"outcome_id":"syn-out-03","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"syn-act-01"},"observed_at":"2026-09-12T11:00:00+07:00","status":"PAID","metrics":{"valid_orders":1,"commission_paid_vnd":12500},"source_ref":"synthetic:br06/report-03"}
+  ]
+}
