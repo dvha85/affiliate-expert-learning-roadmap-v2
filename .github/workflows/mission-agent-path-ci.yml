@@ -54,6 +54,7 @@ jobs:
           go run ./cmd/demo M08 | grep -q '"policy_mode": "NON_AUTHORIZING"'
           go run ./cmd/demo M08 | grep -q '"execution_authorized": false'
           go run ./cmd/demo M09 | grep -q 'HUMAN_APPROVAL_REQUIRED'
+          go run ./cmd/demo m09-check testdata/m08-intent.json testdata/m09-policy.json testdata/m09-approval.json testdata/m09-authorization.json testdata/m09-execution.json | grep -q '"result":"CONSISTENT_UNVERIFIED"'
           go run ./cmd/demo M09 | grep -q '"execution_mode": "APPROVED_LIVE"'
           go run ./cmd/demo M10 | grep -q '"execution_mode": "GOVERNED_CANARY"'
           go run ./cmd/demo M10 | grep -q '"side_effect_state": "PERFORMED"'
