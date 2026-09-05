@@ -67,7 +67,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
-| BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); nhánh `codex/br-02-measurement-window`; [evidence](#br-02--bằng-chứng-triển-khai) |
+| BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21); [evidence](#br-02--bằng-chứng-triển-khai) |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
@@ -130,6 +130,7 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 #### BR-02 — Bằng chứng triển khai
 
 - Người thực hiện: Codex; reviewer: chủ repo, chờ review. Baseline: main `b17748a501736dcdfed6e2b8abb44e00115d40d6`.
+- PR triển khai: [#21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21), nhánh `codex/br-02-measurement-window`; commit code/tests `159d336fc770cbc07d84fcbc811f5c709fe9781c`. Trạng thái CI theo từng commit xem tại [Checks của PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21/checks); không suy CI PASS từ kết quả local.
 - Red/green: thêm `TestM03MeasurementWindow` trước khi sửa runtime; 3 subtest (`early_zero_regression`, `just_before_end`, `early_utc`) FAIL vì nhận VALID thay vì MEASUREMENT_WINDOW_OPEN. Sau sửa cả 19 subtest PASS; thêm `TestM05RejectsPrematureNoOutcome` để chứng minh evaluation không nhận kết luận số 0 quá sớm, nhưng vẫn nhận số 0 tại end.
 - Eval M03 thêm E08–E15 (8 case, tổng 15); các case cũ không bị bỏ hoặc nới expected. Quy tắc mới chỉ chặn `NO_OBSERVED_OUTCOME` trước end; giữ quan sát tạm/giao dịch hợp lệ. So sánh timestamp bằng `time.Time`, nhận đúng bằng end và offset tương đương.
 - Kiểm tại local: `go test ./...` và `go vet ./...` trong cả `lab/mission-runtime` và `lab/affiliate-bot`; 8 Python validator và 10 Python regression tests; `git diff --check`. Tất cả exit 0 (affiliate-bot chạy lại với GOCACHE tạm vì cache mặc định bị sandbox chặn). Lệnh chạy riêng: `go test ./cmd/demo -run 'TestM03(MeasurementWindow|EvalPack)|TestM05RejectsPrematureNoOutcome' -v`.
