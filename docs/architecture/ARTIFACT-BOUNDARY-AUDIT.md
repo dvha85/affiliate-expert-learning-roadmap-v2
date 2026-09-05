@@ -46,7 +46,7 @@ BR-03b cần adapter tường minh từ Result + context do người cung cấp 
 
 ## Phần còn lại của BR-03
 
-- BR-03a: Advisor boundary, eval và lệnh kiểm file — chờ review PR.
+- BR-03a: Advisor boundary, eval và lệnh kiểm file — PR #22 đã merge tại `487ed73`.
 - BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — TODO.
 - BR-03c: lựa chọn/pin bộ kiểm JSON Schema đầy đủ nếu cần; kiểm output thực và raw boundaries của các artifact còn lại ở bảng; không nới schema hoặc xóa semantic guards để lấy PASS — TODO.
 
