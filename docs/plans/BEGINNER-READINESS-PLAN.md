@@ -70,7 +70,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a đã merge; BR-03b chờ chủ repo review; BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
-| BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
+| BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [quickstart](../../curriculum/BOOT/QUICKSTART.md); [evidence](evidence/BR-05-QUICKSTART.md) |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | TODO | Chưa phân công |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
@@ -196,13 +196,17 @@ PR: [#23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23
 
 Liên quan phát hiện 11.
 
-- [ ] Viết quickstart có link cài Git/Go/editor, phiên bản được kiểm và nhánh lệnh theo macOS/Windows/Linux; chỉ công bố hệ điều hành đã thực sự smoke.
-- [ ] Có lệnh clone đầy đủ repo, cd, git status, go version, go run, go test và output dự kiến.
-- [ ] Giải thích vị trí repo root, module root, path, cách tạo/sửa/lưu file.
-- [ ] Có xử lý các lỗi command not found, PATH, sai thư mục/module và Go version.
-- [ ] Dẫn tới BOOT-REFERENCE cho bài intentional failure, đồng thời nêu chính xác file/dòng logic cần sửa.
+- [x] Viết quickstart có link cài Git/Go/editor, phiên bản được kiểm và nhánh lệnh theo macOS/Windows/Linux; phân biệt smoke clone/cache với cài toolchain trên máy trắng, Windows chưa smoke.
+- [x] Có lệnh clone đầy đủ repo, cd, git status, go version, go run, go test và output dự kiến.
+- [x] Giải thích vị trí repo root, module root, path, cách tạo/sửa/lưu file.
+- [x] Có xử lý các lỗi command not found, PATH, sai thư mục/module và Go version.
+- [x] Dẫn tới BOOT-REFERENCE cho bài intentional failure, đồng thời nêu chính xác file/dòng logic cần sửa; harness kiểm lỗi đó trong clone riêng.
 
 Nghiệm thu: trên môi trường sạch thuộc profile hỗ trợ, người thử đi từ clone đến test PASS theo tài liệu mà không phải hỏi thêm lệnh bị thiếu. Không đánh dấu OS chưa thử là đã hỗ trợ đầy đủ.
+
+Triển khai BR-05: [quickstart](../../curriculum/BOOT/QUICKSTART.md), [smoke/evidence](evidence/BR-05-QUICKSTART.md). macOS clone sạch/cache rỗng PASS vòng run→test→intentional assertion FAIL→fix→PASS→O00; CI thêm smoke Ubuntu. Installer và pilot người mới chưa được kiểm độc lập, Windows chưa smoke. PR dựa trên BR-03b để hướng dẫn đủ contracts module; không merge trước PR #24. Giữ IN_REVIEW, không tự claim full-machine onboarding hoặc Mission PASS.
+
+[PR #25](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25), base là nhánh BR-03b của [#24](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24); commit triển khai `59fb37ba950abe32eb2a76f0d4aa11bfc9891809`. [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25/checks). Sau merge #24, đổi base #25 về main và kiểm CI trước khi merge tiếp.
 
 ### BR-06 — Một vòng affiliate thủ công có số liệu
 

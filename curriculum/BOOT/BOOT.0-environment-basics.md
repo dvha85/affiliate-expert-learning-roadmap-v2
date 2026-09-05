@@ -1,5 +1,7 @@
 # BOOT.0 — Chuẩn bị môi trường cho người mới
 
+[Quickstart từng lệnh từ clone đến test](QUICKSTART.md) cung cấp link cài đặt, path/module, lỗi PATH/Go và phạm vi nền tảng đã kiểm; đọc cùng bài này.
+
 **Vai trò:** onboarding (làm quen môi trường) kỹ thuật tối thiểu trước BOOT.1; không phải Mission PASS gate (cổng PASS của Mission).
 
 ## Mục tiêu

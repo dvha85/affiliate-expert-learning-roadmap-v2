@@ -1,5 +1,7 @@
 # BOOT.1 — Chạy, sửa và kiểm thử Bot
 
+[Quickstart mục intentional FAIL](QUICKSTART.md#5-sửa-và-lưu--intentional-fail) chỉ đúng file/dòng logic để sửa, cách lưu và test phải FAIL rồi PASS; không commit lỗi cố ý.
+
 **Vai trò:** Tooling bootcamp, không phải Mission PASS gate.
 
 Nếu terminal/Git/Go environment chưa ổn định, hoàn thành `BOOT.0` trước. BOOT.1 không dùng việc debug môi trường để thay thế việc học test semantics.

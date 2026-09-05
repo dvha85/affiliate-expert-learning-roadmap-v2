@@ -54,6 +54,11 @@ jobs:
         run: |
           go test ./...
           go vet ./...
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Beginner quickstart isolated-clone smoke
+        run: python scripts/smoke_quickstart.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
