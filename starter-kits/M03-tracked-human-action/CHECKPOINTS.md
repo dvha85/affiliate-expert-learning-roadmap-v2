@@ -8,4 +8,5 @@
 - [ ] Phân biệt `PENDING`/trạng thái giao dịch quan sát được với kết luận cả window; không bắt mọi observation phải chờ window end.
 - [ ] Báo cáo đến muộn tạo `outcome_id` mới, cùng `effect_ref`; giữ record cũ, nguồn/thời điểm và giải thích bổ sung/đính chính, không cộng trùng snapshot.
 - [ ] zero observed value không bị nhầm với missing.
+- [ ] Hai file qua `m03-check` (schema trước semantic); đã thử field thiếu/null/key trùng và thấy reject, không coi VALID là đã resolve decision trong store hoặc proof thật.
 - [ ] Reality + Operated evidence đã lưu, không chứa secret.

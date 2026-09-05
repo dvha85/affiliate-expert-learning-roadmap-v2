@@ -40,6 +40,7 @@ jobs:
         run: |
           go run ./cmd/demo O00 | grep -q 'DRY_RUN_ONLY'
           go run ./cmd/demo M03 | grep -q 'VALID'
+          go run ./cmd/demo m03-check testdata/m03-action.json testdata/m03-outcome.json | grep -q '"result":"VALID"'
           go run ./cmd/demo M04 | grep -q 'SUPPORTED'
           go run ./cmd/demo advisor-check testdata/m04-advisor-output.json testdata/m04-evidence.json 2026-09-03T01:00:00Z 24 | grep -q 'SUPPORTED'
           go run ./cmd/demo M05 | grep -q 'REVIEW_REQUIRED'

@@ -19,6 +19,8 @@ eval_pack: evals/M03-tracked-human-action/
 
 ## Authority ceiling
 
+Kiểm file bằng [m03-check](../docs/architecture/M03-JSON-BOUNDARY.md) trước bàn giao: JSON sai schema bị chặn trước semantic. VALID của cặp file không xác minh decision tồn tại trong store hoặc nguồn báo cáo là thật; không thay Reality/Operated proof.
+
 Chỉ người thực hiện external action; máy chỉ validate/record.
 
 ## PASS

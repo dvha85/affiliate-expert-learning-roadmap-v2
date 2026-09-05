@@ -15,5 +15,6 @@
 - predicted result (kết quả dự đoán):
 - observed result (kết quả quan sát):
 - failure case đã thử (ca lỗi đã thử):
+- Kiểm JSON bằng m03-check: lệnh, exit code, stdout/stderr và case schema sai; ghi riêng khỏi bằng chứng action thật:
 - limitation (giới hạn):
 - next measurement (phép đo tiếp theo):

@@ -46,6 +46,8 @@ Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket 
 
 ## Phần còn lại của BR-03
 
+BR-03c.1 đang triển khai trên nhánh `codex/br-03c-m03-boundary` (Codex; reviewer chủ repo, chưa review). [Boundary M03](M03-JSON-BOUNDARY.md) nối ActionRecord/OutcomeRecord raw schema + strict decode vào lệnh m03-check và raw eval; output serialize được kiểm lại. Alias M11 không nhận ở boundary này. Chưa đóng các dòng M05–M11; typed validators cũ không trở thành raw schema boundary chỉ nhờ thêm lệnh mới.
+
 - BR-03a: Advisor boundary, eval và lệnh kiểm file — PR #22 đã merge tại `487ed73`.
 - BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — đã merge #24. Schema package pin jsonschema/v6 v6.0.2, embed canonical files và chặn loader ngoài, bật format assertions; CI có tests và smoke export.
 - BR-03c: lựa chọn/pin bộ kiểm JSON Schema đầy đủ nếu cần; kiểm output thực và raw boundaries của các artifact còn lại ở bảng; không nới schema hoặc xóa semantic guards để lấy PASS — TODO.

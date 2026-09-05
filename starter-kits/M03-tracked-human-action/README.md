@@ -8,3 +8,5 @@
 6. Lưu operated evidence dưới `learner/M03/`, không commit dữ liệu nhạy cảm.
 
 PASS cần Capability + Reality + Operated; fixture/CI chỉ chứng minh capability.
+
+Trước bàn giao hai file JSON, dùng [m03-check](../../docs/architecture/M03-JSON-BOUNDARY.md) để kiểm schema và semantic của cặp file. Lệnh không lưu store và không resolve decision_id với DecisionPacket; bước đối chiếu decision ở mục 5 vẫn bắt buộc. Không chỉnh compliance_reviewed=true chỉ để làm lệnh PASS.

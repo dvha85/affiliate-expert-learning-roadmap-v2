@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07 đã merge; BR-06a IN_REVIEW tại PR #27, BR-06b chờ chương trình/kênh; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07/BR-06a đã merge; BR-03c.1 đã review, chờ CI sau cập nhật main tại PR #28; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -66,11 +66,13 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 Cập nhật sau review: PR #24 → #25 → #26 đã merge đúng thứ tự tại `9102f00`, `f438028`, `ccf6c79`; 4/4 checks mỗi head PASS, tests/vet ba module, 8 validators và 10 Python regressions PASS. BR-05/BR-07 DONE ở phạm vi tài liệu/bài tập đã review; installer trên máy trắng, Windows và năng lực học viên chưa được xác minh, tiếp tục theo dõi ở BR-16. Các đoạn “IN_REVIEW/chờ merge” trong bằng chứng triển khai cũ bên dưới là lịch sử trước lần cập nhật này.
 
+PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c844`. PR #28 đã review code/tests và không thấy lỗi chặn trong phạm vi M03, đang cập nhật kế hoạch theo main trước lượt CI mới. BR-03c tổng thể vẫn mở; không suy live proof từ fixtures.
+
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge (#22/#24); BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge; BR-03c.1 IN_REVIEW [PR #28](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/28), reviewer chủ repo (chưa review); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; reviewer: chủ repo (chưa review); BR-06a IN_REVIEW [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27); [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
@@ -141,6 +143,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 - Rollback: revert PR BR-02 nếu được merge; lưu ý việc đó đưa lỗi kết luận sớm trở lại.
 
 ### BR-03 — Output đúng schema trước semantic validation
+
+BR-03c.1: Codex thực hiện, reviewer chủ repo (chưa review), nhánh `codex/br-03c-m03-boundary`; [thiết kế/evidence](../architecture/M03-JSON-BOUNDARY.md). Phạm vi raw M03 action/outcome + CLI read-only + raw eval + output schema; không sửa alias M11 hoặc triển khai store. BR-03c tổng thể vẫn IN_PROGRESS, không DONE chỉ từ M03.
 
 Liên quan phát hiện 7, 8.
 

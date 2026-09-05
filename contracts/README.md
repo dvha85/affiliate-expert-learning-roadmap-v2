@@ -67,6 +67,8 @@ Lần tải dependency đầu cần mạng; sau khi build, schema nằm trong bi
 
 ## Boundary
 
+BR-03c.1: mission-runtime dùng cùng package qua local replace để kiểm ActionRecord/OutcomeRecord trong `m03-check` và raw eval M03. Xem [phạm vi](../docs/architecture/M03-JSON-BOUNDARY.md); không suy conformance của M05–M11 hoặc mọi typed caller từ lệnh này.
+
 `ValidateRaw` kiểm JSON gốc và schema; JSON duplicate key/trailing data bị từ chối. `DecodeStrict` kiểm exact spelling và field mà Go type hỗ trợ, thay vì để decoder bỏ field lạ/case alias. Schema cho extension không có nghĩa Go projection giữ được extension: M02 từ chối field chưa hỗ trợ, không bỏ dữ liệu ngầm.
 
 Giới hạn độ sâu JSON 128; file/JSONL vẫn có giới hạn I/O riêng của caller. Package này không kiểm provenance, freshness, linkage, input hash hoặc quyền thực thi; runtime giữ các kiểm tra đó sau kiểm schema. Compile đủ schema không chứng minh output mọi Mission đã conformance; BR-03c còn phải nối boundary vào từng luồng.
