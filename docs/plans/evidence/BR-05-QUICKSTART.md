@@ -1,6 +1,7 @@
 # BR-05 — Evidence quickstart
 
 - Người thực hiện: Codex; reviewer: chủ repo, chưa review. Tài liệu: [QUICKSTART](../../../curriculum/BOOT/QUICKSTART.md).
+- [PR #25](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25), commit tài liệu/harness `59fb37b`; [job CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25/checks) kiểm lại trên Ubuntu. Phụ thuộc PR #24.
 - Đối tượng smoke: code commit `4e62eb7cc70d936883994f7c93eabeb6a8ce1fe2` (BR-03b), clone mới từ checkout local; Go 1.27.0 darwin/arm64, Git 2.50.1 Apple Git-155; Python 3.9.6 để chạy harness.
 - Lệnh: `python3 scripts/smoke_quickstart.py --go /usr/local/go/bin/go`. Người có go trong PATH không cần `--go`.
 - Mỗi lần dùng thư mục clone, GOCACHE và GOMODCACHE mới, GOTOOLCHAIN=local; dependency pin tải lại. Không dùng lại build cache để tạo PASS giả. Clone local kiểm source/working tree, không giả làm kiểm network clone GitHub hoặc installer.

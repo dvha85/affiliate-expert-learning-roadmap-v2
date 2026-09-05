@@ -206,6 +206,8 @@ Nghiệm thu: trên môi trường sạch thuộc profile hỗ trợ, người t
 
 Triển khai BR-05: [quickstart](../../curriculum/BOOT/QUICKSTART.md), [smoke/evidence](evidence/BR-05-QUICKSTART.md). macOS clone sạch/cache rỗng PASS vòng run→test→intentional assertion FAIL→fix→PASS→O00; CI thêm smoke Ubuntu. Installer và pilot người mới chưa được kiểm độc lập, Windows chưa smoke. PR dựa trên BR-03b để hướng dẫn đủ contracts module; không merge trước PR #24. Giữ IN_REVIEW, không tự claim full-machine onboarding hoặc Mission PASS.
 
+[PR #25](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25), base là nhánh BR-03b của [#24](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24); commit triển khai `59fb37ba950abe32eb2a76f0d4aa11bfc9891809`. [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/25/checks). Sau merge #24, đổi base #25 về main và kiểm CI trước khi merge tiếp.
+
 ### BR-06 — Một vòng affiliate thủ công có số liệu
 
 Liên quan phát hiện 2.
