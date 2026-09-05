@@ -1,5 +1,7 @@
 # BR-03c.8b — Audit chain M11, không cấp quyền
 
+Trạng thái IN_REVIEW tại [PR #37](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/37), commit triển khai `72d3700`. [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/37/checks). Chưa merge.
+
 Evidence local: tests/vet ba module, 8 Python validators, 10 Python regressions và diff check PASS. Tests CLI và chuyển trạng thái sandbox PASS. CI phải kiểm theo head PR riêng.
 
 #36 đã review/merge `fa9b9db`, CI 4/4 PASS trên head `0f98edc`, tests/vet mission-runtime PASS. Bài này nối các artifact boundary M11/M08/M03/M05 trong một bundle lịch sử. Không thay `m11-check` kiểm từng file.
