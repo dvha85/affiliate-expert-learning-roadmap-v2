@@ -1,5 +1,7 @@
 # Starter M11 — Production Closed Loop (vòng production có quản trị)
 
+Sau kiểm artifact, làm [audit bundle M11](../../docs/architecture/M11-CHAIN-AUDIT.md) để phân biệt cycle nhất quán và resolution vẫn STOPPED; không cấp quyền execute/resume.
+
 Làm [bài m11-check từng artifact](../../docs/architecture/M11-JSON-BOUNDARY.md) trước; PASS chưa xác thực chain hoặc cấp quyền production.
 
 Mục tiêu: luyện production lease/health/stop/recovery/closed-loop semantics (ngữ nghĩa lease/sức khỏe/dừng/phục hồi/vòng kín) trước khi bật adapter thật.
