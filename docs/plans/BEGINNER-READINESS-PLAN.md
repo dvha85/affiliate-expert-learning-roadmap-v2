@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07 đã merge; BR-06a đang triển khai bản trung lập, BR-06b chờ chương trình/kênh; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07 đã merge; BR-06a IN_REVIEW tại PR #27, BR-06b chờ chương trình/kênh; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -73,7 +73,7 @@ Cập nhật sau review: PR #24 → #25 → #26 đã merge đúng thứ tự t�
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge (#22/#24); BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
-| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; reviewer: chủ repo (chưa review); BR-06a nhánh `codex/br-06-manual-affiliate-loop`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
+| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; reviewer: chủ repo (chưa review); BR-06a IN_REVIEW [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27); [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
