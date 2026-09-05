@@ -2,6 +2,8 @@
 
 Phạm vi: `ActionRecord`/`OutcomeRecord` qua lệnh chỉ đọc `m03-check` trong mission-runtime. Đây là phần đầu BR-03c, không đóng cả BR-03 và không thay tích hợp learner Bot BR-08/BR-10.
 
+Trạng thái IN_REVIEW: [PR #28](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/28), code/tests commit `a7ebfed`; người thực hiện Codex, reviewer chủ repo (chưa review). PR độc lập từ main, không chứa diff BR-06a #27 và chưa merge.
+
 ## Luồng kiểm
 
 JSON gốc → canonical schema nhúng → exact typed decode → kiểm action → kiểm effect link/cửa sổ đo → kiểm schema của artifact serialize → xuất envelope.

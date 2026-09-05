@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/BR-04 đã merge; BR-03b/BR-05/BR-07 chờ review theo thứ tự PR #24 → #25 → #26; BR-03c và các phần tích hợp tiếp theo chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/b/BR-04/BR-05/BR-07 đã merge; BR-06a tại PR #27 còn mở; BR-03c.1 IN_REVIEW tại PR #28, BR-03c tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -70,7 +70,7 @@ Cập nhật đợt BR-03c.1: #24/#25/#26 đã review và merge vào main; các 
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a đã merge; BR-03b chờ chủ repo review; BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b đã merge; BR-03c.1 IN_REVIEW [PR #28](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/28), reviewer chủ repo (chưa review); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [quickstart](../../curriculum/BOOT/QUICKSTART.md); [evidence](evidence/BR-05-QUICKSTART.md) |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
