@@ -69,7 +69,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21); [evidence](#br-02--bằng-chứng-triển-khai) |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
-| BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [MVP spec](../product/MVP-SPEC.md); fixture trung lập, chưa có chương trình |
+| BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23)); [MVP spec](../product/MVP-SPEC.md); fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | TODO | Chưa phân công |
@@ -166,6 +166,8 @@ Liên quan phát hiện 2, 11.
 Nghiệm thu: một reviewer đọc spec có thể nói được bot giúp ai làm việc gì, đầu vào lấy ở đâu, đầu ra trông thế nào và thế nào là hoàn thành MVP.
 
 Evidence BR-04: [MVP-SPEC](../product/MVP-SPEC.md) và [REFERENCE-CASE](../product/REFERENCE-CASE.md). Chỉ là đặc tả/mẫu nội dung, không phải pipeline/CLI đã triển khai. Chủ repo xác nhận chưa có chương trình affiliate; BR-06 sẽ hướng dẫn trung lập và giữ platform proof chưa xác nhận. Reviewer chưa phê duyệt spec; giữ IN_REVIEW.
+
+PR: [#23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23), commit đặc tả `7fc5baa2636feb618cc6c88cacfd90af1f0ddddc`; 8 validator và diff check local PASS. [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23/checks). PR độc lập với [#22 — BR-03a](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/22); cập nhật BR-02 DONE và phần còn lại BR-03 nằm ở #22, không ghi đè tiến độ đó khi gộp kế hoạch.
 
 ### BR-05 — Quickstart từ máy chưa cài công cụ
 
