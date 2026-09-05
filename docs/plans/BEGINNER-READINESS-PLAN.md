@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a đã merge; BR-03b/c chưa triển khai; BR-04 đã được chủ repo yêu cầu merge.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02/BR-03a/BR-04 đã merge; BR-03b chờ review, BR-03c chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -68,7 +68,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; [PR #22 — BR-03a](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/22) đã merge `487ed73`; BR-03b/c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a đã merge; BR-03b chờ chủ repo review; BR-03c còn TODO; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
@@ -145,7 +145,7 @@ Liên quan phát hiện 7, 8.
 - [x] Tái hiện AdvisorOutput ADVISE reason rỗng hiện vẫn SUPPORTED; bổ sung test bắt lỗi này.
 - [x] Lập bảng type Go ↔ schema JSON ↔ input/output CLI cho các artifact được dùng (bản audit, không claim các dòng đã conformance).
 - [ ] Kiểm required field, enum, null/array, unique IDs, timestamp và field ngoài schema tại boundary.
-- [ ] Chốt vai trò M02 recorded_result: giữ projection có adapter sang DecisionPacket hoặc chuyển sang canonical packet bằng thiết kế được review; không đổi shape mà quên replay dữ liệu cũ.
+- [x] BR-03b đề xuất giữ M02 projection + adapter sang DecisionPacket, có kiểm schema/replay và ngoại lệ ranked:null cũ; chờ review thiết kế trong PR triển khai.
 - [ ] Ghi rõ kiểm schema không thay kiểm liên kết, freshness hoặc tính hỗ trợ của nội dung bằng chứng.
 - [ ] Chọn cách validation nhỏ nhất đáp ứng contract; nếu thêm dependency phải pin và ghi cách cài.
 
@@ -161,6 +161,18 @@ Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output 
 - Kiểm chứng local: Go tests/vet + CLI fixture ở mission-runtime; 8 Python validators, 10 Python regression tests và diff check PASS. Không đổi history M02; adapter/replay conformance sâu hơn vẫn thuộc BR-03b.
 - [Audit artifact và quyết định bảo toàn M02](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) ghi BR-03b/c còn TODO. Không đánh dấu DONE chỉ vì M04 PASS.
 - Chủ repo xác nhận chưa có chương trình affiliate: BR-04/BR-06 sẽ dùng fixture trung lập, chưa có platform/operated proof; không tự đăng ký chương trình hoặc chọn kênh đăng thay chủ repo.
+
+#### BR-03b — History schema + DecisionPacket adapter (IN_REVIEW)
+
+- [PR #24](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24); commit triển khai `a9d80726b1f66f1de42d652db89b1a1e161e1464`; [CI theo commit](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/24/checks).
+
+- Baseline: `eacbd27`. Người thực hiện: Codex; reviewer: chủ repo, chờ review. [Thiết kế/mapping](../architecture/M02-DECISION-ADAPTER.md); [schema runtime](../../contracts/README.md).
+- Package contracts nhúng schema canonical, pin jsonschema/v6 v6.0.2 và go.sum; format assertions bật, không tải schema ngoài. Compile schema không thay việc nối runtime từng Mission (BR-03c).
+- Capture/load/append M02 kiểm raw schema + field exact/duplicate/unsupported trước semantic ID/hash/time checks. Context xuất packet bắt buộc tường minh, không tự tạo fact; packet phải qua canonical schema và history phải replay=MATCH.
+- Record mới serialize ranked rỗng thành []; chỉ ranked:null lịch sử được kiểm qua view [] và so sánh replay tương đương, giữ file cũ/input hash. Không nới canonical schema, không rewrite history. Thiếu ranked và các dạng sai khác vẫn bị từ chối.
+- Kiểm chứng: tests/vet của contracts, affiliate-bot và mission-runtime PASS; 8 Python validators và 10 regression tests PASS; diff check PASS. Cache Go mặc định bị sandbox chặn nên chạy lại với GOCACHE riêng ở tmp.
+- Smoke binary mới: capture sample → APPENDED, replay → MATCH, history decision → packet giữ exact obs-a-1/obs-b-1, state RANK_SCENARIO và action:null. CI thêm cùng smoke export. Tests kiểm context/raw mutations, strict schema, output serialization, read-only export, legacy replay và mutation không alias dữ liệu gốc.
+- Không claim M03–M11 đã dùng bộ kiểm schema mới; BR-03c và item cha BR-03 còn mở. Rollback bằng revert PR sau merge, không reset dữ liệu học viên.
 
 ## 6. Đợt B — Người mới bắt đầu được và hiểu sản phẩm đang xây
 

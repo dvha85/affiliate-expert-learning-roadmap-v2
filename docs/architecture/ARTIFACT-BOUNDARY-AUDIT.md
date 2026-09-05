@@ -2,7 +2,7 @@
 
 ## Phạm vi đã triển khai
 
-BR-03a kiểm `AdvisorOutput` M04 tại JSON boundary và trước SUPPORTED. Đây **không phải** tuyên bố toàn bộ 29 schema đã được cưỡng chế ở runtime. BR-03b/c bên dưới còn mở; bảng này là bản đồ để review từng phần, không phải báo cáo conformance đầy đủ.
+BR-03a kiểm `AdvisorOutput` M04 tại JSON boundary và trước SUPPORTED. BR-03b bổ sung schema package, M02 capture/load/serialized history và adapter xuất DecisionPacket (chờ review). Đây **không phải** tuyên bố toàn bộ 29 schema đã được cưỡng chế ở runtime. BR-03c còn mở; bảng này là bản đồ để review từng phần, không phải báo cáo conformance đầy đủ.
 
 Chọn standard library Go cho contract nhỏ M04: kiểm JSON gốc, required/unknown/duplicate keys, null/array/item types, enum, constant false, unique/nonempty evidence IDs và reason. Không thêm dependency. `reason`/ID chỉ chứa khoảng trắng cũng bị từ chối (chặt hơn minLength của schema). Test khóa cấu trúc schema M04 để buộc review validator khi contract đổi. Không dùng giải pháp thủ công này như một JSON Schema engine tổng quát cho `$ref`, `allOf` hoặc các contract phức tạp.
 
@@ -14,10 +14,10 @@ Schema bên dưới nằm trong `contracts/`; type nằm trong module tương �
 
 | Artifact / Go type | Schema | Input/output hiện tại và phần cần kiểm |
 |---|---|---|
-| `affiliate-bot.Observation` | `observation.schema.json` | M02 capture nhận file observations; phần domain/history dùng schema kết hợp |
-| `affiliate-bot.HistoryRecord` | `history-record.schema.json` | capture/JSONL/list/replay; cần test raw input và serialized output theo schema |
+| `affiliate-bot.Observation` | `observation.schema.json` | BR-03b capture kiểm raw observations theo history subschema có `$ref`/`allOf`, strict decode trước hash |
+| `affiliate-bot.HistoryRecord` | `history-record.schema.json` | BR-03b kiểm capture/JSONL/load/append + serialized output; ngoại lệ legacy ranked:null được ghi riêng |
 | `affiliate-bot.Result` | projection trong `history-record.schema.json` | `recorded_result` không phải DecisionPacket; giữ dữ liệu replay hiện tại |
-| Chưa có type DecisionPacket canonical ở bot | `decision-packet.schema.json` | M00 template; cần adapter được review, không ép cast Result |
+| `affiliate-bot.DecisionPacket` | `decision-packet.schema.json` | BR-03b: history decision xuất packet riêng đã kiểm schema từ replay=MATCH + context tường minh; không ép cast Result |
 | `HumanActionRecord` | `action-record.schema.json` | M03 eval nhận record; demo chỉ trả trạng thái validation |
 | `EffectRef` | `effect-ref.schema.json` | Nested trong Outcome/Evaluation; raw decode cần kiểm kind/id/field lạ |
 | `OutcomeRecord` | `outcome-record.schema.json` | M03/M05 eval và M10/M11 runtime; còn internal ActionID alias cần audit |
@@ -40,14 +40,14 @@ Schema bên dưới nằm trong `contracts/`; type nằm trong module tương �
 
 ## M02 — Quyết định bảo toàn và đề xuất adapter
 
-Giữ `HistoryRecord.recorded_result` là projection của deterministic ranking (`Result`), giữ `formula_version`, input hash và thuật toán replay hiện hành. BR-03a không sửa schema/history bytes; test/replay cũ vẫn phải PASS. Đây là quyết định bảo toàn, **chưa hoàn thành adapter**.
+Giữ `HistoryRecord.recorded_result` là projection của deterministic ranking (`Result`), giữ `formula_version` và input hash. BR-03b thêm adapter riêng và kiểm raw schema, không viết lại history cũ. Ranking rỗng ở record mới xuất []; riêng ranked:null cũ được xem như array rỗng khi kiểm/replay. Các kiểm ID/hash/formula khác không bị bỏ. Xem [mapping và lệnh adapter](M02-DECISION-ADAPTER.md), [ngoại lệ tương thích](../../contracts/README.md).
 
-BR-03b cần adapter tường minh từ Result + context do người cung cấp sang DecisionPacket: giữ exact `decision_id/evidence_ids`, map state theo enum canonical; câu hỏi, supported facts, assumptions, unknowns, next measurement phải có nguồn/căn cứ, không tự bịa để điền required field. `action` luôn null. Phải review mapping `reasons` → `reason`, arrays nil/rỗng và field domain `ranked` không được lọt vào canonical packet. Packet mới là artifact riêng, không ghi đè recorded_result; kiểm schema và replay fixtures trước/sau.
+Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket giữ exact `decision_id/evidence_ids`, giữ state; context không override action hoặc ID. `action` luôn null; reasons nối newline, các array copy độc lập và không null trong packet. Field domain ranked không lọt vào canonical packet. Tests kiểm output serialize, mutation input, legacy replay và file không đổi; nội dung supported_facts vẫn cần người review.
 
 ## Phần còn lại của BR-03
 
 - BR-03a: Advisor boundary, eval và lệnh kiểm file — PR #22 đã merge tại `487ed73`.
-- BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — TODO.
+- BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — IN_REVIEW. Schema package pin jsonschema/v6 v6.0.2, embed canonical files và chặn loader ngoài, bật format assertions; CI có tests và smoke export.
 - BR-03c: lựa chọn/pin bộ kiểm JSON Schema đầy đủ nếu cần; kiểm output thực và raw boundaries của các artifact còn lại ở bảng; không nới schema hoặc xóa semantic guards để lấy PASS — TODO.
 
 Chỉ đánh dấu BR-03 DONE khi BR-03b/c có implementation/evidence và được review; bảng mapping hoặc unit test M04 không thay được các phần đó.

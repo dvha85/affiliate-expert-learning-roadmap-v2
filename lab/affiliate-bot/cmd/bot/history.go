@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
 
 const (
@@ -132,6 +134,13 @@ func validateCanonicalHistoryObservation(observation Observation, asOfTime time.
 }
 
 func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observation) (HistoryRecord, error) {
+	raw, err := json.Marshal(observations)
+	if err != nil {
+		return HistoryRecord{}, err
+	}
+	if err := contracts.ValidateRaw("history-record.schema.json#/properties/observations", raw); err != nil {
+		return HistoryRecord{}, err
+	}
 	if strings.TrimSpace(recordID) == "" {
 		return HistoryRecord{}, errors.New("record_id is required")
 	}
@@ -159,6 +168,9 @@ func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observat
 		return HistoryRecord{}, err
 	}
 	decision := evaluate(canonical)
+	if decision.Ranked == nil {
+		decision.Ranked = []Ranked{}
+	}
 	decision.DecisionID = recordID
 	decision.EvidenceIDs = canonicalEvidenceIDs(canonical)
 	return HistoryRecord{
@@ -173,6 +185,13 @@ func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observat
 }
 
 func validateHistoryRecord(record HistoryRecord) error {
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	if err := validateHistoryJSON(raw); err != nil {
+		return err
+	}
 	if strings.TrimSpace(record.RecordID) == "" {
 		return errors.New("record_id is required")
 	}
@@ -233,6 +252,9 @@ func LoadHistory(path string) ([]HistoryRecord, error) {
 			return nil, fmt.Errorf("history line %d is empty", lineNumber)
 		}
 		var record HistoryRecord
+		if err := validateHistoryJSON([]byte(raw)); err != nil {
+			return nil, fmt.Errorf("history line %d corrupt: %w", lineNumber, err)
+		}
 		if err := json.Unmarshal([]byte(raw), &record); err != nil {
 			return nil, fmt.Errorf("history line %d corrupt: %w", lineNumber, err)
 		}
@@ -305,7 +327,16 @@ func Replay(record HistoryRecord) ReplayReport {
 	actual := evaluate(record.Observations)
 	actual.DecisionID = record.RecordID
 	actual.EvidenceIDs = canonicalEvidenceIDs(record.Observations)
-	if reflect.DeepEqual(actual, record.RecordedResult) {
+	// Legacy projection encoded an empty ranking as null; preserve file bytes
+	// while comparing its empty-array meaning with newly emitted records.
+	recorded := record.RecordedResult
+	if actual.Ranked == nil {
+		actual.Ranked = []Ranked{}
+	}
+	if recorded.Ranked == nil {
+		recorded.Ranked = []Ranked{}
+	}
+	if reflect.DeepEqual(actual, recorded) {
 		return ReplayReport{RecordID: record.RecordID, State: replayMatch, Reason: "same input + same formula_version tái tạo cùng decision"}
 	}
 	return ReplayReport{RecordID: record.RecordID, State: replayDrift, Reason: "replayed decision khác recorded decision"}

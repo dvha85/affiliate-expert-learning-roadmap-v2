@@ -49,6 +49,11 @@ jobs:
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
+      - name: Embedded canonical schema tests
+        working-directory: contracts
+        run: |
+          go test ./...
+          go vet ./...
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
@@ -62,3 +67,4 @@ jobs:
           go run ./cmd/bot history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
           go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
           go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
+          go run ./cmd/bot history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'

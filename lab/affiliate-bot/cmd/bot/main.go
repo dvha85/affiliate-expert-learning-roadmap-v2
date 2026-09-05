@@ -182,11 +182,13 @@ func runHistory(args []string) error {
 		return fmt.Errorf("usage: history capture|list|replay ...")
 	}
 	switch args[1] {
+	case "decision":
+		return exportHistoryDecision(os.Stdout, args[2:])
 	case "capture":
 		if len(args) != 7 {
 			return fmt.Errorf("usage: history capture <history.jsonl> <observations.json> <record_id> <as_of> <ingested_at>")
 		}
-		observations, err := loadObservations(args[3])
+		observations, err := loadHistoryObservations(args[3])
 		if err != nil {
 			return err
 		}
