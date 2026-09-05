@@ -1,5 +1,7 @@
 # BR-03c.5 — ActionIntent/PolicyDecision M08
 
+IN_REVIEW: [PR #32](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/32), code/tests `e28e7d9`; Codex thực hiện, chủ repo chưa review. Tests/vet ba module, 8 validators, 10 Python tests và smoke CLI local PASS; CI kiểm theo head PR.
+
 Conformance offline, không executor/approval/store. Intent qua canonical schema + strict decode trước EvaluateShadowPolicy; PolicyDecision serialize được kiểm canonical schema trước xuất. Không nhận alias shadow_only/dry_run/approval_required nội bộ từ JSON. Không gọi SealShadowActionIntent để sửa hash/quyền của input.
 
 Từ repo root:
