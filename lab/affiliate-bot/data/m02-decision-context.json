@@ -1,0 +1,7 @@
+{
+  "question": "Fixture hiện cho phép kết luận gì và còn thiếu bằng chứng nào?",
+  "supported_facts": [],
+  "assumptions": ["Giá và commission trong fixture hoàn toàn giả lập."],
+  "unknowns": ["Nhu cầu thị trường và conversion thực tế chưa được đo."],
+  "next_measurement": "Khi có nguồn hợp lệ, ghi observation thật và rà lại kết luận với người."
+}
