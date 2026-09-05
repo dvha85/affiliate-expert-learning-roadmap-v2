@@ -85,6 +85,13 @@ AI model cũng không mặc định phải self-host (tự lưu trữ) trên VPS
 
 Chi tiết: `docs/technology/DEPLOYMENT-ALWAYS-ON.md`.
 
+## Kế hoạch hoàn thiện repo
+
+- [Kế hoạch chỉnh sửa theo review 05/09/2026](docs/plans/BEGINNER-READINESS-PLAN.md): các đợt triển khai, đầu việc, phụ thuộc, trạng thái và tiêu chí nghiệm thu.
+- [Báo cáo review khả năng tự học](REVIEW-2026-09-05.md): phát hiện, bằng chứng và giới hạn kiểm chứng tại phiên bản được đánh giá.
+
+Đây là tiến độ phát triển repo; tiến độ học thực tế vẫn nằm trong `PROGRESS.md`.
+
 ## Chính sách repo
 
 Repo v2 không mang lớp compatibility/migration (tương thích/chuyển đổi) từ repo cũ. Legacy syllabus, numeric lesson map, Mission trùng lặp, migration script và runtime lịch sử chỉ tồn tại ở repo lịch sử.
