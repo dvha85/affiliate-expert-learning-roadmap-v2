@@ -60,6 +60,7 @@ jobs:
           go run ./cmd/demo m10-check approval testdata/m10-approval.json | grep -q '"result":"ARTIFACT_VALID_UNVERIFIED"'
           go run ./cmd/demo M10 | grep -q '"side_effect_state": "PERFORMED"'
           go run ./cmd/demo M11 | grep -q 'GOVERNED_PRODUCTION'
+          go run ./cmd/demo m11-check activation testdata/m11-activation.json | grep -q '"result":"ARTIFACT_VALID_UNVERIFIED"'
           go run ./cmd/demo M11 | grep -q '"decision": "ALLOW_PRODUCTION"'
           go run ./cmd/demo M11 | grep -q '"execution_authorized": false'
           go run ./cmd/demo M11 | grep -q '"execution_mode": "GOVERNED_PRODUCTION"'

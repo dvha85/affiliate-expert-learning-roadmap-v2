@@ -1,5 +1,7 @@
 # Eval M11 — Production Closed Loop (vòng production có quản trị)
 
+BR-03c.8 thêm [bài kiểm raw JSON từng artifact](../../docs/architecture/M11-JSON-BOUNDARY.md); PASS không thay kiểm toàn chain, STOP/recovery hoặc live evidence.
+
 Eval kiểm production authority (quyền production) chứ không chỉ happy path (đường chạy thuận lợi).
 
 Bắt buộc chứng minh:
