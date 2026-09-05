@@ -2,6 +2,8 @@
 
 Phạm vi: kiểm EvaluationRecord → ImprovementProposal → ReviewRecord cùng một ActionRecord và các OutcomeRecord M03, qua lệnh chỉ đọc. Đây là conformance harness, không phải store/learner integration BR-08/BR-12 và không đóng BR-03 tổng thể.
 
+Trạng thái IN_REVIEW: [PR #29](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/29), code/tests `e02c915`; Codex thực hiện, chủ repo chưa review. Base main sau #28, chưa merge PR M05.
+
 ## Lệnh và input
 
 Từ repo root:
