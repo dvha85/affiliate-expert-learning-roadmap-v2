@@ -17,6 +17,8 @@ Tool Registry (sổ đăng ký tool) chỉ đọc; Agent proposal (đề xuất 
 
 ## Authority ceiling
 
+Kiểm offline [m07-check](../docs/architecture/M07-JSON-BOUNDARY.md) không cấp quyền gọi tool. SUPPORTED chỉ kiểm ID/registry/call hiện có, không xác minh nội dung claim hoặc live enforcement.
+
 Không machine execution có side effect trong Mission này.
 
 ## PASS

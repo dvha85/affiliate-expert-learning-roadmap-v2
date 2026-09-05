@@ -46,6 +46,8 @@ Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket 
 
 ## Phần còn lại của BR-03
 
+BR-03c.3 đã review/merge #30 `891562a`, CI 4/4 PASS. BR-03c.4 M07: [boundary](M07-JSON-BOUNDARY.md), nhánh `codex/br-03c-m07-boundary`, Codex thực hiện/chủ repo chưa review; canonical registry toàn mảng, proposal shape local, không model/network/store.
+
 BR-03c.2 đã review/merge #29 tại `7a0f6c4`, CI 4/4 PASS. BR-03c.3 M06 đang triển khai trên nhánh `codex/br-03c-m06-boundary` (Codex; chủ repo chưa review): [output schema/profile](M06-JSON-BOUNDARY.md), provenance synthetic của harness và ID binding; không nối source parser/store/n8n.
 
 BR-03c.1 đã review/merge #28 tại `d89a04c`, sau #27 `09a2f50`. BR-03c.2 (Codex, reviewer chủ repo chưa review) đang triển khai [M05 boundary](M05-JSON-BOUNDARY.md) trên nhánh `codex/br-03c-m05-boundary`: schema-first Evaluation/Proposal/Review và cặp M03 qua m05-check, strict IDs/timeline, output schema, không apply. Notes tùy chọn được giữ; risks nil/rỗng bỏ khi serialize thay vì null. Không claim M06–M11 đã có raw conformance.

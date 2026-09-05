@@ -1,0 +1,1 @@
+[{"name":"public_http","read_only":true,"allowed_methods":["GET","HEAD"],"allowed_hosts":["example.com"]}]

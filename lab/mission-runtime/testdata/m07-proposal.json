@@ -1,0 +1,1 @@
+{"state":"PROPOSE","answer":"Synthetic example only; no source fetched.","evidence_ids":["syn-e1"],"tool_calls":[{"tool_name":"public_http","method":"GET","target":"https://example.com/offer"}]}

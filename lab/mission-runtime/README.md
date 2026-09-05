@@ -31,6 +31,10 @@ M05 có lệnh chỉ đọc kiểm 5 file: [m05-check và bài tập](../../docs
 
 M06 có [m06-check](../../docs/architecture/M06-JSON-BOUNDARY.md) cho response fixture offline. Normalizer xuất synthetic/test và kiểm Observation schema; không fetch hoặc persist. Không dùng nhãn real của output harness cũ làm bằng chứng nguồn thật.
 
+## Kiểm M07 từ file (BR-03c.4)
+
+M07: [m07-check offline](../../docs/architecture/M07-JSON-BOUNDARY.md) kiểm proposal/registry/context IDs từ ba file, không fetch/model và không cấp execution. ToolRegistry kiểm cả mảng canonical; AgentProposal chỉ có shape local.
+
 ## Kiểm AdvisorOutput từ file (BR-03a)
 
 Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:

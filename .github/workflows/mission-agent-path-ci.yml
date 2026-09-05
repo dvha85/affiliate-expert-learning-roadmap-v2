@@ -48,6 +48,7 @@ jobs:
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo m06-check testdata/m06-response.json | grep -q '"evidence_kind":"synthetic"'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'
+          go run ./cmd/demo m07-check testdata/m07-proposal.json testdata/m07-registry.json testdata/m07-evidence-ids.json | grep -q '"execution_authorized":false'
           go run ./cmd/demo M08 | grep -q 'SHADOW_POLICY_ALLOW'
           go run ./cmd/demo M08 | grep -q '"policy_mode": "NON_AUTHORIZING"'
           go run ./cmd/demo M08 | grep -q '"execution_authorized": false'

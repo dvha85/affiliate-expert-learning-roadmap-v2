@@ -1,5 +1,7 @@
 # M07 Operated Evidence (bằng chứng vận hành)
 
+- Kiểm offline m07-check: ba input refs, output/rejection; ghi riêng khỏi live model/tool trace và bằng chứng nội dung:
+
 - Model/provider/version (mô hình/nhà cung cấp/phiên bản):
 - Tool Registry (sổ đăng ký tool):
 - Source allowlist (danh sách nguồn cho phép):
