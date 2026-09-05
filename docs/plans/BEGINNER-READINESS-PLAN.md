@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01 đã merge; BR-02 đã triển khai, đang chờ review; các item còn lại chưa triển khai.
+- Trạng thái: IN_PROGRESS — BR-01/BR-02 đã merge; BR-03a đang chờ review, BR-03b/c chưa triển khai.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -67,8 +67,8 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
-| BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21); [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
+| BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; reviewer: chủ repo (chờ review BR-03a); [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
@@ -129,7 +129,7 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 #### BR-02 — Bằng chứng triển khai
 
-- Người thực hiện: Codex; reviewer: chủ repo, chờ review. Baseline: main `b17748a501736dcdfed6e2b8abb44e00115d40d6`.
+- Người thực hiện: Codex; chủ repo đã yêu cầu merge PR #21. Merge commit `1e94ec59385f5983c5130b10b889b083852b7b17`; 4 checks PASS trên head `4aef9f0` trước merge. Baseline triển khai: main `b17748a501736dcdfed6e2b8abb44e00115d40d6`.
 - PR triển khai: [#21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21), nhánh `codex/br-02-measurement-window`; commit code/tests `159d336fc770cbc07d84fcbc811f5c709fe9781c`. Trạng thái CI theo từng commit xem tại [Checks của PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21/checks); không suy CI PASS từ kết quả local.
 - Red/green: thêm `TestM03MeasurementWindow` trước khi sửa runtime; 3 subtest (`early_zero_regression`, `just_before_end`, `early_utc`) FAIL vì nhận VALID thay vì MEASUREMENT_WINDOW_OPEN. Sau sửa cả 19 subtest PASS; thêm `TestM05RejectsPrematureNoOutcome` để chứng minh evaluation không nhận kết luận số 0 quá sớm, nhưng vẫn nhận số 0 tại end.
 - Eval M03 thêm E08–E15 (8 case, tổng 15); các case cũ không bị bỏ hoặc nới expected. Quy tắc mới chỉ chặn `NO_OBSERVED_OUTCOME` trước end; giữ quan sát tạm/giao dịch hợp lệ. So sánh timestamp bằng `time.Time`, nhận đúng bằng end và offset tương đương.
@@ -142,14 +142,23 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 Liên quan phát hiện 7, 8.
 
-- [ ] Tái hiện AdvisorOutput ADVISE reason rỗng hiện vẫn SUPPORTED; bổ sung test bắt lỗi này.
-- [ ] Lập bảng type Go ↔ schema JSON ↔ input/output CLI cho các artifact được dùng.
+- [x] Tái hiện AdvisorOutput ADVISE reason rỗng hiện vẫn SUPPORTED; bổ sung test bắt lỗi này.
+- [x] Lập bảng type Go ↔ schema JSON ↔ input/output CLI cho các artifact được dùng (bản audit, không claim các dòng đã conformance).
 - [ ] Kiểm required field, enum, null/array, unique IDs, timestamp và field ngoài schema tại boundary.
 - [ ] Chốt vai trò M02 recorded_result: giữ projection có adapter sang DecisionPacket hoặc chuyển sang canonical packet bằng thiết kế được review; không đổi shape mà quên replay dữ liệu cũ.
 - [ ] Ghi rõ kiểm schema không thay kiểm liên kết, freshness hoặc tính hỗ trợ của nội dung bằng chứng.
 - [ ] Chọn cách validation nhỏ nhất đáp ứng contract; nếu thêm dependency phải pin và ghi cách cài.
 
 Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output thực của runtime được kiểm bằng schema tương ứng; fixture history hiện tại vẫn replay hoặc có quyết định chuyển đổi rõ.
+
+#### BR-03a — Advisor boundary (IN_REVIEW; item cha chưa hoàn thành)
+
+- Baseline `1e94ec5`: `TestAdvisorRejectsEmptyReason` FAIL vì nhận SUPPORTED thay vì INVALID_SCHEMA; sau sửa PASS.
+- Đã thêm raw JSON boundary cho M04, giữ required/null/duplicate/unknown information trước typed decode; enum/type/unique IDs/reason/constant false được kiểm. Guard typed không thay raw boundary. Test snapshot canonical schema buộc review khi schema đổi; đây là validator riêng cho M04, không phải engine schema tổng quát.
+- Có lệnh `advisor-check` nhận output/context từ file, xuất artifact đã kiểm cùng semantic result; CI chạy smoke fixture. 6 case eval mới; eval giữ JSON gốc. Test CLI handler kiểm artifact serialize lại, lỗi không được xuất success envelope; test freshness/linkage/provenance vẫn giữ độc lập.
+- Kiểm chứng local: Go tests/vet + CLI fixture ở mission-runtime; 8 Python validators, 10 Python regression tests và diff check PASS. Không đổi history M02; adapter/replay conformance sâu hơn vẫn thuộc BR-03b.
+- [Audit artifact và quyết định bảo toàn M02](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) ghi BR-03b/c còn TODO. Không đánh dấu DONE chỉ vì M04 PASS.
+- Chủ repo xác nhận chưa có chương trình affiliate: BR-04/BR-06 sẽ dùng fixture trung lập, chưa có platform/operated proof; không tự đăng ký chương trình hoặc chọn kênh đăng thay chủ repo.
 
 ## 6. Đợt B — Người mới bắt đầu được và hiểu sản phẩm đang xây
 
@@ -477,5 +486,6 @@ BR-04 có thể được chốt song song với ba PR này. Sau đó mới chố
 | 05/09/2026 | Lập kế hoạch 6 đợt, 19 đầu việc, mapping toàn bộ review | Review tại commit 7d2a3ab; các item triển khai đều TODO |
 | 05/09/2026 | Triển khai BR-01, chuyển IN_REVIEW; 18 item còn lại TODO | [Bằng chứng BR-01](#br-01--bằng-chứng-triển-khai); chờ human review |
 | 05/09/2026 | Ghi nhận BR-01 DONE theo yêu cầu merge của chủ repo; triển khai BR-02 IN_REVIEW; 17 item còn lại TODO | PR #20 đã merge; [bằng chứng BR-02](#br-02--bằng-chứng-triển-khai) |
+| 05/09/2026 | BR-02 DONE theo yêu cầu merge; BR-03 IN_PROGRESS, phần a chờ review, b/c TODO | PR #21 merge `1e94ec5`; audit artifact và regression M04 |
 
 Việc commit kế hoạch không có nghĩa các lỗi đã sửa hoặc Mission của học viên đã PASS.

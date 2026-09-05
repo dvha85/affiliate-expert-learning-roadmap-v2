@@ -41,6 +41,7 @@ jobs:
           go run ./cmd/demo O00 | grep -q 'DRY_RUN_ONLY'
           go run ./cmd/demo M03 | grep -q 'VALID'
           go run ./cmd/demo M04 | grep -q 'SUPPORTED'
+          go run ./cmd/demo advisor-check testdata/m04-advisor-output.json testdata/m04-evidence.json 2026-09-03T01:00:00Z 24 | grep -q 'SUPPORTED'
           go run ./cmd/demo M05 | grep -q 'REVIEW_REQUIRED'
           go run ./cmd/demo M06 | grep -q 'NEW'
           go run ./cmd/demo M07 | grep -q 'SUPPORTED'

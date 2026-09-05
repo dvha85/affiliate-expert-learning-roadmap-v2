@@ -176,8 +176,8 @@ type AdvisorOutput struct {
 }
 
 func EvaluateAdvisorOutput(o AdvisorOutput, ev []AdvisorEvidence, asOf string, maxAgeHours int) string {
-	if o.WriteToolRequested {
-		return "REJECT_WRITE_REQUEST"
+	if state := validateAdvisorFields(o); state != missionValid {
+		return state
 	}
 	if o.State == "ABSTAIN" {
 		return "ABSTAIN"
@@ -194,6 +194,12 @@ func EvaluateAdvisorOutput(o AdvisorOutput, ev []AdvisorEvidence, asOf string, m
 	}
 	idx := map[string]AdvisorEvidence{}
 	for _, x := range ev {
+		if strings.TrimSpace(x.EvidenceID) == "" || strings.TrimSpace(x.SourceRef) == "" {
+			return missionInvalid
+		}
+		if _, exists := idx[x.EvidenceID]; exists {
+			return missionInvalid
+		}
 		idx[x.EvidenceID] = x
 	}
 	for _, id := range o.EvidenceIDs {
