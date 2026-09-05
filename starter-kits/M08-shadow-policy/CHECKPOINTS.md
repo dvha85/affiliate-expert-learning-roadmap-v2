@@ -2,7 +2,7 @@
 
 - [ ] ActionIntent liên kết tới Decision/Evidence có thật.
 - [ ] Nếu intent bắt nguồn từ Agent thì có `proposal_ref`, và tham chiếu đó truy được về proposal đã biết; proposal của Agent không tự cấp authority.
-- [ ] `shadow_only=true` và `dry_run=true`.
+- [ ] ActionIntent có `intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`.
 - [ ] Intent hash đổi khi candidate action bị sửa; lỗi tuần tự hóa JSON không được tạo hash giả.
 - [ ] Thời hạn (expiry), target allowlist và policy version đều được kiểm.
 - [ ] Loại hành động (action type) không có policy mapping phải `DENY` theo nguyên tắc fail closed.

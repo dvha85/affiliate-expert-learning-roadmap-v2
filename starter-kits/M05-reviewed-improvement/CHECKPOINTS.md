@@ -1,6 +1,6 @@
 # M05 Checkpoints
 
-- [ ] EvaluationRecord nối Decision→Action→Outcome.
+- [ ] EvaluationRecord nối Decision→Action→Outcome: `decision_id` khớp quyết định; `effect_ref.effect_kind=HUMAN_ACTION`, `effect_ref.effect_id` khớp `ActionRecord.action_id`; các OutcomeRecord trong `outcome_ids` có cùng `effect_ref`.
 - [ ] ImprovementProposal tham chiếu evaluation IDs có thật.
 - [ ] current/proposed version khác nhau và có rollback.
 - [ ] `auto_apply=false`.
