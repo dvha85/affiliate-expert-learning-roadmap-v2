@@ -7,6 +7,7 @@
 - performed_at (thời điểm thực hiện):
 - measurement_window_end (cuối cửa sổ đo lường):
 - OutcomeRecord / outcome_id (bản ghi kết quả / mã kết quả):
+- OutcomeRecord.effect_ref (tham chiếu hành động): `effect_kind=HUMAN_ACTION`; điền `effect_id` khớp `ActionRecord.action_id`:
 - observed_at + source_ref (thời điểm quan sát + nguồn):
 - predicted result (kết quả dự đoán):
 - observed result (kết quả quan sát):

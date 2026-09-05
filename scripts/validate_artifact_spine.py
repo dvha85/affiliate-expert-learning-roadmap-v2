@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,9 +56,24 @@ for field in ["decision_id", "evidence_ids", "formula_version", "state"]:
         errors.append(f"HistoryRecord recorded_result lineage field missing: {field}")
 
 template = (ROOT / "templates/M00-EVIDENCE-PACKET.md").read_text(encoding="utf-8")
-for marker in ["observation_id", "subject_id", "evidence_ids", "action: `null`"]:
+for marker in ["observation_id", "subject_id", "evidence_ids"]:
     if marker not in template:
         errors.append(f"M00 evidence template missing canonical marker: {marker}")
+
+# Inspect the actual packet field, not the checklist or prose mentioning null.
+# Accept plain/inline-code keys and values, but require exactly one declaration.
+packet_sections = re.findall(
+    r"^## Human DecisionPacket[^\n]*\n(.*?)(?=^## |\Z)",
+    template, re.MULTILINE | re.DOTALL,
+)
+action_values = []
+if len(packet_sections) == 1:
+    action_values = re.findall(
+        r"^[ \t]*[-*+] +(?:`action`|action)[ \t]*:[ \t]*(.*)$",
+        packet_sections[0], re.MULTILINE,
+    )
+if len(action_values) != 1 or action_values[0].strip() not in ("null", "`null`"):
+    errors.append("M00 Human DecisionPacket must declare exactly one action field with value null")
 
 m02_fixture = load_json("lab/affiliate-bot/data/m02-sample-observations.json")
 if not isinstance(m02_fixture, list) or not m02_fixture:

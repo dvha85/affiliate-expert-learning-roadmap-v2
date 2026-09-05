@@ -21,7 +21,7 @@
 - Chi phí tối đa theo đơn vị nhỏ + currency (tiền tệ):
 - Số outcome tối đa còn chờ:
 
-## 3. Trusted CanaryCostBound (giới hạn chi phí đáng tin)
+## 3. TrustedCostBound (giới hạn chi phí đáng tin)
 
 - ID/hash của CostBound:
 - Intent ID/hash được bind:

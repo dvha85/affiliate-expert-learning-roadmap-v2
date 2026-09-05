@@ -21,10 +21,16 @@ Development Agent có thể sửa code/docs/tests và mở PR nhưng không tự
 
 Khuyến nghị bật required checks trên `main`:
 
-- `Curriculum CI / curriculum`
-- `Curriculum CI / evidence-and-safety`
-- `Curriculum CI / python-regression`
-- `Curriculum CI / deterministic-runtime`
+| Workflow | Tên check chính xác trên GitHub |
+|---|---|
+| `curriculum-ci.yml` — Curriculum CI | `structure-language-and-foundations` |
+| `curriculum-ci.yml` — Curriculum CI | `deterministic-runtime` |
+| `mission-agent-path-ci.yml` — Mission Agent Path CI | `mission-semantics-and-blueprints` |
+| `mission-agent-path-ci.yml` — Mission Agent Path CI | `mission-runtime` |
+
+Tên check là tên job, không phải tên step; regression tests Python thuộc job `structure-language-and-foundations`. Khi cấu hình, chọn đúng check do GitHub Actions phát hành trên commit hiện hành. Không dùng các tên cũ `curriculum`, `evidence-and-safety`, `python-regression` hoặc tự thêm tiền tố workflow vào tên check.
+
+Đây là cấu hình **khuyến nghị**, không xác nhận branch protection hiện đã bật. Sửa tài liệu/workflow không tự sửa branch protection; việc bật hoặc thay required checks cần thao tác quản trị riêng của chủ repo.
 
 Đồng thời bật:
 

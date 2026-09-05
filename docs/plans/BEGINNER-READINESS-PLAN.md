@@ -2,10 +2,10 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: PLANNED — đã lập kế hoạch, chưa triển khai các đầu việc.
+- Trạng thái: IN_PROGRESS — BR-01 đã triển khai, đang chờ review; các item còn lại chưa triển khai.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
-- Người phụ trách từng đầu việc: chưa phân công; phải điền khi nhận việc.
+- Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
 - Nguồn quyết định thứ tự học và quyền hạn vẫn là [CURRICULUM.md](../../CURRICULUM.md).
 
 ## 1. Kết quả cần đạt
@@ -26,7 +26,7 @@ Kế hoạch này quản lý **công việc hoàn thiện repo**. Các đợt ph
 - Có một ví dụ sản phẩm xuyên suốt; có mẫu input/output và bài sửa code theo từng bước.
 - Sửa sai lệch đã tìm thấy trước khi mở rộng chức năng phụ thuộc.
 - Bộ conformance được dùng để kiểm behavior; shared implementation không được làm test mất khả năng phát hiện lỗi.
-- Chưa triển khai các hạng mục trong chính PR lưu kế hoạch này.
+- PR lưu kế hoạch ban đầu không triển khai các hạng mục; tiến độ triển khai sau đó được ghi ở bảng theo dõi.
 
 ### Giả định làm việc
 
@@ -66,7 +66,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
-| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | TODO | Chưa phân công |
+| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); nhánh `codex/br-01-ci-contract-alignment`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | TODO | Chưa phân công |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
@@ -94,13 +94,25 @@ Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này m
 
 Liên quan phát hiện 9, 10 và ghi chú governance trong review.
 
-- [ ] Sửa `scripts/validate_artifact_spine.py` để chấp nhận định dạng tương đương của field action trong template; không bỏ invariant action=null.
-- [ ] Đổi checkpoint M08 về `intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`.
-- [ ] Rà starter/templates cho `action_id` dùng sai vai trò của EffectRef và tên cost-bound cũ; giữ alias chỉ ở nơi có giải thích implementation.
-- [ ] Đối chiếu `.github/workflows/*.yml` và `docs/governance/REPOSITORY-GOVERNANCE.md`; cập nhật tên check thực tế. Thay branch protection là thao tác quản trị riêng, không suy ra từ sửa tài liệu.
-- [ ] Ghi trạng thái baseline CI trước/sau.
+- [x] Sửa `scripts/validate_artifact_spine.py` để chấp nhận định dạng tương đương của field action trong template; không bỏ invariant action=null.
+- [x] Đổi checkpoint M08 về `intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`.
+- [x] Rà starter/templates cho `action_id` dùng sai vai trò của EffectRef và tên cost-bound cũ; giữ alias chỉ ở nơi có giải thích implementation.
+- [x] Đối chiếu `.github/workflows/*.yml` và `docs/governance/REPOSITORY-GOVERNANCE.md`; cập nhật tên check thực tế. Thay branch protection là thao tác quản trị riêng, không suy ra từ sửa tài liệu.
+- [x] Ghi trạng thái baseline CI trước/sau.
 
 Nghiệm thu: 8 validator chạy độc lập đều exit 0; template action non-null vẫn bị phát hiện; checkpoint khớp canonical schema; không hạ tiêu chuẩn kiểm tra để lấy CI xanh.
+
+#### BR-01 — Bằng chứng triển khai
+
+- Ngày: 05/09/2026. Người thực hiện: Codex. Reviewer: chủ repo, chưa review.
+- Baseline: `8db79ebff7fa275329d5b8dae3923171db42fdac` (main sau PR #19). Chạy lại tại local: 7/8 validator exit 0; `validate_artifact_spine.py` exit 1 vì marker ``action: `null` `` không nhận key được bọc backtick. CI PR #19: job `structure-language-and-foundations` lỗi ở validator này, ba job còn lại PASS.
+- Sau sửa tại local (Python 3.9.6): cả 8 validator exit 0; 10 regression tests PASS; `git diff --check` exit 0. Kết quả GitHub Actions của PR triển khai cần kiểm riêng, không suy từ local PASS.
+- Lệnh tái hiện: `python3 -m unittest discover -s scripts/tests -v`; `for script in scripts/validate_*.py; do python3 "$script" || exit 1; done`; `git diff --check`.
+- Regression chạy validator thật trong repo tạm: nhận key/value dạng thường hoặc inline code; từ chối action object, string `"null"`, boolean, số, array, giá trị rỗng/sai, field thiếu/trùng, section thiếu/trùng và null chỉ nằm ở prose/checklist/section khác. Mutation schema action sang object vẫn exit 1. Không sửa template thật để chạy probe.
+- CI đã thêm unittest discovery trước các validator; không bỏ check hiện hữu. Validator chỉ nhận đúng một field action=null trong section Human DecisionPacket, không phải trình phân tích Markdown tổng quát.
+- Đã đối chiếu `action-intent.schema.json`, `effect-ref.schema.json`, `evaluation-record.schema.json` và `trusted-cost-bound.schema.json`. `action_id` còn lại trong starter/templates là ID của ActionRecord hoặc đích của `effect_ref.effect_id`, không còn thay field EffectRef của Outcome/Evaluation. Không còn `shadow_only`, `dry_run`, `CanaryCostBound` trong hai thư mục đó.
+- Phạm vi: validator/tests/workflow, checkpoint/template M03/M05/M08/M10 và governance. Không đổi schema, Go runtime, branch protection, `PROGRESS.md` hoặc kết luận của review lịch sử; BR-02/BR-03 vẫn TODO.
+- Rollback: revert PR BR-01 sau khi được merge; không reset lịch sử hoặc sửa dữ liệu học viên.
 
 ### BR-02 — Cửa sổ đo M03
 
@@ -451,5 +463,6 @@ BR-04 có thể được chốt song song với ba PR này. Sau đó mới chố
 | Ngày | Thay đổi | Bằng chứng |
 |---|---|---|
 | 05/09/2026 | Lập kế hoạch 6 đợt, 19 đầu việc, mapping toàn bộ review | Review tại commit 7d2a3ab; các item triển khai đều TODO |
+| 05/09/2026 | Triển khai BR-01, chuyển IN_REVIEW; 18 item còn lại TODO | [Bằng chứng BR-01](#br-01--bằng-chứng-triển-khai); chờ human review |
 
 Việc commit kế hoạch không có nghĩa các lỗi đã sửa hoặc Mission của học viên đã PASS.
