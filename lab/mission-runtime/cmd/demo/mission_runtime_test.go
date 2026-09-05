@@ -30,8 +30,8 @@ func TestM03EvalPack(t *testing.T) {
 }
 
 func TestM04EvalPack(t *testing.T) {
-	type tc struct { CaseID string `json:"case_id"`; Output AdvisorOutput `json:"output"`; Evidence []AdvisorEvidence `json:"evidence"`; AsOf string `json:"as_of"`; MaxAgeHours int `json:"max_age_hours"`; Expected string `json:"expected"` }
-	for _,c:=range loadCases[tc](t,"M04-grounded-ai-advisor") { t.Run(c.CaseID,func(t *testing.T){ if got:=EvaluateAdvisorOutput(c.Output,c.Evidence,c.AsOf,c.MaxAgeHours); got!=c.Expected { t.Fatalf("expected %s got %s",c.Expected,got) } }) }
+	type tc struct { CaseID string `json:"case_id"`; Output json.RawMessage `json:"output"`; Evidence []AdvisorEvidence `json:"evidence"`; AsOf string `json:"as_of"`; MaxAgeHours int `json:"max_age_hours"`; Expected string `json:"expected"` }
+	for _,c:=range loadCases[tc](t,"M04-grounded-ai-advisor") { t.Run(c.CaseID,func(t *testing.T){ output, got := DecodeAdvisorOutput(c.Output); if got == missionValid { got = EvaluateAdvisorOutput(output,c.Evidence,c.AsOf,c.MaxAgeHours) }; if got!=c.Expected { t.Fatalf("expected %s got %s",c.Expected,got) } }) }
 }
 
 func TestM05EvalPack(t *testing.T) {

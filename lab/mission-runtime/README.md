@@ -19,6 +19,18 @@ go run ./cmd/demo M11
 
 Runtime này là **conformance oracle/harness (bộ đối chiếu chuẩn)**, không phải Affiliate Bot thứ hai. Từ M03 trở đi learner dùng behavior/failure cases ở đây để kiểm implementation được gắn vào cùng learner Bot/workspace đang tiến hóa từ `lab/affiliate-bot/`.
 
+## Kiểm AdvisorOutput từ file (BR-03a)
+
+Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:
+
+```bash
+go run ./cmd/demo advisor-check testdata/m04-advisor-output.json testdata/m04-evidence.json 2026-09-03T01:00:00Z 24
+```
+
+Output gồm `advisor_output` và `result=SUPPORTED`. Đây là fixture tổng hợp, không phải evidence thật. Thay hai path bằng bản output/context của bạn để kiểm JSON gốc; không tự bỏ field lạ hay thêm giá trị thiếu trước khi kiểm. Schema sai trả lỗi `INVALID_SCHEMA` trên stderr và exit 1; yêu cầu write trả `REJECT_WRITE_REQUEST`. JSON hợp lệ mới đi qua kiểm liên kết/freshness và xuất envelope; `result` có thể là `REJECT_UNGROUNDED`, `ABSTAIN_STALE`, `ABSTAIN_FUTURE` hoặc `INVALID`, dù exit 0 vì lệnh đã hoàn tất phép kiểm. Luôn đọc result, không lấy exit 0 làm phê duyệt.
+
+`MAX_AGE_HOURS` là số nguyên không âm. Evidence file là mảng các object `evidence_id`, `observed_at`, `source_ref`; đây là context rút gọn, không phải canonical Observation. AdvisorOutput dùng schema riêng; không gán schema đó cho cả envelope. Lệnh không gọi model, fetch nguồn hoặc thực hiện action; tích hợp learner Bot thuộc BR-11.
+
 ```text
 run mission-runtime demo/test
 != learner integration
