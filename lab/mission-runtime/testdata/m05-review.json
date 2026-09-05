@@ -1,0 +1,8 @@
+{
+  "review_id":"syn-r",
+  "proposal_id":"syn-p",
+  "reviewed_by":"human",
+  "reviewed_at":"2026-09-10T12:00:00+07:00",
+  "decision":"REQUEST_CHANGES",
+  "reason":"collect actual evidence first"
+}

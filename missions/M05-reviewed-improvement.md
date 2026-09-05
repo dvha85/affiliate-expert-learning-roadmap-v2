@@ -17,6 +17,8 @@ eval_pack: evals/M05-reviewed-improvement/
 
 ## Authority ceiling
 
+Kiểm file qua [m05-check](../docs/architecture/M05-JSON-BOUNDARY.md): schema trước semantic, không persist/apply. VALID của chuỗi vẫn giữ nguyên decision REJECT/REQUEST_CHANGES/APPROVE_FOR_MANUAL_CHANGE và execution_authorized=false; không thay review thật hoặc bằng chứng vận hành.
+
 Không machine execution có side effect trong Mission này.
 
 ## PASS

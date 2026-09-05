@@ -23,6 +23,10 @@ Runtime này là **conformance oracle/harness (bộ đối chiếu chuẩn)**, k
 
 M03 có lệnh riêng `go run ./cmd/demo m03-check testdata/m03-action.json testdata/m03-outcome.json` từ module này. Lệnh chỉ đọc, schema-first rồi kiểm liên kết/cửa sổ đo; lỗi schema hoặc semantic đều exit 1 và không xuất envelope. Xem [hướng dẫn và giới hạn BR-03c.1](../../docs/architecture/M03-JSON-BOUNDARY.md). Cặp fixture synthetic mô phỏng compliance=true, không phải review/action thật; không có store hoặc execution.
 
+## Kiểm Evaluation/Proposal/Review từ file (BR-03c.2)
+
+M05 có lệnh chỉ đọc kiểm 5 file: [m05-check và bài tập](../../docs/architecture/M05-JSON-BOUNDARY.md). Schema-first, giữ liên kết/timeline, không apply proposal; result VALID không có nghĩa review APPROVE hoặc execution authorized.
+
 ## Kiểm AdvisorOutput từ file (BR-03a)
 
 Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:

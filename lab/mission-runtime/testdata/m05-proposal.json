@@ -1,0 +1,11 @@
+{
+  "proposal_id":"syn-p",
+  "evaluation_ids":["syn-ev"],
+  "current_version":"v1",
+  "proposed_version":"v2",
+  "change_summary":"clarify missing versus zero",
+  "expected_benefit":"avoid premature conclusions",
+  "risks":["overfit to one synthetic example"],
+  "rollback":"restore v1 after manual review",
+  "auto_apply":false
+}
