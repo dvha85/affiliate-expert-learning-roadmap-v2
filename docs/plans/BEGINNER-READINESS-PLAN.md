@@ -64,6 +64,8 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 ## 4. Bảng theo dõi
 
+Cập nhật đợt BR-03c.1: #24/#25/#26 đã review và merge vào main; các đoạn chờ merge bên dưới là lịch sử. #27 (BR-06a) đã review diff/tài liệu/fixture, không thấy lỗi chặn trong phạm vi đó; head `af7c844` có 4/4 CI checks PASS, tests contracts local PASS. PR #27 vẫn mở, chưa merge theo yêu cầu review hiện tại. BR-03c.1 bắt đầu ActionRecord/OutcomeRecord M03; các artifact còn lại chưa hoàn tất.
+
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
@@ -139,6 +141,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 - Rollback: revert PR BR-02 nếu được merge; lưu ý việc đó đưa lỗi kết luận sớm trở lại.
 
 ### BR-03 — Output đúng schema trước semantic validation
+
+BR-03c.1: Codex thực hiện, reviewer chủ repo (chưa review), nhánh `codex/br-03c-m03-boundary`; [thiết kế/evidence](../architecture/M03-JSON-BOUNDARY.md). Phạm vi raw M03 action/outcome + CLI read-only + raw eval + output schema; không sửa alias M11 hoặc triển khai store. BR-03c tổng thể vẫn IN_PROGRESS, không DONE chỉ từ M03.
 
 Liên quan phát hiện 7, 8.
 

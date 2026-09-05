@@ -1,0 +1,10 @@
+{
+  "action_id": "syn-a",
+  "decision_id": "syn-d",
+  "action_type": "SYNTHETIC_MEASUREMENT",
+  "target": "synthetic-target",
+  "performed_by": "human",
+  "performed_at": "2026-09-03T10:00:00+07:00",
+  "measurement_window_end": "2026-09-10T10:00:00+07:00",
+  "compliance_reviewed": true
+}
