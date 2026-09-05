@@ -44,4 +44,4 @@ Cả ba record dùng `effect_ref={effect_kind:HUMAN_ACTION,effect_id:syn-act-01}
 3. Vì sao PENDING/số 0/báo cáo đến muộn không được gộp thành cùng một trạng thái?
 4. Vì sao fixture PASS vẫn chưa có bằng chứng doanh thu, platform compliance hoặc action thật?
 
-Chuyển case này sang fixture JSON chạy được xuyên suốt là việc BR-09–BR-12; không claim đã có pipeline đó trong BR-04.
+BR-06 có [hướng dẫn vòng thủ công](MANUAL-AFFILIATE-LOOP.md) và [fixture action/report/outcome](../../examples/affiliate-manual/manual-loop.json) được kiểm schema/mapping offline. Chuyển case này sang pipeline chạy được xuyên suốt vẫn là việc BR-09–BR-12; fixture test không phải importer hoặc platform proof.

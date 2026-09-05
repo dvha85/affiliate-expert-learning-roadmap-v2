@@ -2,7 +2,7 @@
 
 ## Phạm vi đã triển khai
 
-BR-03a kiểm `AdvisorOutput` M04 tại JSON boundary và trước SUPPORTED. BR-03b bổ sung schema package, M02 capture/load/serialized history và adapter xuất DecisionPacket (chờ review). Đây **không phải** tuyên bố toàn bộ 29 schema đã được cưỡng chế ở runtime. BR-03c còn mở; bảng này là bản đồ để review từng phần, không phải báo cáo conformance đầy đủ.
+BR-03a kiểm `AdvisorOutput` M04 tại JSON boundary và trước SUPPORTED. BR-03b bổ sung schema package, M02 capture/load/serialized history và adapter xuất DecisionPacket (đã review/merge PR #24 tại `9102f00`). Đây **không phải** tuyên bố toàn bộ 29 schema đã được cưỡng chế ở runtime. BR-03c còn mở; bảng này là bản đồ để review từng phần, không phải báo cáo conformance đầy đủ.
 
 Chọn standard library Go cho contract nhỏ M04: kiểm JSON gốc, required/unknown/duplicate keys, null/array/item types, enum, constant false, unique/nonempty evidence IDs và reason. Không thêm dependency. `reason`/ID chỉ chứa khoảng trắng cũng bị từ chối (chặt hơn minLength của schema). Test khóa cấu trúc schema M04 để buộc review validator khi contract đổi. Không dùng giải pháp thủ công này như một JSON Schema engine tổng quát cho `$ref`, `allOf` hoặc các contract phức tạp.
 
@@ -47,7 +47,7 @@ Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket 
 ## Phần còn lại của BR-03
 
 - BR-03a: Advisor boundary, eval và lệnh kiểm file — PR #22 đã merge tại `487ed73`.
-- BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — IN_REVIEW. Schema package pin jsonschema/v6 v6.0.2, embed canonical files và chặn loader ngoài, bật format assertions; CI có tests và smoke export.
+- BR-03b: M02 adapter + schema conformance tests cho capture/serialized history/replay — đã merge #24. Schema package pin jsonschema/v6 v6.0.2, embed canonical files và chặn loader ngoài, bật format assertions; CI có tests và smoke export.
 - BR-03c: lựa chọn/pin bộ kiểm JSON Schema đầy đủ nếu cần; kiểm output thực và raw boundaries của các artifact còn lại ở bảng; không nới schema hoặc xóa semantic guards để lấy PASS — TODO.
 
 Chỉ đánh dấu BR-03 DONE khi BR-03b/c có implementation/evidence và được review; bảng mapping hoặc unit test M04 không thay được các phần đó.
