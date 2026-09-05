@@ -46,6 +46,8 @@ Adapter BR-03b từ Result + context do người cung cấp sang DecisionPacket 
 
 ## Phần còn lại của BR-03
 
+BR-03c.2 đã review/merge #29 tại `7a0f6c4`, CI 4/4 PASS. BR-03c.3 M06 đang triển khai trên nhánh `codex/br-03c-m06-boundary` (Codex; chủ repo chưa review): [output schema/profile](M06-JSON-BOUNDARY.md), provenance synthetic của harness và ID binding; không nối source parser/store/n8n.
+
 BR-03c.1 đã review/merge #28 tại `d89a04c`, sau #27 `09a2f50`. BR-03c.2 (Codex, reviewer chủ repo chưa review) đang triển khai [M05 boundary](M05-JSON-BOUNDARY.md) trên nhánh `codex/br-03c-m05-boundary`: schema-first Evaluation/Proposal/Review và cặp M03 qua m05-check, strict IDs/timeline, output schema, không apply. Notes tùy chọn được giữ; risks nil/rỗng bỏ khi serialize thay vì null. Không claim M06–M11 đã có raw conformance.
 
 BR-03c.1 đang triển khai trên nhánh `codex/br-03c-m03-boundary` (Codex; reviewer chủ repo, chưa review). [Boundary M03](M03-JSON-BOUNDARY.md) nối ActionRecord/OutcomeRecord raw schema + strict decode vào lệnh m03-check và raw eval; output serialize được kiểm lại. Alias M11 không nhận ở boundary này. Chưa đóng các dòng M05–M11; typed validators cũ không trở thành raw schema boundary chỉ nhờ thêm lệnh mới.
