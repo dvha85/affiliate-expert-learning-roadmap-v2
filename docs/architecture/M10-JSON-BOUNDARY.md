@@ -1,5 +1,7 @@
 # BR-03c.7 — M10: kiểm từng artifact canary
 
+Trạng thái IN_REVIEW: [PR #34](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/34), commit triển khai `95979c1`. [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/34/checks); chưa merge.
+
 Evidence local: tests/vet ba module, 8 Python validators, 10 Python regressions PASS; CLI fixture trả ba flag false. #33 đã review/merge `6fce165` sau CI 4/4 trên head `1333585`. Kết quả local không thay CI theo head PR M10.
 
 Phạm vi: schema-first và exact typed decode cho `grant`, `approval`, `cost`, `ledger`, `gate`, `authorization`, `execution`. Dùng bảy canonical schema tương ứng trong `contracts/`. Authorization/execution chỉ nhận profile canary; không nhận lẫn field M09/M11. Đây là **kiểm từng file**, không phải audit chain M10 đầy đủ hoặc đường thực thi.

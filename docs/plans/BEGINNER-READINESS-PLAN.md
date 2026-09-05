@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-06a và BR-03c.1–c.6 đã merge (#27–#33); BR-03c.7 M10 đang triển khai; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-06a và BR-03c.1–c.6 đã merge (#27–#33); BR-03c.7 M10 IN_REVIEW tại PR #34; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -72,7 +72,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b/c.1–c.6 đã merge (#33 `6fce165`); BR-03c.7 M10 đang triển khai, reviewer chủ repo chưa review; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; BR-03a/b/c.1–c.6 đã merge (#33 `6fce165`); BR-03c.7 M10 IN_REVIEW [PR #34](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/34), reviewer chủ repo chưa review; [audit/phần còn lại](../architecture/ARTIFACT-BOUNDARY-AUDIT.md) |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
