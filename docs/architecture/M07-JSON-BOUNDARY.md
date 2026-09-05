@@ -1,5 +1,7 @@
 # BR-03c.4 — M07 JSON boundary
 
+IN_REVIEW: [PR #31](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/31), code/tests `b652b27`; Codex thực hiện, chủ repo chưa review. Local tests/vet ba module, 8 validators, 10 Python regression tests và diff check PASS. CI phải kiểm theo head PR riêng.
+
 Phạm vi: conformance offline, không model/fetch/persist/n8n. `ToolRegistry` canonical là mảng không rỗng; ToolSpec chỉ là phần tử. AgentProposal không có schema canonical: decoder kiểm shape local state/answer/evidence_ids/tool_calls, không gọi nó là AdvisorOutput. Context là mảng ID do người cung cấp, không phải payload evidence đáng tin.
 
 Từ repo root:
