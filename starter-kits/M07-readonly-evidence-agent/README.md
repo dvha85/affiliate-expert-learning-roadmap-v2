@@ -1,5 +1,7 @@
 # Bộ khởi đầu — M07
 
+Tham khảo [m07-check offline](../../docs/architecture/M07-JSON-BOUNDARY.md) để kiểm ba file trước integration; không thay model/tool trace thật.
+
 1. Học `curriculum/M07/`.
 2. Đọc `CHECKPOINTS.md` và dùng `M07-OPERATED-EVIDENCE-TEMPLATE.md`.
 3. Chạy `cd lab/mission-runtime && go test ./...` và `go run ./cmd/demo M07`.
