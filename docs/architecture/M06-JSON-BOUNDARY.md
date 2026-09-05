@@ -1,5 +1,7 @@
 # BR-03c.3 — Observation của M06
 
+Trạng thái IN_REVIEW: [PR #30](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/30), code/tests `f54ea51`; Codex thực hiện, chủ repo chưa review. Chưa merge.
+
 Phạm vi: normalizer của conformance harness và CLI **offline** `m06-check`. Không fetch, persist, watcher scheduler hoặc n8n. BR-13/14 vẫn mở. Observation schema canonical không đổi; `additionalProperties:true` cho phép `content_hash`. Profile typed của normalizer chỉ hỗ trợ các field đang xuất, từ chối extension chưa hỗ trợ thay vì bỏ dữ liệu ngầm.
 
 ## Chạy từ repo root
