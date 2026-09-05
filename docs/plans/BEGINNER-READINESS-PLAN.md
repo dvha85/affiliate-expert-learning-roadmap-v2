@@ -69,7 +69,7 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21); [evidence](#br-02--bằng-chứng-triển-khai) |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
-| BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
+| BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [MVP spec](../product/MVP-SPEC.md); fixture trung lập, chưa có chương trình |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | TODO | Chưa phân công |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | TODO | Chưa phân công |
@@ -157,13 +157,15 @@ Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output 
 
 Liên quan phát hiện 2, 11.
 
-- [ ] Viết `docs/product/MVP-SPEC.md` (file mới dự kiến) với audience, câu hỏi, input, output hữu ích, giới hạn và thước đo thành công.
-- [ ] Dùng context giá đỡ laptop làm ví dụ mặc định; ghi rõ chương trình affiliate/kênh nào được chọn sau kiểm khả năng truy cập.
-- [ ] Mô tả kết quả tối thiểu: báo cáo có source/time/limitation, link tới hành động thủ công, số liệu đo và evaluation.
-- [ ] Phân biệt tiêu chí kỹ thuật với KPI kinh doanh; không yêu cầu phải có doanh thu để chứng minh code hoạt động.
-- [ ] Chốt các trường và ID cần xuyên suốt case.
+- [x] Viết `docs/product/MVP-SPEC.md` với audience, câu hỏi, input, output hữu ích, giới hạn và thước đo thành công (chờ review đặc tả).
+- [x] Dùng context giá đỡ laptop làm ví dụ mặc định; chủ repo xác nhận chưa có chương trình, nên dùng fixture trung lập, chưa chọn platform/kênh hoặc claim quyền truy cập.
+- [x] Mô tả kết quả tối thiểu: báo cáo có source/time/limitation, link tới hành động thủ công, số liệu đo và evaluation.
+- [x] Phân biệt tiêu chí kỹ thuật với KPI kinh doanh; không yêu cầu phải có doanh thu để chứng minh code hoạt động.
+- [x] Chốt các trường và ID cần xuyên suốt case trong bản đặc tả chờ review.
 
 Nghiệm thu: một reviewer đọc spec có thể nói được bot giúp ai làm việc gì, đầu vào lấy ở đâu, đầu ra trông thế nào và thế nào là hoàn thành MVP.
+
+Evidence BR-04: [MVP-SPEC](../product/MVP-SPEC.md) và [REFERENCE-CASE](../product/REFERENCE-CASE.md). Chỉ là đặc tả/mẫu nội dung, không phải pipeline/CLI đã triển khai. Chủ repo xác nhận chưa có chương trình affiliate; BR-06 sẽ hướng dẫn trung lập và giữ platform proof chưa xác nhận. Reviewer chưa phê duyệt spec; giữ IN_REVIEW.
 
 ### BR-05 — Quickstart từ máy chưa cài công cụ
 
