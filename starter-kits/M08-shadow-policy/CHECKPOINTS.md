@@ -1,5 +1,7 @@
 # M08 Checkpoints
 
+- [ ] m08-check từ file đã thử hash tamper, authority=true và missing links; không dùng seal để che lỗi input.
+
 - [ ] ActionIntent liên kết tới Decision/Evidence có thật.
 - [ ] Nếu intent bắt nguồn từ Agent thì có `proposal_ref`, và tham chiếu đó truy được về proposal đã biết; proposal của Agent không tự cấp authority.
 - [ ] ActionIntent có `intent_mode=PROPOSAL_ONLY` và `execution_authorized=false`.

@@ -19,6 +19,8 @@ M08 gọi toàn bộ quá trình là shadow (chạy bóng) vì Mission không t�
 
 ## Authority ceiling
 
+[m08-check](../docs/architecture/M08-JSON-BOUNDARY.md) kiểm raw intent và serialized policy; không persist/execute, ALLOW luôn NON_AUTHORIZING và execution_authorized=false.
+
 `ALLOW` trong M08 chỉ là shadow policy result (kết quả chính sách chạy bóng). `ActionIntent.execution_authorized=false` và `PolicyDecision.execution_authorized=false` luôn bắt buộc; không nối executor, không gọi write tool, không tạo side effect.
 
 `policy_review_required` chỉ mô tả review ở policy layer; nó không phải `ApprovalRecord` và không được dùng thay execution approval của M09+.

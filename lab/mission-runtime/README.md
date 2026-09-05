@@ -35,6 +35,10 @@ M06 có [m06-check](../../docs/architecture/M06-JSON-BOUNDARY.md) cho response f
 
 M07: [m07-check offline](../../docs/architecture/M07-JSON-BOUNDARY.md) kiểm proposal/registry/context IDs từ ba file, không fetch/model và không cấp execution. ToolRegistry kiểm cả mảng canonical; AgentProposal chỉ có shape local.
 
+## Kiểm M08 từ file (BR-03c.5)
+
+M08: [m08-check](../../docs/architecture/M08-JSON-BOUNDARY.md), raw schema trước policy, không seal lại hash/quyền. Exit 0 có thể chứa DENY/WAIT; không execute.
+
 ## Kiểm AdvisorOutput từ file (BR-03a)
 
 Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:

@@ -1,0 +1,1 @@
+{"policy_version":"test-v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["syn-d"],"known_evidence_ids":["syn-e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}
