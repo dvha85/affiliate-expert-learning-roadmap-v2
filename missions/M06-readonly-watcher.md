@@ -17,6 +17,8 @@ Watcher (bộ theo dõi) chỉ đọc dùng GET/HEAD trên allowlist (danh sách
 
 ## Authority ceiling
 
+Conformance [m06-check](../docs/architecture/M06-JSON-BOUNDARY.md) chỉ kiểm fixture/output schema, không fetch hoặc persist; normalizer harness dùng synthetic/test. Learner vẫn cần nguồn được phép và history handoff thật để có bằng chứng vận hành.
+
 Không machine execution có side effect trong Mission này.
 
 ## PASS

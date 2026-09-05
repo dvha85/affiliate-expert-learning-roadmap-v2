@@ -1,0 +1,13 @@
+{
+ "subject_id":"syn-product",
+ "status_code":200,
+ "request":{
+  "method":"GET",
+  "url":"https://example.com/offer",
+  "allow_hosts":["example.com"],
+  "observed_at":"2026-09-03T01:00:00Z",
+  "correlation_id":"syn-c",
+  "body":"synthetic response; no real offer data",
+  "previous_hash":""
+ }
+}

@@ -1,5 +1,7 @@
 # M06 Operated Evidence (bằng chứng vận hành)
 
+- Kiểm offline m06-check (ghi riêng khỏi operated proof): input ref, output/schema và rejection; không dùng synthetic làm nguồn thật:
+
 - subject_id + source_url (mã đối tượng + URL nguồn):
 - access method / allowlist review (cách truy cập / rà soát danh sách cho phép):
 - Run 1 correlation_id + change_state (lần chạy 1: mã liên kết + trạng thái thay đổi):

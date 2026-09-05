@@ -1,5 +1,7 @@
 # M06 Checkpoints
 
+- [ ] Đã kiểm output normalizer bằng m06-check; phân biệt synthetic/test với nguồn thật, thiếu body/HEAD với nội dung đã quan sát; schema PASS không phải history persistence.
+
 - [ ] Source/host đã allowlist và review ToS/access method.
 - [ ] Workflow chỉ GET/HEAD; không write credential.
 - [ ] n8n output map về canonical Observation.

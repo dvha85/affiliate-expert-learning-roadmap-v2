@@ -1,5 +1,7 @@
 # Bộ khởi đầu — M06
 
+Bài kiểm [m06-check offline](../../docs/architecture/M06-JSON-BOUNDARY.md) xuất Observation synthetic/test đã kiểm schema, không fetch/persist. Bài này không thay workflow thật và các bước Mission bên dưới.
+
 1. Học `curriculum/M06/`.
 2. Đọc `CHECKPOINTS.md` và dùng `M06-OPERATED-EVIDENCE-TEMPLATE.md`.
 3. Chạy `cd lab/mission-runtime && go test ./...` và `go run ./cmd/demo M06`.

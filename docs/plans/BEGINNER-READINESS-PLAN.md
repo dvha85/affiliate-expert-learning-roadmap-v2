@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-06a (#27) và BR-03c.1 (#28) đã merge; BR-03c.2 M05 IN_REVIEW tại PR #29; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-06a (#27), BR-03c.1 (#28), BR-03c.2 (#29) đã merge; BR-03c.3 M06 đang triển khai; BR-06b chờ chương trình/kênh, BR-03c tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -143,6 +143,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 - Rollback: revert PR BR-02 nếu được merge; lưu ý việc đó đưa lỗi kết luận sớm trở lại.
 
 ### BR-03 — Output đúng schema trước semantic validation
+
+BR-03c.3: Codex thực hiện, reviewer chủ repo chưa review, nhánh `codex/br-03c-m06-boundary`; [M06 boundary/evidence](../architecture/M06-JSON-BOUNDARY.md). #29 đã review và merge `7a0f6c4`, 4/4 checks PASS trên head `50f3200`; tests/vet M03–M11 PASS. M06 chỉ schema/profile/normalizer offline, không thay BR-13/14. Các trạng thái chờ review trước đó bên dưới là lịch sử.
 
 BR-03c.2: Codex thực hiện, reviewer chủ repo chưa review, nhánh `codex/br-03c-m05-boundary`; [phạm vi/evidence M05](../architecture/M05-JSON-BOUNDARY.md). Nối raw EvaluationRecord/ImprovementProposal/ReviewRecord và chuỗi M03 vào CLI chỉ đọc; không apply/persist. BR-03c.1 đã merge `d89a04c` sau review, giải quyết conflict kế hoạch với #27 và chạy lại tests/vet/validators; 4/4 checks PASS trên head `1f4c5bc`. #27 merge trước tại `09a2f50`. Những đoạn chờ review/merge trước đó là lịch sử.
 

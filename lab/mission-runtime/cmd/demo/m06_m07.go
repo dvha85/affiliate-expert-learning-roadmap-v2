@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/url"
 	"strings"
 	"time"
@@ -18,13 +19,20 @@ func EvaluateWatchRequest(r WatchRequest) string {
 	current:=contentHash(r.Body); if r.PreviousHash=="" { return "NEW" }; if r.PreviousHash==current { return "UNCHANGED" }; return "CHANGED"
 }
 
-type CanonicalObservation struct { ObservationID string `json:"observation_id"`; SubjectID string `json:"subject_id"`; SourceURL string `json:"source_url"`; ObservedAt string `json:"observed_at"`; AccessMethod string `json:"access_method"`; EvidenceKind string `json:"evidence_kind"`; ClaimKind string `json:"claim_kind"`; State string `json:"state"`; Limitation string `json:"limitation"`; CorrelationID string `json:"correlation_id"`; ContentHash string `json:"content_hash"` }
+type CanonicalObservation struct { ObservationID string `json:"observation_id"`; SubjectID string `json:"subject_id"`; SourceURL string `json:"source_url"`; ObservedAt string `json:"observed_at"`; AccessMethod string `json:"access_method"`; EvidenceKind string `json:"evidence_kind"`; UseContext string `json:"use_context"`; ClaimKind string `json:"claim_kind"`; State string `json:"state"`; Limitation string `json:"limitation"`; CorrelationID string `json:"correlation_id"`; ContentHash string `json:"content_hash"` }
 func NormalizeWatchObservation(r WatchRequest, subjectID string) (CanonicalObservation,string) {
 	state:=EvaluateWatchRequest(r); if state=="REJECT_WRITE_METHOD" || state=="REJECT_SOURCE" || state==missionInvalid { return CanonicalObservation{},state }
 	if strings.TrimSpace(subjectID)=="" { return CanonicalObservation{},missionInvalid }
 	hash:=contentHash(r.Body)
-	observationID:="obs-"+subjectID+"-"+r.CorrelationID+"-"+hash[:12]
-	return CanonicalObservation{ObservationID:observationID,SubjectID:subjectID,SourceURL:r.URL,ObservedAt:r.ObservedAt,AccessMethod:strings.ToUpper(r.Method),EvidenceKind:"real",ClaimKind:"fact",State:"observed",Limitation:"public read-only source; content hash detects change, not business truth",CorrelationID:r.CorrelationID,ContentHash:hash},state
+	method:=strings.ToUpper(strings.TrimSpace(r.Method))
+	at,_:=time.Parse(time.RFC3339,r.ObservedAt)
+	identity,_:=json.Marshal([]string{subjectID,r.URL,at.UTC().Format(time.RFC3339Nano),method,r.CorrelationID,hash})
+	observationID:="obs-"+contentHash(string(identity))
+	o:=CanonicalObservation{ObservationID:observationID,SubjectID:subjectID,SourceURL:r.URL,ObservedAt:r.ObservedAt,AccessMethod:method,EvidenceKind:"synthetic",UseContext:"test",ClaimKind:"fact",State:"observed",Limitation:"offline supplied response fixture; no network fetch or business truth verified; content hash only",CorrelationID:r.CorrelationID,ContentHash:hash}
+	if method=="HEAD" || strings.TrimSpace(r.Body)=="" { o.ClaimKind="unknown";o.State="missing" }
+	raw,err:=json.Marshal(o)
+	if err!=nil || ValidateM06Observation(raw)!=missionValid { return CanonicalObservation{},"INVALID_SCHEMA" }
+	return o,state
 }
 
 type ToolSpec struct { Name string `json:"name"`; ReadOnly bool `json:"read_only"`; AllowedMethods []string `json:"allowed_methods"`; AllowedHosts []string `json:"allowed_hosts"` }

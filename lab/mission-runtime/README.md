@@ -27,6 +27,10 @@ M03 có lệnh riêng `go run ./cmd/demo m03-check testdata/m03-action.json test
 
 M05 có lệnh chỉ đọc kiểm 5 file: [m05-check và bài tập](../../docs/architecture/M05-JSON-BOUNDARY.md). Schema-first, giữ liên kết/timeline, không apply proposal; result VALID không có nghĩa review APPROVE hoặc execution authorized.
 
+## Kiểm Observation offline (BR-03c.3)
+
+M06 có [m06-check](../../docs/architecture/M06-JSON-BOUNDARY.md) cho response fixture offline. Normalizer xuất synthetic/test và kiểm Observation schema; không fetch hoặc persist. Không dùng nhãn real của output harness cũ làm bằng chứng nguồn thật.
+
 ## Kiểm AdvisorOutput từ file (BR-03a)
 
 Từ thư mục `lab/mission-runtime`, chạy fixture không cần API key:
