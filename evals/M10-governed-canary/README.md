@@ -1,5 +1,7 @@
 # Eval M10 — Governed Canary (canary có quản trị)
 
+Chạy `go test ./cmd/demo -run TestM10Chain -count=1` từ mission-runtime để kiểm [chain audit](../../docs/architecture/M10-CHAIN-AUDIT.md), gồm trường hợp từng file hợp lệ nhưng chain sai. Không thay trusted runtime hoặc E5 evidence.
+
 BR-03c.7 thêm [raw artifact tests và giới hạn](../../docs/architecture/M10-JSON-BOUNDARY.md). PASS từng file không thay eval gate, trusted ledger, hoặc live evidence.
 
 Eval này kiểm deterministic gate (cổng tất định) trước bounded auto-action (hành động tự động bị giới hạn).
