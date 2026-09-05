@@ -1,7 +1,7 @@
 # BR-04 — Đặc tả MVP Affiliate Intelligence Bot
 
-- Trạng thái: IN_REVIEW — đặc tả mục tiêu, không tuyên bố MVP đã được triển khai đầy đủ.
-- Người thực hiện: Codex. Reviewer: chủ repo, chờ review.
+- Trạng thái: chủ repo đã yêu cầu merge PR #23 — đặc tả mục tiêu, không tuyên bố MVP đã được triển khai đầy đủ.
+- Người thực hiện: Codex. Người yêu cầu merge đặc tả: chủ repo.
 - Quyết định đầu vào: chủ repo xác nhận **chưa có chương trình affiliate**. Phiên bản này dùng fixture trung lập; chưa chọn chương trình, kênh đăng, tài khoản hay API.
 - Case tham chiếu: giá đỡ laptop cho người làm việc tại nhà. Các offer, giá và chỉ số mẫu bên dưới đều giả lập, không phải tư vấn mua hàng hoặc nguồn thu dự kiến.
 - Thứ tự học, evidence và authority tuân theo [CURRICULUM](../../CURRICULUM.md); theo dõi triển khai tại [kế hoạch BR](../plans/BEGINNER-READINESS-PLAN.md).

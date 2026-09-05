@@ -1,0 +1,8 @@
+{
+  "state": "ADVISE",
+  "recommendation": "Thu thập thêm bằng chứng chuyển đổi trước khi quyết định.",
+  "reason": "Fixture chỉ cho biết giá, chưa chứng minh khả năng chuyển đổi.",
+  "evidence_ids": ["synthetic-price-1"],
+  "unknowns": ["Tỷ lệ chuyển đổi thực tế"],
+  "write_tool_requested": false
+}

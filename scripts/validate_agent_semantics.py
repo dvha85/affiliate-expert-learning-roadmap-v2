@@ -42,7 +42,7 @@ for mid in ["M03", "M05", "M08", "M09", "M10"]:
 
 runtime = "\n".join(
     (ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8")
-    for name in ["m03_m05.go", "m06_m07.go", "m08.go", "m08_compat.go", "m09.go", "m10.go", "trusted_cost_bound.go"]
+    for name in ["m03_m05.go", "advisor_boundary.go", "m06_m07.go", "m08.go", "m08_compat.go", "m09.go", "m10.go", "trusted_cost_bound.go"]
 )
 for marker in [
     "DRY_RUN_ONLY", "BROKEN_LINK", "REJECT_MACHINE_EXECUTION", "REJECT_WRITE_REQUEST", "ABSTAIN_FUTURE", "REJECT_AUTO_APPLY",
