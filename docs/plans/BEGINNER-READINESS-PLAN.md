@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-01 đã triển khai, đang chờ review; các item còn lại chưa triển khai.
+- Trạng thái: IN_PROGRESS — BR-01 đã merge; BR-02 đã triển khai, đang chờ review; các item còn lại chưa triển khai.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -66,8 +66,8 @@ Quy mô S/M/L chỉ là ước lượng tương đối để chia PR: S một ph
 
 | ID | Đợt | Đầu việc | Ưu tiên / quy mô | Phụ thuộc | Trạng thái | Người thực hiện / PR / evidence |
 |---|---|---|---|---|---|---|
-| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20); [evidence](#br-01--bằng-chứng-triển-khai) |
-| BR-02 | A | Sửa measurement window M03 | P1 / S | — | TODO | Chưa phân công |
+| BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
+| BR-02 | A | Sửa measurement window M03 | P1 / S | — | IN_REVIEW | Codex; reviewer: chủ repo (chờ review); [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21); [evidence](#br-02--bằng-chứng-triển-khai) |
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | TODO | Chưa phân công |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | TODO | Chưa phân công |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | TODO | Chưa phân công |
@@ -104,7 +104,7 @@ Nghiệm thu: 8 validator chạy độc lập đều exit 0; template action non
 
 #### BR-01 — Bằng chứng triển khai
 
-- Ngày: 05/09/2026. Người thực hiện: Codex. Reviewer: chủ repo, chưa review.
+- Ngày: 05/09/2026. Người thực hiện: Codex. Chủ repo đã yêu cầu merge BR-01; PR #20 merge tại `b17748a501736dcdfed6e2b8abb44e00115d40d6`, cả 4 checks PASS trên head `b86f60f` trước merge.
 - PR triển khai: [#20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20), nhánh `codex/br-01-ci-contract-alignment`; commit code/tests: `4eb51e0adca0753836ea83f78837ac6ee6b99fc0`. Trạng thái CI theo từng commit xem tại [Checks của PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20/checks).
 - Baseline: `8db79ebff7fa275329d5b8dae3923171db42fdac` (main sau PR #19). Chạy lại tại local: 7/8 validator exit 0; `validate_artifact_spine.py` exit 1 vì marker ``action: `null` `` không nhận key được bọc backtick. CI PR #19: job `structure-language-and-foundations` lỗi ở validator này, ba job còn lại PASS.
 - Sau sửa tại local (Python 3.9.6): cả 8 validator exit 0; 10 regression tests PASS; `git diff --check` exit 0. Kết quả GitHub Actions của PR triển khai cần kiểm riêng, không suy từ local PASS.
@@ -119,13 +119,24 @@ Nghiệm thu: 8 validator chạy độc lập đều exit 0; template action non
 
 Liên quan phát hiện 6.
 
-- [ ] Quy định rõ dữ liệu tạm thời/PENDING khác với kết luận chốt của một cửa sổ đo.
-- [ ] Thêm ca hồi quy: action 03/09 10:00, window end 10/09 10:00, kết luận NO_OBSERVED_OUTCOME lúc 03/09 11:00 phải bị từ chối hoặc giữ PENDING.
-- [ ] Kiểm mốc đúng bằng window end, sau window, trước action và timestamp khác timezone.
-- [ ] Sửa `ValidateActionOutcomeLink`, eval M03, schema nếu cần và bài M03.2/M03.3 nhất quán.
-- [ ] Nêu rõ cách bổ sung record khi báo cáo đến muộn, tránh overwrite bằng chứng cũ.
+- [x] Quy định rõ dữ liệu tạm thời/PENDING khác với kết luận chốt của một cửa sổ đo.
+- [x] Thêm ca hồi quy: action 03/09 10:00, window end 10/09 10:00, kết luận NO_OBSERVED_OUTCOME lúc 03/09 11:00 phải bị từ chối hoặc giữ PENDING.
+- [x] Kiểm mốc đúng bằng window end, sau window, trước action và timestamp khác timezone.
+- [x] Sửa `ValidateActionOutcomeLink`, eval M03, schema nếu cần và bài M03.2/M03.3 nhất quán.
+- [x] Nêu rõ cách bổ sung record khi báo cáo đến muộn, tránh overwrite bằng chứng cũ.
 
 Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regression; số 0 sau một cửa sổ đo hợp lệ vẫn được nhận; tài liệu không buộc mọi observation tạm thời phải chờ nếu contract đã cho phép PENDING.
+
+#### BR-02 — Bằng chứng triển khai
+
+- Người thực hiện: Codex; reviewer: chủ repo, chờ review. Baseline: main `b17748a501736dcdfed6e2b8abb44e00115d40d6`.
+- PR triển khai: [#21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21), nhánh `codex/br-02-measurement-window`; commit code/tests `159d336fc770cbc07d84fcbc811f5c709fe9781c`. Trạng thái CI theo từng commit xem tại [Checks của PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21/checks); không suy CI PASS từ kết quả local.
+- Red/green: thêm `TestM03MeasurementWindow` trước khi sửa runtime; 3 subtest (`early_zero_regression`, `just_before_end`, `early_utc`) FAIL vì nhận VALID thay vì MEASUREMENT_WINDOW_OPEN. Sau sửa cả 19 subtest PASS; thêm `TestM05RejectsPrematureNoOutcome` để chứng minh evaluation không nhận kết luận số 0 quá sớm, nhưng vẫn nhận số 0 tại end.
+- Eval M03 thêm E08–E15 (8 case, tổng 15); các case cũ không bị bỏ hoặc nới expected. Quy tắc mới chỉ chặn `NO_OBSERVED_OUTCOME` trước end; giữ quan sát tạm/giao dịch hợp lệ. So sánh timestamp bằng `time.Time`, nhận đúng bằng end và offset tương đương.
+- Kiểm tại local: `go test ./...` và `go vet ./...` trong cả `lab/mission-runtime` và `lab/affiliate-bot`; 8 Python validator và 10 Python regression tests; `git diff --check`. Tất cả exit 0 (affiliate-bot chạy lại với GOCACHE tạm vì cache mặc định bị sandbox chặn). Lệnh chạy riêng: `go test ./cmd/demo -run 'TestM03(MeasurementWindow|EvalPack)|TestM05RejectsPrematureNoOutcome' -v`.
+- Đồng bộ runtime, eval, annotation schema status, bài M03.2/M03.3, mission và starter/checkpoints/evidence template. Không đổi JSON shape/enum; schema đơn lẻ không thể so sánh với ActionRecord nên runtime thực thi điều kiện cross-record.
+- Giới hạn: không thêm store/CLI nhập dữ liệu, không cưỡng chế append-only, không claim kết quả kinh doanh hay Operated PASS. Hướng dẫn record bổ sung và chọn snapshot nằm trong M03.2; BR-03/BR-10 vẫn chưa triển khai. Không đổi quyền machine execution.
+- Rollback: revert PR BR-02 nếu được merge; lưu ý việc đó đưa lỗi kết luận sớm trở lại.
 
 ### BR-03 — Output đúng schema trước semantic validation
 
@@ -465,5 +476,6 @@ BR-04 có thể được chốt song song với ba PR này. Sau đó mới chố
 |---|---|---|
 | 05/09/2026 | Lập kế hoạch 6 đợt, 19 đầu việc, mapping toàn bộ review | Review tại commit 7d2a3ab; các item triển khai đều TODO |
 | 05/09/2026 | Triển khai BR-01, chuyển IN_REVIEW; 18 item còn lại TODO | [Bằng chứng BR-01](#br-01--bằng-chứng-triển-khai); chờ human review |
+| 05/09/2026 | Ghi nhận BR-01 DONE theo yêu cầu merge của chủ repo; triển khai BR-02 IN_REVIEW; 17 item còn lại TODO | PR #20 đã merge; [bằng chứng BR-02](#br-02--bằng-chứng-triển-khai) |
 
 Việc commit kế hoạch không có nghĩa các lỗi đã sửa hoặc Mission của học viên đã PASS.
