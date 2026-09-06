@@ -326,6 +326,8 @@ Nghiệm thu: packet → input → history → quyết định resolve được 
 
 ### BR-10 — M03 action/outcome importer vào bot
 
+BR-10a triển khai chờ review: [action store riêng và CLI record/list](../architecture/BR-10A-ACTION-STORE.md), resolve exact decision trong history/replay MATCH; fixture synthetic, không execution. Tests duplicate/conflict/orphan/path alias/corrupt store và restart smoke. BR-10 chưa DONE; outcome import/linkage và nghiệm thu tổng thể còn mở.
+
 Liên quan phát hiện 1, 2, 6.
 
 - [ ] Lệnh ghi ActionRecord chỉ nhận decision_id tồn tại; phân biệt human record với machine execution.
