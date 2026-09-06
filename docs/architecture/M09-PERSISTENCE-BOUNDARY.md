@@ -1,5 +1,7 @@
 # BR-03d.1 — Bảo vệ persistence M09
 
+IN_REVIEW: [PR #39](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/39), commit triển khai `b04db90`. [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/39/checks). Chưa merge.
+
 Evidence local: tests/vet ba module, 8 Python validators, 10 Python regressions và diff check PASS. CI cần xác nhận theo head PR riêng.
 
 #38 đã review/merge `0744f6a`, tests/vet mission-runtime và CI 4/4 PASS trên head `74bec6e`. Phần này sửa trực tiếp LoadM09State/PersistM09State, không chỉ thêm CLI audit.
