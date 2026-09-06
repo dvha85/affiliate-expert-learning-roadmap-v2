@@ -1,8 +1,8 @@
-# Shared core — BR-08b
+# Shared core — BR-08 / BR-09
 
-IN_REVIEW tại [PR #48](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/48), commit triển khai `5f85472`. Chưa merge; BR-08 tổng thể còn mở.
+BR-08 đã nghiệm thu scoped sau #47–#51. BR-09 bổ sung `m00.Convert` và `m00.SourceFields`: chuyển packet JSON thành M02 input, kiểm lại projection/provenance, không I/O trong core. [Mapping và giới hạn](../examples/m00-import/README.md); BR-09 còn chờ review.
 
-Module import được từ harness và learner, hiện chỉ có `m03`. Implementation được chuyển từ cmd/demo, không có bản sao validation thứ hai. Package m03 nhận bytes/types, không đọc file, gọi clock, ghi store hoặc gọi executor. contracts vẫn là nguồn schema.
+Module import được từ harness và learner, có `m00` và `m03`. Implementation M03 được chuyển từ cmd/demo, không có bản sao validation thứ hai. Package m03 nhận bytes/types, không đọc file, gọi clock, ghi store hoặc gọi executor. contracts vẫn là nguồn schema.
 
 API: HumanActionRecord, EffectRef, OutcomeRecord; ValidateHumanActionRecord, ValidateEffectRef, ValidateOutcomeRecord, ValidateActionOutcomeLink; DecodeM03Action, DecodeM03Outcome, CheckM03Pair. Status giữ tương thích. VALID là schema/semantic của pair, không resolve decision store hoặc cấp quyền.
 

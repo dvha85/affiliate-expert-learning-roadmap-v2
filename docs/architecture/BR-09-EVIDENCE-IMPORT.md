@@ -24,6 +24,8 @@ V1 chỉ price/commission_rate, hai field bắt buộc khai báo kể cả missi
 
 Các kiểm thử local PASS ngày 2026-09-06: tests/vet bốn module, smoke BR-08/BR-09, 8 validators và 10 Python regressions. CI thêm smoke BR-09 ở deterministic-runtime. Bằng chứng này là synthetic lab, không là pilot học viên, E1 hoặc readiness vận hành.
 
+Kiểm lại snapshot `c2266fc` bằng clone local độc lập `git clone --no-local`: cùng toàn bộ checks trên PASS; git status trống trước/sau. Dùng toolchain/cache sẵn có, không là cold install hoặc clone remote trên máy học viên. Sau snapshot chỉ đồng bộ README/evidence.
+
 ## Giới hạn còn lại
 
 Review/merge BR-09 trước khi đóng checklist. Không fetch account/program, không gom nguồn mâu thuẫn tự động, không migrate store, không trusted clock/đa writer/crash-safe persistence, không mở live execution. BR-10 mới liên kết/persist action/outcome. BR-06b vẫn chờ chương trình/kênh thật.
