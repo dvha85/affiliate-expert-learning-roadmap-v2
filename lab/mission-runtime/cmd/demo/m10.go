@@ -406,14 +406,19 @@ func canaryLockPath(dir, grantID, version string) string {
 	sum := sha256.Sum256([]byte("lock\x00" + grantID + "\x00" + version)); return filepath.Join(dir, "canary-lock-"+hex.EncodeToString(sum[:]))
 }
 func persistCanaryLedger(path string, ledger CanaryLedger) error {
-	b, err := json.MarshalIndent(ledger, "", "  "); if err != nil { return err }
+	b, err := encodeCanaryLedger(ledger); if err != nil { return err }
 	tmp := path + ".tmp"; if err = os.WriteFile(tmp, b, 0600); err != nil { return err }; return os.Rename(tmp, path)
 }
-func loadExistingCanaryLedger(path string) (CanaryLedger, error) {
-	var ledger CanaryLedger; b, err := os.ReadFile(path); if err != nil { return ledger, err }; err = json.Unmarshal(b, &ledger); return ledger, err
+func loadExistingCanaryLedger(path string, grant CanaryGrant) (CanaryLedger, error) {
+	b, err := os.ReadFile(path); if err != nil { return CanaryLedger{}, err }
+	ledger, err := decodeCanaryLedger(b); if err != nil { return CanaryLedger{}, err }
+	if ledger.GrantID != grant.GrantID || ledger.GrantVersion != grant.GrantVersion || ledger.GrantHash != grant.GrantHash { return CanaryLedger{}, errors.New("M10 ledger grant binding mismatch") }
+	return ledger, nil
 }
 func ensureInitialCanaryLedger(path string, ledger CanaryLedger) error {
-	b, err := json.MarshalIndent(ledger, "", "  "); if err != nil { return err }
+	b, err := encodeCanaryLedger(ledger); if err != nil { return err }
+	if ledger.ExecutionsTotal != 0 || ledger.ExecutionsInWindow != 0 || ledger.CostMinorTotal != 0 || ledger.PendingOutcomes != 0 || len(ledger.PendingExecutionIDs) != 0 || len(ledger.SuccessfulIdempotencyKeys) != 0 || len(ledger.OutcomeLinks) != 0 || ledger.ReconciliationRequired || ledger.LastExecutionAt != "" { return errors.New("M10 initial ledger must be empty") }
+	if err = reserveCanaryInitialization(path); err != nil { return err }
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600); if err != nil { return err }
 	if _, err = f.Write(b); err != nil { _ = f.Close(); return err }; if err = f.Sync(); err != nil { _ = f.Close(); return err }; return f.Close()
 }
@@ -442,13 +447,14 @@ func ExecuteCanaryLocalSandbox(state *M10State, auth CanaryExecutionAuthorizatio
 	_ = lock.Close(); defer os.Remove(lockPath)
 
 	ledgerPath := canaryLedgerPath(dir, state.Grant.GrantID, state.Grant.GrantVersion)
-	ledger, err := loadExistingCanaryLedger(ledgerPath)
+	ledger, err := loadExistingCanaryLedger(ledgerPath, state.Grant)
 	if os.IsNotExist(err) {
+		if state.Ledger.GrantID != state.Grant.GrantID || state.Ledger.GrantVersion != state.Grant.GrantVersion || state.Ledger.GrantHash != state.Grant.GrantHash { return CanaryExecutionRecord{}, "WAIT_RECONCILIATION" }
 		if state.Ledger.ExecutionsTotal != 0 || state.Ledger.ExecutionsInWindow != 0 || state.Ledger.CostMinorTotal != 0 || state.Ledger.PendingOutcomes != 0 ||
 			len(state.Ledger.SuccessfulIdempotencyKeys) != 0 || len(state.Ledger.PendingExecutionIDs) != 0 || len(state.Ledger.OutcomeLinks) != 0 || state.Ledger.ReconciliationRequired {
 			return CanaryExecutionRecord{}, "WAIT_LEDGER_MISSING"
 		}
-		if err = ensureInitialCanaryLedger(ledgerPath, state.Ledger); err != nil { return CanaryExecutionRecord{}, "WAIT_RECONCILIATION" }
+		if err = ensureInitialCanaryLedger(ledgerPath, state.Ledger); err != nil { if os.IsExist(err) { return CanaryExecutionRecord{}, "WAIT_LEDGER_MISSING" }; return CanaryExecutionRecord{}, "WAIT_RECONCILIATION" }
 		ledger = state.Ledger
 	} else if err != nil { return CanaryExecutionRecord{}, "WAIT_RECONCILIATION" }
 	state.Ledger = ledger
@@ -506,7 +512,7 @@ func RecordCanaryOutcome(state *M10State, dir, outcomeID, executionID, observedA
 	lock, err := os.OpenFile(lockPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600); if err != nil { return "WAIT_CANARY_LOCK" }
 	_ = lock.Close(); defer os.Remove(lockPath)
 	ledgerPath := canaryLedgerPath(dir, state.Grant.GrantID, state.Grant.GrantVersion)
-	ledger, err := loadExistingCanaryLedger(ledgerPath); if err != nil || ledger.ReconciliationRequired || ledger.PendingOutcomes < 1 { return "WAIT_RECONCILIATION" }
+	ledger, err := loadExistingCanaryLedger(ledgerPath, state.Grant); if err != nil || ledger.ReconciliationRequired || ledger.PendingOutcomes < 1 { return "WAIT_RECONCILIATION" }
 	if ledger.GrantHash != state.Grant.GrantHash { return "WAIT_RECONCILIATION" }
 	for _, link := range ledger.OutcomeLinks { if link.OutcomeID == outcomeID { return "DUPLICATE_OUTCOME" } }
 	idx := -1; for i, id := range ledger.PendingExecutionIDs { if id == executionID { idx = i; break } }
