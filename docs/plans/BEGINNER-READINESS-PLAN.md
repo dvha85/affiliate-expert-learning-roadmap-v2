@@ -278,6 +278,8 @@ Smoke bài tập trong bản sao tạm riêng: bài A đổi valid_orders từ 0
 
 ### BR-08 — Shared core, entrypoint và quyền sở hữu state
 
+BR-08b đã review/merge #48 `56a1ccf`. BR-08c [learner action validate](../architecture/BR-08C-ACTION-CLI.md) triển khai trên `codex/br-08c-action-validate`, chờ review; chỉ file-read/core, giữ legacy CLI. BR-08d/e còn TODO, item cha chưa DONE.
+
 BR-08a đã review/merge #47 `8ecd60a`, ADR-003 Accepted. BR-08b: [core/m03](../../core/README.md) đã extract types/decode/validation; harness giữ wrappers/aliases, eval expected không đổi; tests/vet bốn module với GOWORK=off, 8 validators và 10 Python regressions PASS. Chưa thêm learner CLI/store, chưa merge BR-08b; BR-08c–e vẫn TODO.
 
 BR-08a: Codex khảo sát baseline `8c7c86d`, [ADR-003](../architecture/ADR-003-SHARED-CORE-CLI-STORE.md) đề xuất module core riêng, extract M03 trước, giữ history M02 và CLI cũ. ADR đang Proposed/chờ review; chưa đánh dấu checklist thiết kế Accepted hoặc BR-08 DONE. Lộ trình BR-08b–e và tiêu chí nghiệm thu ở ADR; mọi lệnh mới chỉ là đề xuất.

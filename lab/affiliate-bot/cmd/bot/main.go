@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/app"
 	"os"
 	"sort"
 	"strings"
@@ -233,6 +234,9 @@ func runHistory(args []string) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "action" {
+		os.Exit(app.RunAction(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	var err error
 	if len(os.Args) > 1 && os.Args[1] == "history" {
 		err = runHistory(os.Args[1:])
