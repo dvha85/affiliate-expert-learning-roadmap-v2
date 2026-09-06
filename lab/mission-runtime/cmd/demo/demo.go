@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,5 +21,5 @@ func runMissionDemo(args []string) error {
 	case "M10": r,e:=demoM10();if e!=nil{return e};result=r
 	case "M11": r,e:=demoM11();if e!=nil{return e};result=r
 	default:return fmt.Errorf("unknown mission %s",id)}
-	b,e:=json.MarshalIndent(missionDemoEnvelope{id,result},"","  ");if e!=nil{return e};fmt.Println(string(b));return nil
+	b,e:=marshalMissionDemo(id,result);if e!=nil{return e};fmt.Println(string(b));return nil
 }
