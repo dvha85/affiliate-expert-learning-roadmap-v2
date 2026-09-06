@@ -17,9 +17,16 @@ type History interface {
 
 type JSONL struct{}
 
+// MaxHistoryRecordBytes is the JSON payload limit, excluding LF/CRLF framing.
+// Reader and writer share this bound; rejection occurs before opening a file.
+const MaxHistoryRecordBytes = 1 << 20
+
 func (JSONL) Open(path string) (io.ReadCloser, error) { return os.Open(path) }
 
 func (JSONL) AppendLine(path string, record []byte) error {
+	if len(record) > MaxHistoryRecordBytes {
+		return fmt.Errorf("history record exceeds %d bytes", MaxHistoryRecordBytes)
+	}
 	if len(record) == 0 || bytes.ContainsAny(record, "\r\n") {
 		return fmt.Errorf("history record must be one nonempty JSON line")
 	}

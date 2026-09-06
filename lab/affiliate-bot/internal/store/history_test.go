@@ -30,7 +30,7 @@ func TestJSONLAppendAndRead(t *testing.T) {
 	if string(b) != "{\"id\":\"one\"}\n{\"id\":\"two\"}\n" || string(record) != `{"id":"one"}` {
 		t.Fatal(string(b))
 	}
-	for _, bad := range [][]byte{nil, []byte("{}\n{}"), []byte("{}\r")} {
+	for _, bad := range [][]byte{nil, []byte("{}\n{}"), []byte("{}\r"), bytes.Repeat([]byte("x"), MaxHistoryRecordBytes+1)} {
 		if e = s.AppendLine(p, bad); e == nil {
 			t.Fatal("accepted invalid frame")
 		}
@@ -38,6 +38,16 @@ func TestJSONLAppendAndRead(t *testing.T) {
 	after, _ := os.ReadFile(p)
 	if !bytes.Equal(b, after) {
 		t.Fatal("rejected frame changed file")
+	}
+}
+
+func TestOversizedRecordDoesNotCreateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.jsonl")
+	if err := (JSONL{}).AppendLine(path, bytes.Repeat([]byte("x"), MaxHistoryRecordBytes+1)); err == nil {
+		t.Fatal("oversize accepted")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("file created", err)
 	}
 }
 

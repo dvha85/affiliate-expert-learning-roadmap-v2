@@ -30,4 +30,10 @@ Kiểm lại snapshot `c2266fc` bằng clone local độc lập `git clone --no-
 
 ## Giới hạn còn lại
 
+### Sửa findings review #52
+
+- P1: reader Scanner mặc định 64 KiB không đọc lại dòng 80.103 byte dù capture đã APPENDED. Đã thống nhất `store.MaxHistoryRecordBytes=1<<20`, reader cấp chỗ cho payload + CRLF và kiểm payload; application/store chặn quá giới hạn trước ghi. Không nâng thành unbounded reader hoặc sửa history cũ.
+- P2: timestamp cùng instant khác timezone được chọn theo thứ tự đầu vào, trong khi provenance sắp field; tính lại projection bị lệch. Đã thêm tie-break từ điển cho equal instant, giữ nguyên timestamp nguồn.
+- Regression đã FAIL trước sửa: timezone self-validation; 40 sản phẩm load lỗi token too long; oversized append được chấp nhận. Sau sửa tests kiểm permutation, source timestamps, 40-product capture/load/replay/duplicate, không ghi khi oversize, giới hạn -1/đúng/+1 với LF/CRLF/no newline đều PASS. Giới hạn 1 MiB là chính sách lab tường minh, không thay schema/hash/formula.
+
 Review/merge BR-09 trước khi đóng checklist. Không fetch account/program, không gom nguồn mâu thuẫn tự động, không migrate store, không trusted clock/đa writer/crash-safe persistence, không mở live execution. BR-10 mới liên kết/persist action/outcome. BR-06b vẫn chờ chương trình/kênh thật.

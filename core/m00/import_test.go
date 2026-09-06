@@ -3,6 +3,7 @@ package m00
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,30 @@ func fixture(t *testing.T) Packet {
 		t.Fatal(e)
 	}
 	return p
+}
+
+func TestEqualInstantTimezonePermutation(t *testing.T) {
+	p := fixture(t)
+	p.Products[0].Fields[1].ObservedAt = "2026-09-02T07:00:00+07:00"
+	raw, _ := json.Marshal(p)
+	first, err := Convert(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(first[0])
+	fields, err := SourceFields(encoded)
+	if err != nil {
+		t.Fatal("own output rejected", err)
+	}
+	if fields[0].ObservedAt != "2026-09-02T07:00:00+07:00" || fields[1].ObservedAt != "2026-09-02T00:00:00Z" {
+		t.Fatal("source timestamps changed", fields)
+	}
+	p.Products[0].Fields[0], p.Products[0].Fields[1] = p.Products[0].Fields[1], p.Products[0].Fields[0]
+	raw, _ = json.Marshal(p)
+	second, err := Convert(raw)
+	if err != nil || !reflect.DeepEqual(first, second) {
+		t.Fatal("order dependent", err)
+	}
 }
 
 func TestNumericProjectionDoesNotRewriteEvidence(t *testing.T) {

@@ -290,10 +290,15 @@ func loadHistoryWith(storage store.History, path string) ([]HistoryRecord, error
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	// Allow the full payload plus CRLF framing, with an explicit payload check.
+	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	var records []HistoryRecord
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
+		if len(scanner.Bytes()) > store.MaxHistoryRecordBytes {
+			return nil, fmt.Errorf("history line %d exceeds %d bytes", lineNumber, store.MaxHistoryRecordBytes)
+		}
 		raw := strings.TrimSpace(scanner.Text())
 		if raw == "" {
 			return nil, fmt.Errorf("history line %d is empty", lineNumber)
@@ -332,6 +337,13 @@ func AppendHistory(path string, record HistoryRecord) (string, error) {
 func appendHistoryWith(storage store.History, path string, record HistoryRecord) (string, error) {
 	if err := validateHistoryRecord(record); err != nil {
 		return "", err
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return "", err
+	}
+	if len(encoded) > store.MaxHistoryRecordBytes {
+		return "", fmt.Errorf("history record exceeds %d bytes", store.MaxHistoryRecordBytes)
 	}
 	existing, err := loadHistoryWith(storage, path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -378,10 +390,6 @@ func appendHistoryWith(storage store.History, path string, record HistoryRecord)
 		}
 	}
 
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return "", err
-	}
 	if err := storage.AppendLine(path, encoded); err != nil {
 		return "", err
 	}

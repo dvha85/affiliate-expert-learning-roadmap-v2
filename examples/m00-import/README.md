@@ -23,6 +23,10 @@ V1 yêu cầu ghi rõ hai field, kể cả khi thiếu: dùng state=missing, cla
 
 Numeric literal tối đa 128 ký tự, exponent trong [-400, 400]; số không giữ được nghĩa thập phân qua float64 M02 bị từ chối, kể cả underflow. Đây là giới hạn profile, không làm tròn evidence để tiếp tục.
 
+History dùng giới hạn chung 1 MiB (1.048.576 byte) cho mỗi JSON record, không tính LF/CRLF. Capture từ chối record lớn hơn trước khi ghi, không tạo file mới hay sửa history có sẵn; chia packet theo nhóm sản phẩm nhỏ hơn với record ID riêng khi cần. Import VALID chỉ xác nhận phép chuyển đổi, không hứa mọi artifact vừa giới hạn persistence. Reader hỗ trợ record đến đúng giới hạn, kể cả dòng cuối không newline. Không tự sửa/truncate file cũ vượt giới hạn.
+
+Khi timestamp hai field biểu diễn cùng thời điểm, aggregate chọn chuỗi RFC3339 nhỏ nhất theo thứ tự từ điển để không phụ thuộc thứ tự field; timestamp từng nguồn vẫn giữ nguyên trong provenance. Quy tắc này không chuyển timezone nguồn hoặc thay freshness.
+
 History giữ nguyên JSONL/hash/formula cũ; provenance nằm trong trường transformation đã có và được hash. Khi capture, projection import được tính lại để phát hiện lệch provenance. Reuse aggregate ID hoặc source field ID với nội dung khác bị CONFLICT; lần quan sát t2 phải có ID mới. DecisionPacket.evidence_ids trỏ tới aggregate tồn tại trong history; mở transformation JSON để resolve tiếp exact IDs từng field. Không giả vờ DecisionPacket trỏ trực tiếp raw field IDs.
 
 ## Thực hành t1/t2, restart, quyết định

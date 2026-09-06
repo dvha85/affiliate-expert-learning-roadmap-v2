@@ -194,7 +194,9 @@ func Convert(raw []byte) ([]map[string]any, error) {
 			if err != nil {
 				return nil, err
 			}
-			if latest == "" || instant.After(latestTime) {
+			// Equal instants can have different RFC3339 spellings. Use a stable
+			// tie-break so sorting provenance cannot change our own projection.
+			if latest == "" || instant.After(latestTime) || (instant.Equal(latestTime) && f.ObservedAt < latest) {
 				latest, latestTime = f.ObservedAt, instant
 			}
 			if f.Value != nil && (*f.Value < 0 || (f.Field == "commission_rate" && *f.Value > 1)) {
