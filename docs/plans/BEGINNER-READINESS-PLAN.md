@@ -144,6 +144,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 ### BR-03 — Output đúng schema trước semantic validation
 
+E-01 đã review/merge #44 `1c68ad2`, CI 4/4 PASS. [E-02 ma trận output](../architecture/E-02-OUTPUT-MATRIX.md) bổ sung tests output thật; còn quyết định canonical/diagnostic gate trước khi nghiệm thu E-03. Không dùng PASS của shape tests để claim mọi syscall đã được fault-inject.
+
 Audit BR-03e đã review/merge #43 `28073d8` (CI 4/4 PASS). [E-01 bảo toàn timestamp](../architecture/E-01-TIMESTAMP-PRECISION.md) đang triển khai; E-02 ma trận output và E-03 nghiệm thu còn mở. Các ghi chú chờ review phía dưới là lịch sử.
 
 Trạng thái hiện hành: [BR-03e audit](../architecture/BR-03E-CLOSURE-AUDIT.md) thay các TODO lịch sử bên dưới. d.1–d.4 đã merge. Chưa đóng checklist tổng hợp: cần E-01 precision, E-02 ma trận output thực và E-03 quyết định nghiệm thu; không yêu cầu triển khai live để nghiệm thu schema.
