@@ -2,7 +2,7 @@
 
 Triển khai chờ review; BR-10 chưa DONE. Baseline #53 đã review/merge `765ac70`: tests/vet learner, smoke BR-10a và CI 4/4 PASS, không finding chặn trong scope lab một writer. Không live proof hoặc account affiliate.
 
-PR [#54](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/54), chưa merge. Local tests/vet bốn module, smoke BR-10b, 8 validators và 10 Python regressions PASS.
+PR [#54](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/54) đã review/merge `533cc6f`; CI 4/4, smoke BR-10b và tests/vet learner chạy lại PASS, không finding chặn scope lab. [BR-10c audit](BR-10C-ACCEPTANCE.md) kiểm toàn chain; BR-10 chưa tự DONE.
 
 ## Profile và ownership
 

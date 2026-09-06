@@ -326,6 +326,8 @@ Nghiệm thu: packet → input → history → quyết định resolve được 
 
 ### BR-10 — M03 action/outcome importer vào bot
 
+BR-10c: [audit nghiệm thu toàn chain](../architecture/BR-10C-ACCEPTANCE.md) READY_FOR_REVIEW sau #54 merged `533cc6f`. Smoke bắt đầu từ M00 trong workspace tạm, kiểm decision/action/outcome exact IDs, restart/list/replay, đứt upstream, corruption/alias và payload limit. Chưa chốt BR-10 DONE; importer báo cáo nền tảng chưa có, giữ mở riêng cùng BR-06b. Những ghi chú BR-10b chờ review bên dưới là lịch sử.
+
 Hiện hành: BR-10a #53 đã review/merge `765ac70`. [BR-10b outcome store/import/list](../architecture/BR-10B-OUTCOME-STORE.md) đang triển khai chờ review; canonical JSON synthetic, EffectRef/time/pending/zero/duplicate/conflict/orphan được kiểm. Chưa importer nền tảng/live report, chưa chốt BR-10 DONE. Ghi chú BR-10a chờ review bên dưới là lịch sử.
 
 BR-10a triển khai chờ review: [action store riêng và CLI record/list](../architecture/BR-10A-ACTION-STORE.md), resolve exact decision trong history/replay MATCH; fixture synthetic, không execution. Tests duplicate/conflict/orphan/path alias/corrupt store và restart smoke. BR-10 chưa DONE; outcome import/linkage và nghiệm thu tổng thể còn mở.
