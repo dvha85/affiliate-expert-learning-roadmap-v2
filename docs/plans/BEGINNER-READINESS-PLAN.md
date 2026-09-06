@@ -78,7 +78,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
-| BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | IN_REVIEW | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52), importer và bài thực hành synthetic; chưa nghiệm thu DONE |
+| BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | TODO | Chưa phân công |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | TODO | Chưa phân công |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
@@ -311,16 +311,16 @@ Các tên lệnh dưới đây là **giao diện đề xuất, chưa tồn tại
 
 ### BR-09 — M00 evidence sang M01/M02 có hướng dẫn và converter
 
-Triển khai: [profile, mapping và bài thực hành t1/t2](../../examples/m00-import/README.md), core/m00 và learner evidence import read-only; giữ provenance trong transformation hiện có, không migration. Smoke scripts/smoke_br09.py kiểm input → history → DecisionPacket, restart/replay, source-ID conflict và projection tamper. IN_PROGRESS đến review/merge; checklist nghiệm thu chưa tự đóng. Chỉ synthetic lab, không thay M00 E1 hoặc learner pilot.
+DONE trong phạm vi lab sau review/merge #52 `5fa86b9`. [Profile, mapping và bài thực hành t1/t2](../../examples/m00-import/README.md): core/m00 và learner evidence import read-only; giữ provenance trong transformation hiện có, không migration. Smoke kiểm input → history → DecisionPacket, restart/replay, source-ID conflict và projection tamper. Hai findings kích thước history/timestamp đã sửa với regression FAIL trước/PASS sau tại `27a92ea`; CI 4/4, tests/vet bốn module, smoke BR-08/BR-09, 8 validators và 10 Python tests PASS. [Kết luận review](../architecture/BR-09-EVIDENCE-IMPORT.md). Chỉ JSON profile price/commission và synthetic lab, không thay M00 E1, learner pilot hoặc live proof; BR-06b/BR-10 vẫn mở.
 
 Liên quan phát hiện 8.
 
-- [ ] Thêm một packet mẫu đầy đủ trong khu vực examples mới, có nguồn/gắn nhãn đúng và không lẫn file evidence cá nhân.
-- [ ] Công bố bảng map subject_id/product_id, field claim/value, source/time và dữ liệu domain.
-- [ ] Cung cấp converter/importer; giữ unknown, pending và missing theo semantics, không tự điền commission.
-- [ ] Chỉ rõ khi nào nhiều field observation được nhóm thành product input và provenance từng field được giữ thế nào.
-- [ ] Xuất recorded_result/DecisionPacket qua adapter đã chốt ở BR-03.
-- [ ] Bài thực hành hai lần quan sát t1/t2 và restart/list/replay dùng chính dữ liệu đã nhập.
+- [x] Packet JSON profile mẫu t1/t2 trong examples, gắn nhãn synthetic, không lẫn evidence cá nhân.
+- [x] Bảng map subject_id/product_id, field claim/value, source/time và dữ liệu domain.
+- [x] Converter/importer giữ unknown, pending và missing, không tự điền commission.
+- [x] Quy tắc nhóm price/commission theo product và provenance từng field được ghi rõ.
+- [x] Xuất recorded_result/DecisionPacket qua adapter đã chốt ở BR-03.
+- [x] Bài thực hành t1/t2 và restart/list/replay dùng chính dữ liệu đã nhập.
 
 Nghiệm thu: packet → input → history → quyết định resolve được ID; thiếu commission trả trạng thái trung thực; duplicate/conflict và replay có test; có ví dụ lệnh lẫn output đầy đủ.
 

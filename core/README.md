@@ -1,6 +1,6 @@
 # Shared core — BR-08 / BR-09
 
-BR-08 đã nghiệm thu scoped sau #47–#51. BR-09 bổ sung `m00.Convert` và `m00.SourceFields`: chuyển packet JSON thành M02 input, kiểm lại projection/provenance, không I/O trong core. [Mapping và giới hạn](../examples/m00-import/README.md); BR-09 còn chờ review.
+BR-08 đã nghiệm thu scoped sau #47–#51. BR-09 bổ sung `m00.Convert` và `m00.SourceFields`: chuyển packet JSON thành M02 input, kiểm lại projection/provenance, không I/O trong core. [Mapping và giới hạn](../examples/m00-import/README.md); BR-09 đã nghiệm thu lab sau merge #52 `5fa86b9`, không là live proof.
 
 Module import được từ harness và learner, có `m00` và `m03`. Implementation M03 được chuyển từ cmd/demo, không có bản sao validation thứ hai. Package m03 nhận bytes/types, không đọc file, gọi clock, ghi store hoặc gọi executor. contracts vẫn là nguồn schema.
 

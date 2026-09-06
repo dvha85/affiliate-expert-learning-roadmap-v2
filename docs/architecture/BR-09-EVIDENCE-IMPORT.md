@@ -1,8 +1,8 @@
 # BR-09 — Quyết định adapter nhập M00 và nghiệm thu lab
 
-Baseline: BR-08 đã review/merge #51 (`9fc6147`), closure scope trên main `a3bccc7`. BR-09 chưa DONE trước review/merge PR này.
+Baseline: BR-08 đã review/merge #51 (`9fc6147`), closure scope trên main `a3bccc7`.
 
-PR triển khai: [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52), READY_FOR_REVIEW, chưa merge.
+PR triển khai: [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) đã merge `5fa86b9`. BR-09 DONE trong phạm vi lab JSON profile price/commission → M01/M02 → DecisionPacket. Review lại head `27a92ea`: hai findings bên dưới đã sửa, không còn finding chặn merge; CI 4/4, tests/vet bốn module, smoke BR-08/BR-09, 8 validators và 10 Python regressions PASS. Không chốt E1, live proof hoặc learner pilot.
 
 ## Thiết kế
 
@@ -36,4 +36,4 @@ Kiểm lại snapshot `c2266fc` bằng clone local độc lập `git clone --no-
 - P2: timestamp cùng instant khác timezone được chọn theo thứ tự đầu vào, trong khi provenance sắp field; tính lại projection bị lệch. Đã thêm tie-break từ điển cho equal instant, giữ nguyên timestamp nguồn.
 - Regression đã FAIL trước sửa: timezone self-validation; 40 sản phẩm load lỗi token too long; oversized append được chấp nhận. Sau sửa tests kiểm permutation, source timestamps, 40-product capture/load/replay/duplicate, không ghi khi oversize, giới hạn -1/đúng/+1 với LF/CRLF/no newline đều PASS. Giới hạn 1 MiB là chính sách lab tường minh, không thay schema/hash/formula.
 
-Review/merge BR-09 trước khi đóng checklist. Không fetch account/program, không gom nguồn mâu thuẫn tự động, không migrate store, không trusted clock/đa writer/crash-safe persistence, không mở live execution. BR-10 mới liên kết/persist action/outcome. BR-06b vẫn chờ chương trình/kênh thật.
+Checklist BR-09 được đóng sau review/merge trong scope lab trên. Không fetch account/program, không gom nguồn mâu thuẫn tự động, không migrate store, không trusted clock/đa writer/crash-safe persistence, không mở live execution. BR-10 mới liên kết/persist action/outcome. BR-06b vẫn chờ chương trình/kênh thật.
