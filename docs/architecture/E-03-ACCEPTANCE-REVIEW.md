@@ -1,5 +1,7 @@
 # E-03 — Review nghiệm thu BR-03
 
+E-02b và review E-03: [PR #46](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/46), commit triển khai `94d5c1c`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; quyết định đóng item cha chờ review PR.
+
 Baseline `2cf3bc1` sau review/merge #45; review này gồm thay đổi E-02b cùng PR, chưa merge. Codex thực hiện review kỹ thuật; chủ repo review PR trước khi đổi item cha sang DONE.
 
 ## Quyết định đề xuất
