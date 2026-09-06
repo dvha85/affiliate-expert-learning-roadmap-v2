@@ -1,5 +1,7 @@
 # BR-03d.2 — Bảo vệ persistence M10
 
+IN_REVIEW: [PR #40](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/40), commit triển khai `bf5edd3`. Tests/vet ba module, 8 validators, 10 Python regressions local PASS; CI theo head PR. Chưa merge.
+
 #39 đã review/merge `d009d1f`, CI 4/4 PASS trên head `ca708a5`; tests/vet mission-runtime PASS. Phần này nối validation vào reader/writer ledger M10, không chỉ CLI audit.
 
 ## Đọc và ghi
