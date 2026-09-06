@@ -21,6 +21,8 @@ Hai packet t1/t2 là **synthetic**, không phải E1, báo cáo affiliate hay b�
 
 V1 yêu cầu ghi rõ hai field, kể cả khi thiếu: dùng state=missing, claim_kind=unknown, value=null và provenance giải thích thiếu ở đâu. Metadata, tên field không hỗ trợ, duplicate keys/IDs, số ngoài range và subject không khớp bị từ chối. Thêm currency hoặc field khác cần profile mới/review, không nhét nó vào giá trị khác. Một packet có thể chứa nhiều sản phẩm; không có merge nhiều nguồn tự động.
 
+Numeric literal tối đa 128 ký tự, exponent trong [-400, 400]; số không giữ được nghĩa thập phân qua float64 M02 bị từ chối, kể cả underflow. Đây là giới hạn profile, không làm tròn evidence để tiếp tục.
+
 History giữ nguyên JSONL/hash/formula cũ; provenance nằm trong trường transformation đã có và được hash. Khi capture, projection import được tính lại để phát hiện lệch provenance. Reuse aggregate ID hoặc source field ID với nội dung khác bị CONFLICT; lần quan sát t2 phải có ID mới. DecisionPacket.evidence_ids trỏ tới aggregate tồn tại trong history; mở transformation JSON để resolve tiếp exact IDs từng field. Không giả vờ DecisionPacket trỏ trực tiếp raw field IDs.
 
 ## Thực hành t1/t2, restart, quyết định

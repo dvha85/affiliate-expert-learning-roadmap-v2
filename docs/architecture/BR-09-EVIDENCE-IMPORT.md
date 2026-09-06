@@ -2,6 +2,8 @@
 
 Baseline: BR-08 đã review/merge #51 (`9fc6147`), closure scope trên main `a3bccc7`. BR-09 chưa DONE trước review/merge PR này.
 
+PR triển khai: [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52), READY_FOR_REVIEW, chưa merge.
+
 ## Thiết kế
 
 Chọn JSON transcription profile `m00-input/v1`, không parser Markdown. Core/m00 là converter thuần, learner internal/app chỉ file/stdout/stderr. History M02 giữ ownership, format và formula; chỉ bổ sung kiểm projection và ID nguồn của observation do importer tạo. Không đưa application/store vào core.
