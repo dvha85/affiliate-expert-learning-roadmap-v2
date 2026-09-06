@@ -2,7 +2,7 @@
 
 Baseline sau #50 `46a8e45`. BR-08a/#47 `8ecd60a`, b/#48 `56a1ccf`, c/#49 `b8fa83b`, d/#50 `46a8e45` đã review/merge. BR-08e chờ review PR, không tự đóng item cha.
 
-PR nghiệm thu: [#51](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/51), trạng thái READY_FOR_REVIEW; chưa merge.
+PR nghiệm thu: [#51](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/51) đã merge tại `9fc6147` ngày 2026-09-06. Review toàn diff head `3788000`: không có finding chặn merge; kiểm expected độc lập, temp workspace, exit/stdout và scope; smoke chạy lại PASS, CI 4/4 PASS. BR-08 DONE chỉ trong phạm vi nêu dưới đây. Các trạng thái đề xuất bên dưới là lịch sử trước review.
 
 ## Tiêu chí và bằng chứng
 

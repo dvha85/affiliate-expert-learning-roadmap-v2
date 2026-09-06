@@ -77,8 +77,8 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
-| BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | IN_PROGRESS | Codex; BR-08a [ADR-003](../architecture/ADR-003-SHARED-CORE-CLI-STORE.md) Proposed, chờ review; chưa refactor; BR-08b–e còn TODO |
-| BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
+| BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
+| BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | IN_PROGRESS | Codex; importer và bài thực hành synthetic; chờ review nghiệm thu |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | TODO | Chưa phân công |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | TODO | Chưa phân công |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
@@ -278,7 +278,7 @@ Smoke bài tập trong bản sao tạm riêng: bài A đổi valid_orders từ 0
 
 ### BR-08 — Shared core, entrypoint và quyền sở hữu state
 
-Trạng thái hiện hành: BR-08a–d đã merge #47–#50. [BR-08e nghiệm thu](../architecture/BR-08E-ACCEPTANCE.md) bổ sung smoke hai binary và review ma trận; READY_FOR_REVIEW, item cha vẫn IN_PROGRESS đến review/merge. Các ghi chú “chưa merge” của bước trước bên dưới là lịch sử.
+Trạng thái hiện hành: DONE trong phạm vi shared M03 + learner CLI read-only + store seam M02. #47–#51 đã merge; #51 tại `9fc6147`, review toàn diff không có lỗi chặn, smoke chạy lại PASS và CI 4/4 PASS ngày 2026-09-06. [BR-08e nghiệm thu](../architecture/BR-08E-ACCEPTANCE.md) ghi giới hạn. Các ghi chú “chưa merge” của bước trước bên dưới là lịch sử, không phải trạng thái hiện hành.
 
 BR-08c/#49 đã review/merge `b8fa83b`. BR-08d [store seam M02](../architecture/BR-08D-HISTORY-STORE.md) triển khai: I/O adapter riêng, application giữ validation/ID/hash/duplicate/replay; chưa merge. Không migration/DB mới/action store; BR-08e còn TODO.
 
@@ -291,11 +291,11 @@ BR-08a: Codex khảo sát baseline `8c7c86d`, [ADR-003](../architecture/ADR-003-
 Liên quan phát hiện 1, 8.
 
 - [x] ADR-003 đã Accepted tại #47 trước refactor: shared module/package, import graph, store owner và conformance boundary.
-- [ ] Đưa capability cần dùng lại ra khỏi `cmd/demo/package main` hoặc tạo adapter có boundary rõ; tránh copy toàn bộ runtime thành bản thứ hai.
-- [ ] Giữ expected outcomes/cases độc lập; không kiểm một hàm bằng cách so nó với chính nó.
-- [ ] Thiết kế CLI thống nhất nhận file/context, output có cấu trúc, exit code rõ và không phụ thuộc dữ liệu hard-code.
-- [ ] Tách lệnh demo, validate, persist và execute; tên lệnh không gây hiểu lầm về side effect.
-- [ ] Có hướng dẫn từng bước để học viên mở rộng cùng workspace từ baseline.
+- [x] Đưa capability M03 cần dùng lại ra core/m03; không copy runtime.
+- [x] Giữ expected outcomes/cases độc lập; không kiểm một hàm bằng cách so nó với chính nó.
+- [x] CLI action validate nhận file, output JSON và exit code rõ.
+- [x] Phân biệt harness demo, learner validate read-only và history capture persist; không thêm live execute.
+- [x] Có hướng dẫn từng bước để học viên mở rộng cùng workspace từ baseline.
 
 Nghiệm thu: lệnh demo cũ vẫn dùng được hoặc có cập nhật đường học đồng bộ; một capability M03 nhận file của người học qua entrypoint thật; full regression qua; store owner được ghi rõ.
 
