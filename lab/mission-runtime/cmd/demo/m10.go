@@ -368,7 +368,9 @@ func EvaluateCanaryGate(state M10State, ctx M10Context) CanaryGateDecision {
 	if containsFold(ledger.SuccessfulIdempotencyKeys, i.IdempotencyKey) { g.Decision = "WAIT"; g.Reason = "DUPLICATE_EXECUTION"; return g }
 	if ledger.ExecutionsTotal >= grant.MaxExecutionsTotal { return requireApproval(&g, "CANARY_TOTAL_BUDGET_EXHAUSTED") }
 	if ledger.ExecutionsInWindow >= grant.MaxExecutionsPerWindow { g.Decision = "WAIT"; g.Reason = "RATE_LIMIT_REACHED"; return g }
-	if ledger.CostMinorTotal+costBound.MaxCostMinor > grant.MaxCostMinorTotal { return requireApproval(&g, "CANARY_COST_BUDGET_EXHAUSTED") }
+	// Amounts are nonnegative after the checks above. Check the spent bound first
+	// so subtraction is safe, then compare remaining budget without overflowing a sum.
+	if ledger.CostMinorTotal > grant.MaxCostMinorTotal || costBound.MaxCostMinor > grant.MaxCostMinorTotal-ledger.CostMinorTotal { return requireApproval(&g, "CANARY_COST_BUDGET_EXHAUSTED") }
 	if ledger.PendingOutcomes >= grant.MaxPendingOutcomes { g.Decision = "WAIT"; g.Reason = "OUTCOME_BACKPRESSURE"; return g }
 	g.Decision = "ALLOW_CANARY"; g.Reason = "CANARY_ELIGIBLE"; g.PerActionApprovalRequired = false
 	return g
