@@ -1,6 +1,6 @@
 # E-01 — Bảo toàn timestamp M10/M11
 
-Audit #43 đã review/merge `28073d8`. E-01 triển khai trên `codex/br-03e-01-timestamp`, chờ review; BR-03 chưa DONE, E-02/E-03 vẫn mở.
+Audit #43 đã review/merge `28073d8`. E-01 IN_REVIEW tại [PR #44](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/44), commit triển khai `3fa923e`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; BR-03 chưa DONE, E-02/E-03 vẫn mở.
 
 Đổi bốn output Format(RFC3339) thành Format(RFC3339Nano): WindowStartedAt khi normalize M10/M11 và ExpiresAt khi authorize M10/M11. Giữ nguyên phép chọn minimum expiry và guard hết hạn; không làm tròn nới quyền, không đổi schema/hash hoặc rewrite file cũ. Timestamp không có phần lẻ giữ cùng wire format; file cũ đã mất precision không thể phục dựng ngầm.
 
