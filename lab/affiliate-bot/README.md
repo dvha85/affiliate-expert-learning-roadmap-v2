@@ -90,6 +90,8 @@ Ví dụ M03 bắt đầu từ `DecisionPacket.decision_id` hiện có rồi th�
 Sau capture/replay, chạy `go run ./cmd/bot history decision <history.jsonl> <record_id> <context.json>` để xuất packet mới đã kiểm schema. Mẫu context: `data/m02-decision-context.json`; [hướng dẫn và mapping](../../docs/architecture/M02-DECISION-ADAPTER.md). Lệnh chỉ đọc, không thay history; không redirect stdout vào file history đầu vào.
 # M03: kiểm action/outcome từ file
 
+[BR-10a: ghi nhận ActionRecord thủ công](../../docs/architecture/BR-10A-ACTION-STORE.md): `bot action record HISTORY.jsonl ACTIONS.jsonl ACTION.json`, đọc lại bằng `bot action list HISTORY.jsonl ACTIONS.jsonl`. Store action riêng, không đăng bài/thực thi; decision phải tồn tại và replay MATCH. Lệnh validate dưới đây vẫn chỉ đọc.
+
 Đường nhập trước M03: [BR-09 — packet M00 → input M01 → history M02 → DecisionPacket](../../examples/m00-import/README.md), lệnh `bot evidence import PACKET.json` read-only; capture vẫn là bước ghi tường minh.
 
 [BR-08e: kiểm tích hợp learner/harness và giới hạn nghiệm thu](../../docs/architecture/BR-08E-ACCEPTANCE.md) có smoke script dùng workspace tạm, không sửa dữ liệu cá nhân.

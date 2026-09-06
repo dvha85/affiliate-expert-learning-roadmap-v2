@@ -238,6 +238,9 @@ func main() {
 		os.Exit(app.RunEvidence(os.Args[2:], os.Stdout, os.Stderr))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "action" {
+		if len(os.Args) > 2 && (os.Args[2] == "record" || os.Args[2] == "list") {
+			os.Exit(runActionStore(os.Args[2:], os.Stdout, os.Stderr))
+		}
 		os.Exit(app.RunAction(os.Args[2:], os.Stdout, os.Stderr))
 	}
 	var err error
