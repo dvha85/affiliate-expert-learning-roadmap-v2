@@ -1,5 +1,7 @@
 # E-02 — Ma trận output runtime M09–M11
 
+IN_REVIEW: [PR #45](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/45), commit triển khai `f20e530`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; E-02 còn quyết định export diagnostic bên dưới.
+
 Baseline main sau #44 `1c68ad2`; E-01 đã review/merge, CI 4/4 PASS. E-02 triển khai test + ma trận trên `codex/br-03e-02-output-matrix`, chờ review. Không thay runtime/schema; không đồng nhất độ phủ shape với độ phủ mọi lỗi hệ điều hành.
 
 ## Bằng chứng trực tiếp mới
