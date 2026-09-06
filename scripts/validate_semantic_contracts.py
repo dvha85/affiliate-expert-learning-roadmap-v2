@@ -91,6 +91,7 @@ runtime = "\n".join(
     (ROOT / "lab/mission-runtime/cmd/demo" / name).read_text(encoding="utf-8")
     for name in ["m03_m05.go", "m08.go", "m08_compat.go", "trusted_cost_bound.go", "production_activation.go"]
 )
+runtime += "\n" + (ROOT / "core/m03/m03.go").read_text(encoding="utf-8")
 for marker in [
     "EffectRef", "HUMAN_ACTION", "MACHINE_EXECUTION",
     "PROPOSAL_ONLY", "NON_AUTHORIZING", "INTENT_AUTHORITY_FORBIDDEN",
