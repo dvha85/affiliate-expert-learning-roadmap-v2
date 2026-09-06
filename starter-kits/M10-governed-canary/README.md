@@ -1,5 +1,7 @@
 # Starter M10 — Governed Canary (canary có quản trị)
 
+[Persistence M10](../../docs/architecture/M10-PERSISTENCE-BOUNDARY.md) chặn ledger sai/hỏng và mất ledger mới khi dấu khởi tạo còn; không tự xóa dấu hoặc reset budget để vượt lỗi.
+
 Sau kiểm từng artifact, làm [bài audit chain M10](../../docs/architecture/M10-CHAIN-AUDIT.md): chín file với pre-gate ledger; PASS vẫn không cấp quyền execute.
 
 Bài kiểm file offline: [BR-03c.7 M10 JSON boundary](../../docs/architecture/M10-JSON-BOUNDARY.md). PASS từng artifact không xác thực grant, không kiểm toàn chain và không cho phép execute.

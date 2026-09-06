@@ -2,6 +2,8 @@
 
 ## Phạm vi đã triển khai
 
+BR-03d.1 M09 đã merge #39 `d009d1f`. [BR-03d.2 M10 persistence](M10-PERSISTENCE-BOUNDARY.md) nối schema/strict decode vào ledger reader/writer và dấu khởi tạo mới. Ledger legacy không dấu, rollback toàn snapshot, duration arithmetic và M11 persistence còn mở.
+
 BR-03c.8b đã merge #37 `28cee8d`; overflow cost M10 đã merge #38 `0744f6a`. [BR-03d.1 M09 persistence](M09-PERSISTENCE-BOUNDARY.md) nối raw validation vào Load/Persist, giữ số JSON và marker restart. Reader M10/M11 còn mở; các trạng thái cũ dưới đây là lịch sử.
 
 BR-03c.8 đã merge #36 `fa9b9db`. [BR-03c.8b M11 chain audit](M11-CHAIN-AUDIT.md) kiểm issuance/cycle và profile resolved-stop chưa commit ledger, với snapshot rõ ràng; không xác thực provenance hoặc tích hợp trusted persistence/executor. BR-03 tổng thể còn mở.
