@@ -90,4 +90,6 @@ Ví dụ M03 bắt đầu từ `DecisionPacket.decision_id` hiện có rồi th�
 Sau capture/replay, chạy `go run ./cmd/bot history decision <history.jsonl> <record_id> <context.json>` để xuất packet mới đã kiểm schema. Mẫu context: `data/m02-decision-context.json`; [hướng dẫn và mapping](../../docs/architecture/M02-DECISION-ADAPTER.md). Lệnh chỉ đọc, không thay history; không redirect stdout vào file history đầu vào.
 # M03: kiểm action/outcome từ file
 
+[BR-08e: kiểm tích hợp learner/harness và giới hạn nghiệm thu](../../docs/architecture/BR-08E-ACCEPTANCE.md) có smoke script dùng workspace tạm, không sửa dữ liệu cá nhân.
+
 Lệnh mới `bot action validate ACTION.json OUTCOME.json` dùng shared core M03, chỉ đọc file. Xem [hướng dẫn, exit code và giới hạn](../../docs/architecture/BR-08C-ACTION-CLI.md). VALID không là approval hoặc bằng chứng vận hành; chưa ghi action/outcome vào store.
