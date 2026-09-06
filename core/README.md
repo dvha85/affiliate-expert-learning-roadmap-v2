@@ -1,5 +1,7 @@
 # Shared core — BR-08b
 
+IN_REVIEW tại [PR #48](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/48), commit triển khai `5f85472`. Chưa merge; BR-08 tổng thể còn mở.
+
 Module import được từ harness và learner, hiện chỉ có `m03`. Implementation được chuyển từ cmd/demo, không có bản sao validation thứ hai. Package m03 nhận bytes/types, không đọc file, gọi clock, ghi store hoặc gọi executor. contracts vẫn là nguồn schema.
 
 API: HumanActionRecord, EffectRef, OutcomeRecord; ValidateHumanActionRecord, ValidateEffectRef, ValidateOutcomeRecord, ValidateActionOutcomeLink; DecodeM03Action, DecodeM03Outcome, CheckM03Pair. Status giữ tương thích. VALID là schema/semantic của pair, không resolve decision store hoặc cấp quyền.
