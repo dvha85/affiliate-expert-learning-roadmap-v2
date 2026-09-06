@@ -3,56 +3,19 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	"io"
 	"os"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
 
-// DecodeM03Action checks schema on original bytes, then decodes exact field names.
-// VALID here means structurally valid, not reviewed or linked to a stored decision.
-func DecodeM03Action(raw []byte) (HumanActionRecord, string) {
-	var action HumanActionRecord
-	if contracts.ValidateRaw("action-record.schema.json", raw) != nil || contracts.DecodeStrict(raw, &action) != nil {
-		return HumanActionRecord{}, "INVALID_SCHEMA"
-	}
-	return action, missionValid
-}
+func DecodeM03Action(raw []byte) (HumanActionRecord, string) { return m03.DecodeM03Action(raw) }
+func DecodeM03Outcome(raw []byte) (OutcomeRecord, string)    { return m03.DecodeM03Outcome(raw) }
 
-// The M11 internal ActionID alias is never accepted at this canonical boundary.
-func DecodeM03Outcome(raw []byte) (OutcomeRecord, string) {
-	var outcome OutcomeRecord
-	if contracts.ValidateRaw("outcome-record.schema.json", raw) != nil || contracts.DecodeStrict(raw, &outcome) != nil {
-		return OutcomeRecord{}, "INVALID_SCHEMA"
-	}
-	return outcome, missionValid
-}
+type M03CheckResult = m03.M03CheckResult
 
-type M03CheckResult struct {
-	Action  HumanActionRecord `json:"action"`
-	Outcome OutcomeRecord     `json:"outcome"`
-	Result  string            `json:"result"`
-}
-
-// CheckM03Pair preserves semantic checks after both raw schema checks. It neither
-// looks up decision_id in a store nor verifies a report's truth or completeness.
-func CheckM03Pair(actionRaw, outcomeRaw []byte) (M03CheckResult, string) {
-	a, state := DecodeM03Action(actionRaw)
-	if state != missionValid {
-		return M03CheckResult{}, state
-	}
-	o, state := DecodeM03Outcome(outcomeRaw)
-	if state != missionValid {
-		return M03CheckResult{}, state
-	}
-	if state = ValidateHumanActionRecord(a); state != missionValid {
-		return M03CheckResult{}, state
-	}
-	if state = ValidateActionOutcomeLink(a, o); state != missionValid {
-		return M03CheckResult{}, state
-	}
-	return M03CheckResult{Action: a, Outcome: o, Result: missionValid}, missionValid
-}
+func CheckM03Pair(a, o []byte) (M03CheckResult, string) { return m03.CheckM03Pair(a, o) }
 
 // runM03Check is read-only and emits no success envelope on any rejected pair.
 func runM03Check(w io.Writer, args []string) error {

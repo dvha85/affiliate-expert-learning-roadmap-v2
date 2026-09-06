@@ -1,6 +1,6 @@
 # ADR-003 — Shared core, CLI và quyền sở hữu store
 
-Status: Proposed — BR-08a, chờ review; chưa triển khai refactor. Baseline khảo sát: main `8c7c86d` sau nghiệm thu BR-03 lab/schema. Không thay ADR-001/002 hoặc authority của learner Bot.
+Status: Accepted — BR-08a đã review/merge #47 `8ecd60a`. Baseline khảo sát: main `8c7c86d` sau nghiệm thu BR-03 lab/schema. Không thay ADR-001/002 hoặc authority của learner Bot. BR-08b extract core/m03 đang triển khai trong PR tiếp theo; các mô tả “chưa tồn tại” dưới đây là thời điểm đề xuất ADR.
 
 PR: [#47](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/47), commit khảo sát/ADR `27a7f5a`. Local: 8 validators, 10 Python regressions và diff check PASS. Chưa merge; BR-08b–e chưa triển khai.
 

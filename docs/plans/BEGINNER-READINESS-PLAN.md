@@ -278,11 +278,13 @@ Smoke bài tập trong bản sao tạm riêng: bài A đổi valid_orders từ 0
 
 ### BR-08 — Shared core, entrypoint và quyền sở hữu state
 
+BR-08a đã review/merge #47 `8ecd60a`, ADR-003 Accepted. BR-08b: [core/m03](../../core/README.md) đã extract types/decode/validation; harness giữ wrappers/aliases, eval expected không đổi; tests/vet bốn module với GOWORK=off, 8 validators và 10 Python regressions PASS. Chưa thêm learner CLI/store, chưa merge BR-08b; BR-08c–e vẫn TODO.
+
 BR-08a: Codex khảo sát baseline `8c7c86d`, [ADR-003](../architecture/ADR-003-SHARED-CORE-CLI-STORE.md) đề xuất module core riêng, extract M03 trước, giữ history M02 và CLI cũ. ADR đang Proposed/chờ review; chưa đánh dấu checklist thiết kế Accepted hoặc BR-08 DONE. Lộ trình BR-08b–e và tiêu chí nghiệm thu ở ADR; mọi lệnh mới chỉ là đề xuất.
 
 Liên quan phát hiện 1, 8.
 
-- [ ] Viết ADR trước khi refactor: giữ một module hay tách shared module/package; chỉ rõ import graph, store owner và conformance boundary.
+- [x] ADR-003 đã Accepted tại #47 trước refactor: shared module/package, import graph, store owner và conformance boundary.
 - [ ] Đưa capability cần dùng lại ra khỏi `cmd/demo/package main` hoặc tạo adapter có boundary rõ; tránh copy toàn bộ runtime thành bản thứ hai.
 - [ ] Giữ expected outcomes/cases độc lập; không kiểm một hàm bằng cách so nó với chính nó.
 - [ ] Thiết kế CLI thống nhất nhận file/context, output có cấu trúc, exit code rõ và không phụ thuộc dữ liệu hard-code.

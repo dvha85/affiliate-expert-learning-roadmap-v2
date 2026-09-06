@@ -29,7 +29,12 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/mission-runtime/go.mod
-      - name: O00 and M03-M11 executable eval packs
+      - name: Shared M03 core tests and vet without workspace
+        working-directory: core
+        env:
+          GOWORK: "off"
+        run: go test ./... && go vet ./...
+      - name: M03-M11 independent harness eval packs
         working-directory: lab/mission-runtime
         run: go test ./...
       - name: Vet mission runtime
