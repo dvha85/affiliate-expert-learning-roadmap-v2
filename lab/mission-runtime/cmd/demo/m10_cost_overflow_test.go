@@ -70,6 +70,7 @@ func TestM10ExecutorRejectsOverflowAfterLedgerReload(t *testing.T) {
 		t.Fatal(status)
 	}
 	dir := t.TempDir()
+	s.Authorization = &a
 	path := canaryLedgerPath(dir, s.Grant.GrantID, s.Grant.GrantVersion)
 	stored := s.Ledger
 	stored.CostMinorTotal = math.MaxInt64
