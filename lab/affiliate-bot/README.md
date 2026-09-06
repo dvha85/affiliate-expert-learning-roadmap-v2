@@ -90,6 +90,10 @@ Ví dụ M03 bắt đầu từ `DecisionPacket.decision_id` hiện có rồi th�
 Sau capture/replay, chạy `go run ./cmd/bot history decision <history.jsonl> <record_id> <context.json>` để xuất packet mới đã kiểm schema. Mẫu context: `data/m02-decision-context.json`; [hướng dẫn và mapping](../../docs/architecture/M02-DECISION-ADAPTER.md). Lệnh chỉ đọc, không thay history; không redirect stdout vào file history đầu vào.
 # M03: kiểm action/outcome từ file
 
+[BR-11a mock advisor](../../docs/architecture/BR-11A-MOCK-ADVISOR.md): `bot advisor mock HISTORY ACTIONS OUTCOMES CONFIG.json` chỉ đọc context và trả HUMAN_REVIEW, không gọi provider hay ghi store.
+
+Các guard freshness có trạng thái `ABSTAIN_STALE` và `ABSTAIN_FUTURE`; yêu cầu write tool bị `REJECT_WRITE_REQUEST`.
+
 [BR-10c: audit toàn chain từ M00](../../docs/architecture/BR-10C-ACCEPTANCE.md): chạy `python3 scripts/smoke_br10c.py` từ root để kiểm workspace lab độc lập; không phải live proof.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
