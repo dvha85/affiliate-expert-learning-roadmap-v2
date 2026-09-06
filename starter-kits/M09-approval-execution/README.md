@@ -1,5 +1,7 @@
 # Bộ khởi đầu — M09
 
+[Persistence M09](../../docs/architecture/M09-PERSISTENCE-BOUNDARY.md) kiểm state khi Load/Persist, giữ số JSON và marker replay; không xác thực người duyệt từ file.
+
 [m09-check offline](../../docs/architecture/M09-JSON-BOUNDARY.md) kiểm năm file, không authenticate approval/execute. Giữ bằng chứng consistency riêng khỏi trusted human approval và vận hành thật.
 
 1. Học `curriculum/M09/M09.1 → M09.2 → M09.3`.

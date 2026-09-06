@@ -228,7 +228,7 @@ func AuthorizeM09(state M09State, ctx M09Context) (ExecutionAuthorization, strin
 }
 
 func PersistM09State(path string, s M09State) error {
-	b, err := json.MarshalIndent(s, "", "  ")
+	b, err := encodeM09State(s)
 	if err != nil {
 		return err
 	}
@@ -248,8 +248,7 @@ func LoadM09State(path string) (M09State, error) {
 	if err != nil {
 		return s, err
 	}
-	err = json.Unmarshal(b, &s)
-	return s, err
+	return DecodeM09State(b)
 }
 
 func authorizationBindingMatches(got, expected ExecutionAuthorization) bool {
