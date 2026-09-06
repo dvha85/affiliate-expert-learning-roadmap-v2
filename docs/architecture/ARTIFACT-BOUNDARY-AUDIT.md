@@ -1,5 +1,7 @@
 # BR-03 — Đối chiếu artifact và boundary
 
+Trạng thái hiện hành: **BR-03 DONE trong phạm vi lab/schema** sau #46 `ac9e0dd`; [E-03 nghiệm thu](E-03-ACCEPTANCE-REVIEW.md). Các TODO/IN_PROGRESS dưới đây là lịch sử triển khai; H-01–H-04 và BR-06b giữ mở.
+
 ## Phạm vi đã triển khai
 
 **Trạng thái mới nhất:** [BR-03e — audit điều kiện đóng](BR-03E-CLOSURE-AUDIT.md), baseline `e0d3558` sau #42. Ma trận bên dưới là lịch sử khảo sát; không dùng các dòng TODO cũ thay kết luận BR-03e. E-01 precision timestamp và E-02 bằng chứng output theo nhánh còn cần xử lý trước khi đóng; provenance/rollback/crash consistency tách hardening riêng.

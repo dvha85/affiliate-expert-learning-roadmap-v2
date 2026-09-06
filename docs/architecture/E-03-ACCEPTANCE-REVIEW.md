@@ -1,5 +1,11 @@
 # E-03 — Review nghiệm thu BR-03
 
+## Quyết định cuối sau review
+
+**ACCEPTED — BR-03 DONE trong phạm vi lab/schema.** Chủ repo yêu cầu review kỹ #46, merge và chốt khi review đạt. Codex review đạt; #46 đã merge tại `ac9e0dd8de4a9354ea8f68b41878ab39f11cd013`, head `a13dca9` CI 4/4 PASS. Đã chạy lại tests/vet ba module, 8 validators, 10 Python regressions và smoke `go run ./cmd/demo M10`/`M11` PASS. Không có lỗi chặn trong phạm vi xuất diagnostic/canonical và conformance đã mô tả.
+
+Chấp thuận shape coverage theo builder chung như ma trận E-02, không phải fault injection mọi syscall. Các giới hạn 1–5 và H-01–H-04 dưới đây vẫn áp dụng; BR-06b vẫn chờ chương trình/kênh. Nội dung READY_FOR_REVIEW/chưa merge phía dưới là lịch sử trước quyết định này, không phải trạng thái hiện hành. Không đánh dấu kế hoạch tổng thể DONE hoặc chứng nhận production-ready.
+
 E-02b và review E-03: [PR #46](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/46), commit triển khai `94d5c1c`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; quyết định đóng item cha chờ review PR.
 
 Baseline `2cf3bc1` sau review/merge #45; review này gồm thay đổi E-02b cùng PR, chưa merge. Codex thực hiện review kỹ thuật; chủ repo review PR trước khi đổi item cha sang DONE.

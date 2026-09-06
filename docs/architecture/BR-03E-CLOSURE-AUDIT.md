@@ -1,5 +1,7 @@
 # BR-03e — Audit điều kiện đóng BR-03
 
+Kết quả xử lý audit: E-01/#44, E-02/#45, E-02b/#46 đã merge; [E-03 đã nghiệm thu lab/schema](E-03-ACCEPTANCE-REVIEW.md) tại #46 `ac9e0dd`. Các kết luận “chưa DONE” bên dưới mô tả baseline audit, không còn là trạng thái hiện hành. H-01–H-04 vẫn mở.
+
 Audit đã review/merge [PR #43](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/43) tại `28073d8`, CI 4/4 PASS. [E-01 precision](E-01-TIMESTAMP-PRECISION.md) đang triển khai; E-02/E-03 còn mở. Nội dung baseline và phát hiện dưới đây được giữ làm bằng chứng, chưa đóng BR-03.
 
 Ngày 06/09/2026; baseline `e0d3558552fc1968e2a69e55be8080e604170350` (main sau #42). Người audit: Codex; chờ chủ repo review. Đây là audit code/test local, không phải chứng nhận vận hành. PR này chỉ tài liệu, không sửa runtime hoặc schema.

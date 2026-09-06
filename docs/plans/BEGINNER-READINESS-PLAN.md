@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-03d.1–d.4 đã merge #39–#42 (main `e0d3558`); [BR-03e audit](../architecture/BR-03E-CLOSURE-AUDIT.md) chờ review, còn E-01 timestamp và E-02 ma trận output trước nghiệm thu. BR-06b chờ chương trình/kênh; BR-03 tổng thể chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-03 DONE trong phạm vi lab/schema sau #46 `ac9e0dd`; [E-03 nghiệm thu](../architecture/E-03-ACCEPTANCE-REVIEW.md). H-01–H-04 vẫn mở; BR-06b chờ chương trình/kênh. Kế hoạch tổng thể chưa hoàn thành, không claim bot sẵn sàng live.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -72,7 +72,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 |---|---|---|---|---|---|---|
 | BR-01 | A | Sửa CI marker và đồng bộ checkpoint/tên check | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge; [PR #20](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/20) đã merge `b17748a`; [evidence](#br-01--bằng-chứng-triển-khai) |
 | BR-02 | A | Sửa measurement window M03 | P1 / S | — | DONE | Codex; chủ repo yêu cầu merge; [PR #21](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/21) đã merge `1e94ec5`; [evidence](#br-02--bằng-chứng-triển-khai) |
-| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | IN_PROGRESS | Codex; d.1–d.4 đã merge #39–#42; [BR-03e](../architecture/BR-03E-CLOSURE-AUDIT.md) chờ review; E-01 P1 precision, E-02 P2 output branches, E-03 nghiệm thu; H-01–H-04 tách hardening |
+| BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | DONE | Chỉ phạm vi lab/schema; Codex review đạt, chủ repo yêu cầu chốt nếu review đạt; #46 merge `ac9e0dd`, CI 4/4 PASS; [E-03 nghiệm thu và giới hạn](../architecture/E-03-ACCEPTANCE-REVIEW.md); H-01–H-04 vẫn mở |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
@@ -144,6 +144,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 ### BR-03 — Output đúng schema trước semantic validation
 
+**Nghiệm thu hiện hành: DONE trong phạm vi lab/schema**, sau review/merge #46 `ac9e0dd`, head `a13dca9` CI 4/4 PASS. Chủ repo yêu cầu chốt E-03 nếu review đạt; review không có lỗi chặn trong phạm vi đã nêu. Tests/vet ba module, 8 validators, 10 Python regressions và smoke CLI M10/M11 PASS. [E-03](../architecture/E-03-ACCEPTANCE-REVIEW.md) là quyết định hiện hành; các đoạn IN_PROGRESS/chờ review bên dưới giữ làm lịch sử. Không nghiệm thu trusted provenance, rollback, crash consistency hoặc vận hành affiliate thật.
+
 E-02/#45 đã review/merge `2cf3bc1`. E-02b nối diagnostic/canonical export boundary, [E-03 review nghiệm thu](../architecture/E-03-ACCEPTANCE-REVIEW.md) READY_FOR_REVIEW cho phạm vi lab/schema sau khi PR triển khai được review/merge. Item cha vẫn IN_PROGRESS; H-01–H-04 và BR-06b không đóng cùng BR-03.
 
 E-01 đã review/merge #44 `1c68ad2`, CI 4/4 PASS. [E-02 ma trận output](../architecture/E-02-OUTPUT-MATRIX.md) bổ sung tests output thật; còn quyết định canonical/diagnostic gate trước khi nghiệm thu E-03. Không dùng PASS của shape tests để claim mọi syscall đã được fault-inject.
@@ -168,10 +170,10 @@ Liên quan phát hiện 7, 8.
 
 - [x] Tái hiện AdvisorOutput ADVISE reason rỗng hiện vẫn SUPPORTED; bổ sung test bắt lỗi này.
 - [x] Lập bảng type Go ↔ schema JSON ↔ input/output CLI cho các artifact được dùng (bản audit, không claim các dòng đã conformance).
-- [ ] Kiểm required field, enum, null/array, unique IDs, timestamp và field ngoài schema tại boundary.
+- [x] Kiểm required field, enum, null/array, unique IDs, timestamp và field ngoài schema tại boundary trong phạm vi lab/schema E-03.
 - [x] BR-03b đề xuất giữ M02 projection + adapter sang DecisionPacket, có kiểm schema/replay và ngoại lệ ranked:null cũ; chờ review thiết kế trong PR triển khai.
-- [ ] Ghi rõ kiểm schema không thay kiểm liên kết, freshness hoặc tính hỗ trợ của nội dung bằng chứng.
-- [ ] Chọn cách validation nhỏ nhất đáp ứng contract; nếu thêm dependency phải pin và ghi cách cài.
+- [x] Ghi rõ kiểm schema không thay kiểm liên kết, freshness hoặc tính hỗ trợ của nội dung bằng chứng (BR-03e/E-03).
+- [x] Chọn cách validation đáp ứng contract; contracts pin jsonschema/v6 v6.0.2; M04 validator riêng có drift test.
 
 Nghiệm thu: output sai schema bị từ chối trước khi SUPPORTED; output thực của runtime được kiểm bằng schema tương ứng; fixture history hiện tại vẫn replay hoặc có quyết định chuyển đổi rõ.
 
