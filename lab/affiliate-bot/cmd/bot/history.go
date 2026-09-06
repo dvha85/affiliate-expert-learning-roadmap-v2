@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 const (
@@ -236,7 +237,11 @@ func validateHistoryRecord(record HistoryRecord) error {
 }
 
 func LoadHistory(path string) ([]HistoryRecord, error) {
-	file, err := os.Open(path)
+	return loadHistoryWith(store.JSONL{}, path)
+}
+
+func loadHistoryWith(storage store.History, path string) ([]HistoryRecord, error) {
+	file, err := storage.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -279,10 +284,14 @@ func LoadHistory(path string) ([]HistoryRecord, error) {
 }
 
 func AppendHistory(path string, record HistoryRecord) (string, error) {
+	return appendHistoryWith(store.JSONL{}, path, record)
+}
+
+func appendHistoryWith(storage store.History, path string, record HistoryRecord) (string, error) {
 	if err := validateHistoryRecord(record); err != nil {
 		return "", err
 	}
-	existing, err := LoadHistory(path)
+	existing, err := loadHistoryWith(storage, path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
@@ -302,16 +311,11 @@ func AppendHistory(path string, record HistoryRecord) (string, error) {
 		}
 	}
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
 	encoded, err := json.Marshal(record)
 	if err != nil {
 		return "", err
 	}
-	if _, err := file.Write(append(encoded, '\n')); err != nil {
+	if err := storage.AppendLine(path, encoded); err != nil {
 		return "", err
 	}
 	return appendAdded, nil
