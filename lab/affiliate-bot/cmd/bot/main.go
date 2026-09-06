@@ -234,6 +234,9 @@ func runHistory(args []string) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "evidence" {
+		os.Exit(app.RunEvidence(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "action" {
 		os.Exit(app.RunAction(os.Args[2:], os.Stdout, os.Stderr))
 	}
