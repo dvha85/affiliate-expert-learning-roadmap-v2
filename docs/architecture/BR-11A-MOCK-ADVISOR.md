@@ -24,4 +24,4 @@ python3 scripts/smoke_br11a.py
 
 Smoke tạo M02 decision, action và PENDING outcome synthetic trong TemporaryDirectory, chạy mock qua process mới, kiểm IDs `d`, `obs-a-1`, `obs-b-1`, `a`, `o`; sau đó kiểm stale/future/orphan và no-write. Kết quả: `BR-11a PASS: mock grounded context; stale/future/orphan boundaries; no writes`.
 
-Không có retry/timeout/provider SDK vì chưa có live adapter; không secret/model/prompt version live. Context vẫn caller-declared, source_ref không xác thực. Không dùng outcome snapshots để cộng commission; không ghi EvaluationRecord/Proposal (BR-12), không gọi action executor. Live provider và proof riêng chỉ làm sau khi có cấu hình/nguồn được cấp quyền.
+Mock không cần retry/timeout/provider SDK vì chưa có live adapter. [BR-11b.1](BR-11B1-PROVIDER-BOUNDARY.md) bổ sung interface provider, provenance và test HTTP fixture có giới hạn; không bật live. Context vẫn caller-declared, source_ref không xác thực. Không dùng outcome snapshots để cộng commission; không ghi EvaluationRecord/Proposal (BR-12), không gọi action executor. Live provider và proof riêng chỉ làm sau khi có cấu hình/nguồn được cấp quyền.

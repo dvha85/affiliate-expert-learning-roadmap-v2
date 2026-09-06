@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -175,9 +176,10 @@ func runAdvisor(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("CONTEXT_ERROR", nil, err, 1)
 	}
-	output, status := checkAdvisorResponse(mockAdvisor(ctx), ctx)
+	provider := mockAdvisorProvider{}
+	output, status := evaluateAdvisorProvider(context.Background(), provider, ctx)
 	if status != "SUPPORTED" && status != "ABSTAIN" {
 		return emit(status, nil, fmt.Errorf("advisor rejected: %s", status), 1)
 	}
-	return emit(status, map[string]any{"advisor_output": output, "context": ctx}, nil, 0)
+	return emit(status, map[string]any{"advisor_output": output, "context": ctx, "provenance": provider.identity()}, nil, 0)
 }

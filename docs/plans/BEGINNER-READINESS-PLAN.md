@@ -357,6 +357,8 @@ BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affili
 
 BR-11b còn OPEN: chọn provider/model được phép dùng, cấu hình secret qua môi trường, timeout/retry hữu hạn, ghi version context/prompt/provider và proof live riêng. Chưa chọn provider hoặc cấp quyền gọi dịch vụ có phí; mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
 
+BR-11b.1 IMPLEMENTED, chờ review: [ranh giới provider offline](../architecture/BR-11B1-PROVIDER-BOUNDARY.md), mock dùng interface chung, HTTP fixture chỉ loopback, timeout/retry/body size hữu hạn, khóa từ môi trường và provenance có version. Regression dùng server giả lập; chưa mở CLI live. BR-11b.2 provider thật/proof vẫn OPEN.
+
 Liên quan phát hiện 1, 4, 7.
 
 - [ ] Tạo mock provider chạy offline để bài học không cần credential ngay.
