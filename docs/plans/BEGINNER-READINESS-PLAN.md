@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-03d.1 M09 đã merge #39 `d009d1f`; BR-03d.2 M10 IN_REVIEW tại PR #40; BR-06b chờ chương trình/kênh, BR-03 tổng thể chưa hoàn thành.
+- Trạng thái: IN_PROGRESS — BR-03d.1 M09 đã merge #39 `d009d1f`; BR-03d.2 M10 IN_REVIEW tại PR #40; BR-03d.3 M11 đã triển khai, đang kiểm tra trước PR; BR-06b chờ chương trình/kênh, BR-03 tổng thể chưa hoàn thành.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.

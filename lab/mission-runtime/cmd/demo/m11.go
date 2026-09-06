@@ -583,21 +583,19 @@ func productionActivationPath(dir, id, version string) string {
 	return filepath.Join(dir, "production-activation-"+hex.EncodeToString(s[:])+".json")
 }
 func persistProductionLedger(path string, l ProductionLedger) error {
-	b, err := json.MarshalIndent(l, "", "  ")
+	b, err := encodeProductionArtifact("ledger", l)
 	if err != nil { return err }
 	tmp := path + ".tmp"
 	if err = os.WriteFile(tmp, b, 0600); err != nil { return err }
 	return os.Rename(tmp, path)
 }
-func loadProductionLedger(path string) (ProductionLedger, error) {
-	var l ProductionLedger
+func loadProductionLedger(path string, lease ProductionLease) (ProductionLedger, error) {
 	b, err := os.ReadFile(path)
-	if err != nil { return l, err }
-	err = json.Unmarshal(b, &l)
-	return l, err
+	if err != nil { return ProductionLedger{}, err }
+	return decodeProductionLedger(b, lease)
 }
 func ensureInitialProductionLedger(path string, l ProductionLedger) error {
-	b, err := json.MarshalIndent(l, "", "  ")
+	b, err := encodeProductionArtifact("ledger", l)
 	if err != nil { return err }
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil { return err }
@@ -606,7 +604,7 @@ func ensureInitialProductionLedger(path string, l ProductionLedger) error {
 	return f.Close()
 }
 func writeActivationRecord(path string, r productionActivationRecord) error {
-	b, err := json.MarshalIndent(r, "", "  ")
+	b, err := encodeProductionArtifact("activation", r)
 	if err != nil { return err }
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil { return err }
@@ -615,14 +613,20 @@ func writeActivationRecord(path string, r productionActivationRecord) error {
 	return f.Close()
 }
 func productionActivationMatches(path string, lease ProductionLease) bool {
-	var r productionActivationRecord
 	b, err := os.ReadFile(path)
-	if err != nil || json.Unmarshal(b, &r) != nil { return false }
+	if err != nil { return false }
+	v, status := DecodeM11Artifact("activation", b)
+	if status != missionValid { return false }
+	r := v.(*productionActivationRecord)
 	return r.LeaseID == lease.LeaseID && r.LeaseVersion == lease.LeaseVersion && r.LeaseHash == lease.LeaseHash
 }
 
 // InitializeProductionLedger is an explicit activation step. The executor never creates a missing production ledger.
 func InitializeProductionLedger(state *M11State, dir, activatedAt string) string {
+	// Validate both serialized artifacts before creating directories or activation.
+	if state == nil { return "DENY_ACTIVATION" }
+	if _, err := encodeProductionArtifact("ledger", state.Ledger); err != nil { return "DENY_ACTIVATION" }
+	if _, err := encodeProductionArtifact("activation", productionActivationRecord{LeaseID:state.Lease.LeaseID, LeaseVersion:state.Lease.LeaseVersion, LeaseHash:state.Lease.LeaseHash, ActivatedAt:activatedAt}); err != nil { return "DENY_ACTIVATION" }
 	if state == nil || state.Lease.LeaseHash == "" || state.Lease.LeaseHash != ComputeProductionLeaseHash(state.Lease) {
 		return "DENY_ACTIVATION"
 	}
@@ -690,7 +694,7 @@ func ExecuteProductionLocalSandbox(state *M11State, a ProductionExecutionAuthori
 	activationPath := productionActivationPath(dir, state.Lease.LeaseID, state.Lease.LeaseVersion)
 	if !productionActivationMatches(activationPath, state.Lease) { return ProductionExecutionRecord{}, "STOP_ACTIVATION_STATE_MISSING" }
 	ledgerPath := productionLedgerPath(dir, state.Lease.LeaseID, state.Lease.LeaseVersion)
-	ledger, err := loadProductionLedger(ledgerPath)
+	ledger, err := loadProductionLedger(ledgerPath, state.Lease)
 	if os.IsNotExist(err) { return ProductionExecutionRecord{}, "STOP_LEDGER_MISSING" }
 	if err != nil { return ProductionExecutionRecord{}, "STOP_LEDGER_UNREADABLE" }
 	state.Ledger = ledger
@@ -788,7 +792,7 @@ func ResolveProductionReconciliation(state *M11State, dir string, r ProductionRe
 	if err != nil { return "WAIT_PRODUCTION_LOCK" }
 	_ = lock.Close(); defer os.Remove(lockPath)
 	ledgerPath := productionLedgerPath(dir, state.Lease.LeaseID, state.Lease.LeaseVersion)
-	ledger, err := loadProductionLedger(ledgerPath)
+	ledger, err := loadProductionLedger(ledgerPath, state.Lease)
 	if err != nil || ledger.ControlMode != "STOPPED" || !ledger.ReconciliationRequired { return "DENY_RECONCILIATION_RESOLUTION" }
 	if containsFold(ledger.ReconciliationResolutionIDs, r.ResolutionID) { return "DUPLICATE_RECONCILIATION_RESOLUTION" }
 	if r.EffectState == "PERFORMED" && !containsFold(ledger.SuccessfulIdempotencyKeys, state.Execution.IdempotencyKey) {
@@ -820,7 +824,7 @@ func RecordProductionOutcome(state *M11State, dir, outcomeID, executionID, obser
 	if err != nil { return "WAIT_PRODUCTION_LOCK" }
 	_ = lock.Close(); defer os.Remove(lockPath)
 	ledgerPath := productionLedgerPath(dir, state.Lease.LeaseID, state.Lease.LeaseVersion)
-	ledger, err := loadProductionLedger(ledgerPath)
+	ledger, err := loadProductionLedger(ledgerPath, state.Lease)
 	if err != nil || ledger.ReconciliationRequired || ledger.PendingOutcomes < 1 { return "WAIT_RECONCILIATION" }
 	if ledger.LeaseID != state.Lease.LeaseID || ledger.LeaseVersion != state.Lease.LeaseVersion || ledger.LeaseHash != state.Lease.LeaseHash {
 		return "WAIT_RECONCILIATION"
