@@ -2,6 +2,8 @@
 
 READY_FOR_REVIEW, chưa tự chốt BR-10 DONE. Baseline #53 `765ac70`, #54 `533cc6f` đã merge. Review #54 head `2e4d276`: không finding chặn trong scope canonical JSON/lab một writer; smoke BR-10b và tests/vet learner chạy lại PASS, CI 4/4 PASS. Các giới hạn không thuộc phạm vi này vẫn mở.
 
+Trạng thái hiện hành: BR-10 lab/schema DONE sau review/merge #55 `6d311a8`; audit chạy lại PASS, CI 4/4 PASS, không finding chặn. Các trạng thái chờ review bên dưới là lịch sử. Importer nền tảng và live proof tách thành BR-10d trong kế hoạch, chưa hoàn thành.
+
 PR audit: [#55](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/55), chưa merge. Clone local độc lập `git clone --no-local` snapshot `f4cefbc`: audit, tests/vet bốn module, 8 validators và 10 Python regressions PASS; git status trống trước/sau. Dùng toolchain/cache sẵn có, không cold install hoặc máy học viên. Sau snapshot chỉ bổ sung bằng chứng/liên kết tài liệu.
 
 ## Cách chạy và bằng chứng

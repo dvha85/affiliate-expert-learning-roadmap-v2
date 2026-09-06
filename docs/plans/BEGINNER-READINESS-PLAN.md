@@ -326,6 +326,15 @@ Nghiệm thu: packet → input → history → quyết định resolve được 
 
 ### BR-10 — M03 action/outcome importer vào bot
 
+Hiện hành: **BR-10 lab/schema DONE**, #55 review/merge `6d311a8`, audit chạy lại và CI 4/4 PASS. Chỉ canonical JSON trong workspace một writer. Phần chưa có importer chương trình cụ thể/live proof được tách BR-10d bên dưới, không bị đóng theo nghiệm thu lab. Các trạng thái cũ sau đây là lịch sử.
+
+#### BR-10d — Importer nền tảng và live proof (OPEN, phụ thuộc BR-06b)
+
+- Chọn chương trình/kênh đã có quyền truy cập; hiện chưa có.
+- Map format export thực tế, transaction identity, timezone/window, pending/valid/cancel/refund/paid; không dùng UTM thay attribution.
+- Có fixture export khử dữ liệu riêng tư, tests mapping và thực hành nhập báo cáo; tách synthetic smoke khỏi live proof.
+- Nghiệm thu riêng sau adapter và proof được review; chưa chạy API, chưa nhận dữ liệu thật, không đánh DONE.
+
 BR-10c: [audit nghiệm thu toàn chain](../architecture/BR-10C-ACCEPTANCE.md) READY_FOR_REVIEW sau #54 merged `533cc6f`. Smoke bắt đầu từ M00 trong workspace tạm, kiểm decision/action/outcome exact IDs, restart/list/replay, đứt upstream, corruption/alias và payload limit. Chưa chốt BR-10 DONE; importer báo cáo nền tảng chưa có, giữ mở riêng cùng BR-06b. Những ghi chú BR-10b chờ review bên dưới là lịch sử.
 
 Hiện hành: BR-10a #53 đã review/merge `765ac70`. [BR-10b outcome store/import/list](../architecture/BR-10B-OUTCOME-STORE.md) đang triển khai chờ review; canonical JSON synthetic, EffectRef/time/pending/zero/duplicate/conflict/orphan được kiểm. Chưa importer nền tảng/live report, chưa chốt BR-10 DONE. Ghi chú BR-10a chờ review bên dưới là lịch sử.
