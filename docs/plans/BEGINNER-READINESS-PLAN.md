@@ -144,6 +144,8 @@ Nghiệm thu: probe sai hiện tại chuyển thành test bắt được regress
 
 ### BR-03 — Output đúng schema trước semantic validation
 
+Audit BR-03e đã review/merge #43 `28073d8` (CI 4/4 PASS). [E-01 bảo toàn timestamp](../architecture/E-01-TIMESTAMP-PRECISION.md) đang triển khai; E-02 ma trận output và E-03 nghiệm thu còn mở. Các ghi chú chờ review phía dưới là lịch sử.
+
 Trạng thái hiện hành: [BR-03e audit](../architecture/BR-03E-CLOSURE-AUDIT.md) thay các TODO lịch sử bên dưới. d.1–d.4 đã merge. Chưa đóng checklist tổng hợp: cần E-01 precision, E-02 ma trận output thực và E-03 quyết định nghiệm thu; không yêu cầu triển khai live để nghiệm thu schema.
 
 BR-03c.6 M09: Codex thực hiện, reviewer chủ repo chưa review; nhánh `codex/br-03c-m09-boundary`, [phạm vi/evidence](../architecture/M09-JSON-BOUNDARY.md). #32 đã review/merge `9aae6ad`, CI 4/4 trên head `c407a43`, tests/vet mission-runtime PASS. M09 lần này chỉ raw profile/consistency audit, không cấp authorization mới hoặc thay persistence/executor. Các trạng thái chờ merge cũ là lịch sử.

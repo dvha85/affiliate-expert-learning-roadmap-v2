@@ -1,6 +1,6 @@
 # BR-03e — Audit điều kiện đóng BR-03
 
-IN_REVIEW: [PR #43](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/43). Go tests/vet ba module, 8 validators và 10 Python regressions local PASS; CI theo head PR. Chưa merge, chưa đóng BR-03.
+Audit đã review/merge [PR #43](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/43) tại `28073d8`, CI 4/4 PASS. [E-01 precision](E-01-TIMESTAMP-PRECISION.md) đang triển khai; E-02/E-03 còn mở. Nội dung baseline và phát hiện dưới đây được giữ làm bằng chứng, chưa đóng BR-03.
 
 Ngày 06/09/2026; baseline `e0d3558552fc1968e2a69e55be8080e604170350` (main sau #42). Người audit: Codex; chờ chủ repo review. Đây là audit code/test local, không phải chứng nhận vận hành. PR này chỉ tài liệu, không sửa runtime hoặc schema.
 

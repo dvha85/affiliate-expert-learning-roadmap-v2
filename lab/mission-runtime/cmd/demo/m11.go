@@ -357,7 +357,7 @@ func normalizedProductionLedger(l ProductionLedger, lease ProductionLease, now t
 	window, safe := checkedMissionSeconds(lease.WindowSeconds)
 	if !safe || lease.WindowSeconds < 60 { return l, false }
 	if !now.Before(started.Add(window)) {
-		l.WindowStartedAt = now.Format(time.RFC3339)
+		l.WindowStartedAt = now.Format(time.RFC3339Nano)
 		l.ExecutionsInWindow = 0
 	}
 	return l, true
@@ -570,7 +570,7 @@ func AuthorizeProduction(state M11State, ctx M11Context) (ProductionExecutionAut
 		ProductionHealthSnapshotID: state.Health.SnapshotID, ProductionHealthSnapshotHash: state.Health.SnapshotHash,
 		ProductionCostBoundID: state.CostBound.CostBoundID, ProductionCostBoundHash: state.CostBound.CostBoundHash,
 		ProductionCostBoundMinor: state.CostBound.MaxCostMinor, ExecutorID: ctx.Executor.ExecutorID,
-		AuthorizedAt: ctx.Now, ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey,
+		AuthorizedAt: ctx.Now, ExpiresAt: expires.Format(time.RFC3339Nano), IdempotencyKey: state.Intent.IdempotencyKey,
 		CorrelationID: state.Intent.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true,
 	}
 	return a, g, "AUTHORIZED"
