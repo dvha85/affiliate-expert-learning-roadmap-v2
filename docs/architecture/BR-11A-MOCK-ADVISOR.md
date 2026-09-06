@@ -2,6 +2,8 @@
 
 Triển khai chờ review; BR-11 chưa DONE. BR-10 lab đã audit/merge #55 `6d311a8`. Mock này đọc history/action/outcome canonical JSON, tạo context có version và trả HUMAN_REVIEW; không gọi provider, không ghi store, không thực thi.
 
+PR: [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56), chưa merge. Kiểm thử ngày 2026-09-07: tests/vet bốn module, 8 validators, 10 Python regressions và smoke BR-11a PASS. Core M04 được chuyển khỏi harness; static semantic validator đọc implementation mới ở core/m04.
+
 ## Lệnh
 
 ```text
