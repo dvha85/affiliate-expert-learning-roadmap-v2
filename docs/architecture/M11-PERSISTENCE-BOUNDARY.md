@@ -1,6 +1,6 @@
 # BR-03d.3 — Bảo vệ persistence M11
 
-Triển khai trên nhánh `codex/br-03d-m11-persistence`, nối tiếp PR #40 (M10). Chưa merge; BR-03 tổng thể chưa hoàn thành.
+IN_REVIEW: [PR #41](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/41), commit triển khai `d544ba6`, nối tiếp PR #40 (M10). Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; BR-03 tổng thể chưa hoàn thành. Merge #40 trước, đổi base #41 về main rồi kiểm lại diff/CI.
 
 ## Boundary đọc/ghi
 
