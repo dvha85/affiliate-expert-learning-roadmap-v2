@@ -1,5 +1,7 @@
 # BR-08d — Store seam M02 và quyền sở hữu dữ liệu
 
+IN_REVIEW: [PR #50](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/50), commit triển khai `79556ca`. Tests/vet bốn module GOWORK=off, 8 validators và 10 Python regressions local PASS. Chưa merge.
+
 BR-08c đã review/merge #49 `b8fa83b`, CI 4/4 PASS. BR-08d chỉ tách filesystem I/O, không thay database, hash, schema, command hoặc dữ liệu đã lưu.
 
 ## Quyền sở hữu
