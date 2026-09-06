@@ -357,7 +357,7 @@ BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affili
 
 BR-11b còn OPEN: chọn provider/model được phép dùng, cấu hình secret qua môi trường, timeout/retry hữu hạn, ghi version context/prompt/provider và proof live riêng. Chưa chọn provider hoặc cấp quyền gọi dịch vụ có phí; mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
 
-BR-11b.1 IMPLEMENTED, chờ review: [ranh giới provider offline](../architecture/BR-11B1-PROVIDER-BOUNDARY.md), mock dùng interface chung, HTTP fixture chỉ loopback, timeout/retry/body size hữu hạn, khóa từ môi trường và provenance có version. Regression dùng server giả lập; chưa mở CLI live. BR-11b.2 provider thật/proof vẫn OPEN.
+BR-11b.1 DONE trong phạm vi [ranh giới provider offline](../architecture/BR-11B1-PROVIDER-BOUNDARY.md), #57 merged `b465fa7`: mock dùng interface chung, HTTP fixture chỉ loopback, timeout/retry/body size hữu hạn, khóa từ môi trường và provenance có version. Review không có lỗi chặn trong scope; learner race/tests/vet, smoke BR-11a và CI 4/4 PASS. Regression dùng server giả lập; chưa mở CLI live. BR-11b.2 provider thật/proof vẫn OPEN; BR-11 giữ IN_PROGRESS.
 
 Liên quan phát hiện 1, 4, 7.
 

@@ -1,6 +1,6 @@
 # BR-11b.1 — Chuẩn bị ranh giới provider, kiểm thử offline
 
-Trạng thái: IMPLEMENTED, chờ review PR. BR-11 vẫn IN_PROGRESS; chưa có live provider hay bằng chứng vận hành thật.
+Trạng thái: DONE trong phạm vi chuẩn bị provider và HTTP fixture offline. [PR #57](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/57) đã review/merge tại `b465fa7`. BR-11 vẫn IN_PROGRESS; chưa có live provider hay bằng chứng vận hành thật.
 
 ## Phạm vi
 
@@ -26,6 +26,8 @@ Request fixture gồm identity, instruction và context; response là AdvisorOut
 Chạy trong `lab/affiliate-bot`: `go test ./...` và `go vet ./...`. Chạy `python3 scripts/smoke_br11a.py` từ gốc repo để kiểm tra CLI mock và store không thay đổi. CI hiện có đã chạy toàn bộ test learner nên bao gồm test mới.
 
 Kiểm tra local ngày 2026-09-07: toàn bộ test/vet learner PASS, regression HTTP với race detector PASS, smoke BR-11a PASS, 8 validators và 10 Python regressions PASS. Có regression ngưỡng response bằng đúng giới hạn và request vượt giới hạn bị chặn trước khi gửi. Chưa coi đây là review độc lập hoặc kết quả CI của PR.
+
+Review head `be6fc3f`: không phát hiện lỗi chặn trong phạm vi offline; đã rà soát loopback/proxy/redirect, vòng retry/deadline/body limit, secret/error output, context preflight và schema/reference/state boundary. Chạy lại toàn bộ learner với race detector và vet PASS; smoke BR-11a PASS; CI 4/4 PASS trước merge. Giới hạn live bên dưới vẫn là điều kiện nghiệm thu riêng, không được suy ra từ fixture.
 
 ## Chưa nghiệm thu
 
