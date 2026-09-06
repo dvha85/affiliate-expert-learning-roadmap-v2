@@ -1,6 +1,6 @@
 # BR-03d.4 — Bảo vệ phép tính thời gian M10/M11
 
-Triển khai trên `codex/br-03d-time-arithmetic`, chờ review. BR-03d.2 đã merge #40 `1c974ca`; BR-03d.3 đã merge #41 `e4616a2`.
+IN_REVIEW tại [PR #42](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/42), commit triển khai `03abfba`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS; chưa merge. BR-03d.2 đã merge #40 `1c974ca`; BR-03d.3 đã merge #41 `e4616a2`.
 
 Bốn phép chuyển giây sang duration ở runtime được kiểm trước phép nhân: window M10/M11, health freshness và health expiry M11. Giới hạn là floor(MaxInt64 / 1 giây) = 9223372036 giây. Không clamp hoặc sửa grant/lease. Window vượt giới hạn trả ledger không đổi + false, gate từ chối LEDGER_MISMATCH; health age vượt giới hạn từ chối INVALID_HEALTH_AGE_LIMIT trước khi cấp authorization. Severe STOP hiện hữu vẫn có ưu tiên.
 
