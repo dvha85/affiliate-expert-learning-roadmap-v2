@@ -2,6 +2,8 @@
 
 ## Phạm vi đã triển khai
 
+**Trạng thái mới nhất:** [BR-03e — audit điều kiện đóng](BR-03E-CLOSURE-AUDIT.md), baseline `e0d3558` sau #42. Ma trận bên dưới là lịch sử khảo sát; không dùng các dòng TODO cũ thay kết luận BR-03e. E-01 precision timestamp và E-02 bằng chứng output theo nhánh còn cần xử lý trước khi đóng; provenance/rollback/crash consistency tách hardening riêng.
+
 BR-03d.2/#40 đã merge `1c974ca`; BR-03d.3/#41 đã merge `e4616a2`. [BR-03d.4 time boundary](M10-M11-TIME-BOUNDARY.md) bảo vệ duration runtime M10/M11, chờ review. Các ghi chú IN_REVIEW bên dưới là lịch sử; rollback/provenance vẫn mở.
 
 BR-03d.1 M09 đã merge #39 `d009d1f`. [BR-03d.2 M10 persistence](M10-PERSISTENCE-BOUNDARY.md) IN_REVIEW tại #40. [BR-03d.3 M11 persistence](M11-PERSISTENCE-BOUNDARY.md) nối schema/strict decode vào ledger/activation reader và writer, exact lease binding, regression restart STOPPED. Ledger legacy không dấu, rollback toàn snapshot và duration arithmetic vẫn còn mở. Các trạng thái phía dưới là lịch sử.
