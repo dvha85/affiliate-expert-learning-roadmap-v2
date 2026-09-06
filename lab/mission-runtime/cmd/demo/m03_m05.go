@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m04"
 	"sort"
 	"strings"
 	"time"
@@ -66,69 +67,18 @@ type HumanActionRecord = m03.HumanActionRecord
 type EffectRef = m03.EffectRef
 type OutcomeRecord = m03.OutcomeRecord
 
-func ValidateEffectRef(ref EffectRef) string { return m03.ValidateEffectRef(ref) }
+func ValidateEffectRef(ref EffectRef) string               { return m03.ValidateEffectRef(ref) }
 func ValidateHumanActionRecord(r HumanActionRecord) string { return m03.ValidateHumanActionRecord(r) }
-func ValidateOutcomeRecord(r OutcomeRecord) string { return m03.ValidateOutcomeRecord(r) }
-func ValidateActionOutcomeLink(a HumanActionRecord, o OutcomeRecord) string { return m03.ValidateActionOutcomeLink(a, o) }
+func ValidateOutcomeRecord(r OutcomeRecord) string         { return m03.ValidateOutcomeRecord(r) }
+func ValidateActionOutcomeLink(a HumanActionRecord, o OutcomeRecord) string {
+	return m03.ValidateActionOutcomeLink(a, o)
+}
 
-type AdvisorEvidence struct {
-	EvidenceID string `json:"evidence_id"`
-	ObservedAt string `json:"observed_at"`
-	SourceRef  string `json:"source_ref"`
-}
-type AdvisorOutput struct {
-	State              string   `json:"state"`
-	Recommendation     string   `json:"recommendation"`
-	Reason             string   `json:"reason"`
-	EvidenceIDs        []string `json:"evidence_ids"`
-	Unknowns           []string `json:"unknowns"`
-	WriteToolRequested bool     `json:"write_tool_requested"`
-}
+type AdvisorEvidence = m04.AdvisorEvidence
+type AdvisorOutput = m04.AdvisorOutput
 
 func EvaluateAdvisorOutput(o AdvisorOutput, ev []AdvisorEvidence, asOf string, maxAgeHours int) string {
-	if state := validateAdvisorFields(o); state != missionValid {
-		return state
-	}
-	if o.State == "ABSTAIN" {
-		return "ABSTAIN"
-	}
-	if o.State != "ADVISE" && o.State != "HUMAN_REVIEW" {
-		return missionInvalid
-	}
-	if len(o.EvidenceIDs) == 0 {
-		return "REJECT_UNGROUNDED"
-	}
-	now, e := time.Parse(time.RFC3339, asOf)
-	if e != nil {
-		return missionInvalid
-	}
-	idx := map[string]AdvisorEvidence{}
-	for _, x := range ev {
-		if strings.TrimSpace(x.EvidenceID) == "" || strings.TrimSpace(x.SourceRef) == "" {
-			return missionInvalid
-		}
-		if _, exists := idx[x.EvidenceID]; exists {
-			return missionInvalid
-		}
-		idx[x.EvidenceID] = x
-	}
-	for _, id := range o.EvidenceIDs {
-		x, ok := idx[id]
-		if !ok {
-			return "REJECT_UNGROUNDED"
-		}
-		at, e := time.Parse(time.RFC3339, x.ObservedAt)
-		if e != nil {
-			return missionInvalid
-		}
-		if at.After(now) {
-			return "ABSTAIN_FUTURE"
-		}
-		if maxAgeHours >= 0 && now.Sub(at) > time.Duration(maxAgeHours)*time.Hour {
-			return "ABSTAIN_STALE"
-		}
-	}
-	return "SUPPORTED"
+	return m04.EvaluateAdvisorOutput(o, ev, asOf, maxAgeHours)
 }
 
 type EvaluationRecord struct {

@@ -69,6 +69,8 @@ jobs:
         run: python scripts/smoke_br10b.py
       - name: BR-10c full learner chain audit
         run: python scripts/smoke_br10c.py
+      - name: BR-11a mock advisor smoke
+        run: python scripts/smoke_br11a.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
