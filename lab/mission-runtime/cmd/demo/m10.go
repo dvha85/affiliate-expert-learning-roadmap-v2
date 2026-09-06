@@ -264,7 +264,9 @@ func normalizedCanaryLedger(l CanaryLedger, g CanaryGrant, now time.Time) (Canar
 	}
 	started, err := time.Parse(time.RFC3339, l.WindowStartedAt)
 	if err != nil || now.Before(started) { return l, false }
-	if now.Sub(started) >= time.Duration(g.WindowSeconds)*time.Second {
+	window, safe := checkedMissionSeconds(g.WindowSeconds)
+	if !safe || g.WindowSeconds < 60 { return l, false }
+	if !now.Before(started.Add(window)) {
 		l.WindowStartedAt = now.Format(time.RFC3339)
 		l.ExecutionsInWindow = 0
 	}

@@ -106,7 +106,7 @@ func TestM10ChainScopeAndTime(t *testing.T) {
 			c.Now = "2026-09-03T08:10:00Z"
 		}},
 		{"large_window", func(s *M10State, c *M10Context) {
-			s.Grant.WindowSeconds = math.MaxInt64
+			s.Grant.WindowSeconds = math.MaxInt64 / 1000000000 // largest runtime-representable seconds
 			s.Grant = SealCanaryGrant(s.Grant)
 			s.Ledger.GrantHash = s.Grant.GrantHash
 			refreshGrantApproval(c, s.Grant)

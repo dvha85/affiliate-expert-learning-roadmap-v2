@@ -354,7 +354,9 @@ func normalizedProductionLedger(l ProductionLedger, lease ProductionLease, now t
 	if l.ControlMode != "NORMAL" && l.ControlMode != "STOPPED" { return l, false }
 	started, err := time.Parse(time.RFC3339, l.WindowStartedAt)
 	if err != nil || now.Before(started) { return l, false }
-	if now.Sub(started) >= time.Duration(lease.WindowSeconds)*time.Second {
+	window, safe := checkedMissionSeconds(lease.WindowSeconds)
+	if !safe || lease.WindowSeconds < 60 { return l, false }
+	if !now.Before(started.Add(window)) {
 		l.WindowStartedAt = now.Format(time.RFC3339)
 		l.ExecutionsInWindow = 0
 	}
@@ -505,7 +507,9 @@ func EvaluateProductionGate(state M11State, ctx M11Context) ProductionGateDecisi
 	if h.ReconciliationRequired { return productionStop(&g, "RECONCILIATION_REQUIRED") }
 	if h.ConsecutiveFailures >= l.MaxConsecutiveFailures { return productionStop(&g, "FAILURE_THRESHOLD") }
 	if h.OldestPendingOutcomeAgeSeconds > l.MaxOutcomeAgeSeconds { return productionStop(&g, "OUTCOME_STALE") }
-	if now.Sub(healthObservedAt) > time.Duration(l.MaxHealthSnapshotAgeSeconds)*time.Second { return productionDegrade(&g, "HEALTH_STALE") }
+	healthAge, safe := checkedMissionSeconds(l.MaxHealthSnapshotAgeSeconds)
+	if !safe { g.Reason = "INVALID_HEALTH_AGE_LIMIT"; return g }
+	if now.After(healthObservedAt.Add(healthAge)) { return productionDegrade(&g, "HEALTH_STALE") }
 	if !h.TelemetryComplete { return productionDegrade(&g, "TELEMETRY_INCOMPLETE") }
 	if h.DependencyState != "HEALTHY" { return productionDegrade(&g, "DEPENDENCY_DEGRADED") }
 
@@ -551,7 +555,9 @@ func AuthorizeProduction(state M11State, ctx M11Context) (ProductionExecutionAut
 	if errNow != nil || errIntent != nil || errLease != nil || errCost != nil || errHealth != nil {
 		g.Decision = "DENY"; g.Reason = "AUTHORIZATION_TIME_INVALID"; return ProductionExecutionAuthorization{}, g, g.Decision
 	}
-	healthExpires := healthObservedAt.Add(time.Duration(state.Lease.MaxHealthSnapshotAgeSeconds) * time.Second)
+	healthAge, safe := checkedMissionSeconds(state.Lease.MaxHealthSnapshotAgeSeconds)
+	if !safe { g.Decision = "DENY"; g.Reason = "INVALID_HEALTH_AGE_LIMIT"; return ProductionExecutionAuthorization{}, g, g.Decision }
+	healthExpires := healthObservedAt.Add(healthAge)
 	expires := minTime(minTime(intentExpires, leaseExpires), minTime(costExpires, healthExpires))
 	if !expires.After(now) {
 		g.Decision = "DEGRADE"; g.Reason = "HEALTH_STALE"; return ProductionExecutionAuthorization{}, g, g.Decision
