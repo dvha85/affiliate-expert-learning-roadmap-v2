@@ -26,6 +26,12 @@ Script build hai binary vào TemporaryDirectory, GOWORK=off, copy fixture synthe
 
 Full regression: tests/vet bốn module core, contracts, lab/affiliate-bot, lab/mission-runtime với GOWORK=off; 8 validators và 10 Python regressions. CI bổ sung smoke hai binary trong deterministic-runtime; mission-runtime vẫn chạy core với toolchain riêng và demo cũ.
 
+### Kết quả kiểm chứng ngày 2026-09-06
+
+Clone local độc lập bằng `git clone --no-local --branch codex/br-08e-acceptance` tại snapshot `f5730c0`: smoke PASS cả bốn case M03, usage và M02 capture/duplicate/list/replay; tests/vet cả bốn module PASS; 8 validators và 10 Python regressions PASS. `git status --porcelain` trống trước và sau kiểm thử. Sau snapshot này, bước smoke CI được chuyển xuống sau setup-python để dùng Python 3.12 đã khai báo.
+
+Đây là clone sạch từ repository local, dùng Go/toolchain/cache đã có trên máy; không phải bằng chứng cài đặt cold-cache, clone remote trên máy người mới hoặc vận hành affiliate thật.
+
 ## Kết luận đề xuất
 
 READY_FOR_REVIEW cho BR-08 trong phạm vi shared M03 + learner CLI read-only + store seam M02. Chỉ đổi BR-08 DONE sau review/merge PR nghiệm thu và chấp thuận scope. Không claim pilot máy người mới/Windows, toàn bộ Bot liên tục M00–M11 hoặc production-ready.

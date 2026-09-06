@@ -49,8 +49,6 @@ jobs:
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
-      - name: BR-08 learner and harness integration smoke
-        run: python3 scripts/smoke_br08.py
       - name: Embedded canonical schema tests
         working-directory: contracts
         run: |
@@ -61,6 +59,8 @@ jobs:
           python-version: "3.12"
       - name: Beginner quickstart isolated-clone smoke
         run: python scripts/smoke_quickstart.py
+      - name: BR-08 learner and harness integration smoke
+        run: python scripts/smoke_br08.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
