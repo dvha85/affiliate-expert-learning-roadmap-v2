@@ -61,6 +61,8 @@ jobs:
         run: python scripts/smoke_quickstart.py
       - name: BR-08 learner and harness integration smoke
         run: python scripts/smoke_br08.py
+      - name: BR-09 evidence import continuity smoke
+        run: python scripts/smoke_br09.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...

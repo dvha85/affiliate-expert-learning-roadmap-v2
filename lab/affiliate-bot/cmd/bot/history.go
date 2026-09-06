@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
@@ -93,6 +94,13 @@ func inputHash(observations []Observation) (string, error) {
 }
 
 func validateCanonicalHistoryObservation(observation Observation, asOfTime time.Time) error {
+	raw, err := json.Marshal(observation)
+	if err != nil {
+		return err
+	}
+	if _, err := m00.SourceFields(raw); err != nil {
+		return err
+	}
 	if strings.TrimSpace(observation.ObservationID) == "" {
 		return errors.New("observation_id is required for M02 history")
 	}
@@ -135,6 +143,9 @@ func validateCanonicalHistoryObservation(observation Observation, asOfTime time.
 }
 
 func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observation) (HistoryRecord, error) {
+	if err := validateImportIdentities(observations); err != nil {
+		return HistoryRecord{}, err
+	}
 	raw, err := json.Marshal(observations)
 	if err != nil {
 		return HistoryRecord{}, err
@@ -186,6 +197,9 @@ func NewHistoryRecord(recordID, asOf, ingestedAt string, observations []Observat
 }
 
 func validateHistoryRecord(record HistoryRecord) error {
+	if err := validateImportIdentities(record.Observations); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(record)
 	if err != nil {
 		return err
@@ -232,6 +246,34 @@ func validateHistoryRecord(record HistoryRecord) error {
 	}
 	if hash != record.InputHash {
 		return fmt.Errorf("input_hash mismatch for %s", record.RecordID)
+	}
+	return nil
+}
+
+// Raw field IDs and derived observation IDs share one namespace per snapshot.
+func validateImportIdentities(observations []Observation) error {
+	seen := map[string]bool{}
+	for _, observation := range observations {
+		if seen[observation.ObservationID] {
+			return fmt.Errorf("duplicate observation_id %s", observation.ObservationID)
+		}
+		seen[observation.ObservationID] = true
+	}
+	for _, observation := range observations {
+		raw, err := json.Marshal(observation)
+		if err != nil {
+			return err
+		}
+		fields, err := m00.SourceFields(raw)
+		if err != nil {
+			return err
+		}
+		for _, field := range fields {
+			if seen[field.ObservationID] {
+				return fmt.Errorf("duplicate source observation_id %s", field.ObservationID)
+			}
+			seen[field.ObservationID] = true
+		}
 	}
 	return nil
 }
@@ -304,6 +346,31 @@ func appendHistoryWith(storage store.History, path string, record HistoryRecord)
 		}
 		for _, previousObservation := range old.Observations {
 			for _, candidateObservation := range record.Observations {
+				previousRaw, _ := json.Marshal(previousObservation)
+				candidateRaw, _ := json.Marshal(candidateObservation)
+				previousFields, err := m00.SourceFields(previousRaw)
+				if err != nil {
+					return "", err
+				}
+				candidateFields, err := m00.SourceFields(candidateRaw)
+				if err != nil {
+					return "", err
+				}
+				for _, field := range previousFields {
+					if field.ObservationID == candidateObservation.ObservationID {
+						return "", fmt.Errorf("CONFLICT: source ID reused as aggregate ID")
+					}
+					for _, candidate := range candidateFields {
+						if field.ObservationID == candidate.ObservationID && !reflect.DeepEqual(field, candidate) {
+							return "", fmt.Errorf("CONFLICT: source observation_id %s reused with different content", field.ObservationID)
+						}
+					}
+				}
+				for _, field := range candidateFields {
+					if field.ObservationID == previousObservation.ObservationID {
+						return "", fmt.Errorf("CONFLICT: aggregate ID reused as source ID")
+					}
+				}
 				if previousObservation.ObservationID == candidateObservation.ObservationID && !reflect.DeepEqual(previousObservation, candidateObservation) {
 					return "", fmt.Errorf("CONFLICT: observation_id %s reused with different content", candidateObservation.ObservationID)
 				}

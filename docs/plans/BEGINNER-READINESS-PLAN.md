@@ -311,6 +311,8 @@ Các tên lệnh dưới đây là **giao diện đề xuất, chưa tồn tại
 
 ### BR-09 — M00 evidence sang M01/M02 có hướng dẫn và converter
 
+Triển khai: [profile, mapping và bài thực hành t1/t2](../../examples/m00-import/README.md), core/m00 và learner evidence import read-only; giữ provenance trong transformation hiện có, không migration. Smoke scripts/smoke_br09.py kiểm input → history → DecisionPacket, restart/replay, source-ID conflict và projection tamper. IN_PROGRESS đến review/merge; checklist nghiệm thu chưa tự đóng. Chỉ synthetic lab, không thay M00 E1 hoặc learner pilot.
+
 Liên quan phát hiện 8.
 
 - [ ] Thêm một packet mẫu đầy đủ trong khu vực examples mới, có nguồn/gắn nhãn đúng và không lẫn file evidence cá nhân.

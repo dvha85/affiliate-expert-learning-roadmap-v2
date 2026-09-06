@@ -1,0 +1,46 @@
+{
+  "version": "m00-input/v1",
+  "question": "Synthetic: so sánh commission theo scenario; chưa chọn chương trình affiliate.",
+  "products": [
+    {
+      "observation_id": "br09-product-a-t2",
+      "subject_id": "offer-a",
+      "product_name": "Synthetic offer A",
+      "currency": "USD",
+      "fields": [
+        {
+          "observation_id": "br09-price-t2",
+          "subject_id": "offer-a",
+          "source_ref": "fixture:br09-t2",
+          "observed_at": "2026-09-02T00:00:00Z",
+          "access_method": "local_fixture",
+          "evidence_kind": "synthetic",
+          "use_context": "test",
+          "field_or_claim": "price",
+          "claim_kind": "assumption",
+          "value": 100,
+          "state": "observed",
+          "source_authority_or_role": "synthetic_fixture",
+          "transformation_or_method": "none",
+          "limitation": "Synthetic lab fixture; no account, offer or market verification."
+        },
+        {
+          "observation_id": "br09-commission_rate-t2",
+          "subject_id": "offer-a",
+          "source_ref": "fixture:br09-t2",
+          "observed_at": "2026-09-02T00:00:00Z",
+          "access_method": "local_fixture",
+          "evidence_kind": "synthetic",
+          "use_context": "test",
+          "field_or_claim": "commission_rate",
+          "claim_kind": "assumption",
+          "value": 0.08,
+          "state": "observed",
+          "source_authority_or_role": "synthetic_fixture",
+          "transformation_or_method": "none",
+          "limitation": "Synthetic lab fixture; no account, offer or market verification."
+        }
+      ]
+    }
+  ]
+}
