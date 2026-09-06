@@ -2,6 +2,8 @@
 
 Trạng thái: triển khai chờ review, BR-10 chưa DONE. Baseline BR-09 lab đã merge #52. Không có chương trình/kênh thật; mọi ví dụ dưới đây là synthetic, không là proof đã đăng bài.
 
+PR: [#53](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/53), chưa merge. Local tests/vet bốn module, 8 validators, 10 Python regressions và smoke BR-08/09/10a PASS.
+
 ## Quyết định store và authority
 
 Giữ history M02 nguyên format/hash/formula. File `actions.jsonl` riêng chỉ chứa canonical ActionRecord, mỗi dòng một record; không nhét action vào history hoặc dùng state harness M09–M11. Learner application trong cmd/bot chịu trách nhiệm resolve/replay/duplicate/conflict; `internal/store.JSONL` chỉ I/O, dùng giới hạn chung 1 MiB/record. M03 schema và semantics dùng shared core, không copy validator.
