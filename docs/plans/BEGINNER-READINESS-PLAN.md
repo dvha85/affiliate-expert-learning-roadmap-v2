@@ -80,7 +80,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; #53/#54 merged; BR-10c [#55](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/55) chờ nghiệm thu lab; importer nền tảng còn mở |
-| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | Codex; BR-11a [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) chờ review, live provider/proof còn mở |
+| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | BR-11a mock offline DONE, #56 merged `3daed32`; BR-11b live provider/proof còn mở |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
@@ -352,6 +352,10 @@ Liên quan phát hiện 1, 2, 6.
 Nghiệm thu: action và outcome thật hoặc fixture được gắn nhãn đi vào cùng store; list/query chứng minh continuity; proof thực tế do học viên thực hiện riêng, không được sinh ra từ fixtures.
 
 ### BR-11 — M04 advisor có adapter thực
+
+BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) `3daed32`: [hướng dẫn/kết luận](../architecture/BR-11A-MOCK-ADVISOR.md). Context từ store, exact IDs, source/time/payload, max_age 0..8760; mock HUMAN_REVIEW, schema/reference/freshness guards, read-only. CI 4/4 và tests/vet/smoke chạy lại PASS.
+
+BR-11b còn OPEN: chọn provider/model được phép dùng, cấu hình secret qua môi trường, timeout/retry hữu hạn, ghi version context/prompt/provider và proof live riêng. Chưa chọn provider hoặc cấp quyền gọi dịch vụ có phí; mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
 
 Liên quan phát hiện 1, 4, 7.
 

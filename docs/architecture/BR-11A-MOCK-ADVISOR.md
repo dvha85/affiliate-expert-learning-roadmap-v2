@@ -1,8 +1,8 @@
 # BR-11a — Mock advisor M04 offline
 
-Triển khai chờ review; BR-11 chưa DONE. BR-10 lab đã audit/merge #55 `6d311a8`. Mock này đọc history/action/outcome canonical JSON, tạo context có version và trả HUMAN_REVIEW; không gọi provider, không ghi store, không thực thi.
+BR-11a DONE trong phạm vi mock offline; BR-11 tổng thể chưa DONE. BR-10 lab đã audit/merge #55 `6d311a8`. Mock này đọc history/action/outcome canonical JSON, tạo context có version và trả HUMAN_REVIEW; không gọi provider, không ghi store, không thực thi.
 
-PR: [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56), chưa merge. Kiểm thử ngày 2026-09-07: tests/vet bốn module, 8 validators, 10 Python regressions và smoke BR-11a PASS. Core M04 được chuyển khỏi harness; static semantic validator đọc implementation mới ở core/m04.
+PR: [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) đã review/merge `3daed32`. Review head `3e8b183` ngày 2026-09-07: không finding chặn trong scope mock offline; smoke BR-11a và tests/vet core/learner/harness chạy lại PASS, CI 4/4 PASS. Trước review: tests/vet bốn module, 8 validators và 10 Python regressions PASS. Core M04 được chuyển khỏi harness; static semantic validator đọc implementation mới ở core/m04.
 
 ## Lệnh
 
