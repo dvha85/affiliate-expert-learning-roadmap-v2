@@ -1,5 +1,7 @@
 # BR-03c.6 — M09: kiểm artifact, không cấp quyền
 
+Cập nhật: [BR-03d.1](M09-PERSISTENCE-BOUNDARY.md) bảo vệ Load/Persist riêng; nội dung dưới đây mô tả CLI m09-check ban đầu.
+
 Trạng thái: IN_REVIEW tại [PR #33](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/33). Commit triển khai `8dcd376`; chưa merge. Xem [CI theo head PR](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/33/checks).
 
 Kiểm local: tests/vet ba module PASS, 8 Python validators và 10 Python regressions PASS, diff check PASS. CLI fixture xuất CONSISTENT_UNVERIFIED/CANCELLED/NOT_PERFORMED với hai flag quyền false. CI phải kiểm riêng theo head PR.

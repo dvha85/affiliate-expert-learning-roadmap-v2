@@ -2,6 +2,8 @@
 
 ## Phạm vi đã triển khai
 
+BR-03c.8b đã merge #37 `28cee8d`; overflow cost M10 đã merge #38 `0744f6a`. [BR-03d.1 M09 persistence](M09-PERSISTENCE-BOUNDARY.md) nối raw validation vào Load/Persist, giữ số JSON và marker restart. Reader M10/M11 còn mở; các trạng thái cũ dưới đây là lịch sử.
+
 BR-03c.8 đã merge #36 `fa9b9db`. [BR-03c.8b M11 chain audit](M11-CHAIN-AUDIT.md) kiểm issuance/cycle và profile resolved-stop chưa commit ledger, với snapshot rõ ràng; không xác thực provenance hoặc tích hợp trusted persistence/executor. BR-03 tổng thể còn mở.
 
 BR-03c.7b đã merge #35 `07c1b8a`. [BR-03c.8 M11 artifact boundary](M11-JSON-BOUNDARY.md) kiểm 11 loại file riêng, lease/health hash, time và ledger self-consistency. Full chain M11 và trusted persistence/executor chưa tích hợp.
