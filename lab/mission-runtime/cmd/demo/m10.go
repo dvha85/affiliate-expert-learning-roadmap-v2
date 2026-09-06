@@ -267,7 +267,7 @@ func normalizedCanaryLedger(l CanaryLedger, g CanaryGrant, now time.Time) (Canar
 	window, safe := checkedMissionSeconds(g.WindowSeconds)
 	if !safe || g.WindowSeconds < 60 { return l, false }
 	if !now.Before(started.Add(window)) {
-		l.WindowStartedAt = now.Format(time.RFC3339)
+		l.WindowStartedAt = now.Format(time.RFC3339Nano)
 		l.ExecutionsInWindow = 0
 	}
 	return l, true
@@ -395,7 +395,7 @@ func AuthorizeCanary(state M10State, ctx M10Context) (CanaryExecutionAuthorizati
 		CanaryGrantID: state.Grant.GrantID, CanaryGrantVersion: state.Grant.GrantVersion, CanaryGrantHash: state.Grant.GrantHash,
 		CanaryGateID: gate.GateID, CanaryCostBoundID: state.CostBound.CostBoundID, CanaryCostBoundHash: state.CostBound.CostBoundHash,
 		CanaryCostBoundMinor: state.CostBound.MaxCostMinor, ExecutorID: ctx.Executor.ExecutorID, AuthorizedAt: ctx.Now,
-		ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID,
+		ExpiresAt: expires.Format(time.RFC3339Nano), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID,
 		ExecutionMode: "GOVERNED_CANARY", ExecutionAuthorized: true,
 	}
 	return auth, gate, "AUTHORIZED"
