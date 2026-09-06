@@ -77,7 +77,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
 | BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
-| BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | TODO | Chưa phân công |
+| BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | IN_PROGRESS | Codex; BR-08a [ADR-003](../architecture/ADR-003-SHARED-CORE-CLI-STORE.md) Proposed, chờ review; chưa refactor; BR-08b–e còn TODO |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | TODO | Chưa phân công |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | TODO | Chưa phân công |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | TODO | Chưa phân công |
@@ -277,6 +277,8 @@ Smoke bài tập trong bản sao tạm riêng: bài A đổi valid_orders từ 0
 ## 7. Đợt C — Cùng một bot từ M00 đến M05
 
 ### BR-08 — Shared core, entrypoint và quyền sở hữu state
+
+BR-08a: Codex khảo sát baseline `8c7c86d`, [ADR-003](../architecture/ADR-003-SHARED-CORE-CLI-STORE.md) đề xuất module core riêng, extract M03 trước, giữ history M02 và CLI cũ. ADR đang Proposed/chờ review; chưa đánh dấu checklist thiết kế Accepted hoặc BR-08 DONE. Lộ trình BR-08b–e và tiêu chí nghiệm thu ở ADR; mọi lệnh mới chỉ là đề xuất.
 
 Liên quan phát hiện 1, 8.
 
