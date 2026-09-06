@@ -79,7 +79,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
-| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; BR-10a [#53](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/53) chờ review; outcome và nghiệm thu còn mở |
+| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; BR-10a #53 merged; BR-10b [#54](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/54) chờ review; nghiệm thu còn mở |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | TODO | Chưa phân công |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
@@ -325,6 +325,8 @@ Liên quan phát hiện 8.
 Nghiệm thu: packet → input → history → quyết định resolve được ID; thiếu commission trả trạng thái trung thực; duplicate/conflict và replay có test; có ví dụ lệnh lẫn output đầy đủ.
 
 ### BR-10 — M03 action/outcome importer vào bot
+
+Hiện hành: BR-10a #53 đã review/merge `765ac70`. [BR-10b outcome store/import/list](../architecture/BR-10B-OUTCOME-STORE.md) đang triển khai chờ review; canonical JSON synthetic, EffectRef/time/pending/zero/duplicate/conflict/orphan được kiểm. Chưa importer nền tảng/live report, chưa chốt BR-10 DONE. Ghi chú BR-10a chờ review bên dưới là lịch sử.
 
 BR-10a triển khai chờ review: [action store riêng và CLI record/list](../architecture/BR-10A-ACTION-STORE.md), resolve exact decision trong history/replay MATCH; fixture synthetic, không execution. Tests duplicate/conflict/orphan/path alias/corrupt store và restart smoke. BR-10 chưa DONE; outcome import/linkage và nghiệm thu tổng thể còn mở.
 

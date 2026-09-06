@@ -2,7 +2,7 @@
 
 Trạng thái: triển khai chờ review, BR-10 chưa DONE. Baseline BR-09 lab đã merge #52. Không có chương trình/kênh thật; mọi ví dụ dưới đây là synthetic, không là proof đã đăng bài.
 
-PR: [#53](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/53), chưa merge. Local tests/vet bốn module, 8 validators, 10 Python regressions và smoke BR-08/09/10a PASS.
+PR: [#53](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/53) đã review/merge `765ac70`. Review scope lab không finding chặn; tests/vet learner và smoke BR-10a chạy lại PASS, CI 4/4 PASS. Các ghi chú chờ review ở đầu là lịch sử, BR-10 tổng thể vẫn mở.
 
 ## Quyết định store và authority
 
