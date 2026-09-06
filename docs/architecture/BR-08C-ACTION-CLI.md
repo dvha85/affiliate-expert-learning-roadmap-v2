@@ -1,5 +1,7 @@
 # BR-08c — M03 qua learner CLI
 
+IN_REVIEW: [PR #49](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/49), commit `f1826e4`. Tests/vet bốn module, binary integration tests, 8 validators và 10 Python regressions local PASS. Chưa merge.
+
 BR-08b đã review/merge #48 `56a1ccf`, CI 4/4 PASS. BR-08c nối `cmd/bot` → `internal/app` → `core/m03` → contracts; không gọi harness hoặc copy validation. Store/record/import thuộc BR-08d/BR-10, chưa triển khai.
 
 ## Chạy trong cùng Bot
