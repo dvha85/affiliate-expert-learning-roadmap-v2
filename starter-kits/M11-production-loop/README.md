@@ -28,3 +28,6 @@ Chỉ activate production khi:
 - recovery runbook (sổ tay phục hồi) đã thử;
 - ImprovementProposal vẫn `auto_apply=false`;
 - không có đường code cho Bot tự renew/widen authority.
+# Persistence boundary
+
+Xem [BR-03d.3: ledger/activation validation và giới hạn restart](../../docs/architecture/M11-PERSISTENCE-BOUNDARY.md). Đây là kiểm thử sandbox, không cấp quyền affiliate live.

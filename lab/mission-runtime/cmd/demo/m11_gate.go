@@ -54,7 +54,7 @@ func EnforceProductionGate(state *M11State, ctx M11Context, dir string) (Product
 		return ProductionGateDecision{Decision:"STOP",Reason:"ACTIVATION_STATE_MISSING"}, "STOP_ACTIVATION_STATE_MISSING"
 	}
 	ledgerPath := productionLedgerPath(dir, state.Lease.LeaseID, state.Lease.LeaseVersion)
-	ledger, err := loadProductionLedger(ledgerPath)
+	ledger, err := loadProductionLedger(ledgerPath, state.Lease)
 	if os.IsNotExist(err) {
 		return ProductionGateDecision{Decision:"STOP",Reason:"LEDGER_MISSING"}, "STOP_LEDGER_MISSING"
 	}
