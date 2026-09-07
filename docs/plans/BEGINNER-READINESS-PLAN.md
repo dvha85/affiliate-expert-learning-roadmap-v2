@@ -454,6 +454,8 @@ BR-17d đang triển khai/review: [M11 lifecycle/STOP/reconciliation boundary](.
 
 BR-18a đang triển khai/review: [runbook deployment/recovery 24/7](../architecture/BR-18A-DEPLOYMENT-RECOVERY-RUNBOOK.md) yêu cầu runtime/resource limits, backup checksum, restore/replay, STOP drill và human review. Chưa chọn host/backup target nên evidence vẫn UNVERIFIED.
 
+BR-18b đang triển khai/review: [backup/restore smoke offline](../architecture/BR-18B-BACKUP-RESTORE-SMOKE.md) kiểm checksum/tamper, byte-identical restore và durable STOP marker trong thư mục tạm. Đây chưa phải storage/host evidence 24/7; BR-18 vẫn IN_PROGRESS.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
