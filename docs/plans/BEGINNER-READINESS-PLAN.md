@@ -404,6 +404,8 @@ Nghiệm thu: chạy được một câu hỏi với artifact của BR-10; hallu
 
 ### BR-12 — M05 evaluation, đề xuất và review
 
+BR-12b IN_REVIEW: [evaluation store/CLI](../architecture/BR-12B-EVALUATION-STORE.md), baseline `46f3d66`, nhánh `codex/br-12b-evaluation-store`. Tạo record INCONCLUSIVE từ exact decision/action/outcome, replay history, kiểm thời gian và đọc lại store; duplicate/conflict, corrupt/alias/framing bị chặn. Chưa protocol kết luận hiệu quả, proposal/review store hoặc walkthrough đầy đủ; BR-12 cha IN_PROGRESS. Không API thật hoặc thay campaign.
+
 BR-12a DONE phạm vi [tách M05 dùng chung](../architecture/BR-12A-SHARED-M05.md), [#69](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/69) merged `1cad062`, head `db477a0`, baseline `9862d9a`. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet, 8 validators và CI 4/4 PASS. Di chuyển types/validators/raw boundary vào core, harness giữ wrappers; validator repo đọc implementation mới, không nới marker. Không thay semantics/schema, không CLI/store learner hoặc API thật. Tiếp theo nối evaluation store trong BR-12b; BR-12 cha IN_PROGRESS và checklist vẫn mở.
 
 Liên quan phát hiện 1, 2.
