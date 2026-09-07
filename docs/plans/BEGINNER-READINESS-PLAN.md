@@ -440,6 +440,8 @@ BR-15b đang triển khai/review: [contract adversarial M07](../architecture/BR-
 
 BR-15c đang triển khai/review: [contract parse output M07](../architecture/BR-15C-M07-OUTPUT-CONTRACT.md), chỉ nhận output có evidence IDs resolve được, `HUMAN_REVIEW`, `A2-RO`, `write_permission=false`; forged/missing/write/escalated output đều `ABSTAIN`. Chưa có model/n8n integration evidence; BR-15 cha TODO.
 
+BR-16a đang triển khai/review: [offline end-to-end continuity smoke](../architecture/BR-16A-OFFLINE-E2E-SMOKE.md) chạy lại các smoke M00→M06 bằng fixture, kiểm tra continuity/restart/replay/failure. Đây chưa phải pilot người mới hay business/live proof; BR-16 cha TODO.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
