@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,8 +75,8 @@ for marker in ["Watcher cache (bộ nhớ đệm) != canonical history", "canoni
     if marker not in m06_lesson:
         errors.append(f"M06 lesson boundary marker missing: {marker}")
 
-m06_runtime = (ROOT / "lab/mission-runtime/cmd/demo/m06_m07.go").read_text(encoding="utf-8")
-if "ObservationID string `json:\"observation_id\"`" not in m06_runtime:
+m06_runtime = (ROOT / "core/m06/m06.go").read_text(encoding="utf-8")
+if not re.search(r'ObservationID\s+string\s+`json:"observation_id"`', m06_runtime):
     errors.append("M06 conformance runtime must emit canonical observation_id")
 
 if errors:
