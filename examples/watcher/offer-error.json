@@ -1,0 +1,1 @@
+{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-05T00:00:00Z","correlation_id":"example-event-3","status_code":503,"body":"service unavailable"}

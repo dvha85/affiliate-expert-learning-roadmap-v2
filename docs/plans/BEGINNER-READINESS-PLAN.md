@@ -426,6 +426,8 @@ Nghiệm thu: đi trọn M00 → M05 trong một workspace với artifact links 
 
 ### BR-13 — M06 fetch/normalize/history handoff thực
 
+BR-13b triển khai/review: [fixture parser và history handoff](../architecture/BR-13B-FIXTURE-HANDOFF.md), baseline `0e47b30`, nhánh `codex/br-13b-fixture-handoff`. CLI profile/URL/method cố định, không fetch; map qua M00, exact event retry/conflict, ACK sau AppendHistory, restart/replay. Fixture có nguồn giả lập/assumption, missing không zero. BR-13 cha IN_PROGRESS; nguồn thực được phép và proof fetch thuộc BR-13c, chưa dùng fixture thay nghiệm thu thật.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
