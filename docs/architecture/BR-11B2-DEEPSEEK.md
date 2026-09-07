@@ -1,5 +1,11 @@
 # BR-11b.2 — DeepSeek V4 Flash
 
+## BR-10 context và accepted output trong ledger
+
+Runner nội bộ `runBR10RecordedCampaignAttempt` tạo bundle synthetic qua store BR-10, kiểm hash fixture versioned, giữ reservation durable trước khi gọi provider và lưu `br11-result/v2`. Chỉ SUPPORTED/ABSTAIN có output nội dung; lỗi/reject chỉ lưu status/context/usage nếu biết. Đọc lại kiểm hash context cố định, grounding, trạng thái output và liên kết reservation. Payload JSON được chuẩn hóa trước persistence để đọc lại không đổi bytes.
+
+`br11-result/v1` vẫn metadata-only, giữ digest và bytes cũ. Hai version dùng chung giới hạn tối đa sáu reservation $0.50; không refund/recreate. Tests trộn version, sửa context/hash/output, output bị từ chối và DeepSeek loopback có usage. Mọi campaign trong tests đều ở thư mục tạm; chưa mở live CLI, chưa gọi API hoặc tiêu ngân sách thật. Bundle fixture partial có thể tồn tại nếu lỗi; không tự sửa/xóa, không dùng nó thay result ledger. Hash cố định là ràng buộc fixture, không phải chữ ký chống tác nhân có quyền sửa toàn bộ repo/ledger.
+
 Người dùng chọn DeepSeek V4 Flash, cho phép tối đa 100 lượt thử với tổng ngân sách $3, chỉ dữ liệu giả lập. Quyền này không cho phép gửi dữ liệu kinh doanh thật hoặc bật thực thi.
 
 ## Bước 1: adapter giao thức (đã merge)
