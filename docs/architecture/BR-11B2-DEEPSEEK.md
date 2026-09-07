@@ -14,7 +14,9 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
-### Result ledger — đang chờ review
+### Result ledger — đã review/merge trong phạm vi metadata offline
+
+[#61](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/61) merged `75f8f7b`, head sửa `92eb078`. Review không còn lỗi chặn trong phạm vi nội bộ sau hai bản sửa dưới đây; tests/race/vet, smoke BR-11a, 8 validators và CI 4/4 PASS. Không nghiệm thu live, hóa đơn hoặc nội dung khuyến nghị. Không phát sinh API request trong quá trình review.
 
 Review #61 bổ sung hai chốt: context digest phải khớp fixture campaign hiện hành, không chỉ là hex 64 ký tự; reader/result writer phải xác minh manifest và thư mục campaign. Regression thay digest bằng hash khác vẫn đúng định dạng hoặc thay manifest, kiểm read/reserve/persist đều từ chối. Khi thay fixture phải version campaign rõ, không dùng fixture mới để diễn giải ledger cũ.
 
