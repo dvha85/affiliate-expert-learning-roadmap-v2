@@ -79,6 +79,8 @@ jobs:
         run: python scripts/smoke_br13c.py
       - name: BR-14a n8n M06 static contract
         run: python scripts/validate_n8n_m06.py
+      - name: BR-14b n8n M06 case contract
+        run: python scripts/validate_n8n_m06_cases.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...

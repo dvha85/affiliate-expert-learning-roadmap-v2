@@ -432,6 +432,8 @@ BR-13c đã triển khai và review, bàn giao qua [PR #76](https://github.com/d
 
 BR-14a đang triển khai/review: [hợp đồng tĩnh M06 n8n](../architecture/BR-14A-N8N-STATIC-CONTRACT.md), validator kiểm tra node/GET-only/change detection/cache boundary/history handoff và chạy trong CI. Đây không thay thế engine smoke; `tested_n8n_version` vẫn `UNVERIFIED` cho tới khi có instance n8n thật và execution evidence. BR-14 cha TODO.
 
+BR-14b đang triển khai/review: [runbook smoke M06](../architecture/BR-14B-N8N-SMOKE-RUNBOOK.md) và case contract offline. Runbook yêu cầu engine version, import result, execution IDs, history refs, credential scope; case contract chỉ kiểm tra trước các bất biến NEW/UNCHANGED/CHANGED, key-order, oversized response và sink failure. Chưa có n8n instance nên chưa tạo integration evidence; BR-14 cha TODO.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
