@@ -234,6 +234,9 @@ func runHistory(args []string) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "proposal" || os.Args[1] == "review") {
+		os.Exit(runImprovementStore(os.Args[1], os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "evaluation" {
 		os.Exit(runEvaluationStore(os.Args[2:], os.Stdout, os.Stderr))
 	}

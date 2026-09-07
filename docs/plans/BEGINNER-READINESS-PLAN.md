@@ -404,6 +404,8 @@ Nghiệm thu: chạy được một câu hỏi với artifact của BR-10; hallu
 
 ### BR-12 — M05 evaluation, đề xuất và review
 
+BR-12c đã triển khai và kiểm thử: [proposal/human review store](../architecture/BR-12C-PROPOSAL-REVIEW-STORE.md), bàn giao/nghiệm thu qua [PR #72](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/72) (trạng thái merge và CI xem tại PR), baseline `784fdd5`, implementation `d9f0492`. Codex thực hiện/review theo quyền chủ repo; learner tests/race/vet và 8 validators PASS. Import/list dùng M05 raw boundary, resolve evaluations/proposal đã lưu và thời gian review; explicit risk/version/rollback, auto_apply=false, không execution. Một writer trusted workspace, human là khai báo chưa xác thực, chưa chọn review hiệu lực tự động. BR-12d walkthrough/FAIL-PASS/rollback còn mở; BR-12 cha IN_PROGRESS.
+
 BR-12b DONE phạm vi [evaluation store/CLI](../architecture/BR-12B-EVALUATION-STORE.md), [#70](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/70) merged `051e6fa`, head `c5b354a`, baseline `46f3d66`. Codex thực hiện/review theo quyền chủ repo; learner tests/race/vet, 8 validators và CI 4/4 PASS, regression evaluation chạy lại PASS trước merge. Tạo record INCONCLUSIVE từ exact decision/action/outcome, replay history, kiểm thời gian và đọc lại store; duplicate/conflict, corrupt/alias/framing bị chặn. Tiếp theo BR-12c: proposal/review store; protocol kết luận hiệu quả và walkthrough đầy đủ chưa có. BR-12 cha IN_PROGRESS. Không API model thật hoặc thay campaign.
 
 BR-12a DONE phạm vi [tách M05 dùng chung](../architecture/BR-12A-SHARED-M05.md), [#69](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/69) merged `1cad062`, head `db477a0`, baseline `9862d9a`. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet, 8 validators và CI 4/4 PASS. Di chuyển types/validators/raw boundary vào core, harness giữ wrappers; validator repo đọc implementation mới, không nới marker. Không thay semantics/schema, không CLI/store learner hoặc API thật. Tiếp theo nối evaluation store trong BR-12b; BR-12 cha IN_PROGRESS và checklist vẫn mở.
@@ -411,8 +413,8 @@ BR-12a DONE phạm vi [tách M05 dùng chung](../architecture/BR-12A-SHARED-M05.
 Liên quan phát hiện 1, 2.
 
 - [x] Tạo EvaluationRecord từ exact decision/effect/outcome chain (#70, conservative v1 INCONCLUSIVE).
-- [ ] Sinh hoặc nhập ImprovementProposal với version, benefit, risk và rollback.
-- [ ] Lệnh nhập Human ReviewRecord; giữ auto_apply=false.
+- [x] Sinh hoặc nhập ImprovementProposal với version, benefit, risk và rollback (BR-12c, #72: importer lab).
+- [x] Lệnh nhập Human ReviewRecord; giữ auto_apply=false (BR-12c, #72; human khai báo, không execution).
 - [ ] Viết một bài thay đổi nhỏ đã review: regression FAIL trước sửa, PASS sau sửa và rollback về version trước.
 - [ ] Có case dữ liệu ít → INCONCLUSIVE/thu thập thêm, không ép kết luận “cải tiến hiệu quả”.
 
