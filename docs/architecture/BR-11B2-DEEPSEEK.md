@@ -16,6 +16,8 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 Bước 2a đang triển khai: `advisor_budget.go` có ledger reservation nội bộ và runner fixture cố định. Khởi tạo phải gọi riêng, không tự tạo lại khi thiếu; mkdir lock loại trừ writer đồng thời, reservation file O_EXCL + fsync file/directory trước khi provider được gọi. Restart đọc lại các file liên tục và manifest exact. File hỏng/thiếu giữa chuỗi hoặc lock còn lại sau crash đều dừng; không tự sửa/reset. Không hoàn tiền dự phòng và không retry.
 
+Review #59 phát hiện đọc manifest/reservation chưa giới hạn kích thước và có thể treo với FIFO. Bản sửa kiểm regular file bằng Lstat trước khi mở, giới hạn size theo độ dài canonical và đọc tối đa limit+1. Regression kiểm manifest và reservation quá lớn, FIFO trên Linux/macOS. Không bảo vệ khỏi tác nhân local thay thế path đồng thời; giới hạn trusted directory vẫn giữ nguyên. #59 chưa được nghiệm thu chỉ dựa trên CI của head cũ.
+
 Reservation tạm thời là 500.000 microUSD ($0,50)/lượt; cap $3 nên chỉ cho tối đa 6 lượt, dù quyền người dùng là tối đa 100. Đây là chính sách bảo thủ để test ledger, **không phải bằng chứng về trần phí thực tế của provider**. Chưa có đối soát usage/giá, chưa có báo cáo kết quả lưu bền và chưa có CLI live. Không được bật live dựa riêng vào ledger này.
 
 Giới hạn ledger: dành cho thư mục local tin cậy, không chống người dùng xóa/rollback toàn bộ dữ liệu hoặc tạo campaign mới ở đường dẫn khác. Chưa bảo vệ đường dẫn khỏi tác nhân local độc hại; trước live phải chốt một campaign path do ứng dụng sở hữu và kiểm tra quyền/identity. Runner nội bộ không nhận context tùy ý, chỉ fixture synthetic. Tests kiểm restart, budget exhaustion, corruption, stale lock, contention và failure vẫn tiêu thụ reservation.

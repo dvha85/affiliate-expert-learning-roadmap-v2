@@ -5,9 +5,27 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
+
+func TestCampaignBoundedFiles(t *testing.T) {
+	for _, name := range []string{"manifest", "attempt-001.json"} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "campaign")
+			if err := initAdvisorCampaign(path); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(path, name), []byte(strings.Repeat("x", 4096)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := reserveAdvisorAttempt(path); err == nil {
+				t.Fatal("oversized file accepted")
+			}
+		})
+	}
+}
 
 func TestCampaignDurableBudget(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "campaign")

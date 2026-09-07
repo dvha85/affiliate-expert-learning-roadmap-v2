@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,6 +18,25 @@ const campaignManifest = "deepseek-fixture-campaign/v1\nmax_attempts=100\nmax_mi
 // Deliberately conservative: at most six reservations until cost accounting is
 // separately reviewed. This is not a claim about current provider pricing.
 const campaignReservation = 500000
+
+// Trusted local directory; reject existing special files before opening them.
+// This does not defend against a hostile process swapping paths concurrently.
+func readCampaignFile(path string, limit int64) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, errors.New("campaign file type or size invalid")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err != nil || int64(len(raw)) > limit {
+		return nil, errors.New("campaign file read invalid")
+	}
+	return raw, nil
+}
 
 func syncCampaignDir(path string) error {
 	f, err := os.Open(path)
@@ -68,7 +88,7 @@ func reserveAdvisorAttempt(path string) (int, error) {
 		return 0, errors.New("campaign locked; inspect interrupted run, do not reset")
 	}
 	defer os.Remove(lock)
-	manifest, err := os.ReadFile(filepath.Join(path, "manifest"))
+	manifest, err := readCampaignFile(filepath.Join(path, "manifest"), int64(len(campaignManifest)))
 	if err != nil || string(manifest) != campaignManifest {
 		return 0, errors.New("campaign manifest invalid")
 	}
@@ -81,7 +101,7 @@ func reserveAdvisorAttempt(path string) (int, error) {
 		if entry.Name() == "lock" {
 			continue
 		}
-		if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
+		if !entry.Type().IsRegular() {
 			return 0, errors.New("campaign entry invalid")
 		}
 		if entry.Name() == "manifest" {
@@ -90,8 +110,8 @@ func reserveAdvisorAttempt(path string) (int, error) {
 		count++
 	}
 	for n := 1; n <= count; n++ {
-		raw, err := os.ReadFile(filepath.Join(path, fmt.Sprintf("attempt-%03d.json", n)))
 		want, _ := json.Marshal(campaignReservationRecord{n, campaignReservation})
+		raw, err := readCampaignFile(filepath.Join(path, fmt.Sprintf("attempt-%03d.json", n)), int64(len(want)))
 		if err != nil || string(raw) != string(want) {
 			return 0, errors.New("campaign reservation corrupt or non-contiguous")
 		}
