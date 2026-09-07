@@ -363,6 +363,8 @@ Subtask result ledger DONE trong phạm vi metadata offline, [#61](https://githu
 
 Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
 
+Path guard IN_REVIEW: Codex thực hiện/review, nhánh `codex/br-11-campaign-path-guard`. Lệnh campaign-report kiểm đường dẫn absolute/clean, toàn chuỗi directory không symlink, hai thư mục ứng dụng/campaign private và owner hiện tại trên Linux/macOS; OS khác từ chối. Chưa có init/live runner; không chống tác nhân local thay path đồng thời hoặc rollback. Missing/unsafe path trả PATH_ERROR, không artifact. Review/CI phải đạt trước merge.
+
 Chủ repo đã yêu cầu xử lý, review và merge lần lượt tất cả các mục còn lại. Đây là quyền tiếp tục các thay đổi repo trong kế hoạch, không là quyền mua dịch vụ, đăng nội dung hoặc thực thi action thật ngoài scope đã chốt. Không cần xin lại quyền merge từng PR đạt kiểm thử/review; mỗi PR vẫn phải có đúng head CI PASS và ghi bằng chứng trước merge.
 
 Điểm kiểm soát hiện hành: #62 report đã review/merge (CI 4/4, learner tests/race/vet PASS). Chưa có DEEPSEEK_API_KEY trong môi trường agent (chỉ kiểm hiện diện, không in khóa); live canary chưa chạy. Việc thiếu khóa không chặn triển khai/test offline, nhưng chặn bằng chứng live. Tiếp tục ownership/init/run và accepted-output fixture trước khi cần khóa; không lấy khóa từ chat, repo, lịch sử shell hoặc file cá nhân.

@@ -16,6 +16,8 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ### Campaign report — IN_REVIEW
 
+Cập nhật sau #62 merge `9645e6d`: path guard đang review. CLI kiểm mọi ancestor hiện hữu bằng Lstat, chặn symlink/non-directory, yêu cầu thư mục ứng dụng và campaign không cho group/other truy cập, owner là effective UID trên Linux/macOS. OS khác fail closed. Không tự chmod/chown/tạo đường dẫn. Missing path nay trả PATH_ERROR trước khi đọc report. Không bảo vệ khỏi hostile concurrent replacement hoặc thay OS-user/config root; đây chưa phải capability filesystem chống TOCTOU. Lệnh init/run live vẫn chưa bật.
+
 Lệnh `bot advisor campaign-report` không nhận path và không đọc API key. Nó dùng thư mục cấu hình của tài khoản máy (`os.UserConfigDir`) cộng `affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`, không phụ thuộc repo/cwd. Trên macOS thông thường là `~/Library/Application Support/affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`. Không tự tạo thư mục, không có init/reset hoặc run live; chưa có campaign thì trả REPORT_ERROR, không artifact.
 
 Report giữ lock ngắn trong lúc đọc, kiểm manifest/results/reservation canonical và sequence, không thay bytes ledger hay refund. Có attempts, reserved_microusd, remaining_reservation_microusd, estimated_known_microusd, missing_result_attempts, unknown_usage_attempts. Tổng estimate chỉ cộng usage đã có, không đại diện tổng hóa đơn khi còn unknown/missing. `invoice_reconciled=false`, `execution_permitted=false` luôn giữ nguyên. Số còn lại là ngân sách reservation, không phải số dư tài khoản provider.

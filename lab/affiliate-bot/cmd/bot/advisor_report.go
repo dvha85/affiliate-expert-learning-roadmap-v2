@@ -115,6 +115,9 @@ func runCampaignReportCLI(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("CONFIG_ERROR", nil, err, 1)
 	}
+	if err := validateCampaignPath(path); err != nil {
+		return emit("PATH_ERROR", nil, err, 1)
+	}
 	r, err := readCampaignReport(path)
 	if err != nil {
 		return emit("REPORT_ERROR", nil, err, 1)
