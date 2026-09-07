@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m04"
 )
 
 const campaignPriceVersion = "deepseek-flash-peak-cache-miss-2026-09-07"
@@ -22,17 +23,19 @@ func campaignContextDigest() string {
 	return hex.EncodeToString(digest[:])
 }
 
-// Metadata only. Never persist raw provider text, secrets, or rejected output.
+// V1 stays metadata-only; V2 stores only fixture context and accepted output.
 type campaignResult struct {
-	Version            string           `json:"version"`
-	Attempt            int              `json:"attempt"`
-	Provider           providerIdentity `json:"provider"`
-	ContextSHA256      string           `json:"context_sha256"`
-	Status             string           `json:"status"`
-	Usage              *deepSeekUsage   `json:"usage"`
-	PriceVersion       string           `json:"price_version"`
-	EstimatedMicroUSD  *int64           `json:"estimated_microusd"`
-	ExecutionPermitted bool             `json:"execution_permitted"`
+	Version            string             `json:"version"`
+	Attempt            int                `json:"attempt"`
+	Provider           providerIdentity   `json:"provider"`
+	ContextSHA256      string             `json:"context_sha256"`
+	Status             string             `json:"status"`
+	Usage              *deepSeekUsage     `json:"usage"`
+	PriceVersion       string             `json:"price_version"`
+	EstimatedMicroUSD  *int64             `json:"estimated_microusd"`
+	ExecutionPermitted bool               `json:"execution_permitted"`
+	Context            *advisorContext    `json:"context,omitempty"`
+	AdvisorOutput      *m04.AdvisorOutput `json:"advisor_output,omitempty"`
 }
 
 func estimateCampaignUsage(u *deepSeekUsage) (*int64, error) {
@@ -48,7 +51,7 @@ func estimateCampaignUsage(u *deepSeekUsage) (*int64, error) {
 }
 
 func validateCampaignResult(r campaignResult) error {
-	if r.Version != "br11-result/v1" || r.Attempt < 1 || r.Attempt > 6 || r.ExecutionPermitted || r.PriceVersion != campaignPriceVersion {
+	if (r.Version != "br11-result/v1" && r.Version != "br11-result/v2") || r.Attempt < 1 || r.Attempt > 6 || r.ExecutionPermitted || r.PriceVersion != campaignPriceVersion {
 		return errors.New("invalid result metadata")
 	}
 	if r.Provider != (mockAdvisorProvider{}).identity() && r.Provider != newDeepSeekProvider().identity() {
@@ -60,8 +63,11 @@ func validateCampaignResult(r campaignResult) error {
 		return errors.New("invalid result status")
 	}
 	h, err := hex.DecodeString(r.ContextSHA256)
-	if err != nil || len(h) != 32 || r.ContextSHA256 != campaignContextDigest() {
+	if err != nil || len(h) != 32 {
 		return errors.New("invalid context digest")
+	}
+	if err := validateCampaignArtifact(r); err != nil {
+		return err
 	}
 	cost, err := estimateCampaignUsage(r.Usage)
 	if err != nil {
@@ -95,7 +101,7 @@ func readCampaignResults(path string) ([]campaignResult, error) {
 		if !strings.HasPrefix(entry.Name(), "result-") {
 			continue
 		}
-		raw, err := readCampaignFile(filepath.Join(path, entry.Name()), 4096)
+		raw, err := readCampaignFile(filepath.Join(path, entry.Name()), 128<<10)
 		if err != nil {
 			return nil, err
 		}
