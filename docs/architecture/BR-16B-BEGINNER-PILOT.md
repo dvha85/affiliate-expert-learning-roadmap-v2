@@ -2,9 +2,28 @@
 
 ## Đường walkthrough
 
-Người học bắt đầu từ `curriculum/BOOT/QUICKSTART.md`, sau đó chạy lần lượt
-fixture smoke M00→M06. Mỗi chặng phải đọc input/output và tự giải thích một
-failure case; không coi output synthetic là affiliate truth.
+Chạy từ repo root. Tất cả lệnh dưới đây dùng cùng một thư mục tạm; ID ở bước
+trước được đưa vào input bước sau. Output JSON là artifact kỹ thuật, không phải
+affiliate truth.
+
+```bash
+python3 scripts/smoke_br16a_offline.py
+
+cd lab/affiliate-bot
+go run ./cmd/bot evidence import ../../examples/m00-import/packet-t2.json \
+  | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["artifact"]))' > /tmp/m00-observations.json
+go run ./cmd/bot history capture /tmp/history.jsonl /tmp/m00-observations.json demo-d \
+  2026-09-03T00:00:00Z 2026-09-03T00:00:00Z
+go run ./cmd/bot m07 context /tmp/history.jsonl demo-d
+go run ./cmd/bot watcher fixture-import /tmp/history.jsonl \
+  ../../examples/watcher/offer-valid.json
+go run ./cmd/bot history replay /tmp/history.jsonl
+```
+
+Expected: `APPENDED` on first writes, `EXACT_DUPLICATE` on retry, an M07
+context containing resolvable `evidence_ids`, watcher `RANK_SCENARIO`, and
+`replay=MATCH`. A forged ID, a POST tool call, or corrupt history must exit
+non-zero and must not write a success artifact.
 
 | Chặng | Người học tự làm | Fixture/automation đã có | Cần ghi nhận |
 |---|---|---|---|
@@ -13,6 +32,8 @@ failure case; không coi output synthetic là affiliate truth.
 | Action/outcome | validate link, thử pending/0 | BR-10a/b/c smoke | EffectRef, orphan ID |
 | Advisor/review | đọc abstain và evidence limits | BR-11/12 smoke | unknowns, human review |
 | Watcher | chạy fixture fetch/import, đổi nội dung | BR-13b/c smoke | NEW/duplicate, provenance |
+| Agent | tạo output JSON có `claims[].field_or_claim`, `claims[].value` và `claims[].evidence_ids`, chạy validator | `bot m07 context/validate` | forged ID, forged value, prompt injection, write request |
+| M08–M11 | tạo intent → policy → approval → bounded canary → STOP | `bot mission ...`, BR-16a | hash/link, human approval, durable STOP |
 
 ## Mẫu bản ghi pilot
 

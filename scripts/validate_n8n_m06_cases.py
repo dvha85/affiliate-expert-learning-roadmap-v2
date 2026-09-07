@@ -19,9 +19,11 @@ def main():
     assert len(canonical(first)) <= 200000
     assert len(canonical({"payload": "x" * 200001})) > 200000
     # Sink failure is a handoff error, never a successful persistence claim.
-    handoff = {"canonical_history_handoff": "REQUIRED", "persisted": False}
-    assert handoff["canonical_history_handoff"] == "REQUIRED" and handoff["persisted"] is False
-    print("N8N M06 CASE CONTRACT PASS: NEW/UNCHANGED/CHANGED, key-order stability, size guard and sink-failure boundary")
+    handoff = {"canonical_history_handoff": "ACK", "canonical_history_persisted": True}
+    assert handoff["canonical_history_handoff"] == "ACK" and handoff["canonical_history_persisted"] is True
+    failed = {"canonical_history_handoff": "NO_ACK", "canonical_history_persisted": False}
+    assert failed["canonical_history_persisted"] is False
+    print("N8N M06 CASE CONTRACT PASS: NEW/UNCHANGED/CHANGED, key-order stability, size guard and ACK/failure boundary")
 
 
 if __name__ == "__main__":

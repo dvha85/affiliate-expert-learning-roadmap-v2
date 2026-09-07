@@ -16,10 +16,12 @@ func NormalizeWatchObservation(r WatchRequest, subjectID string) (CanonicalObser
 }
 
 type ToolSpec struct {
-	Name           string   `json:"name"`
-	ReadOnly       bool     `json:"read_only"`
-	AllowedMethods []string `json:"allowed_methods"`
-	AllowedHosts   []string `json:"allowed_hosts"`
+	Name            string   `json:"name"`
+	ReadOnly        bool     `json:"read_only"`
+	AllowedMethods  []string `json:"allowed_methods"`
+	AllowedHosts    []string `json:"allowed_hosts"`
+	TimeoutMS       int      `json:"timeout_ms,omitempty"`
+	FollowRedirects bool     `json:"follow_redirects,omitempty"`
 }
 type AgentToolCall struct {
 	ToolName string `json:"tool_name"`
@@ -59,7 +61,7 @@ func EvaluateAgentProposal(p AgentProposal, registry []ToolSpec, ids []string, u
 	}
 	for _, c := range p.ToolCalls {
 		t, ok := tools[c.ToolName]
-		if !ok || !t.ReadOnly {
+		if !ok || !t.ReadOnly || t.FollowRedirects || t.TimeoutMS < 0 || t.TimeoutMS > 60000 {
 			return "REJECT_TOOL"
 		}
 		m := strings.ToUpper(strings.TrimSpace(c.Method))

@@ -76,16 +76,16 @@ for rel in ["contracts/outcome-record.schema.json", "contracts/evaluation-record
 # M06 watcher: exact canonical snapshot determines change state; fingerprint is diagnostic only.
 m06 = load_json(missions.get("M06", {}).get("orchestration_blueprint", "lab/n8n/M06-readonly-watcher.blueprint.json"))
 nodes = {node.get("name"): node for node in m06.get("nodes", [])}
-for name in ["Schedule Trigger", "Allowed Source", "Read-only HTTP GET", "Normalize + Change Detect", "Canonical History Handoff", "Report NEW UNCHANGED CHANGED"]:
+for name in ["Schedule Trigger", "Allowed Source + Canonical Store", "Read-only HTTP GET", "Parse Provenance + Change Detect", "Build Canonical History Record", "Canonical History Adapter", "Require Canonical Store ACK", "Report NEW UNCHANGED CHANGED"]:
     if name not in nodes:
         errors.append(f"M06 blueprint missing node: {name}")
 if nodes.get("Read-only HTTP GET", {}).get("parameters", {}).get("method") != "GET":
     errors.append("M06 n8n HTTP node must be GET-only")
-normalize = nodes.get("Normalize + Change Detect", {}).get("parameters", {}).get("jsCode", "")
-for marker in ["stableCanonical", "previous.canonical===canonical", "MAX_CACHE_CHARS", "watcher_cache", "content_fingerprint", "observation_id"]:
+normalize = nodes.get("Parse Provenance + Change Detect", {}).get("parameters", {}).get("jsCode", "")
+for marker in ["previous===content_hash", "200000", "watcher_fingerprint", "content_hash", "observation_id", "claim_kind"]:
     if marker not in normalize:
         errors.append(f"M06 exact change-detection marker missing: {marker}")
-for obsolete in ["let h=5381", "previous===fingerprint"]:
+for obsolete in ["let h=5381", "previous===fingerprint", "canonical_history_handoff:'REQUIRED'"]:
     if obsolete in normalize:
         errors.append(f"M06 must not decide change state from collision-prone fingerprint: {obsolete}")
 

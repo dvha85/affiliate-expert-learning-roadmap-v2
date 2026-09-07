@@ -237,6 +237,15 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "watcher" {
 		os.Exit(runWatcher(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "m07" {
+		os.Exit(runM07(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "mission" {
+		os.Exit(runMissionCommand(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "backup" {
+		os.Exit(runBackupCommand(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && (os.Args[1] == "proposal" || os.Args[1] == "review") {
 		os.Exit(runImprovementStore(os.Args[1], os.Args[2:], os.Stdout, os.Stderr))
 	}

@@ -1,0 +1,14 @@
+{
+  "version": "readiness-matrix/v1",
+  "as_of": "2026-09-07",
+  "overall": "NOT_READY_FOR_PRODUCTION",
+  "criteria": [
+    {"id":"BR-13","title":"M06 watcher persists canonical history","status":"IMPLEMENTED_OFFLINE","implementation_refs":["lab/affiliate-bot/cmd/bot/watcher.go","core/m06/m06.go"],"test_refs":["scripts/smoke_br13b.py","scripts/smoke_br16a_offline.py"],"missing_evidence":["operated n8n run against a selected source"]},
+    {"id":"BR-14","title":"M06 n8n execution","status":"PARTIAL","implementation_refs":["lab/n8n/M06-readonly-watcher.blueprint.json"],"test_refs":["scripts/validate_n8n_m06.py"],"missing_evidence":["import and execute the blueprint in a supported n8n instance"]},
+    {"id":"BR-15","title":"M07 grounding and tool enforcement","status":"PARTIAL","implementation_refs":["core/m07/m07.go","lab/affiliate-bot/cmd/bot/m07.go","lab/n8n/M07-readonly-evidence-agent.blueprint.json"],"test_refs":["scripts/validate_n8n_m07_adversarial.py","scripts/validate_n8n_m07_output_cases.py"],"missing_evidence":["operated model/provider evidence"]},
+    {"id":"BR-16a","title":"shared artifact continuity","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/main.go","lab/affiliate-bot/cmd/bot/mission_command.go"],"test_refs":["scripts/smoke_br16a_offline.py"],"missing_evidence":["complete M00-M11 artifact chain and beginner pilot on a clean machine"]},
+    {"id":"BR-17","title":"M08-M11 learner integration","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/mission_command.go"],"test_refs":["scripts/smoke_br16a_offline.py","scripts/smoke_br18b_backup_restore.py"],"missing_evidence":["reuse of canonical M08-M11 runtime semantics and live executor/production lease operation"]},
+    {"id":"BR-18b","title":"runtime backup restore and durable STOP","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/backup_command.go","lab/affiliate-bot/cmd/bot/mission_command.go"],"test_refs":["scripts/smoke_br18b_backup_restore.py"],"missing_evidence":["deployment recovery drill on target host"]},
+    {"id":"BR-19","title":"readiness audit","status":"PARTIAL","implementation_refs":["scripts/audit_readiness.py","docs/plans/READINESS-MATRIX.json"],"test_refs":["scripts/audit_readiness.py"],"missing_evidence":["audit schema does not yet cross-check all plan claims and evidence graph"]}
+  ]
+}

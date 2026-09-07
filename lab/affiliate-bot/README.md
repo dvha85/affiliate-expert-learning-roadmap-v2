@@ -96,6 +96,40 @@ Các guard freshness có trạng thái `ABSTAIN_STALE` và `ABSTAIN_FUTURE`; yê
 
 [BR-10c: audit toàn chain từ M00](../../docs/architecture/BR-10C-ACCEPTANCE.md): chạy `python3 scripts/smoke_br10c.py` từ root để kiểm workspace lab độc lập; không phải live proof.
 
+## M06–M11 learner entrypoints
+
+Watcher fixture và watcher n8n dùng chung canonical adapter. Chạy adapter local
+trước khi import blueprint M06:
+
+```bash
+go run ./cmd/bot watcher serve /tmp/affiliate-runtime/history.jsonl 127.0.0.1:8787
+go run ./cmd/bot watcher history-handoff HISTORY.jsonl HISTORY-RECORD.json
+```
+
+M07 không tự gắn IDs từ context vào câu trả lời. Lệnh `context` xuất payload đã
+resolve từ history; blueprint n8n cũng GET lại cùng `record_id` từ canonical
+adapter trước khi gọi Agent. `validate` chỉ nhận output model có `A2-RO`,
+`write_permission=false` và mỗi claim có `field_or_claim`/`value` khớp exact
+với evidence IDs đã resolve:
+
+```bash
+go run ./cmd/bot m07 context HISTORY.jsonl DECISION_ID
+go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGISTRY.json
+```
+
+Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
+`m08-policy`, `m09-approval`, `m10-canary`, `m10-reserve`, `m11-stop` và
+`status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
+budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
+và STOP không bị `init` ghi đè; đây vẫn không phải live executor.
+
+```bash
+go run ./cmd/bot mission init /tmp/affiliate-runtime
+go run ./cmd/bot mission status /tmp/affiliate-runtime
+go run ./cmd/bot backup create /tmp/affiliate-runtime /tmp/affiliate-backup
+go run ./cmd/bot backup restore /tmp/affiliate-backup /tmp/affiliate-restored
+```
+
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
 [BR-10a: ghi nhận ActionRecord thủ công](../../docs/architecture/BR-10A-ACTION-STORE.md): `bot action record HISTORY.jsonl ACTIONS.jsonl ACTION.json`, đọc lại bằng `bot action list HISTORY.jsonl ACTIONS.jsonl`. Store action riêng, không đăng bài/thực thi; decision phải tồn tại và replay MATCH. Lệnh validate dưới đây vẫn chỉ đọc.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -118,6 +119,12 @@ func watcherRecordSource(raw []byte, remote string) (HistoryRecord, error) {
 }
 
 func runWatcher(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "serve" {
+		return runWatcherServer(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && (args[0] == "history-handoff" || args[0] == "handoff") {
+		return runWatcherHistoryHandoff(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "fetch-fixture" {
 		return runWatcherFetch(args, stdout, stderr)
 	}
@@ -162,4 +169,160 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
 	return emit(status, map[string]any{"record_id": record.RecordID, "decision_id": record.RecordedResult.DecisionID, "state": record.RecordedResult.State, "observation_ids": record.RecordedResult.EvidenceIDs}, nil, 0)
+}
+
+// runWatcherServer exposes the local BR-13 canonical adapter used by the n8n
+// blueprint. It accepts only complete HistoryRecord JSON on a loopback-bound
+// POST endpoint; all validation and append semantics remain in the learner
+// store implementation.
+func runWatcherServer(args []string, stdout, stderr io.Writer) int {
+	if len(args) < 1 || len(args) > 2 {
+		fmt.Fprintln(stderr, "usage: bot watcher serve HISTORY [127.0.0.1:8787]")
+		return 2
+	}
+	historyPath := args[0]
+	address := "127.0.0.1:8787"
+	if len(args) == 2 {
+		address = args[1]
+	}
+	if !strings.HasPrefix(address, "127.0.0.1:") {
+		fmt.Fprintln(stderr, "canonical adapter must bind to loopback 127.0.0.1")
+		return 1
+	}
+	if err := distinctActionPaths(historyPath); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if info, err := os.Lstat(historyPath); err == nil && !info.Mode().IsRegular() {
+		fmt.Fprintln(stderr, "history must be regular, not symlink")
+		return 1
+	}
+	if _, err := os.Stat(historyPath); err == nil {
+		if _, err := LoadHistory(historyPath); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"status":"OK","execution_permitted":false}`+"\n")
+	})
+	mux.HandleFunc("/v1/history/append", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD","canonical_history_ack":false}`+"\n")
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"status":"INPUT_ERROR","canonical_history_ack":false}`+"\n")
+			return
+		}
+		var record HistoryRecord
+		if err := json.Unmarshal(body, &record); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"status":"INVALID_SCHEMA","canonical_history_ack":false}`+"\n")
+			return
+		}
+		if err := validateHistoryRecord(record); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"status":"INVALID_HISTORY","canonical_history_ack":false}`+"\n")
+			return
+		}
+		status, err := AppendHistory(historyPath, record)
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `{"status":"HANDOFF_ERROR","canonical_history_ack":false}`+"\n")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": record.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false})
+	})
+	mux.HandleFunc("/v1/history", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD"}`+"\n")
+			return
+		}
+		recordID := strings.TrimSpace(r.URL.Query().Get("record_id"))
+		if recordID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"status":"RECORD_ID_REQUIRED"}`+"\n")
+			return
+		}
+		records, err := LoadHistory(historyPath)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, `{"status":"HISTORY_ERROR"}`+"\n")
+			return
+		}
+		var found *HistoryRecord
+		for i := range records {
+			if records[i].RecordID == recordID {
+				copy := records[i]
+				found = &copy
+			}
+		}
+		if found == nil {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"status":"NOT_FOUND"}`+"\n")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(found)
+	})
+	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
+	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
+}
+
+// runWatcherHistoryHandoff is the local BR-13 adapter used by the n8n
+// blueprint. It accepts a complete HistoryRecord, validates it with the same
+// loader used by list/replay, and reports persistence only after AppendHistory
+// returns APPENDED or EXACT_DUPLICATE.
+func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
+	emit := func(status string, artifact any, err error, code int) int {
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+		}
+		out := map[string]any{"command": "watcher history-handoff", "status": status, "execution_permitted": false, "canonical_history_ack": false}
+		if status == appendAdded || status == appendDuplicate || status == "ACK" {
+			out["canonical_history_ack"] = true
+		}
+		if artifact != nil {
+			out["artifact"] = artifact
+		}
+		if err := json.NewEncoder(stdout).Encode(out); err != nil {
+			return 1
+		}
+		return code
+	}
+	if len(args) != 2 {
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot watcher history-handoff HISTORY RECORD.json"), 2)
+	}
+	if err := distinctActionPaths(args...); err != nil {
+		return emit("PATH_ERROR", nil, err, 1)
+	}
+	raw, err := os.ReadFile(args[1])
+	if err != nil {
+		return emit("INPUT_ERROR", nil, err, 1)
+	}
+	var record HistoryRecord
+	if err := json.Unmarshal(raw, &record); err != nil {
+		return emit("INVALID_SCHEMA", nil, err, 1)
+	}
+	if err := validateHistoryRecord(record); err != nil {
+		return emit("INVALID_HISTORY", nil, err, 1)
+	}
+	status, err := AppendHistory(args[0], record)
+	if err != nil {
+		return emit("HANDOFF_ERROR", nil, err, 1)
+	}
+	return emit(status, map[string]any{"record_id": record.RecordID, "decision_id": record.RecordedResult.DecisionID, "state": record.RecordedResult.State, "evidence_ids": record.RecordedResult.EvidenceIDs}, nil, 0)
 }

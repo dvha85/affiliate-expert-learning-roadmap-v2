@@ -82,13 +82,13 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | DONE (lab) | Nghiệm thu qua #73: M00→M05, store links, synthetic review, FAIL/PASS/rollback cô lập; không business/human-pilot proof; trạng thái merge/CI theo PR |
-| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IN_PROGRESS | BR-13a tách shared M06; parser/handoff và nguồn thật chưa nghiệm thu |
-| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | IN_PROGRESS | BR-14a static contract và BR-14b smoke runbook/case contract đã merge; engine import/execution thật còn UNVERIFIED |
-| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | IN_PROGRESS | BR-15a static contract, BR-15b adversarial contract đã merge; BR-15c output contract đang review; model/n8n integration thật còn mở |
-| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | IN_PROGRESS | BR-16a offline smoke đã merge; walkthrough/pilot người mới và residual gaps còn mở |
-| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | IN_PROGRESS | BR-17a proposal-only boundary đang được chốt; live adapter/authorization còn mở |
-| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | IN_PROGRESS | BR-18a/18b đã triển khai/review; runtime/backup target thật còn mở |
-| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | IN_PROGRESS | BR-19a đã triển khai/review; production readiness vẫn bị chặn bởi evidence gaps |
+| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IMPLEMENTED_OFFLINE | `watcher history-handoff` gọi `AppendHistory` và chỉ ACK sau persistence; nguồn/host thật vẫn mở |
+| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | PARTIAL | blueprint đã có parser, canonical adapter, timeout/redirect và ACK gate; import/execute trên n8n thật còn UNVERIFIED |
+| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | IMPLEMENTED_OFFLINE | `core/m07` + `bot m07 validate` chạy output thực; provider/n8n operated evidence còn mở |
+| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | IMPLEMENTED_OFFLINE | `smoke_br16a_offline.py` dùng một workspace/ID chain và process restart; pilot người mới còn mở |
+| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | IMPLEMENTED_OFFLINE | learner Bot có intent/policy/approval/canary/STOP state links; live executor/production lease còn mở |
+| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | IMPLEMENTED_OFFLINE | backup/restore chạy artifact runtime thật, replay và STOP sau restore; target 24/7 thật còn mở |
+| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | IMPLEMENTED | ma trận có cấu trúc ở `docs/plans/READINESS-MATRIX.json`; overall vẫn `NOT_READY_FOR_PRODUCTION` |
 
 Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này mô tả dependency công việc, không giao việc cho agent hay tạo lịch tự động.
 

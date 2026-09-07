@@ -25,7 +25,7 @@ result: PASS | FAIL | UNVERIFIED
    credential read-only. Chạy hai lần cùng nội dung (`NEW`, rồi `UNCHANGED`),
    đổi nội dung (`CHANGED`), rồi đổi thứ tự key JSON (vẫn `UNCHANGED`).
 3. Gửi output qua adapter BR-13; kiểm tra `observation_id`, correlation,
-   `canonical_history_handoff=REQUIRED` và record ID trong canonical history.
+   `canonical_history_handoff=ACK`, `canonical_history_persisted=true` và record ID trong canonical history.
 4. Chạy response quá 200000 ký tự và sink failure. Kỳ vọng fail closed, không
    báo `persisted=true`; retry sau đó không tạo record mơ hồ.
 5. Restart workflow/mất watcher cache: lần sau có thể `NEW`, nhưng history
