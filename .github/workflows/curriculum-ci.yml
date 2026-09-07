@@ -77,6 +77,8 @@ jobs:
         run: python scripts/smoke_br13b.py
       - name: BR-13c pinned HTTPS fixture fetch
         run: python scripts/smoke_br13c.py
+      - name: BR-14a n8n M06 static contract
+        run: python scripts/validate_n8n_m06.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
