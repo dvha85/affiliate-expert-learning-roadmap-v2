@@ -79,8 +79,8 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
-| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; #53/#54 merged; BR-10c [#55](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/55) chờ nghiệm thu lab; importer nền tảng còn mở |
-| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | Codex thực hiện/review kỹ thuật; chủ repo duyệt phạm vi; #56–#59 merged, #59 `9eeddc4`; DeepSeek Flash, tối đa 100 lượt/$3 chỉ fixture; chain conformance IN_REVIEW trên `codex/br-11b2-chain-conformance`; live proof còn mở |
+| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
+| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | Codex thực hiện/review kỹ thuật; chủ repo duyệt phạm vi và yêu cầu xử lý/review/merge lần lượt; #56–#62 merged; DeepSeek Flash, tối đa 100 lượt/$3 chỉ fixture; ownership/init/run/accepted-output proof và live evidence chưa nghiệm thu |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
@@ -362,6 +362,12 @@ BR-11b còn OPEN về proof live. Người dùng đã chọn DeepSeek V4 Flash v
 Subtask result ledger DONE trong phạm vi metadata offline, [#61](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/61) merged `75f8f7b`, head `92eb078`: Codex thực hiện/review, chủ repo yêu cầu tiếp tục; hai lỗi manifest/context digest đã sửa, tests/race/vet, smoke BR-11a, 8 validators và CI 4/4 PASS. Lưu metadata kết quả/usage/hash context, estimate microUSD theo snapshot giá, kiểm link reservation, không refund. Chưa lưu output nội dung để nghiệm thu chất lượng, chưa đối soát hóa đơn, chưa fixed campaign path/CLI/live. Xem [chi tiết BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md). BR-11 tổng thể giữ IN_PROGRESS.
 
 Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
+
+Chủ repo đã yêu cầu xử lý, review và merge lần lượt tất cả các mục còn lại. Đây là quyền tiếp tục các thay đổi repo trong kế hoạch, không là quyền mua dịch vụ, đăng nội dung hoặc thực thi action thật ngoài scope đã chốt. Không cần xin lại quyền merge từng PR đạt kiểm thử/review; mỗi PR vẫn phải có đúng head CI PASS và ghi bằng chứng trước merge.
+
+Điểm kiểm soát hiện hành: #62 report đã review/merge (CI 4/4, learner tests/race/vet PASS). Chưa có DEEPSEEK_API_KEY trong môi trường agent (chỉ kiểm hiện diện, không in khóa); live canary chưa chạy. Việc thiếu khóa không chặn triển khai/test offline, nhưng chặn bằng chứng live. Tiếp tục ownership/init/run và accepted-output fixture trước khi cần khóa; không lấy khóa từ chat, repo, lịch sử shell hoặc file cá nhân.
+
+Các điều kiện ngoài code không được tự đánh DONE: BR-06b/BR-10d cần chương trình/kênh/export được cấp quyền; BR-14 cần phiên bản n8n và smoke thực; BR-16 cần pilot người mới và ghi giới hạn hỗ trợ; BR-17 cần target/action và authorization riêng; BR-18 cần nơi chạy/giới hạn tài nguyên, không mặc định mua VPS; BR-19 phụ thuộc bằng chứng nghiệm thu các mục trước. Các lát cắt offline có thể được review riêng nhưng không thay proof tương ứng.
 
 Campaign report IN_REVIEW: Codex thực hiện, nhánh `codex/br-11b2-campaign-report`, review sau CI/chủ repo duyệt merge. CLI `bot advisor campaign-report` đọc tại user config root + `affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`, không path argument/auto-init. Báo cáo tách reserved/estimated-known/missing-result/unknown-usage, invoice_reconciled=false. Đây là fixed path cho report, chưa chốt ownership/ancestor-path security của runner live; chưa có lệnh init/run live, chưa đối soát phí thực tế.
 
