@@ -1,5 +1,7 @@
 # Shared core — BR-08 / BR-09
 
+BR-13a bổ sung `m06`: normalizer/hash/identity và raw fixture boundary dùng chung với harness. Không fetch, không history persistence hoặc trusted allowlist. [Phạm vi và giới hạn trước network/handoff](../docs/architecture/BR-13A-SHARED-M06.md).
+
 BR-12a bổ sung `m05`: EvaluationRecord/ImprovementProposal/ReviewRecord và raw `CheckM05Chain` dùng chung với harness qua aliases/wrappers. Không I/O, không resolve history store hoặc cấp execution permission. [Phạm vi và các bước tiếp theo](../docs/architecture/BR-12A-SHARED-M05.md). Những mô tả module chỉ có m00/m03 dưới đây là lịch sử BR-08/09; module hiện còn có m04 và m05.
 
 BR-08 đã nghiệm thu scoped sau #47–#51. BR-09 bổ sung `m00.Convert` và `m00.SourceFields`: chuyển packet JSON thành M02 input, kiểm lại projection/provenance, không I/O trong core. [Mapping và giới hạn](../examples/m00-import/README.md); BR-09 đã nghiệm thu lab sau merge #52 `5fa86b9`, không là live proof.

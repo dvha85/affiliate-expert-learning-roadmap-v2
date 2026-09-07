@@ -82,7 +82,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | DONE (lab) | Nghiệm thu qua #73: M00→M05, store links, synthetic review, FAIL/PASS/rollback cô lập; không business/human-pilot proof; trạng thái merge/CI theo PR |
-| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
+| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IN_PROGRESS | BR-13a tách shared M06; parser/handoff và nguồn thật chưa nghiệm thu |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
 | BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | TODO | Chưa phân công |
 | BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | TODO | Chưa phân công |
@@ -425,6 +425,8 @@ Nghiệm thu: đi trọn M00 → M05 trong một workspace với artifact links 
 ## 8. Đợt D — Watcher và Agent được nối và kiểm chứng
 
 ### BR-13 — M06 fetch/normalize/history handoff thực
+
+BR-13a đã triển khai, chờ PR/CI: [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, nhánh `codex/br-13a-shared-m06`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Core/harness/learner tests/race/vet và 8 validators PASS; blocker credits trước đó đã hết ở lần kiểm tiếp. BR-13 cha IN_PROGRESS; parser/handoff và nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
 
