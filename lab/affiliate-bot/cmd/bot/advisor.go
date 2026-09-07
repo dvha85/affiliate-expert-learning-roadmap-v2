@@ -144,6 +144,9 @@ func checkAdvisorResponse(raw []byte, ctx advisorContext) (m04.AdvisorOutput, st
 }
 
 func runAdvisor(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "campaign-report" {
+		return runCampaignReportCLI(args, stdout, stderr)
+	}
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
 			fmt.Fprintln(stderr, err)

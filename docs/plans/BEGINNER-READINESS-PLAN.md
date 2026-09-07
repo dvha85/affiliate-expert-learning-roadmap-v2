@@ -363,6 +363,8 @@ Subtask result ledger DONE trong phạm vi metadata offline, [#61](https://githu
 
 Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
 
+Campaign report IN_REVIEW: Codex thực hiện, nhánh `codex/br-11b2-campaign-report`, review sau CI/chủ repo duyệt merge. CLI `bot advisor campaign-report` đọc tại user config root + `affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`, không path argument/auto-init. Báo cáo tách reserved/estimated-known/missing-result/unknown-usage, invoice_reconciled=false. Đây là fixed path cho report, chưa chốt ownership/ancestor-path security của runner live; chưa có lệnh init/run live, chưa đối soát phí thực tế.
+
 1. Review chain conformance; giữ context từ đúng artifact BR-10, chỉ fixture đã duyệt, không nhận dữ liệu riêng tư tùy ý.
 2. Hoàn thiện một campaign path ứng dụng sở hữu, reservation + báo cáo kết quả lưu bền, usage/giá và đối soát lỗi chưa rõ kết quả. Trần reservation nội bộ không tự chứng minh phí provider <= $3.
 3. Bổ sung lệnh/config mẫu, hướng dẫn học viên chạy/đọc lỗi, provider/model/prompt/context version và expected evidence cho review nội dung. Không secret trong repo/log.
