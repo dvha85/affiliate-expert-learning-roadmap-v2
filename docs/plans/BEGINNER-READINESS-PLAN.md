@@ -8,6 +8,13 @@
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
 - Nguồn quyết định thứ tự học và quyền hạn vẫn là [CURRICULUM.md](../../CURRICULUM.md).
 
+Đính chính ngày 08/09/2026 sau [review baseline ece6a32](evidence/REVIEW-ECE6A32.md):
+BR-13–BR-19 còn thiếu implementation/test trong repo, không chỉ thiếu operated
+evidence. [Kế hoạch sửa R01–R16](REVIEW-REMEDIATION-PLAN.md) chia các PR, dependency,
+negative cases và điều kiện nghiệm thu; kế hoạch đang PROPOSED, chưa triển khai
+các fix. Các đoạn nghiệm thu cũ bên dưới là lịch sử theo phạm vi/commit ghi tại
+đó, không thay thế trạng thái hiện tại trong bảng và readiness matrix.
+
 ## 1. Kết quả cần đạt
 
 Một người chưa biết terminal hoặc Go có thể làm theo tài liệu để xây **cùng một bot** qua các bước: chuẩn bị môi trường, nhập bằng chứng thật, xếp hạng có giới hạn, lưu lịch sử, ghi hành động thủ công, nhập kết quả affiliate, nhận tư vấn có dẫn nguồn, đánh giá thay đổi, rồi vận hành watcher/Agent chỉ đọc.
@@ -51,7 +58,7 @@ Các lựa chọn trên không chặn việc lưu kế hoạch hoặc các sửa
 
 - Dùng mã `BR-01` … `BR-19` trong tên nhánh, tiêu đề issue/PR và commit khi triển khai.
 - Trạng thái hợp lệ: `TODO → IN_PROGRESS → IN_REVIEW → DONE`; dùng `BLOCKED` khi có blocker cụ thể.
-- Bảng bên dưới là nguồn theo dõi trạng thái sửa repo. Nếu tạo GitHub issue thì thêm URL vào cột cuối, không duy trì một bảng trạng thái thứ hai.
+- Với BR-13–BR-19, [readiness matrix](READINESS-MATRIX.json) là nguồn trạng thái tích hợp; bảng bên dưới phải phản ánh cùng trạng thái. RP trong kế hoạch sửa là gói công việc, không phải một mức readiness khác. Việc kiểm đồng bộ tự động còn mở ở RP-09. Nếu tạo GitHub issue thì thêm URL vào cột cuối.
 - Mỗi item lúc bắt đầu phải ghi người thực hiện, reviewer và PR/issue. Chưa phân công không đồng nghĩa đã có người đang làm.
 - Chỉ chuyển DONE khi đáp ứng tiêu chí của item, có diff/test/evidence và được review. Nếu chỉ hoàn thành một phần, tách subtask hoặc giữ trạng thái đang làm.
 - Không sửa `PROGRESS.md` để phản ánh tiến độ phát triển. Nó chỉ lưu tiến độ học có bằng chứng.
@@ -82,13 +89,13 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | DONE (lab) | Nghiệm thu qua #73: M00→M05, store links, synthetic review, FAIL/PASS/rollback cô lập; không business/human-pilot proof; trạng thái merge/CI theo PR |
-| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IMPLEMENTED_OFFLINE | `watcher history-handoff` gọi `AppendHistory` và chỉ ACK sau persistence; nguồn/host thật vẫn mở |
-| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | PARTIAL | blueprint đã có parser, canonical adapter, timeout/redirect và ACK gate; import/execute trên n8n thật còn UNVERIFIED |
-| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | IMPLEMENTED_OFFLINE | `core/m07` + `bot m07 validate` chạy output thực; provider/n8n operated evidence còn mở |
-| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | IMPLEMENTED_OFFLINE | `smoke_br16a_offline.py` dùng một workspace/ID chain và process restart; pilot người mới còn mở |
-| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | IMPLEMENTED_OFFLINE | learner Bot có intent/policy/approval/canary/STOP state links; live executor/production lease còn mở |
-| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | IMPLEMENTED_OFFLINE | backup/restore chạy artifact runtime thật, replay và STOP sau restore; target 24/7 thật còn mở |
-| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | IMPLEMENTED | ma trận có cấu trúc ở `docs/plans/READINESS-MATRIX.json`; overall vẫn `NOT_READY_FOR_PRODUCTION` |
+| BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | PARTIAL | Fixture CLI có giá trị; R02/R04 còn lỗi canonical builder/replay gate; RP-04 trước operated source evidence |
+| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | PARTIAL | Có adapter/ACK nhưng JS record chưa khớp core, test chưa chạy node thật; RP-04/RP-08 trước n8n operated run |
+| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | PARTIAL | R01/R03/R05: free-text grounding, canonical IDs và tool-result registration còn thiếu; RP-04/RP-05 trước provider/n8n evidence |
+| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | PARTIAL | Shared workspace/restart đã có nhưng R14 chain còn bỏ chặng; RP-07/RP-08 trước pilot máy sạch |
+| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | PARTIAL | R06–R11/R14: schema/policy, exact-number, budget/expiry/concurrency, path safety và M11 lifecycle; RP-01…RP-07; chưa có live executor |
+| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | PARTIAL | R12/R13: backup bỏ nested artifacts, restore chưa kiểm full graph; RP-03/RP-06 trước drill trên target host |
+| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | PARTIAL | R15/R16: CI/blueprint coverage và audit graph còn thiếu; RP-08/RP-09. PR kế hoạch chỉ đính chính trạng thái, overall `NOT_READY_FOR_PRODUCTION` |
 
 Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này mô tả dependency công việc, không giao việc cho agent hay tạo lịch tự động.
 
