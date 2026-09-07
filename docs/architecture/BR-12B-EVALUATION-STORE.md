@@ -2,6 +2,8 @@
 
 Baseline `46f3d66`; dùng `core/m05` sau #69. Phạm vi lab một writer, không API/model hoặc execution, không proposal/review store trong lát cắt này.
 
+Đã review/merge #70 tại `051e6fa`, head `c5b354a`. Codex thực hiện/review theo quyền chủ repo; learner tests/race/vet, 8 validators và CI 4/4 PASS. Regression evaluation chạy lại PASS trước merge. Nhánh được đồng bộ qua GitHub API khi Git HTTPS lỗi, tree và commit SHA khớp bản local đã kiểm thử; không thay nội dung trong lúc đồng bộ.
+
 ## Lệnh
 
 Tại `lab/affiliate-bot`, chạy với ba store BR-10 có sẵn trong cùng workspace. Thay các tên đường dẫn bằng file thực của bạn; không dùng ledger DeepSeek làm store evaluation.
