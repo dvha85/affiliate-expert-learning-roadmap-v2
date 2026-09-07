@@ -85,7 +85,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IN_PROGRESS | BR-13a tách shared M06; parser/handoff và nguồn thật chưa nghiệm thu |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | IN_PROGRESS | BR-14a static contract và BR-14b smoke runbook/case contract đã merge; engine import/execution thật còn UNVERIFIED |
 | BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | IN_PROGRESS | BR-15a static contract, BR-15b adversarial contract đã merge; BR-15c output contract đang review; model/n8n integration thật còn mở |
-| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | TODO | Chưa phân công |
+| BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | IN_PROGRESS | BR-16a offline smoke đã merge; walkthrough/pilot người mới và residual gaps còn mở |
 | BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | TODO | Chưa phân công |
 | BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | TODO | Chưa phân công |
 | BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | TODO | Chưa phân công |
@@ -441,6 +441,8 @@ BR-15b đang triển khai/review: [contract adversarial M07](../architecture/BR-
 BR-15c đang triển khai/review: [contract parse output M07](../architecture/BR-15C-M07-OUTPUT-CONTRACT.md), chỉ nhận output có evidence IDs resolve được, `HUMAN_REVIEW`, `A2-RO`, `write_permission=false`; forged/missing/write/escalated output đều `ABSTAIN`. Chưa có model/n8n integration evidence; BR-15 cha TODO.
 
 BR-16a đang triển khai/review: [offline end-to-end continuity smoke](../architecture/BR-16A-OFFLINE-E2E-SMOKE.md) chạy lại các smoke M00→M06 bằng fixture, kiểm tra continuity/restart/replay/failure. Đây chưa phải pilot người mới hay business/live proof; BR-16 cha TODO.
+
+BR-16b đang triển khai/review: [walkthrough và mẫu pilot người mới](../architecture/BR-16B-BEGINNER-PILOT.md) tách bước tự động/fixture khỏi thao tác learner, yêu cầu ghi thời gian, câu hỏi, hỗ trợ và residual gaps. Chưa có người thử độc lập; BR-16 chưa DONE.
 
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
