@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m04"
@@ -97,6 +98,9 @@ func reserveAdvisorAttempt(path string) (int, error) {
 		return 0, err
 	}
 	count := 0
+	if _, err := readCampaignResults(path); err != nil {
+		return 0, err
+	}
 	for _, entry := range entries {
 		if entry.Name() == "lock" {
 			continue
@@ -105,6 +109,9 @@ func reserveAdvisorAttempt(path string) (int, error) {
 			return 0, errors.New("campaign entry invalid")
 		}
 		if entry.Name() == "manifest" {
+			continue
+		}
+		if strings.HasPrefix(entry.Name(), "result-") {
 			continue
 		}
 		count++

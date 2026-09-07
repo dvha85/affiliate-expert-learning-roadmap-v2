@@ -357,7 +357,9 @@ BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affili
 
 BR-11b còn OPEN về proof live. Người dùng đã chọn DeepSeek V4 Flash và cấp quyền tối đa 100 lượt/$3, chỉ fixture. [BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md): adapter #58 merged `dbeda41`; ledger nội bộ #59 merged `9eeddc4` sau sửa bounded read/FIFO, CI 4/4 và learner race/tests/vet PASS. Chưa mở CLI/live. Mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
 
-Đối chiếu tiêu chí BR-11: fixture độc lập của ledger chỉ kiểm giới hạn lượt, không thay artifact BR-10. Subtask chain conformance IN_REVIEW (Codex thực hiện; review kỹ thuật sau CI, chủ repo duyệt merge): test lấy context từ history → human action → PENDING outcome được lưu qua store, truyền qua DeepSeek adapter tới HTTP fixture; expected output viết riêng, không dùng mock generator làm oracle. Case valid/ID bịa/stale/future/reason rỗng/malformed/write request và upstream bytes không đổi. Không là live proof hoặc bằng chứng chất lượng model.
+Đối chiếu tiêu chí BR-11: fixture độc lập của ledger chỉ kiểm giới hạn lượt, không thay artifact BR-10. Subtask chain conformance DONE phạm vi offline sau #60 merged `94c32c8` (Codex thực hiện/review; chủ repo yêu cầu tiếp tục, CI 4/4 và learner race/tests/vet PASS): test lấy context từ history → human action → PENDING outcome được lưu qua store, truyền qua DeepSeek adapter tới HTTP fixture; expected output viết riêng, không dùng mock generator làm oracle. Case valid/ID bịa/stale/future/reason rỗng/malformed/write request và upstream bytes không đổi. Không là live proof hoặc bằng chứng chất lượng model.
+
+Subtask result ledger IN_REVIEW, nhánh `codex/br-11b2-result-ledger`; Codex thực hiện, review sau CI/chủ repo duyệt merge: lưu metadata kết quả/usage/hash context, estimate microUSD theo snapshot giá, kiểm link reservation, không refund. Chưa lưu output nội dung để nghiệm thu chất lượng, chưa đối soát hóa đơn, chưa fixed campaign path/CLI/live. Xem [chi tiết BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md).
 
 Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
 
