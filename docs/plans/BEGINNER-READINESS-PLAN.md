@@ -436,6 +436,8 @@ BR-14b đang triển khai/review: [runbook smoke M06](../architecture/BR-14B-N8N
 
 BR-15a đang triển khai/review: [hợp đồng tĩnh M07](../architecture/BR-15A-M07-STATIC-CONTRACT.md), loại placeholder `e1`, bind evidence IDs từ input context, kiểm registry GET/read-only và grounding ceiling `HUMAN_REVIEW`. Đây chưa phải model/n8n integration evidence; prompt injection, ID bịa và tool boundary thật còn mở. BR-15 cha TODO.
 
+BR-15b đang triển khai/review: [contract adversarial M07](../architecture/BR-15B-M07-ADVERSARIAL-CONTRACT.md), cố định các ca prompt injection, forged ID, thiếu context, host/redirect lạ và write request; chạy trong CI để chống drift. Chưa có model/n8n integration evidence hoặc execution IDs; BR-15 cha TODO.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
