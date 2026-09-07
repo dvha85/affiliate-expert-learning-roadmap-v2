@@ -46,6 +46,7 @@ runtime = "\n".join(
 )
 runtime += "\n" + (ROOT / "core/m03/m03.go").read_text(encoding="utf-8")
 runtime += "\n" + (ROOT / "core/m04/advisor.go").read_text(encoding="utf-8")
+runtime += "\n" + (ROOT / "core/m05/m05.go").read_text(encoding="utf-8")
 for marker in [
     "DRY_RUN_ONLY", "BROKEN_LINK", "REJECT_MACHINE_EXECUTION", "REJECT_WRITE_REQUEST", "ABSTAIN_FUTURE", "REJECT_AUTO_APPLY",
     "EffectRef", "HUMAN_ACTION", "MACHINE_EXECUTION", "REJECT_WRITE_METHOD", "REJECT_TOOL", "REJECT_UNGROUNDED",
