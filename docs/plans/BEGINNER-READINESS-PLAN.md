@@ -446,6 +446,8 @@ BR-16b đang triển khai/review: [walkthrough và mẫu pilot người mới](.
 
 BR-17a đang triển khai/review: [M08 proposal-only boundary](../architecture/BR-17A-M08-PROPOSAL-BOUNDARY.md) chốt intent/policy non-authorizing và không nối executor. Đây chưa phải live adapter evidence; target/action/authorization thật còn cần phạm vi riêng.
 
+BR-17b đang triển khai/review: [M09 approval/persistence boundary](../architecture/BR-17B-M09-APPROVAL-BOUNDARY.md) chốt approval provenance, expiry/policy/kill-switch revalidation sau restart và DENY/WAIT fail-closed. Chỉ là lab/schema evidence; chưa có human authorization hay executor thật.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
