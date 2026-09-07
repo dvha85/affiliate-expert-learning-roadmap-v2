@@ -1,5 +1,7 @@
 # BR-11b.2 — DeepSeek V4 Flash
 
+Cập nhật hiện hành: chủ repo đã chạy một canary, trả ABSTAIN; dashboard khớp 1 request/1150 tokens, phí < $0.01. Xem [bằng chứng và review nghiệm thu BR-11c](BR-11C-ACCEPTANCE.md). Các ghi chú “chưa live” ở phần lịch sử phản ánh thời điểm từng PR, không phải trạng thái hiện hành. Chưa đối soát phí chính xác; không reset hoặc chạy thêm campaign.
+
 ## Chạy canary một lượt (có phí, không tự chạy trong kiểm thử)
 
 Tại `lab/affiliate-bot`, sau khi review code và xác nhận quyền dùng API/ngân sách, dùng key được cấp qua môi trường `DEEPSEEK_API_KEY`. Không đưa key vào repo, tham số lệnh, log hay chat. Lệnh không nhận endpoint/model/input/path tùy ý; chỉ gửi fixture synthetic BR-10 đã đóng băng tới adapter DeepSeek hiện có.
