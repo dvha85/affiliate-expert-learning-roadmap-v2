@@ -2,6 +2,8 @@
 
 Baseline `9862d9a`. BR-11 đã nghiệm thu lab/fixture sau #68. Lát cắt này chuyển types, semantic validation và raw chain boundary từ harness sang `core/m05`; không sao chép thêm một bộ quy tắc vào learner.
 
+Đã review/merge #69 tại `1cad062`, head `db477a0`: core/harness/learner tests/race/vet, 8 validators và CI 4/4 PASS. Codex thực hiện/review theo quyền chủ repo; không có lỗi chặn trong phạm vi di chuyển implementation. Validator semantic được cập nhật đọc core/m05 thay vì chỉ tìm marker ở file cũ.
+
 - `EvaluationRecord`, `ImprovementProposal`, `ReviewRecord` và các validator thuộc core; `CheckM05Chain` kiểm schema tất cả input trước semantic, link/time/duplicate và luôn execution_authorized=false.
 - Demo giữ type aliases/wrappers để M05 và M11 cũ tiếp tục dùng đúng implementation. File I/O, CLI và output serialization vẫn ở demo. Core không đọc store, mạng, key hay clock.
 - Contracts vẫn là nguồn schema; không thay required fields, trạng thái hoặc quyền. `ActionID` nội bộ `json:"-"` giữ tương thích M11, không trở thành trường JSON canonical.

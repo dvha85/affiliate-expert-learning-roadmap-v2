@@ -404,7 +404,7 @@ Nghiệm thu: chạy được một câu hỏi với artifact của BR-10; hallu
 
 ### BR-12 — M05 evaluation, đề xuất và review
 
-BR-12a IN_REVIEW: [tách M05 dùng chung](../architecture/BR-12A-SHARED-M05.md), baseline `9862d9a`, nhánh `codex/br-12a-shared-m05`. Codex thực hiện/review theo quyền chủ repo. Di chuyển types/validators/raw boundary vào core, harness giữ wrappers; không thay semantics/schema, không CLI/store learner hoặc API thật. Sau review/merge mới nối evaluation store trong BR-12b; checklist cha vẫn mở.
+BR-12a DONE phạm vi [tách M05 dùng chung](../architecture/BR-12A-SHARED-M05.md), [#69](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/69) merged `1cad062`, head `db477a0`, baseline `9862d9a`. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet, 8 validators và CI 4/4 PASS. Di chuyển types/validators/raw boundary vào core, harness giữ wrappers; validator repo đọc implementation mới, không nới marker. Không thay semantics/schema, không CLI/store learner hoặc API thật. Tiếp theo nối evaluation store trong BR-12b; BR-12 cha IN_PROGRESS và checklist vẫn mở.
 
 Liên quan phát hiện 1, 2.
 
