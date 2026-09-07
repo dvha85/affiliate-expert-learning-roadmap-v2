@@ -165,11 +165,15 @@ func importImprovement[T any](path, input string, existing []T, decode func([]by
 }
 
 func runImprovementStore(kind string, args []string, stdout, stderr io.Writer) int {
+	command := kind
+	if len(args) > 0 && (args[0] == "import" || args[0] == "list") {
+		command += " " + args[0]
+	}
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 		}
-		envelope := map[string]any{"command": kind, "status": status, "execution_permitted": false, "auto_apply": false}
+		envelope := map[string]any{"command": command, "status": status, "execution_permitted": false, "auto_apply": false}
 		if artifact != nil {
 			envelope["artifact"] = artifact
 		}

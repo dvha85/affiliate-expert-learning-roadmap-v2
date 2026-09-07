@@ -404,6 +404,8 @@ Nghiệm thu: chạy được một câu hỏi với artifact của BR-10; hallu
 
 ### BR-12 — M05 evaluation, đề xuất và review
 
+BR-12d: [walkthrough và nghiệm thu lab](../architecture/BR-12D-ACCEPTANCE.md), baseline `9dd9070`, nhánh `codex/br-12d-walkthrough`. Smoke đi M00→M05 qua binary/process mới, giữ INCONCLUSIVE và không execution. Bài sửa nhãn diagnostic có regression FAIL trước/PASS sau, rollback file khớp hash baseline trong bản sao tạm, restore PASS. ReviewRecord của smoke là synthetic REQUEST_CHANGES, không giả human approval hoặc business proof. Chờ PR review/merge để chốt BR-12 lab; BR-13 là mục kế tiếp, nguồn thật vẫn cần quyền riêng.
+
 BR-12c đã triển khai và kiểm thử: [proposal/human review store](../architecture/BR-12C-PROPOSAL-REVIEW-STORE.md), bàn giao/nghiệm thu qua [PR #72](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/72) (trạng thái merge và CI xem tại PR), baseline `784fdd5`, implementation `d9f0492`. Codex thực hiện/review theo quyền chủ repo; learner tests/race/vet và 8 validators PASS. Import/list dùng M05 raw boundary, resolve evaluations/proposal đã lưu và thời gian review; explicit risk/version/rollback, auto_apply=false, không execution. Một writer trusted workspace, human là khai báo chưa xác thực, chưa chọn review hiệu lực tự động. BR-12d walkthrough/FAIL-PASS/rollback còn mở; BR-12 cha IN_PROGRESS.
 
 BR-12b DONE phạm vi [evaluation store/CLI](../architecture/BR-12B-EVALUATION-STORE.md), [#70](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/70) merged `051e6fa`, head `c5b354a`, baseline `46f3d66`. Codex thực hiện/review theo quyền chủ repo; learner tests/race/vet, 8 validators và CI 4/4 PASS, regression evaluation chạy lại PASS trước merge. Tạo record INCONCLUSIVE từ exact decision/action/outcome, replay history, kiểm thời gian và đọc lại store; duplicate/conflict, corrupt/alias/framing bị chặn. Tiếp theo BR-12c: proposal/review store; protocol kết luận hiệu quả và walkthrough đầy đủ chưa có. BR-12 cha IN_PROGRESS. Không API model thật hoặc thay campaign.
@@ -415,8 +417,8 @@ Liên quan phát hiện 1, 2.
 - [x] Tạo EvaluationRecord từ exact decision/effect/outcome chain (#70, conservative v1 INCONCLUSIVE).
 - [x] Sinh hoặc nhập ImprovementProposal với version, benefit, risk và rollback (BR-12c, #72: importer lab).
 - [x] Lệnh nhập Human ReviewRecord; giữ auto_apply=false (BR-12c, #72; human khai báo, không execution).
-- [ ] Viết một bài thay đổi nhỏ đã review: regression FAIL trước sửa, PASS sau sửa và rollback về version trước.
-- [ ] Có case dữ liệu ít → INCONCLUSIVE/thu thập thêm, không ép kết luận “cải tiến hiệu quả”.
+- [x] Viết một bài thay đổi nhỏ đã review: regression FAIL trước sửa, PASS sau sửa và rollback về version trước (BR-12d, bản sao tạm, không rollback checkout người dùng).
+- [x] Có case dữ liệu ít → INCONCLUSIVE/thu thập thêm, không ép kết luận “cải tiến hiệu quả” (BR-12b/d: PENDING, test result tách business outcome).
 
 Nghiệm thu: đi trọn M00 → M05 trong một workspace với artifact links resolve được; proposal không tự thay code/policy; lưu diff, review và kết quả đo riêng với kết quả test.
 
