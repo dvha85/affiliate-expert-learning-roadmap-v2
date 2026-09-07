@@ -16,6 +16,12 @@ import (
 
 const campaignPriceVersion = "deepseek-flash-peak-cache-miss-2026-09-07"
 
+func campaignContextDigest() string {
+	raw, _ := json.Marshal(campaignFixture())
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
 // Metadata only. Never persist raw provider text, secrets, or rejected output.
 type campaignResult struct {
 	Version            string           `json:"version"`
@@ -54,7 +60,7 @@ func validateCampaignResult(r campaignResult) error {
 		return errors.New("invalid result status")
 	}
 	h, err := hex.DecodeString(r.ContextSHA256)
-	if err != nil || len(h) != 32 {
+	if err != nil || len(h) != 32 || r.ContextSHA256 != campaignContextDigest() {
 		return errors.New("invalid context digest")
 	}
 	cost, err := estimateCampaignUsage(r.Usage)
@@ -72,6 +78,14 @@ func validateCampaignResult(r campaignResult) error {
 
 // Called under the same campaign lock as reservation/result writers.
 func readCampaignResults(path string) ([]campaignResult, error) {
+	info, err := os.Lstat(path)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("campaign missing or invalid")
+	}
+	manifest, err := readCampaignFile(filepath.Join(path, "manifest"), int64(len(campaignManifest)))
+	if err != nil || string(manifest) != campaignManifest {
+		return nil, errors.New("campaign manifest invalid")
+	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -148,9 +162,7 @@ func runRecordedCampaignAttempt(ctx context.Context, path string, p advisorProvi
 	if err != nil {
 		return n, status, err
 	}
-	raw, _ := json.Marshal(campaignFixture())
-	digest := sha256.Sum256(raw)
-	r := campaignResult{Version: "br11-result/v1", Attempt: n, Provider: p.identity(), ContextSHA256: hex.EncodeToString(digest[:]), Status: status, PriceVersion: campaignPriceVersion}
+	r := campaignResult{Version: "br11-result/v1", Attempt: n, Provider: p.identity(), ContextSHA256: campaignContextDigest(), Status: status, PriceVersion: campaignPriceVersion}
 	if ds, ok := p.(*deepSeekProvider); ok && ds.usage.PromptTokens != nil {
 		u := ds.usage
 		r.Usage = &u

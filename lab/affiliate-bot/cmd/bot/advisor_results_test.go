@@ -5,8 +5,51 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestCampaignResultRejectsWrongContextAndManifest(t *testing.T) {
+	for _, kind := range []string{"context", "manifest"} {
+		t.Run(kind, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "campaign")
+			if err := initAdvisorCampaign(path); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := runRecordedCampaignAttempt(context.Background(), path, mockAdvisorProvider{}); err != nil {
+				t.Fatal(err)
+			}
+			results, err := readCampaignResults(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := reserveAdvisorAttempt(path); err != nil {
+				t.Fatal(err)
+			}
+			if kind == "context" {
+				results[0].ContextSHA256 = strings.Repeat("0", 64)
+				raw, _ := json.Marshal(results[0])
+				if err := os.WriteFile(filepath.Join(path, "result-001.json"), raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.WriteFile(filepath.Join(path, "manifest"), []byte("wrong campaign"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := readCampaignResults(path); err == nil {
+				t.Fatal("invalid provenance accepted")
+			}
+			if _, err := reserveAdvisorAttempt(path); err == nil {
+				t.Fatal("invalid provenance allowed next attempt")
+			}
+			results[0].Attempt = 2
+			if err := persistCampaignResult(path, results[0]); err == nil {
+				t.Fatal("invalid campaign accepted write")
+			}
+		})
+	}
+}
 
 func TestCampaignResultRestartAndNoRefund(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "campaign")

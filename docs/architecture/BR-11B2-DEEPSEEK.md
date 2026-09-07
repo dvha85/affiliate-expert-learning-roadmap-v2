@@ -16,6 +16,8 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ### Result ledger — đang chờ review
 
+Review #61 bổ sung hai chốt: context digest phải khớp fixture campaign hiện hành, không chỉ là hex 64 ký tự; reader/result writer phải xác minh manifest và thư mục campaign. Regression thay digest bằng hash khác vẫn đúng định dạng hoặc thay manifest, kiểm read/reserve/persist đều từ chối. Khi thay fixture phải version campaign rõ, không dùng fixture mới để diễn giải ledger cũ.
+
 Sau #60 merged `94c32c8` (chain conformance offline), `advisor_results.go` bổ sung result metadata immutable trong cùng thư mục campaign. Result liên kết attempt đã reserve, lưu provider/model/prompt version, SHA256 context, status, usage nullable, snapshot giá và estimate microUSD. Không lưu raw provider body, reasoning, secret hay output bị reject. Đây chưa là artifact nội dung phục vụ review chất lượng model.
 
 Writer dùng lock cùng reservation, O_EXCL và fsync file/directory. Duplicate/overwrite/orphan bị từ chối; reader strict/canonical/bounded kiểm chi phí tính lại. Reservation kế tiếp kiểm mọi result đã có; result hỏng hoặc orphan chặn request. Nếu crash trước khi có result, reservation vẫn giữ nguyên và lần sau không tái dùng attempt đó. Partial result sau write failure chặn lượt mới, không tự xóa hoặc refund. RESULT_ERROR không có nghĩa request chưa bị tính phí.
