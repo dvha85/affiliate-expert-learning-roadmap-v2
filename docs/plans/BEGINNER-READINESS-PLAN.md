@@ -450,6 +450,8 @@ BR-17b đang triển khai/review: [M09 approval/persistence boundary](../archite
 
 BR-17c đang triển khai/review: [M10 ledger/cost/outcome boundary](../architecture/BR-17C-M10-LEDGER-OUTCOME-BOUNDARY.md) chốt trusted cost, reservation/ledger, idempotency và OutcomeRecord gắn đúng EffectRef; unknown usage/reconciliation thiếu giữ WAIT. Chỉ là lab/schema evidence; chưa có external side effect hay live adapter.
 
+BR-17d đang triển khai/review: [M11 lifecycle/STOP/reconciliation boundary](../architecture/BR-17D-M11-LIFECYCLE-BOUNDARY.md) chốt lease/health gate, STOP durable, recovery review và closed-cycle links; unknown usage hoặc thiếu result giữ cycle mở. Chỉ là lab/schema evidence; chưa có deployment 24/7 hay live closed cycles.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
