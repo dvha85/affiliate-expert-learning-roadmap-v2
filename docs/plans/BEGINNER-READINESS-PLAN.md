@@ -353,6 +353,8 @@ Nghiệm thu: action và outcome thật hoặc fixture được gắn nhãn đi 
 
 ### BR-11 — M04 advisor có adapter thực
 
+Hiện hành: **IN_REVIEW nghiệm thu lab/schema + một live canary synthetic** tại [BR-11c](../architecture/BR-11C-ACCEPTANCE.md), baseline `2e84d7f`. Chủ repo chạy canary: ABSTAIN, 1 request, 1150 tokens; dashboard sau reload khớp tổng usage, phí < $0.01. Estimate $0.000646 chưa là phí chính xác, giữ invoice_reconciled=false. Review nội dung phù hợp outcome PENDING/synthetic, không execution. Đề nghị chốt phạm vi lab sau merge, không chứng minh hiệu quả affiliate hoặc chất lượng model tổng quát. Các đoạn tiến độ phía dưới là lịch sử trước bằng chứng live này.
+
 BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) `3daed32`: [hướng dẫn/kết luận](../architecture/BR-11A-MOCK-ADVISOR.md). Context từ store, exact IDs, source/time/payload, max_age 0..8760; mock HUMAN_REVIEW, schema/reference/freshness guards, read-only. CI 4/4 và tests/vet/smoke chạy lại PASS.
 
 BR-11b còn OPEN về proof live. Người dùng đã chọn DeepSeek V4 Flash và cấp quyền tối đa 100 lượt/$3, chỉ fixture. [BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md): adapter #58 merged `dbeda41`; ledger nội bộ #59 merged `9eeddc4` sau sửa bounded read/FIFO, CI 4/4 và learner race/tests/vet PASS. Chưa mở CLI/live. Mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
