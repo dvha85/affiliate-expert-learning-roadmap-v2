@@ -363,6 +363,8 @@ Subtask result ledger DONE trong phạm vi metadata offline, [#61](https://githu
 
 Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
 
+Campaign init IN_REVIEW: Codex thực hiện/review, nhánh `codex/br-11-campaign-init`. CLI `bot advisor campaign-init` dùng user config root cố định, không path argument, không key/network. Kiểm ancestor/owner/quyền trước khi tạo thư mục ứng dụng private và manifest durable; campaign hiện hữu hoặc partial đều từ chối, không reset/chmod/repair. Tests chỉ tạo thư mục tạm. Chưa chạy init thực hoặc live; bước kế tiếp vẫn là runner fixture BR-10 và accepted-output proof.
+
 Path guard DONE trong phạm vi kiểm đường dẫn hiện hữu: Codex thực hiện/review, #63 merged `a53928c`, head `0372ffe`; CI 4/4 và learner tests/race/vet PASS. Lệnh campaign-report kiểm đường dẫn absolute/clean, toàn chuỗi directory không symlink, hai thư mục ứng dụng/campaign private và owner hiện tại trên Linux/macOS; OS khác từ chối. Chưa có init/live runner; không chống tác nhân local thay path đồng thời hoặc rollback. Missing/unsafe path trả PATH_ERROR, không artifact. BR-11 vẫn IN_PROGRESS; bước tiếp theo là khởi tạo campaign có kiểm soát, không reset ledger có sẵn.
 
 Chủ repo đã yêu cầu xử lý, review và merge lần lượt tất cả các mục còn lại. Đây là quyền tiếp tục các thay đổi repo trong kế hoạch, không là quyền mua dịch vụ, đăng nội dung hoặc thực thi action thật ngoài scope đã chốt. Không cần xin lại quyền merge từng PR đạt kiểm thử/review; mỗi PR vẫn phải có đúng head CI PASS và ghi bằng chứng trước merge.
