@@ -80,7 +80,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; #53/#54 merged; BR-10c [#55](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/55) chờ nghiệm thu lab; importer nền tảng còn mở |
-| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | BR-11a mock offline DONE, #56 merged `3daed32`; BR-11b live provider/proof còn mở |
+| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | Codex thực hiện/review kỹ thuật; chủ repo duyệt phạm vi; #56–#59 merged, #59 `9eeddc4`; DeepSeek Flash, tối đa 100 lượt/$3 chỉ fixture; chain conformance IN_REVIEW trên `codex/br-11b2-chain-conformance`; live proof còn mở |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
@@ -355,13 +355,23 @@ Nghiệm thu: action và outcome thật hoặc fixture được gắn nhãn đi 
 
 BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) `3daed32`: [hướng dẫn/kết luận](../architecture/BR-11A-MOCK-ADVISOR.md). Context từ store, exact IDs, source/time/payload, max_age 0..8760; mock HUMAN_REVIEW, schema/reference/freshness guards, read-only. CI 4/4 và tests/vet/smoke chạy lại PASS.
 
-BR-11b còn OPEN về proof live. Người dùng đã chọn DeepSeek V4 Flash và cấp quyền tối đa 100 lượt/$3, chỉ fixture. [BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md) bắt đầu bằng adapter giao thức; ledger ngân sách lưu bền và runner fixture còn thiếu nên chưa mở CLI/live. Mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
+BR-11b còn OPEN về proof live. Người dùng đã chọn DeepSeek V4 Flash và cấp quyền tối đa 100 lượt/$3, chỉ fixture. [BR-11b.2](../architecture/BR-11B2-DEEPSEEK.md): adapter #58 merged `dbeda41`; ledger nội bộ #59 merged `9eeddc4` sau sửa bounded read/FIFO, CI 4/4 và learner race/tests/vet PASS. Chưa mở CLI/live. Mock không là nghiệm thu phần live. Item cha BR-11 giữ IN_PROGRESS.
+
+Đối chiếu tiêu chí BR-11: fixture độc lập của ledger chỉ kiểm giới hạn lượt, không thay artifact BR-10. Subtask chain conformance IN_REVIEW (Codex thực hiện; review kỹ thuật sau CI, chủ repo duyệt merge): test lấy context từ history → human action → PENDING outcome được lưu qua store, truyền qua DeepSeek adapter tới HTTP fixture; expected output viết riêng, không dùng mock generator làm oracle. Case valid/ID bịa/stale/future/reason rỗng/malformed/write request và upstream bytes không đổi. Không là live proof hoặc bằng chứng chất lượng model.
+
+Thứ tự còn lại trước nghiệm thu BR-11 (không mở rộng BR-12 trước khi chốt dependency):
+
+1. Review chain conformance; giữ context từ đúng artifact BR-10, chỉ fixture đã duyệt, không nhận dữ liệu riêng tư tùy ý.
+2. Hoàn thiện một campaign path ứng dụng sở hữu, reservation + báo cáo kết quả lưu bền, usage/giá và đối soát lỗi chưa rõ kết quả. Trần reservation nội bộ không tự chứng minh phí provider <= $3.
+3. Bổ sung lệnh/config mẫu, hướng dẫn học viên chạy/đọc lỗi, provider/model/prompt/context version và expected evidence cho review nội dung. Không secret trong repo/log.
+4. Review trước live, canary một lượt với fixture BR-10; chỉ tăng lượt nếu usage/kết quả đạt. Tối đa 100 lượt/$3, không bắt buộc dùng hết. Chưa gọi API thật trong các PR trên.
+5. Lưu proof đã loại thông tin riêng tư, nghiệm thu theo checklist BR-11; BR-06b/BR-10d vận hành affiliate thật vẫn mở độc lập.
 
 BR-11b.1 DONE trong phạm vi [ranh giới provider offline](../architecture/BR-11B1-PROVIDER-BOUNDARY.md), #57 merged `b465fa7`: mock dùng interface chung, HTTP fixture chỉ loopback, timeout/retry/body size hữu hạn, khóa từ môi trường và provenance có version. Review không có lỗi chặn trong scope; learner race/tests/vet, smoke BR-11a và CI 4/4 PASS. Regression dùng server giả lập; chưa mở CLI live. BR-11b.2 provider thật/proof vẫn OPEN; BR-11 giữ IN_PROGRESS.
 
 Liên quan phát hiện 1, 4, 7.
 
-- [ ] Tạo mock provider chạy offline để bài học không cần credential ngay.
+- [x] Tạo mock provider chạy offline để bài học không cần credential ngay (#56/#57 đã review/merge).
 - [ ] Thêm một live provider adapter có cấu hình mẫu không chứa secret; provider/model phải ghi lại khi smoke.
 - [ ] Tạo context từ history/outcome hiện có, có evidence payload, exact IDs, source, as_of, max_age và limitation.
 - [ ] Output có cấu trúc → schema validation → reference/freshness validation → ADVISE/HUMAN_REVIEW/ABSTAIN.
