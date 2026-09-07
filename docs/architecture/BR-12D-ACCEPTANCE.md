@@ -2,6 +2,8 @@
 
 Baseline `9dd9070` (#72). Phạm vi nghiệm thu: lab/schema, một workspace một writer; không chứng minh chất lượng tư vấn, hiệu quả affiliate hoặc pilot người mới. Codex thực hiện và review kỹ thuật theo yêu cầu chủ repo. ReviewRecord sinh bởi smoke được gắn rõ synthetic, không thay bằng chứng người thật review.
 
+Bàn giao qua [PR #73](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/73), implementation `7cf10b3`; xem trạng thái merge/CI tại PR. Smoke local, learner tests/race/vet và 8 validators PASS. Review không có lỗi chặn trong phạm vi lab; nghiệm thu DONE trong kế hoạch áp dụng khi PR này được merge, không đóng các giới hạn bên dưới.
+
 ## Chạy lại
 
 Từ repo root, có Git, Python 3 và Go theo learner go.mod:
