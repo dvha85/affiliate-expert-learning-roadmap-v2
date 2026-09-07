@@ -131,3 +131,38 @@ func TestWatcherSinkAndAlias(t *testing.T) {
 	}
 	watchRun(t, input, input, f, "PATH_ERROR")
 }
+
+func TestWatcherFetchPreflightDoesNotAttemptNetwork(t *testing.T) {
+	tests := []struct {
+		name  string
+		args  []string
+		setup func(t *testing.T, dir string) string
+		want  string
+	}{
+		{name: "missing-parent", args: []string{"fetch-fixture"}, setup: func(t *testing.T, dir string) string {
+			return filepath.Join(dir, "missing", "history")
+		}, want: "PATH_ERROR"},
+		{name: "corrupt-history", args: []string{"fetch-fixture"}, setup: func(t *testing.T, dir string) string {
+			path := filepath.Join(dir, "history")
+			if err := os.WriteFile(path, []byte("not-json\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			return path
+		}, want: "HISTORY_ERROR"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			history := tc.setup(t, dir)
+			var out, diag bytes.Buffer
+			code := runWatcher(append(tc.args, history), &out, &diag)
+			var env map[string]any
+			if err := json.Unmarshal(out.Bytes(), &env); err != nil {
+				t.Fatal(err, out.String(), diag.String())
+			}
+			if code == 0 || env["status"] != tc.want || env["network_fetch_attempted"] != false || env["persisted"] != false {
+				t.Fatalf("code=%d env=%v diag=%s", code, env, diag.String())
+			}
+		})
+	}
+}
