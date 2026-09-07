@@ -87,6 +87,8 @@ jobs:
         run: python scripts/validate_n8n_m07_adversarial.py
       - name: BR-15c M07 output contract
         run: python scripts/validate_n8n_m07_output_cases.py
+      - name: BR-19a readiness audit
+        run: python scripts/audit_readiness.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...

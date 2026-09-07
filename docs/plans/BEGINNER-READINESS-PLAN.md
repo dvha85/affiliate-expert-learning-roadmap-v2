@@ -88,7 +88,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | IN_PROGRESS | BR-16a offline smoke đã merge; walkthrough/pilot người mới và residual gaps còn mở |
 | BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | IN_PROGRESS | BR-17a proposal-only boundary đang được chốt; live adapter/authorization còn mở |
 | BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | IN_PROGRESS | BR-18a runbook deployment/recovery đang review; runtime/backup target thật còn mở |
-| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | TODO | Chưa phân công |
+| BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | IN_PROGRESS | BR-19a readiness audit đang review; production readiness vẫn bị chặn bởi evidence gaps |
 
 Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này mô tả dependency công việc, không giao việc cho agent hay tạo lịch tự động.
 
@@ -455,6 +455,8 @@ BR-17d đang triển khai/review: [M11 lifecycle/STOP/reconciliation boundary](.
 BR-18a đang triển khai/review: [runbook deployment/recovery 24/7](../architecture/BR-18A-DEPLOYMENT-RECOVERY-RUNBOOK.md) yêu cầu runtime/resource limits, backup checksum, restore/replay, STOP drill và human review. Chưa chọn host/backup target nên evidence vẫn UNVERIFIED.
 
 BR-18b đang triển khai/review: [backup/restore smoke offline](../architecture/BR-18B-BACKUP-RESTORE-SMOKE.md) kiểm checksum/tamper, byte-identical restore và durable STOP marker trong thư mục tạm. Đây chưa phải storage/host evidence 24/7; BR-18 vẫn IN_PROGRESS.
+
+BR-19a đang triển khai/review: [audit readiness tổng thể](../architecture/BR-19A-READINESS-AUDIT.md) kiểm các blocker affiliate source, n8n/model execution, pilot, live adapter và runtime 24/7; kết quả bắt buộc `NOT_READY_FOR_PRODUCTION` cho tới khi có operated/live evidence.
 
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
