@@ -83,8 +83,8 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | DONE (lab) | Nghiệm thu qua #73: M00→M05, store links, synthetic review, FAIL/PASS/rollback cô lập; không business/human-pilot proof; trạng thái merge/CI theo PR |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | IN_PROGRESS | BR-13a tách shared M06; parser/handoff và nguồn thật chưa nghiệm thu |
-| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
-| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | TODO | Chưa phân công |
+| BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | IN_PROGRESS | BR-14a static contract và BR-14b smoke runbook/case contract đã merge; engine import/execution thật còn UNVERIFIED |
+| BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | IN_PROGRESS | BR-15a static contract, BR-15b adversarial contract đã merge; BR-15c output contract đang review; model/n8n integration thật còn mở |
 | BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | TODO | Chưa phân công |
 | BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | TODO | Chưa phân công |
 | BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | TODO | Chưa phân công |
