@@ -14,6 +14,14 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
+### Runner fixture BR-10 offline — IN_REVIEW
+
+Từ learner: `go run ./cmd/bot advisor fixture-run EXISTING_OUTPUT_PARENT`. Thư mục cha phải có sẵn; mỗi lần tạo một thư mục con mới private `br11-offline-*`, không ghi đè bundle cũ. Đường dẫn trả trong `bundle_path`. Đây là xuất bundle offline, không phải campaign trả phí; không nhận provider/key hoặc history tùy ý.
+
+Runner tạo observation synthetic giá đỡ laptop, ghi history qua store, ghi human action giả lập và PENDING outcome qua chính lệnh store, rồi đọc context bằng buildAdvisorContext. Mock chạy qua boundary shared, chỉ khi SUPPORTED/ABSTAIN mới lưu `advisor.json` chứa context/payload, output và provider/model/prompt version. History/actions/outcomes cùng input fixture nằm trong bundle để đọc lại và replay. Không sửa dữ liệu học viên hoặc PROGRESS. Partial failure giữ bundle để chẩn đoán, status lỗi không chứng minh output đã lưu hoàn chỉnh.
+
+Expected IDs: br11-decision, br11-observation, br11-action, br11-outcome. Pending không phải zero/doanh thu thật. Đọc reason/unknowns để thấy giới hạn nguồn; exact IDs không chứng minh mọi phát biểu đúng. Bundle mock không là live proof, không dùng ledger trả phí hoặc thay context digest campaign v1. Nối DeepSeek/campaign vào chain này vẫn phải được review riêng trước live.
+
 ### Campaign init — đã review/merge, chỉ nghiệm thu offline
 
 PR #64 merged `0f5745d`, head `3a96b11`: review không có lỗi chặn trong scope trusted local directory; CI 4/4, tests/race/vet learner và 8 validators PASS. Không init campaign người dùng hoặc gọi API khi kiểm thử. Các giới hạn TOCTOU, OS support và live proof vẫn giữ nguyên.
