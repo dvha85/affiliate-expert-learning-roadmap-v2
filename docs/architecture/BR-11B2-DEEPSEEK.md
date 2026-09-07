@@ -1,5 +1,18 @@
 # BR-11b.2 — DeepSeek V4 Flash
 
+## Chạy canary một lượt (có phí, không tự chạy trong kiểm thử)
+
+Tại `lab/affiliate-bot`, sau khi review code và xác nhận quyền dùng API/ngân sách, dùng key được cấp qua môi trường `DEEPSEEK_API_KEY`. Không đưa key vào repo, tham số lệnh, log hay chat. Lệnh không nhận endpoint/model/input/path tùy ý; chỉ gửi fixture synthetic BR-10 đã đóng băng tới adapter DeepSeek hiện có.
+
+1. Nếu chưa có campaign, chạy `go run ./cmd/bot advisor campaign-init` đúng một lần. Nếu đã có, không khởi tạo lại, xóa hay đổi config root để né ledger.
+2. Chạy `go run ./cmd/bot advisor campaign-report`; canary yêu cầu `attempts=0`. Kiểm giới hạn chi tiêu phía tài khoản trước khi chạy: reservation nội bộ $0.50 không phải bảo đảm hóa đơn provider và không thay trần đã cho phép $3.
+3. Chạy `go run ./cmd/bot advisor campaign-canary` một lần. Lệnh giữ khóa chống hai tiến trình chạy đồng thời, tạo bundle fixture private bên cạnh campaign, reserve trước request, timeout 30 giây và không retry.
+4. Đọc lại `go run ./cmd/bot advisor campaign-report`: kiểm provider/model/prompt, context, accepted output, usage và phí ước tính. Đối soát usage/phí trên tài khoản, review nội dung trước khi cho phép lượt tiếp theo. SUPPORTED/ABSTAIN chỉ là đạt boundary, không chứng minh lời khuyên đúng hoặc cho phép thực thi.
+
+Thiếu/sai định dạng key trả CONFIG_ERROR trước reservation. PATH_ERROR/REPORT_ERROR cần kiểm cấu hình hoặc tính toàn vẹn dữ liệu. LOCKED cần xác minh tiến trình còn chạy và phục hồi có review; không tự xóa khóa. Có bất kỳ reservation nào trả REVIEW_REQUIRED, kể cả lượt trước lỗi/mất kết quả. Không gọi lại tự động sau timeout hoặc lỗi ghi stdout; đọc report trước. Exit 0 chỉ SUPPORTED/ABSTAIN, exit 2 sai cú pháp, exit 1 các lỗi/reject còn lại. `execution_permitted=false` ở mọi trạng thái.
+
+Bundle partial được giữ trong thư mục ứng dụng để kiểm tra, không tự sửa/xóa. Result ledger mới là nơi đọc kết quả canonical. Giới hạn còn lại: không chống người dùng đổi OS profile/config root, rollback ledger hoặc tác nhân local thay directory đồng thời; khóa còn sót do crash sẽ chặn chạy. Chưa có bằng chứng canary thật; tests chỉ dùng HTTP loopback và key giả. Không tăng lượt hoặc đánh BR-11 DONE trước review bằng chứng live.
+
 ## BR-10 context và accepted output trong ledger
 
 Runner nội bộ `runBR10RecordedCampaignAttempt` tạo bundle synthetic qua store BR-10, kiểm hash fixture versioned, giữ reservation durable trước khi gọi provider và lưu `br11-result/v2`. Chỉ SUPPORTED/ABSTAIN có output nội dung; lỗi/reject chỉ lưu status/context/usage nếu biết. Đọc lại kiểm hash context cố định, grounding, trạng thái output và liên kết reservation. Payload JSON được chuẩn hóa trước persistence để đọc lại không đổi bytes.
