@@ -14,6 +14,16 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
+### Campaign report — IN_REVIEW
+
+Lệnh `bot advisor campaign-report` không nhận path và không đọc API key. Nó dùng thư mục cấu hình của tài khoản máy (`os.UserConfigDir`) cộng `affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`, không phụ thuộc repo/cwd. Trên macOS thông thường là `~/Library/Application Support/affiliate-expert-learning-roadmap-v2/deepseek-br11-v1`. Không tự tạo thư mục, không có init/reset hoặc run live; chưa có campaign thì trả REPORT_ERROR, không artifact.
+
+Report giữ lock ngắn trong lúc đọc, kiểm manifest/results/reservation canonical và sequence, không thay bytes ledger hay refund. Có attempts, reserved_microusd, remaining_reservation_microusd, estimated_known_microusd, missing_result_attempts, unknown_usage_attempts. Tổng estimate chỉ cộng usage đã có, không đại diện tổng hóa đơn khi còn unknown/missing. `invoice_reconciled=false`, `execution_permitted=false` luôn giữ nguyên. Số còn lại là ngân sách reservation, không phải số dư tài khoản provider.
+
+Đây mới là vị trí cố định của lệnh report. Trusted local user config root vẫn là giả định; thay OS profile/config environment, sửa/xóa/rollback dữ liệu hoặc symlink ancestor chưa được chống. Runner live phải kiểm ownership/path và dùng cùng campaign trước khi được bật. Không hướng dẫn người học tạo ledger bằng tay hoặc khởi tạo campaign mới để vượt cap.
+
+Tests kiểm report sau reservation chưa có result và mock result không có usage, ledger bytes không đổi, lock được nhả, file bất thường bị reject, missing không auto-init và CLI từ chối path argument. Tests/vet/race learner được chạy offline; chưa có live proof.
+
 ### Result ledger — đã review/merge trong phạm vi metadata offline
 
 [#61](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/61) merged `75f8f7b`, head sửa `92eb078`. Review không còn lỗi chặn trong phạm vi nội bộ sau hai bản sửa dưới đây; tests/race/vet, smoke BR-11a, 8 validators và CI 4/4 PASS. Không nghiệm thu live, hóa đơn hoặc nội dung khuyến nghị. Không phát sinh API request trong quá trình review.
