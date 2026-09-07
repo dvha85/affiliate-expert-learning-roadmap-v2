@@ -1,5 +1,7 @@
 # BR-13a — Normalizer M06 dùng chung
 
+Bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74), implementation `bb88f6b`; trạng thái merge/CI xem tại PR. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. Không có lỗi chặn trong phạm vi di chuyển code, các giới hạn bên dưới vẫn giữ nguyên.
+
 Baseline `829a0cd`, sau BR-12 lab #73. Di chuyển WatchRequest, CanonicalObservation, EvaluateWatchRequest, NormalizeWatchObservation, ContentHash, M06FileInput và raw decode/profile validation vào `core/m06`. Demo giữ wrappers/aliases; M07 vẫn ở harness. Không thay schema hoặc semantics, không đọc mạng/file/clock trong core.
 
 Core tests độc lập kiểm hash SHA256 literal, NEW/UNCHANGED/CHANGED, identity với thời gian tương đương, HEAD thiếu nội dung, source/method và raw malformed/null/duplicate fields. Regression M06/M07/M11 trong harness giữ nguyên, chạy qua implementation mới. Validator repo đọc core/m06; kiểm field observation_id chịu được khoảng trắng gofmt, không bỏ điều kiện.

@@ -426,7 +426,7 @@ Nghiệm thu: đi trọn M00 → M05 trong một workspace với artifact links 
 
 ### BR-13 — M06 fetch/normalize/history handoff thực
 
-BR-13a đã triển khai, chờ PR/CI: [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, nhánh `codex/br-13a-shared-m06`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Core/harness/learner tests/race/vet và 8 validators PASS; blocker credits trước đó đã hết ở lần kiểm tiếp. BR-13 cha IN_PROGRESS; parser/handoff và nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
+BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
 
