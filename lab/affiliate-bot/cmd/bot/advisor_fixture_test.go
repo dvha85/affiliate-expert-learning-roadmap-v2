@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +13,7 @@ func TestAdvisorFixtureBundle(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 2; i++ {
 		var output bytes.Buffer
-		if code := runAdvisor([]string{"fixture-run", parent}, &output, io.Discard); code != 0 {
+		if code := runAdvisor([]string{"fixture-run", parent}, &output, &output); code != 0 {
 			t.Fatal(code, output.String())
 		}
 		var envelope struct {

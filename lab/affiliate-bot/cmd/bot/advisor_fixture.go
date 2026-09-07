@@ -44,7 +44,7 @@ func buildBR10AdvisorFixture(dir string) (advisorContext, error) {
 	if _, err = AppendHistory(h, r); err != nil {
 		return advisorContext{}, err
 	}
-	action := m03.HumanActionRecord{ActionID: "br11-action", DecisionID: "br11-decision", ActionType: "synthetic", Target: "fixture:none", PerformedBy: "fixture-human", PerformedAt: "2026-09-04T00:00:00Z", MeasurementWindowEnd: "2026-09-05T00:00:00Z", ComplianceReviewed: true}
+	action := m03.HumanActionRecord{ActionID: "br11-action", DecisionID: "br11-decision", ActionType: "synthetic", Target: "fixture:none", PerformedBy: "human", PerformedAt: "2026-09-04T00:00:00Z", MeasurementWindowEnd: "2026-09-05T00:00:00Z", ComplianceReviewed: true}
 	ai := filepath.Join(dir, "action-input.json")
 	if err = writeFixtureJSON(ai, action); err != nil {
 		return advisorContext{}, err
