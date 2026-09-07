@@ -1,0 +1,1 @@
+{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-04T00:00:00Z","correlation_id":"example-event-2","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"Synthetic offer A\",\"currency\":\"USD\",\"price\":100}"}
