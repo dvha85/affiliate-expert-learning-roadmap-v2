@@ -14,6 +14,12 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
+### Campaign init — IN_REVIEW
+
+`bot advisor campaign-init` tạo một campaign trống tại cùng đường dẫn cố định của report. Không nhận path, không đọc API key hoặc gọi mạng. User config root phải có sẵn, không symlink, đúng owner và không group/other-writable. Thư mục ứng dụng phải private/đúng owner; chỉ tạo bằng 0700 nếu chưa có. Manifest fsync trước thành công. Parent và campaign được kiểm tra, không thay quyền dữ liệu có sẵn.
+
+Chạy lại luôn INIT_ERROR nếu campaign tồn tại (kể cả partial init), không reset reservation; giữ dữ liệu để kiểm tra thủ công. Nếu lỗi sau tạo directory/manifest thì không tự xóa. Thông báo INITIALIZED không cấp execution permission hoặc chứng minh đã gọi provider. Chỉ thử init trong temp directory ở tests, chưa khởi tạo campaign người dùng. Hostile path replacement đồng thời vẫn ngoài scope. OS ngoài Linux/macOS fail closed qua ownership guard.
+
 ### Campaign report — IN_REVIEW
 
 Cập nhật sau #62 merge `9645e6d`: path guard đang review. CLI kiểm mọi ancestor hiện hữu bằng Lstat, chặn symlink/non-directory, yêu cầu thư mục ứng dụng và campaign không cho group/other truy cập, owner là effective UID trên Linux/macOS. OS khác fail closed. Không tự chmod/chown/tạo đường dẫn. Missing path nay trả PATH_ERROR trước khi đọc report. Không bảo vệ khỏi hostile concurrent replacement hoặc thay OS-user/config root; đây chưa phải capability filesystem chống TOCTOU. Lệnh init/run live vẫn chưa bật.
