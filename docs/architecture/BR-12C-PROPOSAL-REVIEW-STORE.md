@@ -2,6 +2,8 @@
 
 Baseline `784fdd5`; tiếp nối evaluation store #70/#71. Phạm vi lab, một writer trong workspace tin cậy; không API hoặc execution. Các lệnh dưới chạy tại `lab/affiliate-bot` với các file history/action/outcome/evaluation thực sự đã tạo qua BR-10/BR-12b.
 
+Triển khai `d9f0492`, bàn giao qua [PR #72](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/72); trạng thái merge/CI xem tại PR. Codex thực hiện/review theo quyền chủ repo. Learner tests/race/vet và 8 validators PASS; review không có lỗi chặn trong scope một writer và không thực thi nêu dưới.
+
 ## Lệnh và input
 
 ```sh
