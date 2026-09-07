@@ -14,7 +14,9 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
-### Runner fixture BR-10 offline — IN_REVIEW
+### Runner fixture BR-10 offline — DONE phạm vi mock
+
+PR #65 merged `a26dc34`, head `9693d6e`: review không có lỗi chặn trong phạm vi mock; CI 4/4, learner tests/race/vet và 8 validators PASS. Fixture sửa performed_by về enum human, vẫn synthetic ở action/source/target; không là bằng chứng thao tác thật. Chưa nối paid campaign hoặc gọi DeepSeek.
 
 Từ learner: `go run ./cmd/bot advisor fixture-run EXISTING_OUTPUT_PARENT`. Thư mục cha phải có sẵn; mỗi lần tạo một thư mục con mới private `br11-offline-*`, không ghi đè bundle cũ. Đường dẫn trả trong `bundle_path`. Đây là xuất bundle offline, không phải campaign trả phí; không nhận provider/key hoặc history tùy ý.
 
