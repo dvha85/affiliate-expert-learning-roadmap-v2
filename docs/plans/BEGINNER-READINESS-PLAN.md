@@ -430,6 +430,8 @@ BR-13b triển khai/review: [fixture parser và history handoff](../architecture
 
 BR-13c đã triển khai và review, bàn giao qua [PR #76](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/76): [HTTPS fixture đã ghim](../architecture/BR-13C-HTTPS-FIXTURE.md), baseline `e0896de`, implementation `363b5f4`. Fetch host/ref/hash cố định, không redirect/proxy/URL tùy ý, timeout/size/status/DNS guard; parser → canonical history, retry/replay và ACK sau append. Smoke HTTPS, Go race/vet và validators PASS. Dữ liệu synthetic, không affiliate source/proof. BR-13 cha IN_PROGRESS.
 
+BR-14a đang triển khai/review: [hợp đồng tĩnh M06 n8n](../architecture/BR-14A-N8N-STATIC-CONTRACT.md), validator kiểm tra node/GET-only/change detection/cache boundary/history handoff và chạy trong CI. Đây không thay thế engine smoke; `tested_n8n_version` vẫn `UNVERIFIED` cho tới khi có instance n8n thật và execution evidence. BR-14 cha TODO.
+
 BR-13a đã triển khai và review, bàn giao qua [PR #74](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/74) (trạng thái merge/CI tại PR): [M06 shared core](../architecture/BR-13A-SHARED-M06.md), baseline `829a0cd`, implementation `bb88f6b`. Tách normalizer/raw fixture boundary khỏi demo, không đổi semantics hoặc mở network. Codex thực hiện/review theo quyền chủ repo; core/harness/learner tests/race/vet và 8 validators PASS. BR-13 cha IN_PROGRESS; tiếp theo parser/handoff BR-13b, nguồn được phép/live proof còn mở, không chốt checklist chỉ vì core đã dùng chung.
 
 Liên quan phát hiện 3.
