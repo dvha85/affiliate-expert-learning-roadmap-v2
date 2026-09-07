@@ -80,7 +80,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
 | BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
-| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | IN_PROGRESS | Codex thực hiện/review kỹ thuật; chủ repo duyệt phạm vi và yêu cầu xử lý/review/merge lần lượt; #56–#62 merged; DeepSeek Flash, tối đa 100 lượt/$3 chỉ fixture; ownership/init/run/accepted-output proof và live evidence chưa nghiệm thu |
+| BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | TODO | Chưa phân công |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | TODO | Chưa phân công |
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | TODO | Chưa phân công |
@@ -353,7 +353,7 @@ Nghiệm thu: action và outcome thật hoặc fixture được gắn nhãn đi 
 
 ### BR-11 — M04 advisor có adapter thực
 
-Hiện hành: **IN_REVIEW nghiệm thu lab/schema + một live canary synthetic** tại [BR-11c](../architecture/BR-11C-ACCEPTANCE.md), baseline `2e84d7f`. Chủ repo chạy canary: ABSTAIN, 1 request, 1150 tokens; dashboard sau reload khớp tổng usage, phí < $0.01. Estimate $0.000646 chưa là phí chính xác, giữ invoice_reconciled=false. Review nội dung phù hợp outcome PENDING/synthetic, không execution. Đề nghị chốt phạm vi lab sau merge, không chứng minh hiệu quả affiliate hoặc chất lượng model tổng quát. Các đoạn tiến độ phía dưới là lịch sử trước bằng chứng live này.
+Hiện hành: **DONE trong phạm vi lab/schema + một live canary synthetic**, [#68](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/68) merged `395c728`, head `720fbd9`, CI 4/4 và 8 validators PASS; [review BR-11c](../architecture/BR-11C-ACCEPTANCE.md), baseline `2e84d7f`. Chủ repo chạy canary, Codex review: ABSTAIN, 1 request, 1150 tokens; dashboard sau reload khớp tổng usage, phí < $0.01. Estimate $0.000646 chưa là phí chính xác, giữ invoice_reconciled=false. Nội dung phù hợp outcome PENDING/synthetic, không execution. Dependency BR-11 cho BR-12 đạt trong lab; không chứng minh hiệu quả affiliate hoặc chất lượng model tổng quát. Các đoạn tiến độ phía dưới là lịch sử trước bằng chứng live này.
 
 BR-11a mock offline DONE sau review/merge [#56](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/56) `3daed32`: [hướng dẫn/kết luận](../architecture/BR-11A-MOCK-ADVISOR.md). Context từ store, exact IDs, source/time/payload, max_age 0..8760; mock HUMAN_REVIEW, schema/reference/freshness guards, read-only. CI 4/4 và tests/vet/smoke chạy lại PASS.
 
@@ -394,11 +394,11 @@ BR-11b.1 DONE trong phạm vi [ranh giới provider offline](../architecture/BR-
 Liên quan phát hiện 1, 4, 7.
 
 - [x] Tạo mock provider chạy offline để bài học không cần credential ngay (#56/#57 đã review/merge).
-- [ ] Thêm một live provider adapter có cấu hình mẫu không chứa secret; provider/model phải ghi lại khi smoke.
-- [ ] Tạo context từ history/outcome hiện có, có evidence payload, exact IDs, source, as_of, max_age và limitation.
-- [ ] Output có cấu trúc → schema validation → reference/freshness validation → ADVISE/HUMAN_REVIEW/ABSTAIN.
-- [ ] Có bounded timeout/retry và thông báo lỗi cấu hình; không có write tool ở M04.
-- [ ] Giải thích ID hợp lệ chưa chứng minh mọi phát biểu đúng; case kiểm nội dung vẫn cần expected evidence và review.
+- [x] Thêm một live provider adapter có cấu hình mẫu không chứa secret; provider/model phải ghi lại khi smoke (#58/#67/#68).
+- [x] Tạo context từ history/outcome hiện có, có evidence payload, exact IDs, source, as_of, max_age và limitation (#60/#65/#66).
+- [x] Output có cấu trúc → schema validation → reference/freshness validation → ADVISE/HUMAN_REVIEW/ABSTAIN; live boundary chỉ cho HUMAN_REVIEW/ABSTAIN, chặn ADVISE (#60/#66).
+- [x] Có bounded timeout/retry và thông báo lỗi cấu hình; không có write tool ở M04 (#58/#67, canary không retry).
+- [x] Giải thích ID hợp lệ chưa chứng minh mọi phát biểu đúng; case kiểm nội dung vẫn cần expected evidence và review (#68, chỉ một câu hỏi fixture).
 
 Nghiệm thu: chạy được một câu hỏi với artifact của BR-10; hallucinated ID, stale/future evidence, reason rỗng, malformed output và write request không được SUPPORTED. Live proof có model/prompt/context version; mock không được thay live proof.
 

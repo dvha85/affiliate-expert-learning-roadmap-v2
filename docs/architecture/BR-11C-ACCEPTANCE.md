@@ -42,7 +42,7 @@ Giới hạn: prompt/context đã chủ động giới hạn HUMAN_REVIEW/ABSTAI
 
 ## Quyết định và phần giữ mở
 
-Đề nghị chốt BR-11 DONE **chỉ phạm vi lab/schema + một live canary trên fixture synthetic**, sau review/merge PR tài liệu này. Không yêu cầu thêm lượt chỉ để hoàn tất checklist. Cho phép bắt đầu BR-12 ở cùng phạm vi lab; không mở quyền thực thi hoặc mở rộng ngân sách.
+Đã chốt BR-11 DONE **chỉ phạm vi lab/schema + một live canary trên fixture synthetic**, sau #68 merged `395c728`, head `720fbd9`; CI 4/4 và 8 validators PASS, Codex review theo quyền chủ repo. Không yêu cầu thêm lượt chỉ để hoàn tất checklist. Cho phép bắt đầu BR-12 ở cùng phạm vi lab; không mở quyền thực thi hoặc mở rộng ngân sách.
 
 Giữ invoice_reconciled=false trong ledger: ảnh không đủ precision để xác nhận estimate chính xác. Nếu cần quyết toán chính xác, cần export theo key/khoảng thời gian; không coi đó là blocker của nghiệm thu tích hợp lab. Không sửa metadata canonical để giả lập đối soát.
 
