@@ -14,6 +14,18 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
+### Result ledger — đang chờ review
+
+Review #61 bổ sung hai chốt: context digest phải khớp fixture campaign hiện hành, không chỉ là hex 64 ký tự; reader/result writer phải xác minh manifest và thư mục campaign. Regression thay digest bằng hash khác vẫn đúng định dạng hoặc thay manifest, kiểm read/reserve/persist đều từ chối. Khi thay fixture phải version campaign rõ, không dùng fixture mới để diễn giải ledger cũ.
+
+Sau #60 merged `94c32c8` (chain conformance offline), `advisor_results.go` bổ sung result metadata immutable trong cùng thư mục campaign. Result liên kết attempt đã reserve, lưu provider/model/prompt version, SHA256 context, status, usage nullable, snapshot giá và estimate microUSD. Không lưu raw provider body, reasoning, secret hay output bị reject. Đây chưa là artifact nội dung phục vụ review chất lượng model.
+
+Writer dùng lock cùng reservation, O_EXCL và fsync file/directory. Duplicate/overwrite/orphan bị từ chối; reader strict/canonical/bounded kiểm chi phí tính lại. Reservation kế tiếp kiểm mọi result đã có; result hỏng hoặc orphan chặn request. Nếu crash trước khi có result, reservation vẫn giữ nguyên và lần sau không tái dùng attempt đó. Partial result sau write failure chặn lượt mới, không tự xóa hoặc refund. RESULT_ERROR không có nghĩa request chưa bị tính phí.
+
+Estimate dùng snapshot [giá chính thức](https://api-docs.deepseek.com/quick_start/pricing/) kiểm tra ngày 2026-09-07: Flash peak cache-miss input $0.44/MTok, output $1.32/MTok, tính nguyên microUSD và làm tròn lên. Bỏ qua giảm giá cache/off-peak để ước tính bảo thủ; không phải invoice, không là giá đảm bảo tương lai. Usage không có là null, không phải zero. Không giải phóng reservation theo estimate. Mock không được có usage tính phí. Runner ghi metadata hiện chỉ dùng fixture ledger; chưa nối thành lệnh live nhận artifact BR-10.
+
+Tests: restart đọc lại results, immutable/orphan, kết quả thiếu vẫn giữ reservation, cap không refund, negative/inconsistent usage, integer rounding và unknown != zero. Fixed campaign identity/path, báo cáo tổng hợp/đối soát nhà cung cấp và lưu artifact nội dung có kiểm chứng còn mở trước live. Không dùng ledger hoặc result này để tự đánh DONE BR-11.
+
 Bước 2a đang triển khai: `advisor_budget.go` có ledger reservation nội bộ và runner fixture cố định. Khởi tạo phải gọi riêng, không tự tạo lại khi thiếu; mkdir lock loại trừ writer đồng thời, reservation file O_EXCL + fsync file/directory trước khi provider được gọi. Restart đọc lại các file liên tục và manifest exact. File hỏng/thiếu giữa chuỗi hoặc lock còn lại sau crash đều dừng; không tự sửa/reset. Không hoàn tiền dự phòng và không retry.
 
 Review #59 phát hiện đọc manifest/reservation chưa giới hạn kích thước và có thể treo với FIFO. Bản sửa kiểm regular file bằng Lstat trước khi mở, giới hạn size theo độ dài canonical và đọc tối đa limit+1. Regression kiểm manifest và reservation quá lớn, FIFO trên Linux/macOS. Không bảo vệ khỏi tác nhân local thay thế path đồng thời; giới hạn trusted directory vẫn giữ nguyên. #59 chưa được nghiệm thu chỉ dựa trên CI của head cũ.
