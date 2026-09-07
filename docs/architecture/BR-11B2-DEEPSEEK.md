@@ -14,7 +14,9 @@ Regression server loopback kiểm tra cấu hình request, phản hồi hợp l�
 
 ## Còn thiếu trước khi chạy live
 
-### Campaign init — IN_REVIEW
+### Campaign init — đã review/merge, chỉ nghiệm thu offline
+
+PR #64 merged `0f5745d`, head `3a96b11`: review không có lỗi chặn trong scope trusted local directory; CI 4/4, tests/race/vet learner và 8 validators PASS. Không init campaign người dùng hoặc gọi API khi kiểm thử. Các giới hạn TOCTOU, OS support và live proof vẫn giữ nguyên.
 
 `bot advisor campaign-init` tạo một campaign trống tại cùng đường dẫn cố định của report. Không nhận path, không đọc API key hoặc gọi mạng. User config root phải có sẵn, không symlink, đúng owner và không group/other-writable. Thư mục ứng dụng phải private/đúng owner; chỉ tạo bằng 0700 nếu chưa có. Manifest fsync trước thành công. Parent và campaign được kiểm tra, không thay quyền dữ liệu có sẵn.
 
