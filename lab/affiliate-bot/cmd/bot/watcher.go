@@ -27,6 +27,11 @@ type watcherFixture struct {
 }
 
 func watcherRecord(raw []byte) (HistoryRecord, error) {
+	return watcherRecordSource(raw, "")
+}
+
+// Remote source is supplied only by the fixed, hash-verified fetch adapter.
+func watcherRecordSource(raw []byte, remote string) (HistoryRecord, error) {
 	fail := func(s string) (HistoryRecord, error) { return HistoryRecord{}, fmt.Errorf("watcher: %s", s) }
 	var f watcherFixture
 	if err := contracts.DecodeStrict(raw, &f); err != nil {
@@ -37,6 +42,15 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 	}
 	if f.StatusCode != 200 {
 		return fail("response status must be 200")
+	}
+	access, limitation := "local_fixture", "Fixture supplied locally; no fetch, seller authority or business truth verified."
+	host := "example.com"
+	if remote != "" {
+		if remote != watcherPinnedURL {
+			return fail("unsupported remote source")
+		}
+		f.URL, host = remote, "raw.githubusercontent.com"
+		access, limitation = "GET", "Fetched pinned synthetic fixture over HTTPS; scenario observed_at is not fetch time; no seller authority or business truth verified."
 	}
 	if strings.TrimSpace(f.CorrelationID) == "" || f.CorrelationID != strings.TrimSpace(f.CorrelationID) {
 		return fail("stable correlation_id required")
@@ -59,7 +73,7 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 	if strings.TrimSpace(offer.ProductID) == "" || strings.TrimSpace(offer.ProductName) == "" || offer.Currency != "USD" {
 		return fail("product identity/name and USD required")
 	}
-	request := m06.WatchRequest{Method: f.Method, URL: f.URL, AllowHosts: []string{"example.com"}, ObservedAt: f.ObservedAt, CorrelationID: f.CorrelationID, Body: f.Body}
+	request := m06.WatchRequest{Method: f.Method, URL: f.URL, AllowHosts: []string{host}, ObservedAt: f.ObservedAt, CorrelationID: f.CorrelationID, Body: f.Body}
 	normalized, status := m06.NormalizeWatchObservation(request, offer.ProductID)
 	if status != "NEW" {
 		return fail("normalization rejected")
@@ -80,7 +94,7 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 			value = json.RawMessage("null")
 			state, claim = "missing", "unknown"
 		}
-		fields = append(fields, map[string]any{"observation_id": normalized.ObservationID + "-" + item.name, "subject_id": offer.ProductID, "source_url": f.URL, "observed_at": f.ObservedAt, "access_method": "local_fixture", "evidence_kind": "synthetic", "use_context": "test", "field_or_claim": item.name, "claim_kind": claim, "value": value, "state": state, "source_authority_or_role": "synthetic_fixture", "transformation_or_method": "br13-offer-fixture/v1; body_sha256=" + normalized.ContentHash + "; correlation_id=" + f.CorrelationID, "limitation": "Fixture supplied locally; no fetch, seller authority or business truth verified."})
+		fields = append(fields, map[string]any{"observation_id": normalized.ObservationID + "-" + item.name, "subject_id": offer.ProductID, "source_url": f.URL, "observed_at": f.ObservedAt, "access_method": access, "evidence_kind": "synthetic", "use_context": "test", "field_or_claim": item.name, "claim_kind": claim, "value": value, "state": state, "source_authority_or_role": "synthetic_fixture", "transformation_or_method": "br13-offer-fixture/v1; body_sha256=" + normalized.ContentHash + "; correlation_id=" + f.CorrelationID, "limitation": limitation})
 	}
 	packet := map[string]any{"version": "m00-input/v1", "question": "Synthetic watcher scenario; no business recommendation.", "products": []any{map[string]any{"observation_id": normalized.ObservationID, "subject_id": offer.ProductID, "product_name": offer.ProductName, "currency": offer.Currency, "fields": fields}}}
 	packetRaw, err := json.Marshal(packet)
@@ -104,6 +118,9 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 }
 
 func runWatcher(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "fetch-fixture" {
+		return runWatcherFetch(args, stdout, stderr)
+	}
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
 			fmt.Fprintln(stderr, err)
