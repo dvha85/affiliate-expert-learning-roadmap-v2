@@ -71,6 +71,8 @@ jobs:
         run: python scripts/smoke_br10c.py
       - name: BR-11a mock advisor smoke
         run: python scripts/smoke_br11a.py
+      - name: BR-12d M00-M05 and isolated regression rollback
+        run: python scripts/smoke_br12d.py
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
