@@ -62,6 +62,9 @@ cũ.
 
 - health check fail hoặc lease hết hạn → không activate;
 - STOP durable được ghi trước, đọc lại sau restart và chặn mọi attempt;
+- `backup create` và mọi writer managed dùng cùng runtime gate. Nhận `BUSY`
+  nghĩa là giữ nguyên state, chờ writer/snapshot kết thúc hoặc thực hiện recovery
+  rõ ràng cho gate stale; không xóa lock tự động;
 - backup history + ledger và, nếu M07 adapter đã persist, toàn bộ sidecar
   `history.jsonl.m07/`; manifest chỉ nhận relative path chuẩn hóa, checksum và
   restore vào thư mục cô lập;

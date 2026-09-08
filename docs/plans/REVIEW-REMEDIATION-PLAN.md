@@ -76,7 +76,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — `core/m06`, CLI/HTTP/n8n fixture adapter và resolver M07/M08 đã dùng chung; regression key-order/field ID/DRIFT có trong learner. Generic source và n8n operated run vẫn mở |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract, adapter-owned trace/proposal store và blueprint ACK chain đã có; n8n/model operated evidence, generic deployment policy còn mở |
-| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v2 snapshot recursive sidecar M07, replay trace/proposal/intent và M10 graph; transaction snapshot, coverage inventory M00–M10 đầy đủ còn mở |
+| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v2 snapshot recursive, M07 replay và runtime gate cross-process; coverage inventory M00–M10 đầy đủ, fault/host proof còn mở |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
@@ -329,6 +329,15 @@ và proposal bằng HTTP adapter của learner Bot, restore sang runtime trống
 thử proposal checksum-hợp-lệ nhưng hỏng. Backup từ symlink, writer lock hoặc
 target nằm trong runtime bị từ chối. Đây chưa thay thế snapshot transaction,
 coverage full M00–M10 hoặc n8n/model operated evidence.
+
+**Cập nhật snapshot gate (2026-09-09):** writer của learner runtime và
+`backup create` cùng giữ một runtime gate cross-process. M06/M07 history and
+sidecar, M08–M11 mission state, action/outcome/evaluation/review và import
+ACCESSTRADE trả `BUSY` khi snapshot hoặc writer khác đang giữ gate; stale gate
+không tự bị xóa. Manifest chỉ publish sau toàn bộ copy thành công. Regression
+giữ gate rồi thử backup/history write, và inject lỗi copy để xác nhận target
+partial không có manifest/không restore được. Chưa có filesystem snapshot
+transaction đa-host, kill/power-loss proof hoặc coverage mọi external store.
 
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.

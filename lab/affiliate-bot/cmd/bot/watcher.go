@@ -380,6 +380,16 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_REQUEST", "execution_permitted": false})
 			return
 		}
+		mutatesRuntime := r.URL.Path == "/v1/m07/fetch-and-register" || r.URL.Path == "/v1/m07/register-tool-result" || r.URL.Path == "/v1/m07/register-proposal"
+		if mutatesRuntime {
+			release, lockErr := acquireHistoryRuntimeGate(historyPath)
+			if lockErr != nil {
+				w.WriteHeader(http.StatusConflict)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "BUSY", "execution_permitted": false})
+				return
+			}
+			defer release()
+		}
 		ctx, err := m07AdapterContext(historyPath, request.RecordID)
 		if err != nil {
 			w.WriteHeader(http.StatusConflict)

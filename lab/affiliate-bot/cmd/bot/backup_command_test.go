@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -41,6 +42,32 @@ func m07AdapterCall(t *testing.T, history, endpoint string, request m07AdapterRe
 		t.Fatalf("M07 adapter rejected %s: code=%d response=%+v", endpoint, recorder.Code, response)
 	}
 	return response
+}
+
+func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
+		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])
+		if err != nil {
+			os.Exit(0)
+		}
+		os.Exit(1)
+	}
+	dir := t.TempDir()
+	release, err := acquireRuntimeGate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	child := exec.Command(os.Args[0], "-test.run=TestRuntimeGateRejectsAnotherProcess", "--", dir)
+	child.Env = append(os.Environ(), "GO_WANT_RUNTIME_GATE_HELPER=1")
+	if err := child.Run(); err != nil {
+		t.Fatalf("second process acquired the runtime gate: %v", err)
+	}
+	release()
+	child = exec.Command(os.Args[0], "-test.run=TestRuntimeGateRejectsAnotherProcess", "--", dir)
+	child.Env = append(os.Environ(), "GO_WANT_RUNTIME_GATE_HELPER=1")
+	if err := child.Run(); err == nil {
+		t.Fatal("child kept the runtime gate after it acquired it")
+	}
 }
 
 func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
@@ -107,6 +134,28 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	if code, response := backupCall(t, "create", runtime, filepath.Join(runtime, "must-not-be-created")); code == 0 || response["status"] != "INPUT_ERROR" {
 		t.Fatalf("backup target inside runtime was accepted: code=%d response=%+v", code, response)
 	}
+	beforeBusyWrite, err := os.ReadFile(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseGate, err := acquireRuntimeGate(runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "busy-backup")); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("backup entered a runtime with an active writer: code=%d response=%+v", code, response)
+	}
+	blockedRecord, err := NewHistoryRecord("m07-blocked", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-blocked-o", "p2", "P2", 101, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(history, blockedRecord); err == nil {
+		t.Fatal("history writer entered a runtime while snapshot gate was held")
+	}
+	releaseGate()
+	if afterBusyWrite, err := os.ReadFile(history); err != nil || !bytes.Equal(beforeBusyWrite, afterBusyWrite) {
+		t.Fatalf("blocked history writer changed bytes: %v", err)
+	}
 
 	backup, restored := filepath.Join(root, "backup"), filepath.Join(root, "restored")
 	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
@@ -124,6 +173,24 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(restored, "history.jsonl.m07", "proposals", proposal.ProposalID[len("sha256:"):]+".json")); err != nil {
 		t.Fatalf("restored proposal is missing: %v", err)
+	}
+	interrupted := filepath.Join(root, "interrupted-backup")
+	backupCopyFault = func(name string) error {
+		if name == "mission-state.json" {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	defer func() { backupCopyFault = nil }()
+	if code, response := backupCall(t, "create", runtime, interrupted); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("interrupted backup was accepted: code=%d response=%+v", code, response)
+	}
+	backupCopyFault = nil
+	if _, err := os.Stat(filepath.Join(interrupted, "manifest.json")); !os.IsNotExist(err) {
+		t.Fatalf("interrupted backup published a manifest: %v", err)
+	}
+	if code, response := backupCall(t, "restore", interrupted, filepath.Join(root, "interrupted-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("interrupted snapshot was restorable: code=%d response=%+v", code, response)
 	}
 
 	badBackup := filepath.Join(root, "bad-backup")

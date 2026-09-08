@@ -1027,6 +1027,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
 		lockPath := filepath.Join(args[1], ".mission.lock")
 		if err := os.Mkdir(lockPath, 0700); err != nil {
 			if os.IsExist(err) {

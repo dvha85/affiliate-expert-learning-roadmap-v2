@@ -23,6 +23,11 @@ type backupManifest struct {
 	Required []string          `json:"required"`
 }
 
+// backupCopyFault is a test-only seam for an interrupted snapshot. Manifest
+// publication remains after every copy succeeds, so a partial target never
+// advertises itself as a restorable backup.
+var backupCopyFault func(relativePath string) error
+
 func fileDigest(path string) (string, error) {
 	b, e := os.ReadFile(path)
 	if e != nil {
@@ -75,6 +80,9 @@ func backupFiles(source string) ([]string, error) {
 			return fmt.Errorf("backup does not follow symlink %s", path)
 		}
 		if entry.IsDir() {
+			if entry.Name() == runtimeGateName {
+				return filepath.SkipDir
+			}
 			if entry.Name() == ".mission.lock" {
 				return fmt.Errorf("runtime has an active writer lock")
 			}
@@ -562,6 +570,11 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		} else if !os.IsNotExist(statErr) {
 			return emit("TARGET_ERROR", nil, statErr, 1)
 		}
+		release, lockErr := acquireRuntimeGate(args[1])
+		if lockErr != nil {
+			return emit("BUSY", nil, lockErr, 1)
+		}
+		defer release()
 		if e := validateAccesstradeBackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime ACCESSTRADE receipt graph is invalid: %w", e), 1)
 		}
@@ -590,6 +603,11 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		m := backupManifest{Version: "affiliate-bot-backup/v2", Files: map[string]string{}, Required: required}
 		for _, name := range files {
+			if backupCopyFault != nil {
+				if e = backupCopyFault(name); e != nil {
+					return emit("STORE_ERROR", nil, e, 1)
+				}
+			}
 			b, e := os.ReadFile(filepath.Join(args[1], name))
 			if e != nil {
 				return emit("INPUT_ERROR", nil, e, 1)
