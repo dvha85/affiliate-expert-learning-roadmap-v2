@@ -127,7 +127,7 @@ go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGIST
 Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
 `m08-policy`, `m09-approval`, `m10-canary`, `m10-cost-register`, `m10-gate`,
 `m10-authorize`, `m10-reserve-authorization`, `m10-cancel`, `m10-reserve`,
-`m10-record-failed`, `m10-outcome`, `m11-stop` và
+`m10-record-failed`, `m10-outcome`, `m11-register`, `m11-resolve`, `m11-stop` và
 `status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
 và STOP không bị `init` ghi đè. `m10-cancel` chỉ phát hành execution record
@@ -194,6 +194,15 @@ FAILED execution → fixture outcome/`MACHINE_EXECUTION` EffectRef. Một backup
 checksum hợp lệ nhưng orphan outcome vẫn bị từ chối với `GRAPH_FAILED`. Phạm vi
 này chỉ là flat M10 learner graph: chưa là snapshot transaction, inventory
 recursive M00–M10 hay lifecycle M11.
+
+`m11-register STATE_DIR KIND ARTIFACT.json` và `m11-resolve STATE_DIR KIND ID`
+là artifact spine cho M11: chúng dùng `core/m11` để strict-decode và lưu
+canonical record vào `m11-artifacts.jsonl`; registry chỉ nhận link lifecycle
+đã resolve (lease, approval, health, cost, ledger, gate, authorization,
+execution, activation, reconciliation hoặc cycle). Backup v2 gồm registry này
+nếu runtime đã có nó và kiểm lại graph trước `RESTORED`. Đây chưa phải lệnh
+lease activation, production gate, executor, reconciliation/recovery hay M11
+lifecycle đầy đủ.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 

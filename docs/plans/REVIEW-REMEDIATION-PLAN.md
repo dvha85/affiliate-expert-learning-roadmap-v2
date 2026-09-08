@@ -315,6 +315,14 @@ là một lát cắt RP-06; các hạng mục còn lại bên dưới vẫn mở
 
 ### RP-07a/07b — M11 lifecycle và chain learner đầy đủ
 
+**Cập nhật thực hiện (2026-09-08, artifact spine):** `core/m11` nay sở hữu
+decoder/semantic checks cho M11 artifact; harness gọi decoder này thay vì parser
+semantic riêng. Learner có `m11-register`/`m11-resolve` và registry append-only
+`m11-artifacts.jsonl`, reject hash/schema/link hỏng, và backup v2 snapshot/verify
+registry nếu có. Smoke backup tạo lease qua learner, restore rồi resolve bằng
+process mới. Đây không phải activation hay production lifecycle; phần 07a bên
+dưới vẫn còn bắt buộc trước khi đóng.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

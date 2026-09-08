@@ -48,6 +48,24 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_production_lease(path):
+    payload = {
+        "lease_id": "br18-production-lease", "lease_version": "v1", "policy_version": "br18-v1",
+        "approval_ref": "br18-production-approval", "reviewed_by": "human", "reviewer_id": "pilot-human",
+        "reviewed_at": "2026-09-07T01:05:00Z", "promotion_review_ref": "fixture:br18-promotion-review",
+        "source_canary_grant_id": "br18-g", "source_canary_grant_version": "v1",
+        "source_canary_grant_hash": "sha256:" + "a" * 64, "valid_from": "2026-09-07T01:05:00Z",
+        "expires_at": "2099-09-03T02:50:00Z", "allowed_risk_classes": ["RISK0"],
+        "allowed_action_types": ["DRAFT"], "allowed_hosts": ["example.com"], "executor_ids": ["fixture_stub"],
+        "max_executions_total": 1, "max_executions_per_window": 1, "window_seconds": 60,
+        "max_cost_minor_total": 4, "currency": "USD", "max_pending_outcomes": 1,
+        "max_consecutive_failures": 1, "max_outcome_age_seconds": 60, "max_health_snapshot_age_seconds": 60,
+        "kill_switch_required": True, "correlation_id": "br18-c", "hash_version": "go-json-v1",
+    }
+    payload["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br18b-runtime-") as directory:
@@ -84,11 +102,13 @@ def main():
         machine_outcome = root / "machine-outcome.json"
         machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
+        production_lease = root / "production-lease.json"; write_production_lease(production_lease)
+        assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
         assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v2"
-        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
+        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl"}.issubset(backup_result["artifact"]["required"])
         invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
         (invalid_source / "m10-outcomes.jsonl").unlink()
         assert invoke(bot, "backup", "create", invalid_source, root / "invalid-source-backup", expected=1, env=env)["status"] == "INPUT_ERROR"
@@ -119,8 +139,9 @@ def main():
         assert restored_state["stop"] is True and restored_state["stop_reason"] == "backup-drill"
         assert restored_state["approval"]["approval_id"] == "br18-ap"
         assert restored_state["canary"]["executions_used"] == 1 and restored_state["canary"]["cost_used_minor"] == 4
-        assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists()
+        assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists() and (restored / "m11-artifacts.jsonl").exists()
         assert invoke(bot, "mission", "m10-resolve", restored, "EXECUTION_RECORD", failed["artifact"]["execution_id"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEASE", "br18-production-lease", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)
@@ -131,7 +152,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"] = hashlib.sha256(invalid_state_bytes).hexdigest()
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph uses a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
+    print("BR-18b PASS: runtime-created M10 graph and M11 registry use a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
 
 
 if __name__ == "__main__":

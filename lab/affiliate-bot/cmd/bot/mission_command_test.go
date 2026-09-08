@@ -9,6 +9,7 @@ import (
 	"time"
 
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
 func missionCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -257,6 +258,40 @@ func TestM10ArtifactRegistryRejectsOrphanAuthorization(t *testing.T) {
 	}
 	if _, err := loadM10ArtifactRegistry(dir); err == nil {
 		t.Fatal("orphan authorization was accepted into M10 graph")
+	}
+}
+
+func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	lease := corem11.ProductionLease{LeaseID: "m11-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "m11-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "m11-correlation", HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	raw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := filepath.Join(dir, "lease.json")
+	if err := os.WriteFile(input, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLease, input); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("M11 lease registration failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindLease, lease.LeaseID); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("M11 lease did not resolve: code=%d response=%+v", code, response)
+	}
+	lease.MaxCostMinorTotal = 2
+	tampered, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(input, tampered, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLease, input); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("tampered M11 lease was registered: code=%d response=%+v", code, response)
 	}
 }
 

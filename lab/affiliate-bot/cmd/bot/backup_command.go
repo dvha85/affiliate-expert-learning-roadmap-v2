@@ -67,26 +67,33 @@ func requiredBackupFiles(source string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if state.Canary == nil {
-		return required, nil
-	}
-	required = append(required, filepath.Base(m10ArtifactRegistryPath(source)))
-	entries, err := loadM10ArtifactRegistry(source)
-	if err != nil {
-		return nil, err
-	}
-	for _, entry := range entries {
-		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
-			continue
-		}
-		record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+	if state.Canary != nil {
+		required = append(required, filepath.Base(m10ArtifactRegistryPath(source)))
+		entries, err := loadM10ArtifactRegistry(source)
 		if err != nil {
 			return nil, err
 		}
-		if record.Status == "FAILED" {
-			required = append(required, filepath.Base(m10OutcomeStorePath(source)))
-			break
+		for _, entry := range entries {
+			if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
+				continue
+			}
+			record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+			if err != nil {
+				return nil, err
+			}
+			if record.Status == "FAILED" {
+				required = append(required, filepath.Base(m10OutcomeStorePath(source)))
+				break
+			}
 		}
+	}
+	if _, err := os.Stat(m11ArtifactRegistryPath(source)); err == nil {
+		required = append(required, filepath.Base(m11ArtifactRegistryPath(source)))
+		if _, err := loadM11ArtifactRegistry(source); err != nil {
+			return nil, err
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, err
 	}
 	sort.Strings(required)
 	return required, nil
@@ -124,6 +131,13 @@ func validateM10BackupGraph(dir string) error {
 		if record.Status == "FAILED" && !failedOutcomeIDs[executionID] {
 			return fmt.Errorf("failed execution is missing restored fixture outcome")
 		}
+	}
+	return nil
+}
+
+func validateM11BackupGraph(dir string) error {
+	if _, err := loadM11ArtifactRegistry(dir); err != nil {
+		return fmt.Errorf("M11 artifact graph is invalid: %w", err)
 	}
 	return nil
 }
@@ -225,6 +239,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e = validateM10BackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime M10 graph is invalid: %w", e), 1)
 		}
+		if e = validateM11BackupGraph(args[1]); e != nil {
+			return emit("INPUT_ERROR", nil, e, 1)
+		}
 		m := backupManifest{Version: "affiliate-bot-backup/v2", Files: map[string]string{}, Required: required}
 		for _, name := range files {
 			b, e := os.ReadFile(filepath.Join(args[1], name))
@@ -281,6 +298,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if e = validateM10BackupGraph(args[2]); e != nil {
+		return emit("GRAPH_FAILED", nil, e, 1)
+	}
+	if e = validateM11BackupGraph(args[2]); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
 	}
 	return emit("RESTORED", m, nil, 0)
