@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func missionCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -169,6 +170,43 @@ func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.
 	}
 	if code, response := missionCall(t, "m08-intent", history, request, filepath.Join(dir, "agent.json")); code == 0 || response["status"] != "REJECTED" {
 		t.Fatalf("unresolved agent proposal accepted: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionStateLockRejectsConcurrentMutationWithoutWriting(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	statePath := missionStatePath(dir)
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, ".mission.lock"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-stop", dir, "concurrent-stop"); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("locked mutation was accepted: code=%d response=%+v", code, response)
+	}
+	after, err := os.ReadFile(statePath)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("locked mutation changed state: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "STOP")); !os.IsNotExist(err) {
+		t.Fatalf("locked mutation created STOP marker: %v", err)
+	}
+}
+
+func TestMissionAuthorityRejectsExpiredApprovalBeforeReserve(t *testing.T) {
+	now := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	s := LearnerMissionState{
+		Intent:   &LearnerIntent{IntentID: "i", IntentHash: "h", ExpiresAt: "2026-09-08T01:00:00Z"},
+		Policy:   &LearnerPolicy{PolicyVersion: "v1", PolicyCheckedAt: "2026-09-08T00:00:00Z"},
+		Approval: &LearnerApproval{IntentID: "i", IntentHash: "h", PolicyVersion: "v1", CorrelationID: "", Decision: "APPROVE", OneTime: true, ExpiresAt: "2026-09-07T23:59:59Z"},
+	}
+	if err := missionAuthorityActive(s, now); err == nil {
+		t.Fatal("expired approval was accepted")
 	}
 }
 

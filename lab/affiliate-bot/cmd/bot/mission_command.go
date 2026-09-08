@@ -238,7 +238,70 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 func saveMissionState(dir string, s LearnerMissionState) error {
 	s.Version = missionStateVersion
 	s.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	return writeJSON(missionStatePath(dir), s)
+	return writeJSONAtomic(missionStatePath(dir), s)
+}
+
+// Mission state is mutable, unlike M08 artifacts. Commit it by atomic rename
+// while the mission directory lock is held; never truncate the prior state.
+func writeJSONAtomic(path string, value any) error {
+	b, err := marshalJSON(value)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".mission-state-")
+	if err != nil {
+		return err
+	}
+	temporary := f.Name()
+	defer os.Remove(temporary)
+	if err := f.Chmod(0600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	closeErr := d.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
+	if s.Intent == nil || s.Policy == nil || s.Approval == nil {
+		return fmt.Errorf("intent, policy and approval are required")
+	}
+	intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt)
+	approvalExpiry, approvalErr := time.Parse(time.RFC3339, s.Approval.ExpiresAt)
+	policyChecked, policyErr := time.Parse(time.RFC3339, s.Policy.PolicyCheckedAt)
+	if intentErr != nil || approvalErr != nil || policyErr != nil || !intentExpiry.After(now) || !approvalExpiry.After(now) || policyChecked.After(now) {
+		return fmt.Errorf("intent, approval or policy time binding is invalid or expired")
+	}
+	if s.Approval.Decision != "APPROVE" || !s.Approval.OneTime || s.Approval.IntentID != s.Intent.IntentID || s.Approval.IntentHash != s.Intent.IntentHash || s.Approval.PolicyVersion != s.Policy.PolicyVersion || s.Approval.CorrelationID != s.Intent.CorrelationID {
+		return fmt.Errorf("approval does not bind to current intent/policy")
+	}
+	return nil
 }
 
 type learnerIntentRequest struct {
@@ -360,6 +423,23 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-reserve STATE_DIR COST_MINOR | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
+	// Directory creation and an exclusive lock make the mutable mission state
+	// single-writer across processes. A stale lock fails closed and requires an
+	// explicit recovery procedure rather than silently risking double reserve.
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	if mutatesState && len(args) >= 2 {
+		if err := os.MkdirAll(args[1], 0700); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		lockPath := filepath.Join(args[1], ".mission.lock")
+		if err := os.Mkdir(lockPath, 0700); err != nil {
+			if os.IsExist(err) {
+				return emit("BUSY", nil, fmt.Errorf("mission state is locked; explicit recovery required after an interrupted writer"), 1)
+			}
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		defer os.Remove(lockPath)
+	}
 	switch args[0] {
 	case "m08-intent", "intent":
 		if len(args) != 4 {
@@ -463,6 +543,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if approvedErr != nil || expiresErr != nil || !expiresAt.After(approvedAt) || !expiresAt.After(time.Now().UTC()) || approvedAt.After(time.Now().UTC()) {
 			return emit("REJECTED", nil, fmt.Errorf("approval timestamps are invalid or expired"), 1)
 		}
+		if intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt); intentErr != nil || !intentExpiry.After(time.Now().UTC()) {
+			return emit("REJECTED", nil, fmt.Errorf("intent is expired"), 1)
+		}
+		if s.Approval != nil {
+			if *s.Approval == a {
+				return emit("EXACT_DUPLICATE", a, nil, 0)
+			}
+			return emit("REJECTED", nil, fmt.Errorf("cannot replace an existing approval"), 1)
+		}
 		s.Approval = &a
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -479,8 +568,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop {
 			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
 		}
-		if s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Approval.Decision != "APPROVE" {
-			return emit("REJECTED", nil, fmt.Errorf("approved human record required"), 1)
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
 		}
 		var c LearnerCanary
 		if err = readJSON(args[2], &c); err != nil {
@@ -526,6 +615,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)
 		if parseErr != nil || cost < 0 {
 			return emit("REJECTED", nil, fmt.Errorf("cost must be a non-negative integer"), 1)
@@ -552,7 +644,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		if err = writeJSON(filepath.Join(args[1], "STOP"), map[string]any{"active": true, "reason": args[2]}); err != nil {
+		if err = writeJSONAtomic(filepath.Join(args[1], "STOP"), map[string]any{"active": true, "reason": args[2]}); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("STOPPED", s, nil, 0)
