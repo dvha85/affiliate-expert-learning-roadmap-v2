@@ -21,7 +21,7 @@
             {
               "id": "adapter-url",
               "name": "adapter_url",
-              "value": "={{ $json.adapter_url || 'http://127.0.0.1:8787' }}",
+              "value": "http://127.0.0.1:8787",
               "type": "string"
             },
             {
@@ -33,7 +33,7 @@
             {
               "id": "registry",
               "name": "tool_registry_json",
-              "value": "={{ JSON.stringify($json.tool_registry || [{name:'public_http',read_only:true,allowed_methods:['GET'],allowed_hosts:['example.com'],timeout_ms:10000,follow_redirects:false}]) }}",
+              "value": "[{\"name\":\"public_http\",\"read_only\":true,\"allowed_methods\":[\"GET\"],\"allowed_hosts\":[\"example.com\"],\"timeout_ms\":10000,\"follow_redirects\":false}]",
               "type": "string"
             },
             {
@@ -75,11 +75,21 @@
       }
     },
     {
+      "id": "fetch-ack",
+      "name": "Require Registered Tool ACK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 0],
+      "parameters": {
+        "jsCode": "const response=$json.body||$json; if(response.status!=='ACK'||!response.artifact_id||!response.evidence||!response.evidence.evidence_id) throw new Error('REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
+      }
+    },
+    {
       "id": "context",
       "name": "Canonical M07 Context Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 0],
+      "position": [910, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/context' }}",
@@ -97,14 +107,24 @@
       }
     },
     {
+      "id": "context-ack",
+      "name": "Require Canonical M07 Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 0],
+      "parameters": {
+        "jsCode": "const response=$json.body||$json; const expected=$('M07 Adapter Input').item.json.record_id; if(response.status!=='VALID'||!response.artifact||response.artifact.record_id!==expected||!Array.isArray(response.artifact.evidence)) throw new Error('CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
+      }
+    },
+    {
       "id": "agent",
       "name": "Read-only Evidence Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [920, 0],
+      "position": [1370, 0],
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + JSON.stringify($('Canonical M07 Context Adapter').item.json.body.artifact) + '\nregistered_tool_evidence=' + JSON.stringify($('Fetch and Register Tool Adapter').item.json.body.evidence) }}",
+        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + JSON.stringify($('Require Canonical M07 Context').item.json.artifact) + '\nregistered_tool_evidence=' + JSON.stringify($('Require Registered Tool ACK').item.json.evidence) }}",
         "options": {
           "systemMessage": "You are a read-only evidence analyst. The shared adapter owns network policy, DNS validation, tool trace and permissions. Do not call tools. Return only the required JSON contract."
         }
@@ -115,7 +135,7 @@
       "name": "OpenAI Chat Model - configure credential locally",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
-      "position": [880, 220],
+      "position": [1330, 220],
       "parameters": {
         "options": {}
       }
@@ -125,13 +145,13 @@
       "name": "Validate Grounding Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 0],
+      "position": [1600, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/validate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Fetch and Register Tool Adapter').item.json.body.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
           "response": {
             "response": {
@@ -143,17 +163,27 @@
       }
     },
     {
+      "id": "grounding-ack",
+      "name": "Require Grounded Proposal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1830, 0],
+      "parameters": {
+        "jsCode": "const response=$json.body||$json; if(response.status!=='VALID'||!response.artifact||response.artifact.state!=='HUMAN_REVIEW'||!response.artifact.proposed_action||response.execution_permitted!==false) throw new Error('GROUNDING_NOT_A_PERSISTABLE_PROPOSAL'); return [{json:{...response,execution_permitted:false}}];"
+      }
+    },
+    {
       "id": "proposal",
       "name": "Persist Agent Proposal Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1380, 0],
+      "position": [2060, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-proposal' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Fetch and Register Tool Adapter').item.json.body.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
           "response": {
             "response": {
@@ -163,16 +193,48 @@
           }
         }
       }
+    },
+    {
+      "id": "proposal-ack",
+      "name": "Require Persisted Agent Proposal ACK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2290, 0],
+      "parameters": {
+        "jsCode": "const response=$json.body||$json; if(response.status!=='ACK'||!response.artifact_id||!response.artifact||response.artifact.record_id!==$('M07 Adapter Input').item.json.record_id) throw new Error('AGENT_PROPOSAL_NOT_ACKNOWLEDGED'); return [{json:{proposal_id:response.artifact_id,record_id:response.artifact.record_id,status:'ACK',execution_permitted:false}}];"
+      }
+    },
+    {
+      "id": "report",
+      "name": "Report Persisted M07 Proposal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2520, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id": "proposal", "name": "proposal_id", "value": "={{ $json.proposal_id }}", "type": "string"},
+            {"id": "record", "name": "record_id", "value": "={{ $json.record_id }}", "type": "string"},
+            {"id": "status", "name": "status", "value": "={{ $json.status }}", "type": "string"},
+            {"id": "execution", "name": "execution_permitted", "value": "={{ $json.execution_permitted }}", "type": "boolean"}
+          ]
+        }
+      }
     }
   ],
   "connections": {
     "Manual Trigger": {"main": [[{"node": "M07 Adapter Input", "type": "main", "index": 0}]]},
     "M07 Adapter Input": {"main": [[{"node": "Fetch and Register Tool Adapter", "type": "main", "index": 0}]]},
-    "Fetch and Register Tool Adapter": {"main": [[{"node": "Canonical M07 Context Adapter", "type": "main", "index": 0}]]},
-    "Canonical M07 Context Adapter": {"main": [[{"node": "Read-only Evidence Agent", "type": "main", "index": 0}]]},
+    "Fetch and Register Tool Adapter": {"main": [[{"node": "Require Registered Tool ACK", "type": "main", "index": 0}]]},
+    "Require Registered Tool ACK": {"main": [[{"node": "Canonical M07 Context Adapter", "type": "main", "index": 0}]]},
+    "Canonical M07 Context Adapter": {"main": [[{"node": "Require Canonical M07 Context", "type": "main", "index": 0}]]},
+    "Require Canonical M07 Context": {"main": [[{"node": "Read-only Evidence Agent", "type": "main", "index": 0}]]},
     "OpenAI Chat Model - configure credential locally": {"ai_languageModel": [[{"node": "Read-only Evidence Agent", "type": "ai_languageModel", "index": 0}]]},
     "Read-only Evidence Agent": {"main": [[{"node": "Validate Grounding Adapter", "type": "main", "index": 0}]]},
-    "Validate Grounding Adapter": {"main": [[{"node": "Persist Agent Proposal Adapter", "type": "main", "index": 0}]]}
+    "Validate Grounding Adapter": {"main": [[{"node": "Require Grounded Proposal", "type": "main", "index": 0}]]},
+    "Require Grounded Proposal": {"main": [[{"node": "Persist Agent Proposal Adapter", "type": "main", "index": 0}]]},
+    "Persist Agent Proposal Adapter": {"main": [[{"node": "Require Persisted Agent Proposal ACK", "type": "main", "index": 0}]]},
+    "Require Persisted Agent Proposal ACK": {"main": [[{"node": "Report Persisted M07 Proposal", "type": "main", "index": 0}]]}
   },
   "active": false,
   "settings": {}

@@ -231,6 +231,31 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	if proposal.Code != http.StatusOK {
 		t.Fatal(proposal.Code, proposal.Body.String())
 	}
+	var persisted struct {
+		Status     string                          `json:"status"`
+		ArtifactID string                          `json:"artifact_id"`
+		Artifact   corem07.RegisteredAgentProposal `json:"artifact"`
+	}
+	if err := json.Unmarshal(proposal.Body.Bytes(), &persisted); err != nil || persisted.Status != "ACK" || persisted.ArtifactID == "" || persisted.Artifact.RecordID != record.RecordID {
+		t.Fatalf("proposal did not receive a durable ACK: %s err=%v", proposal.Body.String(), err)
+	}
+	proposalPath, err := m07ArtifactPath(history, "proposals", persisted.ArtifactID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeProposal, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model.Answer = "guaranteed profit"
+	rejectedProposal := call("/v1/m07/register-proposal", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: registration.ArtifactID})
+	if rejectedProposal.Code == http.StatusOK {
+		t.Fatal("ungrounded output was persisted as an M07 proposal")
+	}
+	afterProposal, err := os.ReadFile(proposalPath)
+	if err != nil || !bytes.Equal(beforeProposal, afterProposal) {
+		t.Fatal("rejected M07 proposal changed the persisted artifact", err)
+	}
 	forged := call("/v1/m07/validate", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: "sha256:" + strings.Repeat("0", 64)})
 	if forged.Code == http.StatusOK {
 		t.Fatal("forged tool artifact id accepted")

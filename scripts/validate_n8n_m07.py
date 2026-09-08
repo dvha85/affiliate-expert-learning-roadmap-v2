@@ -9,10 +9,15 @@ required = {
     "Manual Trigger",
     "M07 Adapter Input",
     "Fetch and Register Tool Adapter",
+    "Require Registered Tool ACK",
     "Canonical M07 Context Adapter",
+    "Require Canonical M07 Context",
     "Read-only Evidence Agent",
     "Validate Grounding Adapter",
+    "Require Grounded Proposal",
     "Persist Agent Proposal Adapter",
+    "Require Persisted Agent Proposal ACK",
+    "Report Persisted M07 Proposal",
 }
 missing = required - nodes.keys()
 if missing:
@@ -28,6 +33,10 @@ input_values = {
 for field in ("adapter_url", "record_id", "tool_registry_json", "tool_request_json", "instruction"):
     if field not in input_values:
         raise SystemExit(f"adapter input missing {field}")
+if input_values["adapter_url"] != "http://127.0.0.1:8787":
+    raise SystemExit("M07 adapter_url must be a fixed loopback boundary, not event input")
+if "$json.tool_registry" in input_values["tool_registry_json"] or '"allowed_hosts":["example.com"]' not in input_values["tool_registry_json"]:
+    raise SystemExit("M07 tool registry must be a fixed reviewed policy, not event input")
 for marker in ("untrusted data", "Never request or claim write authority", "proposed_action"):
     if marker not in input_values["instruction"]:
         raise SystemExit(f"M07 instruction safety marker missing: {marker}")
@@ -37,6 +46,17 @@ if fetch.get("method") != "POST" or "/v1/m07/fetch-and-register" not in fetch.ge
     raise SystemExit("M07 fetch must be owned by the shared adapter")
 if "tool_request" not in fetch.get("jsonBody", "") or "tool_registry_json" not in fetch.get("jsonBody", ""):
     raise SystemExit("adapter fetch must receive the request and registry")
+
+for name, markers in {
+    "Require Registered Tool ACK": {"REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED", "response.status!=='ACK'", "response.artifact_id", "response.evidence.evidence_id"},
+    "Require Canonical M07 Context": {"CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED", "response.status!=='VALID'", "response.artifact.record_id!==expected", "Array.isArray(response.artifact.evidence)"},
+    "Require Grounded Proposal": {"GROUNDING_NOT_A_PERSISTABLE_PROPOSAL", "response.artifact.state!=='HUMAN_REVIEW'", "response.artifact.proposed_action", "response.execution_permitted!==false"},
+    "Require Persisted Agent Proposal ACK": {"AGENT_PROPOSAL_NOT_ACKNOWLEDGED", "response.status!=='ACK'", "response.artifact_id", "execution_permitted:false"},
+}.items():
+    code = nodes[name]["parameters"].get("jsCode", "")
+    for marker in markers:
+        if marker not in code:
+            raise SystemExit(f"{name} is missing enforced ACK marker: {marker}")
 
 for name, endpoint in {
     "Canonical M07 Context Adapter": "/v1/m07/context",
@@ -50,14 +70,19 @@ for name, endpoint in {
 connections = blueprint.get("connections", {})
 expected = [
     ("M07 Adapter Input", "Fetch and Register Tool Adapter"),
-    ("Fetch and Register Tool Adapter", "Canonical M07 Context Adapter"),
-    ("Canonical M07 Context Adapter", "Read-only Evidence Agent"),
+    ("Fetch and Register Tool Adapter", "Require Registered Tool ACK"),
+    ("Require Registered Tool ACK", "Canonical M07 Context Adapter"),
+    ("Canonical M07 Context Adapter", "Require Canonical M07 Context"),
+    ("Require Canonical M07 Context", "Read-only Evidence Agent"),
     ("Read-only Evidence Agent", "Validate Grounding Adapter"),
-    ("Validate Grounding Adapter", "Persist Agent Proposal Adapter"),
+    ("Validate Grounding Adapter", "Require Grounded Proposal"),
+    ("Require Grounded Proposal", "Persist Agent Proposal Adapter"),
+    ("Persist Agent Proposal Adapter", "Require Persisted Agent Proposal ACK"),
+    ("Require Persisted Agent Proposal ACK", "Report Persisted M07 Proposal"),
 ]
 for source, target in expected:
     destinations = {item["node"] for branch in connections.get(source, {}).get("main", []) for item in branch}
     if target not in destinations:
         raise SystemExit(f"missing M07 adapter flow {source} -> {target}")
 
-print("N8N M07 STATIC WIRING PASS: adapter-owned fetch/transport, trace registration, validation and proposal persistence use the shared adapter")
+print("N8N M07 STATIC WIRING PASS: fixed loopback adapter, registered trace/context/grounding/proposal ACKs, and persistence handoff are mandatory")
