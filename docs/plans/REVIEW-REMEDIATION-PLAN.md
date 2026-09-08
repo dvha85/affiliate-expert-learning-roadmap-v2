@@ -405,6 +405,13 @@ Walkthrough phải có lệnh build, input paths/fixtures được version contr
 
 - Baseline tests phải tiếp tục chạy. Mỗi PR trên thêm regression vào cùng workflow trước khi merge; không để tests chỉ nằm trong thư mục tạm của reviewer.
 - Wire `smoke_br16a_offline.py` và `smoke_br18b_backup_restore.py` vào `.github/workflows/`; test blueprint đọc và thực thi chính `jsCode` hoặc gọi adapter shared, không tự viết lại canonical()/validator trong test.
+
+**Cập nhật CI (2026-09-08):** hai smoke trên đã được wired vào job
+`deterministic-runtime` của `curriculum-ci.yml`, chạy cho pull request và push
+vào `main`. Đây là regression CI cho shared M00–M11 fixture lineage và M11
+backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở head cho
+đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
+dưới.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.

@@ -87,6 +87,10 @@ jobs:
         run: python scripts/validate_n8n_m07_adversarial.py
       - name: BR-15c M07 output contract
         run: python scripts/validate_n8n_m07_output_cases.py
+      - name: BR-16a shared M00-M11 learner chain
+        run: python scripts/smoke_br16a_offline.py
+      - name: BR-18b M11 backup, reconciliation and restore
+        run: python scripts/smoke_br18b_backup_restore.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
       - name: Go vet
