@@ -342,8 +342,10 @@ resolution đã nằm trong registry, do `human` xác nhận đúng unknown exec
 chỉ chốt ledger ở `RECOVERY_REVIEW_REQUIRED`; lệnh không thể kích hoạt lại lease
 hoặc cấp authorization mới. `smoke_br18b_backup_restore.py` chạy runtime riêng
 qua UNKNOWN → STOP → resolution → backup/restore → restart và xác nhận lease
-cũ vẫn bị reject. Cần thêm trace fault-injection/concurrent-writer và reviewed
-recovery bằng **lease mới** trước khi coi RP-07a hoàn tất.
+cũ vẫn bị reject; smoke cũng sửa stopped ledger với checksum manifest hợp lệ và
+xác nhận restore trả `GRAPH_FAILED`. Cần thêm trace fault-injection/
+concurrent-writer và reviewed recovery bằng **lease mới** trước khi coi RP-07a
+hoàn tất.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 

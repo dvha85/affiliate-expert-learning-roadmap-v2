@@ -243,6 +243,21 @@ def main():
         assert recovery_resolution["status"] == "APPENDED" and recovery_resolution["artifact"]["stopped_ledger"]["control_mode"] == "STOPPED" and recovery_resolution["artifact"]["stopped_ledger"]["reconciliation_required"] is False
         assert invoke(bot, "mission", "m11-reconcile", recovery_runtime, "br18-production-resolution", stopped_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "backup", "create", recovery_runtime, recovery_backup, env=env)["status"] == "BACKED_UP"
+        invalid_reconciliation_backup = root / "invalid-reconciliation-backup"; shutil.copytree(recovery_backup, invalid_reconciliation_backup)
+        changed_lines = []
+        for line in (invalid_reconciliation_backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
+            entry = json.loads(line)
+            if entry["artifact_kind"] == "PRODUCTION_LEDGER" and entry["artifact"].get("stop_reason") == "RECOVERY_REVIEW_REQUIRED":
+                entry["artifact"]["reconciliation_resolution_ids"] = []
+                canonical = json.dumps(entry["artifact"], separators=(",", ":"), ensure_ascii=False).encode()
+                entry["content_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
+            changed_lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
+        changed_bytes = ("\n".join(changed_lines) + "\n").encode()
+        (invalid_reconciliation_backup / "m11-artifacts.jsonl").write_bytes(changed_bytes)
+        invalid_reconciliation_manifest = json.loads((invalid_reconciliation_backup / "manifest.json").read_text(encoding="utf-8"))
+        invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"] = hashlib.sha256(changed_bytes).hexdigest()
+        (invalid_reconciliation_backup / "manifest.json").write_text(json.dumps(invalid_reconciliation_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", invalid_reconciliation_backup, root / "invalid-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", recovery_backup, recovery_restored, env=env)["status"] == "RESTORED"
         assert invoke(bot, "mission", "status", recovery_restored, env=env)["artifact"]["stop"] is True
         assert invoke(bot, "mission", "m11-resolve", recovery_restored, "PRODUCTION_RECONCILIATION", "br18-production-resolution", env=env)["status"] == "RESOLVED"

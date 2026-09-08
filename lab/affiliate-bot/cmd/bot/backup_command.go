@@ -160,20 +160,59 @@ func validateM11BackupGraph(dir string) error {
 		return fmt.Errorf("M11 outcome store is invalid: %w", err)
 	}
 	linked := map[string]bool{}
+	ledgers := []corem11.ProductionLedger{}
+	resolutions := map[string]corem11.ProductionReconciliationResolution{}
+	executions := []corem11.ProductionExecutionRecord{}
 	for _, outcome := range outcomes {
 		linked[outcome.EffectRef.EffectID] = true
 	}
 	for _, entry := range entries {
-		if entry.ArtifactKind != corem11.ArtifactKindExecution {
-			continue
+		switch entry.ArtifactKind {
+		case corem11.ArtifactKindLedger:
+			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 ledger artifact is invalid")
+			}
+			ledgers = append(ledgers, *value.(*corem11.ProductionLedger))
+		case corem11.ArtifactKindReconciliation:
+			value, status := corem11.DecodeArtifact("resolution", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 reconciliation artifact is invalid")
+			}
+			resolution := *value.(*corem11.ProductionReconciliationResolution)
+			resolutions[resolution.ExecutionID] = resolution
+		case corem11.ArtifactKindExecution:
+			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 execution artifact is invalid")
+			}
+			executions = append(executions, *value.(*corem11.ProductionExecutionRecord))
 		}
-		value, status := corem11.DecodeArtifact("execution", entry.Artifact)
-		if status != corem11.Valid {
-			return fmt.Errorf("M11 execution artifact is invalid")
-		}
-		record := value.(*corem11.ProductionExecutionRecord)
+	}
+	for _, record := range executions {
 		if record.Status == "FAILED" && !linked[record.ExecutionID] {
 			return fmt.Errorf("failed M11 execution is missing restored fixture outcome")
+		}
+		if record.Status != "RECONCILIATION_REQUIRED" || record.SideEffectState != "UNKNOWN" {
+			continue
+		}
+		matched := false
+		for _, ledger := range ledgers {
+			if ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ControlMode != "STOPPED" {
+				continue
+			}
+			if resolution, resolved := resolutions[record.ExecutionID]; resolved {
+				if !ledger.ReconciliationRequired && ledger.StopReason == "RECOVERY_REVIEW_REQUIRED" {
+					for _, id := range ledger.ReconciliationResolutionIDs {
+						matched = matched || id == resolution.ResolutionID
+					}
+				}
+			} else if ledger.ReconciliationRequired && ledger.StopReason == "RECONCILIATION_REQUIRED" {
+				matched = true
+			}
+		}
+		if !matched {
+			return fmt.Errorf("unknown M11 execution lacks matching stopped reconciliation ledger")
 		}
 	}
 	return nil
