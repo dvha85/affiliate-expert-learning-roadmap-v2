@@ -323,8 +323,11 @@ registry nếu có. `m11-activate` chỉ tạo activation từ lease + approval 
 register, trong thời hạn và khi chưa STOP; `m11-ledger-init` chỉ tạo ledger
 rỗng sau activation này và không reset được bằng retry. Smoke backup tạo
 lease/approval/activation/ledger qua learner, restore rồi resolve bằng process
-mới. Đây chưa phải production lifecycle; phần 07a bên dưới vẫn còn bắt buộc
-trước khi đóng.
+mới. `m11-gate` resolve exact lease/activation/health/cost/ledger, persist
+gate không-authorizing và fail closed với scope, time, budget hoặc health lỗi.
+Đây chưa phải production lifecycle; authorization, reservation/execution,
+outcome, reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc trước
+khi đóng.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 

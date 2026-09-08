@@ -79,6 +79,19 @@ def write_production_lease_approval(path, lease_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_production_health(path, lease_path):
+    lease = json.loads(lease_path.read_text(encoding="utf-8"))
+    payload = {
+        "snapshot_id": "br18-production-health", "lease_id": lease["lease_id"], "lease_version": lease["lease_version"],
+        "lease_hash": lease["lease_hash"], "observed_at": "2026-09-08T00:00:00Z", "source_refs": ["fixture:br18-health"],
+        "dependency_state": "HEALTHY", "telemetry_complete": True, "consecutive_failures": 0,
+        "reconciliation_required": False, "compliance_alert_count": 0, "oldest_pending_outcome_age_seconds": 0,
+        "hash_version": "go-json-v1",
+    }
+    payload["snapshot_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br18b-runtime-") as directory:
@@ -121,6 +134,12 @@ def main():
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-activate", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-ledger-init", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
+        production_health = root / "production-health.json"; write_production_health(production_health, production_lease)
+        assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "missing-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", expected=1, env=env)["status"] == "REJECTED"
+        gate = invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", env=env)
+        assert gate["status"] == "ALLOW_PRODUCTION" and gate["artifact"]["execution_authorized"] is False
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"

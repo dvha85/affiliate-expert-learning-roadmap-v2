@@ -212,6 +212,13 @@ rỗng sau activation đã resolve, trong thời hạn lease và khi chưa STOP;
 exact cũng không reset usage. Các lệnh này chưa thay thế health gate hay cấp
 phép/executor production.
 
+`m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT`
+resolve toàn bộ artifact trên từ registry, kiểm lease/activation/policy/scope,
+budget, freshness và health, rồi persist `ProductionGateDecision`. Nó trả
+`ALLOW_PRODUCTION`, `DEGRADE`, `STOP`, `REQUIRE_APPROVAL` hoặc `DENY`, nhưng
+luôn giữ `execution_authorized=false`. Bất kỳ ID/link không resolve được đều bị
+reject; chưa có authorization hay executor production ở bước này.
+
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
 [BR-10a: ghi nhận ActionRecord thủ công](../../docs/architecture/BR-10A-ACTION-STORE.md): `bot action record HISTORY.jsonl ACTIONS.jsonl ACTION.json`, đọc lại bằng `bot action list HISTORY.jsonl ACTIONS.jsonl`. Store action riêng, không đăng bài/thực thi; decision phải tồn tại và replay MATCH. Lệnh validate dưới đây vẫn chỉ đọc.

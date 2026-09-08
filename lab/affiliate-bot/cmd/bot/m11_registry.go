@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
@@ -212,4 +214,122 @@ func initializeM11Ledger(dir, leaseID, initializedAt string) (corem11.Production
 	}
 	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, raw)
 	return ledger, status, err
+}
+
+func m11ArtifactValue(dir, kind, id string) (any, error) {
+	entry, err := resolveM11Artifact(dir, kind, id, "")
+	if err != nil {
+		return nil, err
+	}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindActivation: "activation"}
+	profile := profiles[kind]
+	if profile == "" {
+		return nil, fmt.Errorf("unsupported M11 gate artifact")
+	}
+	value, status := corem11.DecodeArtifact(profile, entry.Artifact)
+	if status != corem11.Valid {
+		return nil, fmt.Errorf("invalid registered M11 artifact")
+	}
+	return value, nil
+}
+
+func m11Allowed(values []string, value string) bool {
+	for _, candidate := range values {
+		if strings.EqualFold(candidate, value) {
+			return true
+		}
+	}
+	return false
+}
+
+func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt string) (corem11.ProductionGateDecision, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil || state.Intent == nil || state.Policy == nil {
+		return corem11.ProductionGateDecision{}, "", fmt.Errorf("M11 gate requires persisted intent and policy")
+	}
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, leaseID)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	lease := leaseValue.(*corem11.ProductionLease)
+	healthValue, err := m11ArtifactValue(dir, corem11.ArtifactKindHealth, healthID)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	health := healthValue.(*corem11.ProductionHealthSnapshot)
+	costValue, err := m11ArtifactValue(dir, corem11.ArtifactKindCostBound, costID)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	cost := costValue.(corem10.TrustedCostBound)
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	activationValue, err := m11ArtifactValue(dir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	activation := activationValue.(*corem11.ProductionActivationRecord)
+	if _, err := m11ArtifactValue(dir, corem11.ArtifactKindLeaseApproval, lease.ApprovalRef); err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	now, err := time.Parse(time.RFC3339, evaluatedAt)
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", fmt.Errorf("invalid evaluated_at")
+	}
+	gate := corem11.ProductionGateDecision{GateID: "prod-gate-" + lease.LeaseID + "-" + state.Intent.IntentID, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, RiskClass: state.Policy.RiskClass, HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "DENY", Reason: "INVALID_PRODUCTION_STATE", EvaluatedAt: evaluatedAt, ExecutionsTotalBefore: ledger.ExecutionsTotal, ExecutionsInWindowBefore: ledger.ExecutionsInWindow, CostMinorTotalBefore: ledger.CostMinorTotal, PendingOutcomesBefore: ledger.PendingOutcomes, ExecutionAuthorized: false}
+	decision := func(kind, reason string) (corem11.ProductionGateDecision, string, error) {
+		gate.Decision, gate.Reason = kind, reason
+		raw, e := json.Marshal(gate)
+		if e != nil {
+			return gate, "", e
+		}
+		_, status, e := registerM11Artifact(dir, corem11.ArtifactKindGate, raw)
+		return gate, status, e
+	}
+	if state.Stop {
+		return decision("STOP", "DURABLE_STOP")
+	}
+	validFrom, e1 := time.Parse(time.RFC3339, lease.ValidFrom)
+	expires, e2 := time.Parse(time.RFC3339, lease.ExpiresAt)
+	if e1 != nil || e2 != nil || now.Before(validFrom) || !now.Before(expires) || activation.LeaseHash != lease.LeaseHash {
+		return decision("DENY", "LEASE_INACTIVE")
+	}
+	if ledger.LeaseHash != lease.LeaseHash || ledger.ControlMode == "STOPPED" {
+		return decision("STOP", "STICKY_STOP")
+	}
+	if ledger.ReconciliationRequired {
+		return decision("STOP", "RECONCILIATION_REQUIRED")
+	}
+	if state.Policy.IntentID != state.Intent.IntentID || state.Policy.IntentHash != state.Intent.IntentHash || state.Policy.PolicyVersion != lease.PolicyVersion || !m11Allowed(lease.AllowedRiskClasses, state.Policy.RiskClass) || !m11Allowed(lease.AllowedActionTypes, state.Intent.ActionType) || !m11Allowed(lease.AllowedHosts, strings.Split(strings.TrimPrefix(state.Intent.Target, "https://"), "/")[0]) {
+		return decision("DENY", "POLICY_OR_SCOPE_MISMATCH")
+	}
+	if state.Policy.RiskClass != "RISK0" || state.Policy.Decision != "ALLOW" {
+		return decision("REQUIRE_APPROVAL", "RISK_NOT_PRODUCTION_ELIGIBLE")
+	}
+	if status := corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, now); status != "VALID" {
+		return decision("DENY", status)
+	}
+	if ledger.ExecutionsTotal >= lease.MaxExecutionsTotal || ledger.ExecutionsInWindow >= lease.MaxExecutionsPerWindow || ledger.PendingOutcomes >= lease.MaxPendingOutcomes || cost.MaxCostMinor > lease.MaxCostMinorTotal-ledger.CostMinorTotal {
+		return decision("DENY", "BUDGET_EXCEEDED")
+	}
+	observed, observedErr := time.Parse(time.RFC3339, health.ObservedAt)
+	if observedErr != nil || observed.After(now) || health.LeaseHash != lease.LeaseHash {
+		return decision("DENY", "HEALTH_MISMATCH")
+	}
+	if now.Unix()-observed.Unix() > int64(lease.MaxHealthSnapshotAgeSeconds) {
+		return decision("DEGRADE", "HEALTH_STALE")
+	}
+	if health.ComplianceAlertCount > 0 {
+		return decision("STOP", "COMPLIANCE_ALERT")
+	}
+	if health.ReconciliationRequired || health.ConsecutiveFailures >= lease.MaxConsecutiveFailures || health.OldestPendingOutcomeAgeSeconds > lease.MaxOutcomeAgeSeconds {
+		return decision("STOP", "HEALTH_SAFETY_BLOCK")
+	}
+	if !health.TelemetryComplete || health.DependencyState != "HEALTHY" {
+		return decision("DEGRADE", "HEALTH_DEGRADED")
+	}
+	return decision("ALLOW_PRODUCTION", "PRODUCTION_ELIGIBLE")
 }
