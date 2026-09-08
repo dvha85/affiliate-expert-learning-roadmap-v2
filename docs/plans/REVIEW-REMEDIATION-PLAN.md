@@ -340,8 +340,10 @@ fixture effect không xác định. Nó ghi `RECONCILIATION_REQUIRED`/`UNKNOWN`,
 ledger STOPPED và durable STOP trước khi trả kết quả. `m11-reconcile` chỉ nhận
 resolution đã nằm trong registry, do `human` xác nhận đúng unknown execution và
 chỉ chốt ledger ở `RECOVERY_REVIEW_REQUIRED`; lệnh không thể kích hoạt lại lease
-hoặc cấp authorization mới. Cần thêm trace fault-injection và full restore test
-cho nhánh này trước khi coi RP-07a hoàn tất.
+hoặc cấp authorization mới. `smoke_br18b_backup_restore.py` chạy runtime riêng
+qua UNKNOWN → STOP → resolution → backup/restore → restart và xác nhận lease
+cũ vẫn bị reject. Cần thêm trace fault-injection/concurrent-writer và reviewed
+recovery bằng **lease mới** trước khi coi RP-07a hoàn tất.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 

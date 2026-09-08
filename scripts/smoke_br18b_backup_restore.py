@@ -92,6 +92,18 @@ def write_production_health(path, lease_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_production_resolution(path, lease_path, execution_id):
+    lease = json.loads(lease_path.read_text(encoding="utf-8"))
+    payload = {
+        "resolution_id": "br18-production-resolution", "lease_id": lease["lease_id"],
+        "lease_version": lease["lease_version"], "lease_hash": lease["lease_hash"],
+        "execution_id": execution_id, "resolved_by": "human", "resolver_id": "pilot-human",
+        "resolved_at": "2026-09-08T00:00:03Z", "effect_state": "NOT_PERFORMED",
+        "reason": "fixture provider audit confirmed no side effect",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br18b-runtime-") as directory:
@@ -129,6 +141,8 @@ def main():
         machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
         production_lease = root / "production-lease.json"; write_production_lease(production_lease)
+        recovery_runtime = root / "reconciliation-runtime"; recovery_backup = root / "reconciliation-backup"; recovery_restored = root / "reconciliation-restored"
+        shutil.copytree(runtime, recovery_runtime)
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         production_approval = root / "production-approval.json"; write_production_lease_approval(production_approval, production_lease)
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
@@ -203,6 +217,36 @@ def main():
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", production_outcome_result["artifact"]["post_ledger"]["lease_id"] + "/" + production_outcome_result["artifact"]["post_ledger"]["updated_at"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
+
+        # A separate runtime proves the UNKNOWN path: its durable STOP survives
+        # human reconciliation, backup/restore, and a fresh process. The old
+        # lease is never reactivated by the resolution.
+        assert invoke(bot, "mission", "m11-register", recovery_runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", recovery_runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", recovery_runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", recovery_runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", recovery_runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", recovery_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
+        recovery_gate = invoke(bot, "mission", "m11-gate", recovery_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", env=env)
+        assert recovery_gate["status"] == "ALLOW_PRODUCTION"
+        recovery_authorization = invoke(bot, "mission", "m11-authorize", recovery_runtime, "br18-production-lease", recovery_gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
+        assert recovery_authorization["status"] == "APPENDED"
+        recovery_reservation = invoke(bot, "mission", "m11-reserve-authorization", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
+        assert recovery_reservation["status"] == "APPENDED"
+        recovery_unknown = invoke(bot, "mission", "m11-record-unknown", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z", "fixture provider timeout after dispatch", env=env)
+        assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
+        assert invoke(bot, "mission", "m11-activate", recovery_runtime, "br18-production-lease", "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
+        resolution = root / "production-resolution.json"; write_production_resolution(resolution, production_lease, recovery_unknown["artifact"]["execution"]["execution_id"])
+        assert invoke(bot, "mission", "m11-register", recovery_runtime, "PRODUCTION_RECONCILIATION", resolution, env=env)["status"] == "APPENDED"
+        stopped_ledger_id = recovery_unknown["artifact"]["stopped_ledger"]["lease_id"] + "/" + recovery_unknown["artifact"]["stopped_ledger"]["updated_at"]
+        recovery_resolution = invoke(bot, "mission", "m11-reconcile", recovery_runtime, "br18-production-resolution", stopped_ledger_id, env=env)
+        assert recovery_resolution["status"] == "APPENDED" and recovery_resolution["artifact"]["stopped_ledger"]["control_mode"] == "STOPPED" and recovery_resolution["artifact"]["stopped_ledger"]["reconciliation_required"] is False
+        assert invoke(bot, "mission", "m11-reconcile", recovery_runtime, "br18-production-resolution", stopped_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "backup", "create", recovery_runtime, recovery_backup, env=env)["status"] == "BACKED_UP"
+        assert invoke(bot, "backup", "restore", recovery_backup, recovery_restored, env=env)["status"] == "RESTORED"
+        assert invoke(bot, "mission", "status", recovery_restored, env=env)["artifact"]["stop"] is True
+        assert invoke(bot, "mission", "m11-resolve", recovery_restored, "PRODUCTION_RECONCILIATION", "br18-production-resolution", env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-activate", recovery_restored, "br18-production-lease", "2026-09-08T00:00:04Z", expected=1, env=env)["status"] == "REJECTED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)
         invalid_state = json.loads((invalid_backup / "mission-state.json").read_text(encoding="utf-8")); invalid_state["canary"]["executions_used"] = -1
         invalid_state_bytes = json.dumps(invalid_state).encode()
@@ -211,7 +255,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"] = hashlib.sha256(invalid_state_bytes).hexdigest()
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph and governed M11 reserve/failed-fixture chain use a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
+    print("BR-18b PASS: runtime-created M10 graph, governed M11 failed-fixture outcome, and UNKNOWN-to-human-reconciliation chain use a v2 manifest; checksum, required inventory, orphaned outcome, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":
