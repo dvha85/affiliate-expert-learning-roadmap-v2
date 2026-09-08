@@ -221,7 +221,7 @@ func m11ArtifactValue(dir, kind, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindActivation: "activation"}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation"}
 	profile := profiles[kind]
 	if profile == "" {
 		return nil, fmt.Errorf("unsupported M11 gate artifact")
@@ -396,4 +396,126 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	}
 	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindAuthorization, raw)
 	return authorization, status, err
+}
+
+func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) (corem11.ProductionLedger, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	now, err := time.Parse(time.RFC3339, reservedAt)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("invalid reserved_at")
+	}
+	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	auth := authValue.(*corem11.ProductionExecutionAuthorization)
+	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
+	if err != nil || !expires.After(now) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is inactive")
+	}
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	if ledger.LeaseID != auth.ProductionLeaseID || ledger.LeaseVersion != auth.ProductionLeaseVersion || ledger.LeaseHash != auth.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired || ledger.ExecutionsTotal < 0 || ledger.CostMinorTotal < 0 {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not reservable")
+	}
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, auth.ProductionLeaseID)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	lease := leaseValue.(*corem11.ProductionLease)
+	executionID := "prod-exec-" + auth.AuthorizationID
+	for _, id := range ledger.PendingExecutionIDs {
+		if id == executionID {
+			return corem11.ProductionLedger{}, "", fmt.Errorf("production authorization already reserved")
+		}
+	}
+	if ledger.ExecutionsTotal >= lease.MaxExecutionsTotal || ledger.ExecutionsInWindow >= lease.MaxExecutionsPerWindow || ledger.PendingOutcomes >= lease.MaxPendingOutcomes || auth.ProductionCostBoundMinor > lease.MaxCostMinorTotal-ledger.CostMinorTotal {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("production budget exhausted")
+	}
+	next := *ledger
+	next.ExecutionsTotal++
+	next.ExecutionsInWindow++
+	next.CostMinorTotal += auth.ProductionCostBoundMinor
+	next.PendingOutcomes++
+	next.PendingExecutionIDs = append(append([]string(nil), ledger.PendingExecutionIDs...), executionID)
+	next.UpdatedAt = reservedAt
+	raw, err := json.Marshal(next)
+	if err != nil {
+		return next, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, raw)
+	return next, status, err
+}
+
+func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attemptedAt, reason string) (corem11.ProductionExecutionRecord, corem11.ProductionLedger, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	now, err := time.Parse(time.RFC3339, attemptedAt)
+	if err != nil || strings.TrimSpace(reason) == "" {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("invalid fixture execution input")
+	}
+	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	auth := authValue.(*corem11.ProductionExecutionAuthorization)
+	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
+	if err != nil || !expires.After(now) {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is expired")
+	}
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, reservationLedgerID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	executionID := "prod-exec-" + auth.AuthorizationID
+	pending := false
+	for _, id := range ledger.PendingExecutionIDs {
+		pending = pending || id == executionID
+	}
+	if !pending || ledger.PendingOutcomes < 1 || ledger.LeaseID != auth.ProductionLeaseID {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("execution has no governed reservation")
+	}
+	record := corem11.ProductionExecutionRecord{ExecutionID: executionID, AuthorizationID: auth.AuthorizationID, ProductionLeaseID: auth.ProductionLeaseID, ProductionLeaseVersion: auth.ProductionLeaseVersion, ProductionLeaseHash: auth.ProductionLeaseHash, ProductionGateID: auth.ProductionGateID, ProductionHealthSnapshotID: auth.ProductionHealthSnapshotID, ProductionHealthSnapshotHash: auth.ProductionHealthSnapshotHash, ProductionCostBoundID: auth.ProductionCostBoundID, ProductionCostBoundHash: auth.ProductionCostBoundHash, ProductionCostBoundMinor: auth.ProductionCostBoundMinor, IntentID: auth.IntentID, IntentHash: auth.IntentHash, ExecutorID: auth.ExecutorID, IdempotencyKey: auth.IdempotencyKey, AttemptedAt: attemptedAt, Status: "FAILED", SideEffectState: "NOT_PERFORMED", Error: reason, CorrelationID: auth.CorrelationID}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return record, corem11.ProductionLedger{}, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindExecution, raw)
+	if err != nil {
+		return record, corem11.ProductionLedger{}, status, err
+	}
+	next := *ledger
+	next.PendingOutcomes--
+	next.PendingExecutionIDs = []string{}
+	for _, id := range ledger.PendingExecutionIDs {
+		if id != executionID {
+			next.PendingExecutionIDs = append(next.PendingExecutionIDs, id)
+		}
+	}
+	next.ConsecutiveFailures++
+	next.LastExecutionAt = attemptedAt
+	next.UpdatedAt = attemptedAt
+	ledgerRaw, err := json.Marshal(next)
+	if err != nil {
+		return record, next, status, err
+	}
+	if _, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+		return record, next, ledgerStatus, err
+	}
+	return record, next, status, nil
 }

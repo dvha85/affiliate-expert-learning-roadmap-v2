@@ -142,6 +142,13 @@ def main():
         assert gate["status"] == "ALLOW_PRODUCTION" and gate["artifact"]["execution_authorized"] is False
         authorization = invoke(bot, "mission", "m11-authorize", runtime, "br18-production-lease", gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
         assert authorization["status"] == "APPENDED" and authorization["artifact"]["execution_authorized"] is True
+        reservation_ledger_id = "br18-production-lease/2026-09-08T00:00:01Z"
+        reservation = invoke(bot, "mission", "m11-reserve-authorization", runtime, authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
+        assert reservation["status"] == "APPENDED" and reservation["artifact"]["pending_outcomes"] == 1
+        assert invoke(bot, "mission", "m11-reserve-authorization", runtime, authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)["status"] == "EXACT_DUPLICATE"
+        production_failed = invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)
+        assert production_failed["status"] == "APPENDED" and production_failed["artifact"]["execution"]["status"] == "FAILED" and production_failed["artifact"]["execution"]["side_effect_state"] == "NOT_PERFORMED"
+        assert invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)["status"] == "EXACT_DUPLICATE"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
@@ -183,6 +190,8 @@ def main():
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_ACTIVATION", "br18-production-lease/v1", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", "br18-production-lease/2026-09-08T00:00:00Z", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_AUTHORIZATION", authorization["artifact"]["authorization_id"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", production_failed["artifact"]["post_ledger"]["lease_id"] + "/" + production_failed["artifact"]["post_ledger"]["updated_at"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)
@@ -193,7 +202,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"] = hashlib.sha256(invalid_state_bytes).hexdigest()
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph and M11 registry use a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
+    print("BR-18b PASS: runtime-created M10 graph and governed M11 reserve/failed-fixture chain use a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
 
 
 if __name__ == "__main__":
