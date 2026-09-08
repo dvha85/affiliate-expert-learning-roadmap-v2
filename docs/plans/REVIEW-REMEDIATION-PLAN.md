@@ -325,7 +325,8 @@ rỗng sau activation này và không reset được bằng retry. Smoke backup 
 lease/approval/activation/ledger qua learner, restore rồi resolve bằng process
 mới. `m11-gate` resolve exact lease/activation/health/cost/ledger, persist
 gate không-authorizing và fail closed với scope, time, budget hoặc health lỗi.
-Đây chưa phải production lifecycle; authorization, reservation/execution,
+`m11-authorize` tạo quyền governed có expiry bị chặn bởi lease/intent/approval/
+cost từ gate ALLOW đã persist, nhưng chưa gọi executor. Reservation/execution,
 outcome, reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc trước
 khi đóng.
 

@@ -221,7 +221,7 @@ func m11ArtifactValue(dir, kind, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindActivation: "activation"}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindActivation: "activation"}
 	profile := profiles[kind]
 	if profile == "" {
 		return nil, fmt.Errorf("unsupported M11 gate artifact")
@@ -332,4 +332,68 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 		return decision("DEGRADE", "HEALTH_DEGRADED")
 	}
 	return decision("ALLOW_PRODUCTION", "PRODUCTION_ELIGIBLE")
+}
+
+func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt string) (corem11.ProductionExecutionAuthorization, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil || state.Intent == nil || state.Policy == nil {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("M11 authorization requires persisted intent and policy")
+	}
+	if state.Stop {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	now, err := time.Parse(time.RFC3339, authorizedAt)
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("invalid authorized_at")
+	}
+	if err := missionAuthorityActive(state, now); err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, leaseID)
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
+	lease := leaseValue.(*corem11.ProductionLease)
+	gateValue, err := m11ArtifactValue(dir, corem11.ArtifactKindGate, gateID)
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
+	gate := gateValue.(*corem11.ProductionGateDecision)
+	if gate.Decision != "ALLOW_PRODUCTION" || gate.LeaseID != lease.LeaseID || gate.LeaseVersion != lease.LeaseVersion || gate.LeaseHash != lease.LeaseHash || gate.IntentID != state.Intent.IntentID || gate.IntentHash != state.Intent.IntentHash || gate.PolicyVersion != state.Policy.PolicyVersion || !m11Allowed(lease.ExecutorIDs, executorID) {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate or executor does not authorize this request")
+	}
+	healthValue, err := m11ArtifactValue(dir, corem11.ArtifactKindHealth, gate.HealthSnapshotID)
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
+	health := healthValue.(*corem11.ProductionHealthSnapshot)
+	costValue, err := m11ArtifactValue(dir, corem11.ArtifactKindCostBound, gate.CostBoundID)
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
+	cost := costValue.(corem10.TrustedCostBound)
+	if health.SnapshotHash != gate.HealthSnapshotHash || cost.CostBoundHash != gate.CostBoundHash || cost.MaxCostMinor != gate.CostBoundMinor || corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, now) != "VALID" {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate dependencies no longer resolve")
+	}
+	limits := []string{lease.ExpiresAt, state.Intent.ExpiresAt, state.Approval.ExpiresAt, cost.ExpiresAt}
+	expires := time.Time{}
+	for _, raw := range limits {
+		parsed, parseErr := time.Parse(time.RFC3339, raw)
+		if parseErr != nil {
+			return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("authorization expiry is invalid")
+		}
+		if expires.IsZero() || parsed.Before(expires) {
+			expires = parsed
+		}
+	}
+	if !expires.After(now) {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("authorization would already be expired")
+	}
+	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: "prod-auth-" + gate.GateID + "-" + executorID, IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: executorID, AuthorizedAt: authorizedAt, ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	raw, err := json.Marshal(authorization)
+	if err != nil {
+		return authorization, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindAuthorization, raw)
+	return authorization, status, err
 }

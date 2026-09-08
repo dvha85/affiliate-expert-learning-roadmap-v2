@@ -217,7 +217,13 @@ resolve toàn bộ artifact trên từ registry, kiểm lease/activation/policy/
 budget, freshness và health, rồi persist `ProductionGateDecision`. Nó trả
 `ALLOW_PRODUCTION`, `DEGRADE`, `STOP`, `REQUIRE_APPROVAL` hoặc `DENY`, nhưng
 luôn giữ `execution_authorized=false`. Bất kỳ ID/link không resolve được đều bị
-reject; chưa có authorization hay executor production ở bước này.
+reject.
+
+`m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT` chỉ tạo
+`GOVERNED_PRODUCTION` authorization từ gate `ALLOW_PRODUCTION` đã persist,
+executor được lease allow và health/cost link còn exact. Hạn dùng là mốc sớm
+nhất của lease, intent, human approval và cost bound. Authorization không gọi
+executor; envelope command vẫn `execution_permitted=false`.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
