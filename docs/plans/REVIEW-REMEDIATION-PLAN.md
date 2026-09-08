@@ -436,6 +436,11 @@ vào `main`. Đây là regression CI cho shared M00–M11 fixture lineage và M1
 backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở head cho
 đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
 dưới.
+
+**Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
+`go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
+phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc
+thay thế barrier/fault hook quyết định.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.

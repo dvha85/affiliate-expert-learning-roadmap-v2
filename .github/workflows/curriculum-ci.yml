@@ -49,6 +49,9 @@ jobs:
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
+      - name: Learner Bot race regression
+        working-directory: lab/affiliate-bot
+        run: go test -race ./...
       - name: Embedded canonical schema tests
         working-directory: contracts
         run: |
