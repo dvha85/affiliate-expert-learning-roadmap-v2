@@ -1,11 +1,144 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func missionCall(t *testing.T, args ...string) (int, map[string]any) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	code := runMissionCommand(args, &stdout, &stderr)
+	var envelope map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode mission response %q: %v (stderr: %s)", stdout.String(), err, stderr.String())
+	}
+	return code, envelope
+}
+
+func missionFixture(t *testing.T) (string, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(dir); err != nil {
+		t.Fatal(err)
+	}
+	history := filepath.Join(dir, "history.jsonl")
+	records, err := LoadHistory(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := filepath.Join(dir, "intent-request.json")
+	value := learnerIntentRequest{
+		IntentID: "path-safe-intent", DecisionID: records[0].RecordID,
+		EvidenceIDs: records[0].RecordedResult.EvidenceIDs,
+		ActionType:  "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{},
+		ProposedBy: "human", CreatedAt: "2026-09-07T00:00:00Z", ExpiresAt: "2099-09-07T03:00:00Z",
+		CorrelationID: "path-safe-correlation", IdempotencyKey: "path-safe-key",
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(request, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return dir, history, request
+}
+
+func TestMissionM08IntentRejectsInputOutputAliasesWithoutMutation(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	historyBefore, err := os.ReadFile(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, history); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("history-as-output was not rejected: code=%d response=%+v", code, response)
+	}
+	if historyAfter, err := os.ReadFile(history); err != nil || !bytes.Equal(historyBefore, historyAfter) {
+		t.Fatalf("history changed after rejected command: %v", err)
+	}
+	requestBefore, err := os.ReadFile(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, request); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("request-as-output was not rejected: code=%d response=%+v", code, response)
+	}
+	if requestAfter, err := os.ReadFile(request); err != nil || !bytes.Equal(requestBefore, requestAfter) {
+		t.Fatalf("request changed after rejected command: %v", err)
+	}
+
+	alias := filepath.Join(dir, "history-alias.json")
+	if err := os.Link(history, alias); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, alias); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("hardlink output was not rejected: code=%d response=%+v", code, response)
+	}
+	if historyAfter, err := os.ReadFile(history); err != nil || !bytes.Equal(historyBefore, historyAfter) {
+		t.Fatalf("history changed through hardlink alias: %v", err)
+	}
+
+	symlink := filepath.Join(dir, "history-symlink.json")
+	if err := os.Symlink(history, symlink); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, symlink); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("symlink output was not rejected: code=%d response=%+v", code, response)
+	}
+	if historyAfter, err := os.ReadFile(history); err != nil || !bytes.Equal(historyBefore, historyAfter) {
+		t.Fatalf("history changed through symlink alias: %v", err)
+	}
+}
+
+func TestMissionM08ArtifactOutputHasCreateRetryConflictSemantics(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	intent := filepath.Join(dir, "intent.json")
+	if code, response := missionCall(t, "m08-intent", history, request, intent); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("intent create failed: code=%d response=%+v", code, response)
+	}
+	first, err := os.ReadFile(intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, intent); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("intent retry was not exact duplicate: code=%d response=%+v", code, response)
+	}
+	if retry, err := os.ReadFile(intent); err != nil || !bytes.Equal(first, retry) {
+		t.Fatalf("intent changed on retry: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "conflict.json"), []byte("keep-this-output"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	conflict := filepath.Join(dir, "conflict.json")
+	if code, response := missionCall(t, "m08-intent", history, request, conflict); code == 0 || response["status"] != "CONFLICT" {
+		t.Fatalf("existing output was not rejected: code=%d response=%+v", code, response)
+	}
+	if got, err := os.ReadFile(conflict); err != nil || string(got) != "keep-this-output" {
+		t.Fatalf("existing output was overwritten: %q, %v", got, err)
+	}
+
+	policyConfig := filepath.Join(dir, "policy-input.json")
+	if err := os.WriteFile(policyConfig, []byte(`{"policy_version":"path-safe-v1","now":"2026-09-07T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	policy := filepath.Join(dir, "policy-output.json")
+	if code, response := missionCall(t, "m08-policy", intent, policyConfig, policy); code != 0 || response["status"] != "ALLOW" {
+		t.Fatalf("policy create failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m08-policy", intent, policyConfig, policy); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("policy retry was not exact duplicate: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m08-policy", intent, policyConfig, intent); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("policy input-as-output was not rejected: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m08-policy", intent, policyConfig, policyConfig); code == 0 || response["status"] != "PATH_ERROR" {
+		t.Fatalf("policy configuration-as-output was not rejected: code=%d response=%+v", code, response)
+	}
+}
 
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}

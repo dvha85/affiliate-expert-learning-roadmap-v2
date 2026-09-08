@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -116,14 +117,66 @@ func learnerIntentHash(i LearnerIntent) string {
 }
 
 func writeJSON(path string, value any) error {
-	b, err := json.MarshalIndent(value, "", "  ")
+	b, err := marshalJSON(value)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(b, '\n'), 0600)
+	return os.WriteFile(path, b, 0600)
+}
+
+func marshalJSON(value any) ([]byte, error) {
+	b, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(b, '\n'), nil
+}
+
+// writeNewJSON creates an immutable command artifact. A retry is successful
+// only when it finds the byte-for-byte artifact it would have created; a
+// different existing file, symlink, or special file is never overwritten.
+func writeNewJSON(path string, value any) (string, error) {
+	b, err := marshalJSON(value)
+	if err != nil {
+		return "", err
+	}
+	if info, err := os.Lstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return "", fmt.Errorf("artifact output must be a new regular file")
+		}
+		existing, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		if bytes.Equal(existing, b) {
+			return appendDuplicate, nil
+		}
+		return "", fmt.Errorf("artifact output already exists with different content")
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return "", err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return appendAdded, nil
 }
 func readJSON(path string, value any) error {
 	b, err := os.ReadFile(path)
@@ -345,17 +398,24 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT"), 2)
 		}
+		if err := distinctPaths(args[1:]...); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
 		i, err := buildLearnerIntent(args[1], args[2])
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		if err = writeJSON(args[3], i); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		status, err := writeNewJSON(args[3], i)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
 		}
-		return emit("APPENDED", i, nil, 0)
+		return emit(status, i, nil, 0)
 	case "m08-policy", "policy":
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-policy INTENT POLICY OUT"), 2)
+		}
+		if err := distinctPaths(args[1:]...); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
 		}
 		var i LearnerIntent
 		if err := readJSON(args[1], &i); err != nil {
@@ -365,8 +425,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("DENY", nil, err, 1)
 		}
-		if err = writeJSON(args[3], p); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		status, err := writeNewJSON(args[3], p)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, p, nil, 0)
 		}
 		return emit(p.Decision, p, nil, 0)
 	case "bind":
