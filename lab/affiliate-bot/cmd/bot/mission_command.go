@@ -73,14 +73,17 @@ type LearnerLease struct {
 	CreatedAt     string `json:"created_at"`
 }
 type LearnerReservation struct {
-	ReservationID string `json:"reservation_id"`
-	GrantID       string `json:"grant_id"`
-	IntentID      string `json:"intent_id"`
-	IntentHash    string `json:"intent_hash"`
-	CostMinor     int64  `json:"cost_minor"`
-	CostBoundID   string `json:"cost_bound_id,omitempty"`
-	CostBoundHash string `json:"cost_bound_hash,omitempty"`
-	ReservedAt    string `json:"reserved_at"`
+	ReservationID   string `json:"reservation_id"`
+	GrantID         string `json:"grant_id"`
+	IntentID        string `json:"intent_id"`
+	IntentHash      string `json:"intent_hash"`
+	CostMinor       int64  `json:"cost_minor"`
+	CostBoundID     string `json:"cost_bound_id,omitempty"`
+	CostBoundHash   string `json:"cost_bound_hash,omitempty"`
+	AuthorizationID string `json:"authorization_id,omitempty"`
+	ExecutionID     string `json:"execution_id,omitempty"`
+	ReservationMode string `json:"reservation_mode,omitempty"`
+	ReservedAt      string `json:"reserved_at"`
 }
 
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
@@ -471,9 +474,18 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 		}
 	}
 	seenReservations := map[string]bool{}
+	seenAuthorizations := map[string]bool{}
 	for _, r := range s.Reservations {
 		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || s.Intent == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Intent.IntentID || r.IntentHash != s.Intent.IntentHash || r.CostMinor < 0 {
 			return fmt.Errorf("mission reservation integrity/binding check failed")
+		}
+		if r.AuthorizationID != "" {
+			if r.ReservationMode != "GOVERNED_AUTHORIZATION" || r.CostBoundID == "" || r.CostBoundHash == "" || seenAuthorizations[r.AuthorizationID] {
+				return fmt.Errorf("mission governed reservation integrity/binding check failed")
+			}
+			seenAuthorizations[r.AuthorizationID] = true
+		} else if r.ExecutionID != "" || (r.ReservationMode != "" && r.ReservationMode != "LEGACY_COMPAT") {
+			return fmt.Errorf("mission legacy reservation cannot bind execution")
 		}
 		if _, err := time.Parse(time.RFC3339, r.ReservedAt); err != nil {
 			return fmt.Errorf("mission reservation timestamp is invalid")
@@ -719,6 +731,18 @@ func authorizationBindsMissionState(authorization corem10.ExecutionAuthorization
 		authorization.CorrelationID == s.Intent.CorrelationID && authorization.IdempotencyKey == s.Intent.IdempotencyKey
 }
 
+func resolveAuthorizationCostBound(dir string, authorization corem10.ExecutionAuthorization) (corem10.TrustedCostBound, error) {
+	entry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindTrustedCostBound, authorization.CanaryCostBoundID, "")
+	if err != nil {
+		return corem10.TrustedCostBound{}, err
+	}
+	bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
+	if status != "VALID" || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
+		return corem10.TrustedCostBound{}, fmt.Errorf("authorization cost bound does not resolve exactly")
+	}
+	return bound, nil
+}
+
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -734,12 +758,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-cancel": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-cancel": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -1110,6 +1134,68 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit(status, authorization, nil, 0)
 		}
 		return emit("AUTHORIZED", authorization, nil, 0)
+	case "m10-reserve-authorization":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop {
+			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
+		}
+		if s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
+		}
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil || !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) || !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is invalid, unregistered or mismatched"), 1)
+		}
+		expiresAt, err := time.Parse(time.RFC3339, authorization.ExpiresAt)
+		if err != nil || !expiresAt.After(time.Now().UTC()) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization has expired"), 1)
+		}
+		bound, err := resolveAuthorizationCostBound(args[1], authorization)
+		if err != nil || corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()) != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("authorization cost bound is invalid or expired"), 1)
+		}
+		reservationID := args[3]
+		if reservationID == "" {
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id is required"), 1)
+		}
+		for _, prior := range s.Reservations {
+			if prior.ReservationID == reservationID {
+				if prior.AuthorizationID == authorization.AuthorizationID && prior.GrantID == authorization.CanaryGrantID && prior.IntentID == authorization.IntentID && prior.IntentHash == authorization.IntentHash && prior.CostMinor == authorization.CanaryCostBoundMinor && prior.CostBoundID == authorization.CanaryCostBoundID && prior.CostBoundHash == authorization.CanaryCostBoundHash && prior.ReservationMode == "GOVERNED_AUTHORIZATION" {
+					return emit("EXACT_DUPLICATE", prior, nil, 0)
+				}
+				return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different authorization binding"), 1)
+			}
+			if prior.AuthorizationID == authorization.AuthorizationID {
+				return emit("REJECTED", nil, fmt.Errorf("execution authorization already has a reservation"), 1)
+			}
+		}
+		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutionsTotal || authorization.CanaryCostBoundMinor > s.Canary.MaxCostMinorTotal-s.Canary.CostUsedMinor {
+			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
+		}
+		reservation := LearnerReservation{ReservationID: reservationID, GrantID: authorization.CanaryGrantID, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, CostMinor: authorization.CanaryCostBoundMinor, CostBoundID: authorization.CanaryCostBoundID, CostBoundHash: authorization.CanaryCostBoundHash, AuthorizationID: authorization.AuthorizationID, ReservationMode: "GOVERNED_AUTHORIZATION", ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+		s.Canary.ExecutionsUsed++
+		s.Canary.CostUsedMinor += authorization.CanaryCostBoundMinor
+		s.Reservations = append(s.Reservations, reservation)
+		if err := saveMissionState(args[1], s); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("RESERVED", reservation, nil, 0)
 	case "m10-cancel":
 		if len(args) != 6 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON"), 2)
@@ -1135,9 +1221,22 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if !authorizationBindsMissionState(authorization, s) {
 			return emit("REJECTED", nil, fmt.Errorf("execution authorization does not bind to current mission state"), 1)
 		}
+		reservationIndex := -1
+		for index, reservation := range s.Reservations {
+			if reservation.AuthorizationID == authorization.AuthorizationID {
+				reservationIndex = index
+				break
+			}
+		}
+		if reservationIndex == -1 {
+			return emit("REJECTED", nil, fmt.Errorf("governed authorization requires a bound reservation before execution record"), 1)
+		}
 		record, err := corem10.CancelCanaryExecution(corem10.CancelledExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
+		}
+		if priorExecutionID := s.Reservations[reservationIndex].ExecutionID; priorExecutionID != "" && priorExecutionID != record.ExecutionID {
+			return emit("REJECTED", nil, fmt.Errorf("reservation already binds a different execution record"), 1)
 		}
 		recordRaw, err := json.Marshal(record)
 		if err != nil {
@@ -1152,6 +1251,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		status, err := writeNewJSON(args[3], record)
 		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
+		}
+		if s.Reservations[reservationIndex].ExecutionID == "" {
+			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
+			if err := saveMissionState(args[1], s); err != nil {
+				return emit("STORE_ERROR", nil, err, 1)
+			}
 		}
 		return emit(status, record, nil, 0)
 	case "m10-resolve":
@@ -1216,7 +1321,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			if prior.ReservationID != reservationID {
 				continue
 			}
-			if prior.GrantID == s.Canary.GrantID && prior.IntentID == s.Intent.IntentID && prior.IntentHash == s.Intent.IntentHash && prior.CostMinor == cost {
+			if prior.AuthorizationID == "" && prior.GrantID == s.Canary.GrantID && prior.IntentID == s.Intent.IntentID && prior.IntentHash == s.Intent.IntentHash && prior.CostMinor == cost {
 				return emit("EXACT_DUPLICATE", s.Canary, nil, 0)
 			}
 			return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different binding or cost"), 1)
@@ -1226,7 +1331,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += cost
-		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
+		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservationMode: "LEGACY_COMPAT", ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		if err := saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}

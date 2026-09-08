@@ -130,6 +130,14 @@ nghiệm thu trên `main`**.
   không reserve budget hay tạo EffectRef. Execution thành công/thất bại, ledger
   link, outcome và graph persistence vẫn thuộc RP-03/RP-06/RP-07, do đó RP-03
   vẫn mở.
+- **RP-03 authorization-reservation foundation:** `m10-reserve-authorization`
+  resolve authorization/cost bound đã registry cấp, kiểm expiry/binding rồi
+  charge đúng bound và persist reservation một-lần với `authorization_id`.
+  `m10-cancel` giờ cần reservation đó và ACK chỉ sau khi ghi `execution_id`
+  ngược vào state; retry chỉ cho cùng ID/artifact. `m10-reserve` cũ được giữ
+  compatibility-only, không thể tạo execution binding. Chưa có transaction
+  multi-artifact crash recovery, execution result/outcome/EffectRef hay ledger
+  canonical ngoài learner state, nên RP-03 vẫn mở.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation

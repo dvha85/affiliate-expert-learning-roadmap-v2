@@ -109,7 +109,7 @@ def main():
         i = json.loads(intent.read_text()); p = json.loads(policy.read_text())
         approval = work / "approval.json"; approval.write_text(json.dumps({"approval_id":"br16-ap","intent_id":i["intent_id"],"intent_hash":i["intent_hash"],"policy_version":p["policy_version"],"decision":"APPROVE","approved_by":"human","approver_id":"pilot-human","approved_at":"2026-09-07T01:05:00Z","expires_at":"2099-09-03T02:50:00Z","correlation_id":i["correlation_id"],"one_time":True}), encoding="utf-8")
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
-        grant = work / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 1, 100)
+        grant = work / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 2, 200)
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
         cost = work / "cost-bound.json"; write_cost_bound(cost, i, 100, "2099-09-03T02:45:00Z", "br16-cost")
         assert invoke(bot, "mission", "m10-reserve", state, cost, "unregistered", expected=1)["status"] == "REJECTED"
@@ -133,12 +133,21 @@ def main():
         forged_authorization_data = json.loads(authorization.read_text(encoding="utf-8")); forged_authorization_data["authorization_id"] = "canary-auth-forged-but-schema-valid"
         forged_authorization.write_text(json.dumps(forged_authorization_data), encoding="utf-8")
         assert invoke(bot, "mission", "m10-cancel", state, forged_authorization, work / "forged-execution.json", "2026-09-08T00:01:00Z", "must-not-resolve-forged-authorization", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "unreserved-execution.json", "2026-09-08T00:01:00Z", "must-reserve-before-execution-record", expected=1)["status"] == "REJECTED"
+        reservation = invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")
+        assert reservation["status"] == "RESERVED" and reservation["artifact"]["authorization_id"] == authorization_response["artifact"]["authorization_id"] and reservation["artifact"]["reservation_mode"] == "GOVERNED_AUTHORIZATION"
+        assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r2", expected=1)["status"] == "REJECTED"
         cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")
         assert cancellation["status"] == "APPENDED" and cancellation["artifact"]["status"] == "CANCELLED" and cancellation["artifact"]["side_effect_state"] == "NOT_PERFORMED"
         assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "different-execution.json", "2026-09-08T00:02:00Z", "different-execution-is-rejected", expected=1)["status"] == "REJECTED"
         resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
         assert resolved["status"] == "RESOLVED" and resolved["artifact"] == cancellation["artifact"]
         assert invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", "canary-exec-not-registered", expected=1)["status"] == "REJECTED"
+        current_state = invoke(bot, "mission", "status", state)["artifact"]
+        governed_reservation = next(item for item in current_state["reservations"] if item["reservation_id"] == "br16-governed-r1")
+        assert governed_reservation["execution_id"] == cancellation["artifact"]["execution_id"]
         artifact_kinds = {entry["artifact_kind"] for entry in map(json.loads, (state / "m10-artifacts.jsonl").read_text(encoding="utf-8").splitlines()) if entry}
         assert {"CANARY_GRANT", "TRUSTED_COST_BOUND", "CANARY_GATE", "EXECUTION_AUTHORIZATION", "EXECUTION_RECORD"}.issubset(artifact_kinds)
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
@@ -146,7 +155,8 @@ def main():
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
         expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
         assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
-        # Two independent processes race for the single execution/cost budget.
+        # Two independent legacy-compatible processes race for the one
+        # remaining execution/cost budget after the governed attempt above.
         # The directory lock may make one return BUSY; retrying it must then see
         # the committed budget and cannot create a second reservation.
         attempts = [
@@ -163,9 +173,9 @@ def main():
         assert all(response["status"] in {"RESERVED", "BUSY", "BUDGET_DENIED"} for response in responses.values())
         winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
         loser = "br16-r2" if winner == "br16-r1" else "br16-r1"
-        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
+        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 2
         assert invoke(bot, "mission", "m10-reserve", state, cost, winner)["status"] == "EXACT_DUPLICATE"
-        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
+        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 2
         assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, work / "stale-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
