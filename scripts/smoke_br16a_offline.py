@@ -59,11 +59,27 @@ def main():
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
         grant = work / "grant.json"; grant.write_text(json.dumps({"grant_id":"br16-g","max_executions":1,"max_cost_minor":100,"currency":"USD"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
-        assert invoke(bot, "mission", "m10-reserve", state, "100", "br16-r1")["status"] == "RESERVED"
+        # Two independent processes race for the single execution/cost budget.
+        # The directory lock may make one return BUSY; retrying it must then see
+        # the committed budget and cannot create a second reservation.
+        attempts = [
+            subprocess.Popen([str(bot), "mission", "m10-reserve", str(state), "100", reservation], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            for reservation in ("br16-r1", "br16-r2")
+        ]
+        responses = {}
+        for reservation, process in zip(("br16-r1", "br16-r2"), attempts):
+            stdout, stderr = process.communicate()
+            if process.returncode not in (0, 1):
+                raise AssertionError((stdout, stderr))
+            responses[reservation] = json.loads(stdout)
+        assert sum(response["status"] == "RESERVED" for response in responses.values()) == 1
+        assert all(response["status"] in {"RESERVED", "BUSY", "BUDGET_DENIED"} for response in responses.values())
+        winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
+        loser = "br16-r2" if winner == "br16-r1" else "br16-r1"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
-        assert invoke(bot, "mission", "m10-reserve", state, "100", "br16-r1")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-reserve", state, "100", winner)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
-        assert invoke(bot, "mission", "m10-reserve", state, "1", "br16-r2", expected=1)["status"] == "BUDGET_DENIED"
+        assert invoke(bot, "mission", "m10-reserve", state, "1", loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout
