@@ -1,31 +1,77 @@
-# BR-03c.4 — M07 JSON boundary
+# M07 — JSON grounding boundary (learner CLI)
 
-IN_REVIEW: [PR #31](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/31), code/tests `b652b27`; Codex thực hiện, chủ repo chưa review. Local tests/vet ba module, 8 validators, 10 Python regression tests và diff check PASS. CI phải kiểm theo head PR riêng.
+Trạng thái: **partial offline implementation**. Đây là contract đang được
+`core/m07` và learner Bot dùng; không phải bằng chứng một model provider hoặc
+n8n workflow đã vận hành. `execution_permitted` luôn `false`.
 
-Phạm vi: conformance offline, không model/fetch/persist/n8n. `ToolRegistry` canonical là mảng không rỗng; ToolSpec chỉ là phần tử. AgentProposal không có schema canonical: decoder kiểm shape local state/answer/evidence_ids/tool_calls, không gọi nó là AdvisorOutput. Context là mảng ID do người cung cấp, không phải payload evidence đáng tin.
+M07 resolve một `HistoryRecord` canonical/replay `MATCH`, sau đó tạo context
+với các evidence ID thật của record và từng source field. Model không được
+nhận một danh sách ID để boundary tự gắn vào câu trả lời.
 
-Từ repo root:
+## Contract đầu ra
+
+Đầu ra model là JSON có `state`, `answer`, `claims`, `evidence_ids`,
+`tool_calls`, `authority` và `write_permission`.
+
+- Chỉ `HUMAN_REVIEW` hoặc `ABSTAIN`; authority là `A2-RO` và
+  `write_permission` phải là literal `false`.
+- Với `HUMAN_REVIEW`, mọi claim phải trỏ field/value bằng đúng evidence ID đã
+  resolve. `evidence_ids` phải đúng bằng union evidence được claim cite.
+- `claim.text` và `answer` phải là render deterministic của các claim đã kiểm.
+  Prose tự do của model không được gắn nhãn grounded.
+- `ABSTAIN` không được chứa claim hoặc citation.
+- `tool_calls` trong final model output bị từ chối. Tool trace không được lấy
+  từ lời tự khai của model.
+
+Ví dụ kiểm context và output không có tool evidence:
 
 ```text
-cd lab/mission-runtime
-go run ./cmd/demo m07-check testdata/m07-proposal.json testdata/m07-registry.json testdata/m07-evidence-ids.json
-go test ./cmd/demo -run TestM07 -count=1 -v
+bot m07 context HISTORY.jsonl RECORD_ID
+bot m07 validate HISTORY.jsonl RECORD_ID MODEL_OUTPUT.json REGISTRY.json
 ```
 
-Fixture synthetic; output gồm proposal, registry, result SUPPORTED và execution_authorized=false. Schema được kiểm trên toàn registry input/output. Proposal serialize được kiểm lại shape local. Thiếu/null, key trùng, field lạ, sai enum/type, evidence ID rỗng/trùng bị từ chối. Arrays rỗng được nhận cho proposal/context nhưng registry canonical không cho rỗng. Answer phải không chỉ whitespace; state nhận PROPOSE/HUMAN_REVIEW/ABSTAIN.
+## Tool-result evidence
 
-Registry trùng tên hoặc host trùng không phân biệt hoa thường → INVALID_REGISTRY. Host registry phải là hostname không kèm scheme/path/query/userinfo/port. Call chỉ GET/HEAD trên HTTPS, đúng tool và host, không userinfo/explicit port. Đây là profile hẹp của checker; allowlist trong file không tự trở thành trusted policy vận hành. Schema const read_only=true chặn write registry trước semantic.
+Adapter phải preflight request bằng registry **trước** khi request được thực
+hiện. Khi nhận response, adapter ghi JSON `ToolResult` (record ID, request,
+status 2xx, thời điểm, `redirected=false`, body JSON data), rồi learner Bot
+đăng ký artifact bất biến:
 
-Calls và reference IDs được kiểm ngay cả khi state ABSTAIN, tránh early return của typed helper bỏ qua write request. Sau đó giữ EvaluateAgentProposal để kiểm semantics hiện có. Không sửa global helper/typed eval. E02/E04 registry rỗng và E03 registry ghi có raw result INVALID_SCHEMA; expected typed cũ REJECT_TOOL/REJECT_UNGROUNDED vẫn giữ. Test riêng kiểm unknown evidence với registry hợp lệ; không coi schema reject thay tất cả semantic cases.
+```text
+bot m07 register-tool-result HISTORY.jsonl RECORD_ID REGISTRY.json TOOL_RESULT.json REGISTERED.json
+bot m07 validate HISTORY.jsonl RECORD_ID MODEL_OUTPUT.json REGISTRY.json REGISTERED.json
+```
 
-Lỗi đọc/schema/profile/semantic trả exit 1, không có success envelope; writer error được truyền về. ABSTAIN hợp lệ xuất result ABSTAIN. HUMAN_REVIEW của proposal vẫn được giữ trong output dù helper trả SUPPORTED; không hiểu SUPPORTED là người đã review. Không thay decision, không tự gắn evidence ID từ context để làm grounded.
+Registration kiểm host/method/scheme/port/userinfo/query theo registry, thời
+gian, redirect và status. Trace ID và evidence ID được hash từ response do
+adapter ghi; khi validate, hash và binding `record_id` được tính lại. Body chỉ
+được expose như `tool_result.body`, claim kind `unknown` và limitation
+untrusted; M07 không tự phân loại nó thành product fact.
 
-## Bài thực hành
+Các fail-closed case gồm trace ID/body/request/record ID bị sửa, write request,
+host/port sai, redirect, status không thành công, claim ID/value sai, prose bịa
+và quyền ghi. Retry byte-identical của registration trả `EXACT_DUPLICATE`; file
+output khác nội dung không bị ghi đè.
 
-Copy ba fixture vào thư mục bài tập, thay path lệnh: đổi GET thành POST → REJECT_TOOL, kể cả đổi state sang ABSTAIN; đổi evidence ID sang missing → REJECT_UNGROUNDED; bỏ read_only hoặc đặt false → INVALID_SCHEMA. Khôi phục sửa đổi rồi chạy về PASS. Không sửa registry để hợp thức hóa write request. Không cập nhật PROGRESS từ fixture.
+## Kiểm offline
 
-## Giới hạn
+Từ root repo:
 
-SUPPORTED chỉ kiểm membership ID và registry/call, không chứng minh claim có evidence hỗ trợ, freshness, provenance hoặc tool registry được phê duyệt. Không tải URL, nên chưa thực thi timeout/redirect enforcement trên network; các phần đó thuộc BR-15. Text injection trong eval cũ vẫn là dữ liệu, không được parse thành cấu hình/quyền. Không có đường nạp raw tool text vào CLI này, không claim live injection proof.
+```text
+(cd core && GOWORK=off go test ./m07)
+(cd lab/affiliate-bot && GOWORK=off go test ./cmd/bot -run TestM07 -count=1)
+python3 scripts/validate_n8n_m07_adversarial.py
+python3 scripts/validate_n8n_m07_output_cases.py
+```
 
-Input file chưa có size quota; chỉ dùng file do người vận hành chọn, chưa là public endpoint. Tests kiểm schema/shape, required/null/duplicate, registry duplicate, host/method/port/userinfo, ABSTAIN write, IDs, CLI output/read-only/writer failure và raw eval song song typed eval. BR-03 còn M08–M11 và các integration chưa hoàn tất.
+Hai script cuối chạy learner CLI thật; chúng không thực thi JavaScript node của
+blueprint. Harness `demo m07-check` là fixture legacy/conformance cục bộ, không
+phải authoritative proof cho path learner hoặc workflow.
+
+## Giới hạn còn mở
+
+Blueprint n8n hiện chưa gọi CLI/core registration adapter và chưa persist
+`AgentProposal` cho M08. Chưa có transport seam kiểm timeout/response size/
+private-address policy, ACK vào canonical tool-evidence store chung, hoặc parity
+thực thi code node blueprint. Vì vậy BR-15/RP-05 vẫn **chưa hoàn tất**; không
+dùng tài liệu này để tuyên bố model/n8n/provider đã grounded hoặc operated.

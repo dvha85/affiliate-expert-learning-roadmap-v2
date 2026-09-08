@@ -36,6 +36,12 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def grounded_claim(field, value, evidence_id):
+    value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
+    rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
+    return rendered, {"text": rendered, "field_or_claim": field, "value": value, "evidence_ids": [evidence_id]}
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br16a-shared-") as directory:
@@ -52,7 +58,8 @@ def main():
         context = invoke(bot, "m07", "context", history, "br16-d")["artifact"]
         evidence_id = context["evidence_ids"][0]
         evidence = next(item for item in context["evidence"] if item["evidence_id"] == evidence_id)
-        model.write_text(json.dumps({"state":"HUMAN_REVIEW","answer":"The supplied product snapshot is synthetic and limited.","claims":[{"text":"The supplied product snapshot is synthetic and limited.","field_or_claim":evidence["field_or_claim"],"value":evidence.get("value"),"evidence_ids":[evidence_id]}],"evidence_ids":[evidence_id],"tool_calls":[],"authority":"A2-RO","write_permission":False}), encoding="utf-8")
+        answer, claim = grounded_claim(evidence["field_or_claim"], evidence.get("value"), evidence_id)
+        model.write_text(json.dumps({"state":"HUMAN_REVIEW","answer":answer,"claims":[claim],"evidence_ids":[evidence_id],"tool_calls":[],"authority":"A2-RO","write_permission":False}), encoding="utf-8")
         assert invoke(bot, "m07", "validate", history, "br16-d", model, REGISTRY)["status"] == "VALID"
         action.write_text(json.dumps({"action_id":"br16-a","decision_id":"br16-d","action_type":"synthetic_manual","target":"fixture:br16","performed_by":"human","performed_at":"2026-09-04T00:00:00Z","measurement_window_end":"2026-09-05T00:00:00Z","compliance_reviewed":True}), encoding="utf-8")
         assert invoke(bot, "action", "record", history, actions, action)["status"] == "APPENDED"

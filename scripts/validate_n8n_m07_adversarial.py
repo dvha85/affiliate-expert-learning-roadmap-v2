@@ -18,6 +18,12 @@ def call(bot, *args, expected=0, env=None):
     return json.loads(result.stdout)
 
 
+def grounded_claim(field, value, evidence_id):
+    value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
+    rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
+    return rendered, {"text": rendered, "field_or_claim": field, "value": value, "evidence_ids": [evidence_id]}
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="m07-adversarial-") as directory:
@@ -30,7 +36,8 @@ def main():
         context = call(bot, "m07", "context", history, "m07-d", env=env)["artifact"]
         evidence_id = context["evidence_ids"][0]
         evidence = next(item for item in context["evidence"] if item["evidence_id"] == evidence_id)
-        normal = {"state": "HUMAN_REVIEW", "answer": "The supplied evidence is synthetic and limited.", "claims": [{"text": "The evidence is synthetic.", "field_or_claim": evidence["field_or_claim"], "value": evidence.get("value"), "evidence_ids": [evidence_id]}], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A2-RO", "write_permission": False}
+        answer, claim = grounded_claim(evidence["field_or_claim"], evidence.get("value"), evidence_id)
+        normal = {"state": "HUMAN_REVIEW", "answer": answer, "claims": [claim], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A2-RO", "write_permission": False}
         model = work / "model.json"
         model.write_text(json.dumps(normal), encoding="utf-8")
         assert call(bot, "m07", "validate", history, "m07-d", model, REGISTRY, env=env)["status"] == "VALID"

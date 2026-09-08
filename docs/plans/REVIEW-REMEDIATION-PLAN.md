@@ -75,7 +75,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — learner history resolver foundation, chưa tích hợp n8n/M06 |
-| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | TODO |
+| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract và artifact trace, n8n adapter/proposal store chưa có |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
@@ -113,6 +113,15 @@ nghiệm thu trên `main`**.
   resolve lại record từ store sau append trước khi ACK/return artifact. Chưa
   có core M06 builder chung, chưa đổi n8n blueprint/HTTP adapter, và chưa có
   proposal resolver; RP-04 vẫn mở.
+- **RP-05 foundation:** core/learner M07 nay kiểm output thực: chỉ
+  `HUMAN_REVIEW`/`ABSTAIN`, claim/evidence/value và `answer`/`claim.text` phải
+  là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`
+  tự khai bị reject. `m07 register-tool-result` preflight/validate response,
+  ghi artifact immutable có trace hash rồi `m07 validate` resolve lại hash và
+  record binding trước khi body `unknown` được cite. Test learner trực tiếp và
+  regression M07 cover prose/trace giả. Chưa persist AgentProposal, chưa có canonical
+  tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
+  vẫn mở, R01/R05 chưa đóng toàn phạm vi.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 

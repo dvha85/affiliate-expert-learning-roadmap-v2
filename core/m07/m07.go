@@ -4,10 +4,16 @@ package m07
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
+	"time"
+
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
 
 type ToolSpec struct {
@@ -50,6 +56,28 @@ type Evidence struct {
 	ClaimKind             string `json:"claim_kind"`
 	SourceAuthorityOrRole string `json:"source_authority_or_role,omitempty"`
 	Limitation            string `json:"limitation"`
+}
+
+// ToolResult is supplied by the HTTP adapter after it has performed a
+// preflighted request. Body is JSON data (a JSON string is valid for an HTML
+// response); it is never interpreted as policy or instructions.
+type ToolResult struct {
+	RecordID   string          `json:"record_id"`
+	ToolCall   ToolRequest     `json:"tool_call"`
+	StatusCode int             `json:"status_code"`
+	ReceivedAt string          `json:"received_at"`
+	Redirected bool            `json:"redirected"`
+	Body       json.RawMessage `json:"body"`
+}
+
+// RegisteredToolResult is the durable, immutable handoff from the tool
+// adapter to the model boundary. A model cannot choose its trace ID or its
+// evidence ID: both are derived by RegisterToolResult.
+type RegisteredToolResult struct {
+	Version  string     `json:"version"`
+	RecordID string     `json:"record_id"`
+	TraceID  string     `json:"trace_id"`
+	Result   ToolResult `json:"result"`
 }
 
 func uniqueNonEmpty(values []string) bool {
@@ -151,6 +179,109 @@ func ValidateToolRequest(request ToolRequest, registry []ToolSpec) error {
 	return fmt.Errorf("target host is not allowlisted")
 }
 
+func traceID(result ToolResult) (string, error) {
+	b, err := json.Marshal(result)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+// RegisterToolResult validates a response owned by the adapter before it can
+// enter a model context. It intentionally accepts only successful, non-
+// redirected responses and labels the resulting content unknown/untrusted.
+func RegisterToolResult(raw []byte, registry []ToolSpec) (RegisteredToolResult, error) {
+	var result ToolResult
+	if err := contracts.DecodeStrict(raw, &result); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result schema: %w", err)
+	}
+	if strings.TrimSpace(result.RecordID) == "" || len(bytes.TrimSpace(result.Body)) == 0 {
+		return RegisteredToolResult{}, fmt.Errorf("tool result requires record_id and body")
+	}
+	if err := ValidateToolRequest(result.ToolCall, registry); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result request rejected: %w", err)
+	}
+	if result.Redirected {
+		return RegisteredToolResult{}, fmt.Errorf("tool result redirects are forbidden")
+	}
+	if result.StatusCode < 200 || result.StatusCode > 299 {
+		return RegisteredToolResult{}, fmt.Errorf("tool result status is not successful")
+	}
+	if _, err := time.Parse(time.RFC3339, result.ReceivedAt); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result received_at is invalid: %w", err)
+	}
+	var body any
+	if err := json.Unmarshal(result.Body, &body); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result body must be JSON data: %w", err)
+	}
+	id, err := traceID(result)
+	if err != nil {
+		return RegisteredToolResult{}, err
+	}
+	return RegisteredToolResult{Version: "m07-tool-result/v1", RecordID: result.RecordID, TraceID: id, Result: result}, nil
+}
+
+// ValidateRegisteredToolResult recomputes the adapter-owned trace ID from the
+// stored result. This rejects a forged ID, changed request/body, or a result
+// registered for a different canonical history record.
+func ValidateRegisteredToolResult(raw []byte, registry []ToolSpec, recordID string) (RegisteredToolResult, error) {
+	var registered RegisteredToolResult
+	if err := contracts.DecodeStrict(raw, &registered); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result schema: %w", err)
+	}
+	if registered.Version != "m07-tool-result/v1" || registered.RecordID != recordID || registered.Result.RecordID != recordID {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result record binding is invalid")
+	}
+	resultRaw, err := json.Marshal(registered.Result)
+	if err != nil {
+		return RegisteredToolResult{}, err
+	}
+	recomputed, err := RegisterToolResult(resultRaw, registry)
+	if err != nil {
+		return RegisteredToolResult{}, err
+	}
+	if registered.TraceID != recomputed.TraceID {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result trace_id does not match result")
+	}
+	return recomputed, nil
+}
+
+// Evidence exposes the complete response body under an adapter-derived ID.
+// Field extraction is deliberately deferred: an untrusted arbitrary response
+// must not be silently reclassified into product facts by this boundary.
+func (registered RegisteredToolResult) Evidence() Evidence {
+	var body any
+	_ = json.Unmarshal(registered.Result.Body, &body)
+	return Evidence{
+		EvidenceID: registered.TraceID + "#body", FieldOrClaim: "tool_result.body", Value: body,
+		ClaimKind: "unknown", SourceAuthorityOrRole: "registered_readonly_tool",
+		Limitation: "Untrusted tool response; only the exact registered JSON body is available for citation.",
+	}
+}
+
+// RenderGroundedAnswer is the only answer string the boundary labels
+// grounded. It is built from claims whose field/value/evidence binding has
+// already been checked; model prose is not allowed to smuggle a new claim.
+func RenderGroundedAnswer(claims []Claim) string {
+	parts := make([]string, 0, len(claims))
+	for _, claim := range claims {
+		parts = append(parts, renderClaim(claim))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func renderClaim(claim Claim) string {
+	value := bytes.TrimSpace(claim.Value)
+	var decoded any
+	if json.Unmarshal(value, &decoded) == nil {
+		if canonical, err := json.Marshal(decoded); err == nil {
+			value = canonical
+		}
+	}
+	return claim.FieldOrClaim + "=" + string(value) + " [evidence:" + strings.Join(claim.EvidenceIDs, ",") + "]"
+}
+
 // ValidateAgentOutput checks the model's actual structured output. Context IDs
 // are never copied into the answer automatically: every cited ID and every
 // claim must be present in the model output and resolve in the supplied store.
@@ -171,7 +302,7 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 	if err := json.Unmarshal(raw, &output); err != nil {
 		return output, fmt.Errorf("agent output is not JSON: %w", err)
 	}
-	if output.State != "HUMAN_REVIEW" && output.State != "ABSTAIN" && output.State != "PROPOSE" {
+	if output.State != "HUMAN_REVIEW" && output.State != "ABSTAIN" {
 		return output, fmt.Errorf("unsupported agent state")
 	}
 	if strings.TrimSpace(output.Answer) == "" {
@@ -204,9 +335,14 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 			return output, fmt.Errorf("evidence id %q is not in canonical context", id)
 		}
 	}
+	claimedIDs := []string{}
+	seenClaimedID := map[string]bool{}
 	for _, claim := range output.Claims {
 		if strings.TrimSpace(claim.Text) == "" || strings.TrimSpace(claim.FieldOrClaim) == "" || len(claim.Value) == 0 || !uniqueNonEmpty(claim.EvidenceIDs) || len(claim.EvidenceIDs) == 0 {
 			return output, fmt.Errorf("every claim needs text and evidence")
+		}
+		if claim.Text != renderClaim(claim) {
+			return output, fmt.Errorf("claim text is not the deterministic rendering of its evidence-bound value: got %q want %q", claim.Text, renderClaim(claim))
 		}
 		matched := false
 		for _, id := range claim.EvidenceIDs {
@@ -232,11 +368,27 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 		if !matched {
 			return output, fmt.Errorf("claim value is not bound to a cited evidence field")
 		}
-	}
-	for _, call := range output.ToolCalls {
-		if err := ValidateToolRequest(call, registry); err != nil {
-			return output, fmt.Errorf("tool call rejected: %w", err)
+		for _, id := range claim.EvidenceIDs {
+			if !seenClaimedID[id] {
+				claimedIDs = append(claimedIDs, id)
+				seenClaimedID[id] = true
+			}
 		}
+	}
+	if len(output.ToolCalls) != 0 {
+		return output, fmt.Errorf("tool calls require an adapter trace registered before model validation")
+	}
+	if output.State == "ABSTAIN" {
+		if len(output.Claims) != 0 || len(output.EvidenceIDs) != 0 {
+			return output, fmt.Errorf("abstain output must not cite evidence or make claims")
+		}
+		return output, nil
+	}
+	if !reflect.DeepEqual(output.EvidenceIDs, claimedIDs) {
+		return output, fmt.Errorf("evidence_ids must exactly match evidence cited by claims")
+	}
+	if output.Answer != RenderGroundedAnswer(output.Claims) {
+		return output, fmt.Errorf("answer is not the deterministic rendering of grounded claims")
 	}
 	return output, nil
 }
