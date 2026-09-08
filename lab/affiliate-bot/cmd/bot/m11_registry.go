@@ -500,13 +500,6 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 		return record, corem11.ProductionLedger{}, status, err
 	}
 	next := *ledger
-	next.PendingOutcomes--
-	next.PendingExecutionIDs = []string{}
-	for _, id := range ledger.PendingExecutionIDs {
-		if id != executionID {
-			next.PendingExecutionIDs = append(next.PendingExecutionIDs, id)
-		}
-	}
 	next.ConsecutiveFailures++
 	next.LastExecutionAt = attemptedAt
 	next.UpdatedAt = attemptedAt
@@ -514,7 +507,8 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 	if err != nil {
 		return record, next, status, err
 	}
-	if _, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+	_, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
 		return record, next, ledgerStatus, err
 	}
 	return record, next, status, nil

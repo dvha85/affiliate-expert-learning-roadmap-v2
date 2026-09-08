@@ -329,8 +329,11 @@ gate không-authorizing và fail closed với scope, time, budget hoặc health 
 cost từ gate ALLOW đã persist, nhưng chưa gọi executor. `m11-reserve-authorization`
 chỉ tạo pre-ledger immutable một lần cho authorization đó, charge bound và giữ
 pending execution; `m11-record-failed` chỉ có đường fixture `FAILED`/
-`NOT_PERFORMED`, tạo ExecutionRecord + post-ledger và không gọi executor. Outcome,
-reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc trước khi đóng.
+`NOT_PERFORMED` và không gọi executor. Pending chỉ được giải phóng bởi
+`m11-outcome` khi fixture `CANCELLED` có đúng `MACHINE_EXECUTION` EffectRef
+được ghi; lệnh này tạo post-ledger và vẫn hoạt động để đóng observation sau STOP.
+Business outcome, reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc
+trước khi đóng.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 

@@ -18,6 +18,7 @@ import (
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
@@ -94,6 +95,7 @@ type LearnerReservation struct {
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
+func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
 
 // The registry lives beside mission-state.json and is append-only. It owns the
 // canonical compact JSON used for later resolution; user-supplied output files
@@ -834,6 +836,125 @@ func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRec
 	return outcomes, nil
 }
 
+// validateM11FixtureOutcome accepts only an observation that proves a local
+// fixture did not perform a side effect. It is deliberately not a production
+// business-outcome ingestion path.
+func validateM11FixtureOutcome(dir string, raw []byte) (m03.OutcomeRecord, corem11.ProductionExecutionRecord, string) {
+	outcome, status := m03.DecodeM03Outcome(raw)
+	if status != "VALID" {
+		return outcome, corem11.ProductionExecutionRecord{}, status
+	}
+	if outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" {
+		return outcome, corem11.ProductionExecutionRecord{}, "REQUIRE_MACHINE_EXECUTION"
+	}
+	value, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, outcome.EffectRef.EffectID)
+	if err != nil {
+		return outcome, corem11.ProductionExecutionRecord{}, "ORPHAN_EXECUTION"
+	}
+	record := *value.(*corem11.ProductionExecutionRecord)
+	attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	observedAt, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	if attemptedErr != nil || observedErr != nil || observedAt.Before(attemptedAt) {
+		return outcome, record, "OUTCOME_BEFORE_EXECUTION"
+	}
+	if record.Status != "FAILED" || record.SideEffectState != "NOT_PERFORMED" || outcome.Status != "CANCELLED" || len(outcome.Metrics) != 0 || !strings.HasPrefix(outcome.SourceRef, "fixture:m11-outcome/") {
+		return outcome, record, "INVALID_NO_SIDE_EFFECT_OUTCOME"
+	}
+	return outcome, record, "VALID"
+}
+
+func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
+	f, err := (store.JSONL{}).Open(m11OutcomeStorePath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
+	outcomes := []m03.OutcomeRecord{}
+	seen := map[string]bool{}
+	for scanner.Scan() {
+		outcome, _, status := validateM11FixtureOutcome(dir, scanner.Bytes())
+		if status != "VALID" || seen[outcome.OutcomeID] {
+			return nil, fmt.Errorf("invalid M11 fixture outcome store")
+		}
+		seen[outcome.OutcomeID] = true
+		outcomes = append(outcomes, outcome)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return outcomes, nil
+}
+
+func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecord, corem11.ProductionLedger, string, error) {
+	outcome, record, validation := validateM11FixtureOutcome(dir, raw)
+	if validation != "VALID" {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome rejected: %s", validation)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	for _, prior := range outcomes {
+		if prior.OutcomeID != outcome.OutcomeID {
+			continue
+		}
+		if reflect.DeepEqual(prior, outcome) {
+			return outcome, corem11.ProductionLedger{}, appendDuplicate, nil
+		}
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("outcome_id reused with different content")
+	}
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	if ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ReconciliationRequired {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 ledger cannot accept the outcome")
+	}
+	pendingIndex := -1
+	for index, id := range ledger.PendingExecutionIDs {
+		if id == record.ExecutionID {
+			pendingIndex = index
+		}
+	}
+	if pendingIndex < 0 || ledger.PendingOutcomes < 1 {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome has no pending execution")
+	}
+	for _, link := range ledger.OutcomeLinks {
+		if link.OutcomeID == outcome.OutcomeID || link.ExecutionID == record.ExecutionID {
+			return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 execution already has an outcome")
+		}
+	}
+	next := *ledger
+	next.PendingOutcomes--
+	next.PendingExecutionIDs = append([]string(nil), ledger.PendingExecutionIDs[:pendingIndex]...)
+	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[pendingIndex+1:]...)
+	next.OutcomeLinks = append(append([]corem11.ProductionOutcomeLink(nil), ledger.OutcomeLinks...), corem11.ProductionOutcomeLink{OutcomeID: outcome.OutcomeID, ExecutionID: record.ExecutionID, ObservedAt: outcome.ObservedAt})
+	next.ConsecutiveFailures = 0
+	next.LastOutcomeAt = outcome.ObservedAt
+	next.UpdatedAt = outcome.ObservedAt
+	ledgerRaw, err := json.Marshal(next)
+	if err != nil {
+		return outcome, next, "", err
+	}
+	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+		return outcome, next, status, err
+	}
+	encoded, err := json.Marshal(outcome)
+	if err != nil {
+		return outcome, next, "", err
+	}
+	if err := (store.JSONL{}).AppendLine(m11OutcomeStorePath(dir), encoded); err != nil {
+		return outcome, next, "", err
+	}
+	return outcome, next, appendAdded, nil
+}
+
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -849,12 +970,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-outcome": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -1520,11 +1641,27 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 6 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON"), 2)
 		}
-		record, postLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
+		record, executionLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		return emit(status, map[string]any{"execution": record, "post_ledger": postLedger}, nil, 0)
+		return emit(status, map[string]any{"execution": record, "execution_ledger": executionLedger}, nil, 0)
+	case "m11-outcome":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		outcome, ledger, status, err := recordM11FixtureOutcome(args[1], args[3], raw)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, map[string]any{"outcome": outcome, "post_ledger": ledger}, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)

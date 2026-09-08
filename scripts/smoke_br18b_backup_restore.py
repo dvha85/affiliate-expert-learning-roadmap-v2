@@ -149,11 +149,20 @@ def main():
         production_failed = invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)
         assert production_failed["status"] == "APPENDED" and production_failed["artifact"]["execution"]["status"] == "FAILED" and production_failed["artifact"]["execution"]["side_effect_state"] == "NOT_PERFORMED"
         assert invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)["status"] == "EXACT_DUPLICATE"
+        production_outcome = root / "production-outcome.json"
+        production_outcome.write_text(json.dumps({"outcome_id":"br18-production-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br18-failed"}), encoding="utf-8")
+        execution_ledger_id = production_failed["artifact"]["execution_ledger"]["lease_id"] + "/" + production_failed["artifact"]["execution_ledger"]["updated_at"]
+        orphaned_production_outcome = root / "orphaned-production-outcome.json"
+        orphaned_production_outcome.write_text(json.dumps({"outcome_id":"br18-production-orphan","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":"missing-m11-execution"},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/orphan"}), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-outcome", runtime, orphaned_production_outcome, execution_ledger_id, expected=1, env=env)["status"] == "REJECTED"
+        production_outcome_result = invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)
+        assert production_outcome_result["status"] == "APPENDED" and production_outcome_result["artifact"]["post_ledger"]["pending_outcomes"] == 0
+        assert invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
         assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v2"
-        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl"}.issubset(backup_result["artifact"]["required"])
+        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl", "m11-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
         invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
         (invalid_source / "m10-outcomes.jsonl").unlink()
         assert invoke(bot, "backup", "create", invalid_source, root / "invalid-source-backup", expected=1, env=env)["status"] == "INPUT_ERROR"
@@ -184,14 +193,14 @@ def main():
         assert restored_state["stop"] is True and restored_state["stop_reason"] == "backup-drill"
         assert restored_state["approval"]["approval_id"] == "br18-ap"
         assert restored_state["canary"]["executions_used"] == 1 and restored_state["canary"]["cost_used_minor"] == 4
-        assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists() and (restored / "m11-artifacts.jsonl").exists()
+        assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists() and (restored / "m11-artifacts.jsonl").exists() and (restored / "m11-outcomes.jsonl").exists()
         assert invoke(bot, "mission", "m10-resolve", restored, "EXECUTION_RECORD", failed["artifact"]["execution_id"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEASE", "br18-production-lease", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_ACTIVATION", "br18-production-lease/v1", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", "br18-production-lease/2026-09-08T00:00:00Z", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_AUTHORIZATION", authorization["artifact"]["authorization_id"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"], env=env)["status"] == "RESOLVED"
-        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", production_failed["artifact"]["post_ledger"]["lease_id"] + "/" + production_failed["artifact"]["post_ledger"]["updated_at"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", production_outcome_result["artifact"]["post_ledger"]["lease_id"] + "/" + production_outcome_result["artifact"]["post_ledger"]["updated_at"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)

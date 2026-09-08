@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
 type backupManifest struct {
@@ -89,8 +90,22 @@ func requiredBackupFiles(source string) ([]string, error) {
 	}
 	if _, err := os.Stat(m11ArtifactRegistryPath(source)); err == nil {
 		required = append(required, filepath.Base(m11ArtifactRegistryPath(source)))
-		if _, err := loadM11ArtifactRegistry(source); err != nil {
+		entries, err := loadM11ArtifactRegistry(source)
+		if err != nil {
 			return nil, err
+		}
+		for _, entry := range entries {
+			if entry.ArtifactKind != corem11.ArtifactKindExecution {
+				continue
+			}
+			record, status := corem11.DecodeArtifact("execution", entry.Artifact)
+			if status != corem11.Valid {
+				return nil, fmt.Errorf("invalid M11 execution artifact")
+			}
+			if record.(*corem11.ProductionExecutionRecord).Status == "FAILED" {
+				required = append(required, filepath.Base(m11OutcomeStorePath(source)))
+				break
+			}
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
@@ -136,8 +151,30 @@ func validateM10BackupGraph(dir string) error {
 }
 
 func validateM11BackupGraph(dir string) error {
-	if _, err := loadM11ArtifactRegistry(dir); err != nil {
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
 		return fmt.Errorf("M11 artifact graph is invalid: %w", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return fmt.Errorf("M11 outcome store is invalid: %w", err)
+	}
+	linked := map[string]bool{}
+	for _, outcome := range outcomes {
+		linked[outcome.EffectRef.EffectID] = true
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem11.ArtifactKindExecution {
+			continue
+		}
+		value, status := corem11.DecodeArtifact("execution", entry.Artifact)
+		if status != corem11.Valid {
+			return fmt.Errorf("M11 execution artifact is invalid")
+		}
+		record := value.(*corem11.ProductionExecutionRecord)
+		if record.Status == "FAILED" && !linked[record.ExecutionID] {
+			return fmt.Errorf("failed M11 execution is missing restored fixture outcome")
+		}
 	}
 	return nil
 }
