@@ -1,5 +1,6 @@
 """One shared-artifact BR-16a chain from M00 through M11 learner entrypoints."""
 import json
+import hashlib
 import os
 import shutil
 import subprocess
@@ -21,6 +22,18 @@ def run(command, cwd=ROOT, expected=0, env=None):
 def invoke(bot, *args, expected=0, env=None):
     result = run([bot, *args], expected=expected, env=env)
     return json.loads(result.stdout)
+
+
+def write_cost_bound(path, intent, amount, expires_at, bound_id):
+    payload = {
+        "cost_bound_id": bound_id, "intent_id": intent["intent_id"], "intent_hash": intent["intent_hash"],
+        "max_cost_minor": amount, "currency": "USD", "source_ref": "fixture:br16-cost-registry",
+        "observed_at": "2026-09-07T01:06:00Z", "expires_at": expires_at,
+        "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
+    }
+    digest = hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    payload["cost_bound_hash"] = "sha256:" + digest
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def main():
@@ -59,11 +72,19 @@ def main():
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
         grant = work / "grant.json"; grant.write_text(json.dumps({"grant_id":"br16-g","max_executions":1,"max_cost_minor":100,"currency":"USD"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
+        cost = work / "cost-bound.json"; write_cost_bound(cost, i, 100, "2099-09-03T02:45:00Z", "br16-cost")
+        assert invoke(bot, "mission", "m10-reserve", state, cost, "unregistered", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "EXACT_DUPLICATE"
+        tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
+        expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
+        assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
         # Two independent processes race for the single execution/cost budget.
         # The directory lock may make one return BUSY; retrying it must then see
         # the committed budget and cannot create a second reservation.
         attempts = [
-            subprocess.Popen([str(bot), "mission", "m10-reserve", str(state), "100", reservation], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            subprocess.Popen([str(bot), "mission", "m10-reserve", str(state), str(cost), reservation], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
             for reservation in ("br16-r1", "br16-r2")
         ]
         responses = {}
@@ -77,9 +98,9 @@ def main():
         winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
         loser = "br16-r2" if winner == "br16-r1" else "br16-r1"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
-        assert invoke(bot, "mission", "m10-reserve", state, "100", winner)["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-reserve", state, cost, winner)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
-        assert invoke(bot, "mission", "m10-reserve", state, "1", loser, expected=1)["status"] == "BUDGET_DENIED"
+        assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout

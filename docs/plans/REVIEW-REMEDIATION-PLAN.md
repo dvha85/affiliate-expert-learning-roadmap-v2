@@ -70,10 +70,10 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 
 | Gói | Phạm vi | Phụ thuộc trước khi merge | Quy mô | Trạng thái |
 |---|---|---|---|---|
-| RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | PROPOSED |
-| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | TODO |
-| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | TODO |
-| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | TODO |
+| RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
+| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
+| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
+| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | TODO |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | TODO |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
@@ -83,6 +83,30 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
+
+### Cập nhật triển khai — 2026-09-08
+
+Các thay đổi dưới đây nằm trên branch `codex/rp-01-path-safety` (head
+`df16783` khi ghi mục này), chưa có PR/merge nên **không thay đổi trạng thái
+nghiệm thu trên `main`**.
+
+- **RP-01, phần M08:** commit `b48cea7` chặn cùng path, symlink/hardlink và
+  overwrite artifact khác; retry byte-identical trả `EXACT_DUPLICATE`. Test
+  trực tiếp learner command kiểm history/request/policy không bị mutate. Chưa
+  audit hết các writer khác (backup/restore) nên không đóng RP-01.
+- **RP-02, phần M08:** commit `573d4ed` thêm `core/m08`; learner và harness
+  dùng chung hash/policy/decoder cho ActionIntent/PolicyDecision. Có regression
+  số `9007199254740993`, `parameters:null`, duplicate key và agent proposal
+  chưa resolve. Proposal resolver/store thực vẫn thuộc RP-04/RP-05; chưa có
+  full conformance matrix nên không đóng RP-02.
+- **RP-03 foundation:** commit `1eb452c` thêm state atomic, lock fail-closed và
+  expiry/binding checks; `b68144c` thêm reservation ID/ledger retry;
+  `12d54cc` thêm race smoke; `149128e` thêm `core/m10` TrustedCostBound;
+  `df16783` thêm registry/resolution learner. Smoke `scripts/smoke_br16a_offline.py`
+  chạy register → reserve và các reject unregistered/tampered/expired, restart,
+  STOP và race cap. Grant/approval/ledger hiện chưa là graph canonical M09/M10,
+  chưa có execution stub/outcome linkage hay fault-injection đầy đủ; RP-03 vẫn
+  mở.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 
