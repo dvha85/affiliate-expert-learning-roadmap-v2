@@ -75,6 +75,11 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), appendDuplicate) {
 		t.Fatal(second.Code, second.Body.String())
 	}
+	reordered := watchFixture()
+	reordered.Body = `{"commission_rate":0.08,"price":100,"currency":"USD","product_name":"Fixture A","product_id":"a"}`
+	if response := call(http.MethodPost, reordered); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), appendDuplicate) {
+		t.Fatal("JSON key reorder was not an exact retry", response.Code, response.Body.String())
+	}
 	records, err := LoadHistory(history)
 	if err != nil || len(records) != 1 || records[0].RecordID != response.RecordID || Replay(records[0]).State != replayMatch {
 		t.Fatal(err, records)
@@ -87,6 +92,87 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	records, err = LoadHistory(history)
 	if err != nil || len(records) != 1 {
 		t.Fatal("rejected fixture changed canonical history", err, records)
+	}
+	missing := watchFixture()
+	missing.CorrelationID = "event-missing"
+	missing.Body = `{"product_id":"missing","product_name":"Missing","currency":"USD","price":null,"commission_rate":null}`
+	if response := call(http.MethodPost, missing); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), appendAdded) {
+		t.Fatal("missing fields were not persisted canonically", response.Code, response.Body.String())
+	}
+	records, err = LoadHistory(history)
+	if err != nil || len(records) != 2 || Replay(records[1]).State != replayMatch || records[1].Observations[0].Price != nil || records[1].Observations[0].CommissionRate != nil {
+		t.Fatal("missing-field record did not replay MATCH", err, records)
+	}
+}
+
+func TestM06AdapterAndM08ResolveTheSameCanonicalFieldIDs(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	fixture := watchFixture()
+	fixture.Body = `{"commission_rate":0.08,"price":100,"currency":"USD","product_name":"A&B Bé","product_id":"a"}`
+	raw, err := json.Marshal(m06AdapterRequest{Fixture: mustRawJSON(t, fixture)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	m06AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m06/fixture-import", bytes.NewReader(raw)))
+	if response.Code != http.StatusOK {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal(err, records)
+	}
+	record := records[0]
+	context, err := m07EvidenceContext(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var priceFieldID string
+	for _, evidence := range context.Evidence {
+		if evidence.FieldOrClaim == "price" {
+			priceFieldID = evidence.EvidenceID
+		}
+	}
+	if priceFieldID == "" {
+		t.Fatal("M06 record did not expose its canonical price field ID")
+	}
+	requestPath, intentPath := filepath.Join(dir, "intent-request.json"), filepath.Join(dir, "intent.json")
+	request := learnerIntentRequest{IntentID: "m06-intent", DecisionID: record.RecordID, EvidenceIDs: []string{priceFieldID}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-03T00:01:00Z", ExpiresAt: "2026-09-03T00:05:00Z", CorrelationID: "m06-correlation", IdempotencyKey: "m06-key"}
+	writeRequest := func() {
+		raw, err := json.Marshal(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(requestPath, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeRequest()
+	if code, envelope := missionCall(t, "m08-intent", history, requestPath, intentPath); code != 0 || envelope["status"] != appendAdded {
+		t.Fatalf("M08 did not accept resolved M06 field IDs: code=%d envelope=%+v", code, envelope)
+	}
+	request.IntentID, request.IdempotencyKey = "m06-forged", "m06-forged-key"
+	request.EvidenceIDs = []string{record.RecordID + "#price"}
+	writeRequest()
+	if code, envelope := missionCall(t, "m08-intent", history, requestPath, filepath.Join(dir, "forged-intent.json")); code == 0 || envelope["status"] != "REJECTED" {
+		t.Fatalf("M08 accepted a forged M06 field ID: code=%d envelope=%+v", code, envelope)
+	}
+
+	// A syntactically valid but replay-DRIFT record must be unusable by M08.
+	record.RecordedResult.Reasons = []string{"tampered replay result"}
+	tampered, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(history, append(tampered, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	request.IntentID, request.IdempotencyKey = "m06-drift", "m06-drift-key"
+	request.EvidenceIDs = []string{priceFieldID}
+	writeRequest()
+	if code, envelope := missionCall(t, "m08-intent", history, requestPath, filepath.Join(dir, "drift-intent.json")); code == 0 || envelope["status"] != "REJECTED" {
+		t.Fatalf("M08 accepted a replay-DRIFT M06 record: code=%d envelope=%+v", code, envelope)
 	}
 }
 

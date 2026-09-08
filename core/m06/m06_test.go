@@ -49,6 +49,20 @@ func TestFixtureNormalization(t *testing.T) {
 	}
 }
 
+func TestCanonicalContentHashIgnoresJSONKeyOrderOnly(t *testing.T) {
+	first := `{"product_id":"offer-1","price":100,"title":"A&B"}`
+	reordered := `{"title":"A&B","price":100,"product_id":"offer-1"}`
+	if m06.CanonicalContentHash(first) != m06.CanonicalContentHash(reordered) {
+		t.Fatal("JSON key order changed the M06 content fingerprint")
+	}
+	if m06.ContentHash(first) == m06.ContentHash(reordered) {
+		t.Fatal("test requires distinct transport bytes")
+	}
+	if m06.CanonicalContentHash("plain text") != m06.ContentHash("plain text") {
+		t.Fatal("non-JSON body was normalized without a parser profile")
+	}
+}
+
 func TestRawFixtureBoundary(t *testing.T) {
 	raw := `{"subject_id":"offer-1","status_code":200,"request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"fixture-1","body":"abc"}}`
 	if _, status := m06.DecodeM06Input([]byte(raw)); status != "VALID" {
@@ -97,5 +111,15 @@ func TestOfferFixtureBuildUsesOneCanonicalPacket(t *testing.T) {
 	wrongProfile.AllowHost = "example.com"
 	if _, err := m06.BuildOfferFixture(raw, wrongProfile); err == nil {
 		t.Fatal("source/profile mismatch accepted")
+	}
+	reordered := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"commission_rate\":0.08,\"price\":100,\"currency\":\"USD\",\"product_name\":\"A&B Bé\",\"product_id\":\"a\"}"}`)
+	unicode := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"A&B Bé\",\"currency\":\"USD\",\"price\":100,\"commission_rate\":0.08}"}`)
+	first, err := m06.BuildOfferFixture(unicode, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m06.BuildOfferFixture(reordered, profile)
+	if err != nil || first.RecordID != second.RecordID || string(first.Packet) != string(second.Packet) {
+		t.Fatalf("equivalent Unicode fixture was not canonical: first=%+v second=%+v err=%v", first, second, err)
 	}
 }

@@ -677,8 +677,15 @@ func buildLearnerIntent(historyPath, requestPath, proposalPath string) (LearnerI
 	if err != nil {
 		return LearnerIntent{}, fmt.Errorf("decision_id resolution: %w", err)
 	}
+	// M08 accepts the same canonical field IDs that M07 can ground, rather
+	// than inventing a parallel aggregate-only ID namespace. The resolver has
+	// already required exactly one replay-MATCH HistoryRecord.
+	context, err := m07EvidenceContext(record)
+	if err != nil {
+		return LearnerIntent{}, fmt.Errorf("decision evidence resolution: %w", err)
+	}
 	allowed := map[string]bool{}
-	for _, id := range record.RecordedResult.EvidenceIDs {
+	for _, id := range context.EvidenceIDs {
 		allowed[id] = true
 	}
 	if len(req.EvidenceIDs) == 0 {

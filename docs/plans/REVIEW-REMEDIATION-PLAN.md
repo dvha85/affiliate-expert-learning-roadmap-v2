@@ -74,7 +74,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
-| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — learner history resolver foundation, chưa tích hợp n8n/M06 |
+| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — `core/m06`, CLI/HTTP/n8n fixture adapter và resolver M07/M08 đã dùng chung; regression key-order/field ID/DRIFT có trong learner. Generic source và n8n operated run vẫn mở |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract và artifact trace, n8n adapter/proposal store chưa có |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
@@ -170,6 +170,15 @@ nghiệm thu trên `main`**.
   reject không mutate history. Đây chỉ là fixed synthetic profile; generic
   source profile, n8n operated execution và full shared HistoryRecord type vẫn
   còn mở, nên RP-04 chưa đóng.
+- **RP-04 canonical fingerprint + M08 field links:** M06 dùng canonical JSON
+  fingerprint cho body có cấu trúc (key order không tạo observation mới), còn
+  raw byte hash giữ riêng cho HTTPS fixture pinning. CLI/HTTP adapter retry
+  cùng body reordered là `EXACT_DUPLICATE`; price/commission thiếu tạo field
+  `missing` và HistoryRecord vẫn replay `MATCH`. M08 resolve cùng canonical
+  record rồi dùng đúng field IDs mà M07 context công bố; ID tự dựng và record
+  `DRIFT` đều bị reject. Regression chạy implementation learner thật, không
+  dùng parser Python thay thế. Chưa có generic source profile hoặc n8n engine
+  execution evidence, nên RP-04 vẫn `IN PROGRESS`.
 - **RP-05 foundation:** core/learner M07 nay kiểm output thực: chỉ
   `HUMAN_REVIEW`/`ABSTAIN`, claim/evidence/value và `answer`/`claim.text` phải
   là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`
