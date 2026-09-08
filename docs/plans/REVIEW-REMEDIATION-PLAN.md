@@ -377,6 +377,12 @@ trước rename. Test chứng minh lỗi tại điểm đó giữ nguyên state 
 temporary file và retry commit semantic state mới. Hook không có đường kích hoạt
 từ runtime; nó không chứng minh atomicity giữa mission-state và registry/STOP.
 
+**Cập nhật stopped-ledger crash seam (2026-09-08):** loader fail-closed nếu
+M11 registry có ledger `STOPPED` nhưng mutable state chưa STOP. BR-18b tạo
+snapshot UNKNOWN/STOP rồi sửa manifest hợp lệ để mất state/marker STOP, giữ
+stopped ledger; restore trả `VERIFY_FAILED`. Đây là recovery guard, không phải
+transaction đa-file hay power-loss proof.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

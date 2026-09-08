@@ -236,6 +236,18 @@ def main():
         assert recovery_reservation["status"] == "APPENDED"
         recovery_unknown = invoke(bot, "mission", "m11-record-unknown", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z", "fixture provider timeout after dispatch", env=env)
         assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
+        stopped_state_backup = root / "stopped-state-backup"; stopped_state_partial = root / "stopped-state-partial"
+        assert invoke(bot, "backup", "create", recovery_runtime, stopped_state_backup, env=env)["status"] == "BACKED_UP"
+        shutil.copytree(stopped_state_backup, stopped_state_partial)
+        partial_state = json.loads((stopped_state_partial / "mission-state.json").read_text(encoding="utf-8")); partial_state["stop"] = False; partial_state["stop_reason"] = ""
+        partial_state_bytes = json.dumps(partial_state).encode()
+        (stopped_state_partial / "mission-state.json").write_bytes(partial_state_bytes)
+        (stopped_state_partial / "STOP").unlink()
+        partial_state_manifest = json.loads((stopped_state_partial / "manifest.json").read_text(encoding="utf-8"))
+        partial_state_manifest["files"]["mission-state.json"] = hashlib.sha256(partial_state_bytes).hexdigest()
+        del partial_state_manifest["files"]["STOP"]
+        (stopped_state_partial / "manifest.json").write_text(json.dumps(partial_state_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", stopped_state_partial, root / "stopped-state-partial-restored", expected=1, env=env)["status"] == "VERIFY_FAILED"
         assert invoke(bot, "mission", "m11-activate", recovery_runtime, "br18-production-lease", "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
         resolution = root / "production-resolution.json"; write_production_resolution(resolution, production_lease, recovery_unknown["artifact"]["execution"]["execution_id"])
         assert invoke(bot, "mission", "m11-register", recovery_runtime, "PRODUCTION_RECONCILIATION", resolution, env=env)["status"] == "APPENDED"
