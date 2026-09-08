@@ -39,13 +39,22 @@ type Claim struct {
 }
 
 type AgentOutput struct {
-	State           string        `json:"state"`
-	Answer          string        `json:"answer"`
-	EvidenceIDs     []string      `json:"evidence_ids"`
-	Claims          []Claim       `json:"claims"`
-	ToolCalls       []ToolRequest `json:"tool_calls"`
-	Authority       string        `json:"authority"`
-	WritePermission bool          `json:"write_permission"`
+	State           string          `json:"state"`
+	Answer          string          `json:"answer"`
+	EvidenceIDs     []string        `json:"evidence_ids"`
+	Claims          []Claim         `json:"claims"`
+	ToolCalls       []ToolRequest   `json:"tool_calls"`
+	Authority       string          `json:"authority"`
+	WritePermission bool            `json:"write_permission"`
+	ProposedAction  *ProposedAction `json:"proposed_action,omitempty"`
+}
+
+// ProposedAction is a non-authorizing draft. Raw parameters preserve exact
+// JSON numbers for the later M08 hash/binding comparison.
+type ProposedAction struct {
+	ActionType string          `json:"action_type"`
+	Target     string          `json:"target"`
+	Parameters json.RawMessage `json:"parameters"`
 }
 
 type Evidence struct {
@@ -226,6 +235,9 @@ func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec,
 	if output.State != "HUMAN_REVIEW" {
 		return RegisteredAgentProposal{}, fmt.Errorf("only HUMAN_REVIEW output can become an agent proposal")
 	}
+	if output.ProposedAction == nil {
+		return RegisteredAgentProposal{}, fmt.Errorf("agent proposal requires proposed_action")
+	}
 	trimmed := bytes.TrimSpace(raw)
 	outputDigest, err := canonicalJSONDigest(trimmed)
 	if err != nil {
@@ -387,6 +399,18 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 	if output.Authority != "A2-RO" || output.WritePermission {
 		return output, fmt.Errorf("agent authority/write contract violated")
 	}
+	if output.ProposedAction != nil {
+		if strings.TrimSpace(output.ProposedAction.ActionType) == "" || strings.TrimSpace(output.ProposedAction.Target) == "" || len(bytes.TrimSpace(output.ProposedAction.Parameters)) == 0 {
+			return output, fmt.Errorf("proposed_action is incomplete")
+		}
+		value, err := contracts.Decode(output.ProposedAction.Parameters)
+		if err != nil {
+			return output, fmt.Errorf("proposed_action parameters are invalid: %w", err)
+		}
+		if _, ok := value.(map[string]any); !ok {
+			return output, fmt.Errorf("proposed_action parameters must be an object")
+		}
+	}
 	if !uniqueNonEmpty(output.EvidenceIDs) {
 		return output, fmt.Errorf("evidence_ids must be unique and non-empty")
 	}
@@ -449,7 +473,7 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 		return output, fmt.Errorf("tool calls require an adapter trace registered before model validation")
 	}
 	if output.State == "ABSTAIN" {
-		if len(output.Claims) != 0 || len(output.EvidenceIDs) != 0 {
+		if len(output.Claims) != 0 || len(output.EvidenceIDs) != 0 || output.ProposedAction != nil {
 			return output, fmt.Errorf("abstain output must not cite evidence or make claims")
 		}
 		return output, nil

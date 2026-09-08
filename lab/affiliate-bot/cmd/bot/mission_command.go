@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
@@ -383,7 +384,32 @@ type learnerIntentRequest struct {
 	IdempotencyKey string         `json:"idempotency_key"`
 }
 
-func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) {
+func resolveM07Proposal(record HistoryRecord, proposalPath string) (corem07.RegisteredAgentProposal, corem07.AgentOutput, error) {
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
+	}
+	ctx, err := m07EvidenceContext(record)
+	if err != nil {
+		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
+	}
+	return corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID)
+}
+
+func sameParameters(raw json.RawMessage, parameters map[string]any) bool {
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return false
+	}
+	canonicalProposal, err := json.Marshal(value)
+	if err != nil {
+		return false
+	}
+	canonicalIntent, err := json.Marshal(parameters)
+	return err == nil && bytes.Equal(canonicalProposal, canonicalIntent)
+}
+
+func buildLearnerIntent(historyPath, requestPath, proposalPath string) (LearnerIntent, error) {
 	var req learnerIntentRequest
 	raw, err := os.ReadFile(requestPath)
 	if err != nil {
@@ -425,7 +451,27 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 		return LearnerIntent{}, fmt.Errorf("intent request missing required field")
 	}
 	if req.ProposedBy == "agent" {
-		return LearnerIntent{}, fmt.Errorf("agent proposal_ref must resolve in the canonical proposal store")
+		if proposalPath == "" {
+			return LearnerIntent{}, fmt.Errorf("agent proposal_ref requires a persisted M07 proposal")
+		}
+		proposal, output, err := resolveM07Proposal(record, proposalPath)
+		if err != nil {
+			return LearnerIntent{}, fmt.Errorf("agent proposal resolution: %w", err)
+		}
+		if req.ProposalRef != proposal.ProposalID || output.ProposedAction == nil || req.ActionType != output.ProposedAction.ActionType || req.Target != output.ProposedAction.Target || !sameParameters(output.ProposedAction.Parameters, req.Parameters) {
+			return LearnerIntent{}, fmt.Errorf("agent intent must exactly bind the persisted M07 proposed_action")
+		}
+		proposalEvidence := map[string]bool{}
+		for _, id := range output.EvidenceIDs {
+			proposalEvidence[id] = true
+		}
+		for _, id := range req.EvidenceIDs {
+			if !proposalEvidence[id] {
+				return LearnerIntent{}, fmt.Errorf("agent intent evidence_id %s is absent from proposal", id)
+			}
+		}
+	} else if proposalPath != "" {
+		return LearnerIntent{}, fmt.Errorf("human intent must not supply an agent proposal")
 	}
 	created, err := time.Parse(time.RFC3339, req.CreatedAt)
 	if err != nil {
@@ -447,7 +493,7 @@ type learnerPolicyRequest struct {
 	SeenIdempotency map[string]string `json:"seen_idempotency"`
 }
 
-func evaluateLearnerPolicy(i LearnerIntent, path string) (LearnerPolicy, error) {
+func evaluateLearnerPolicy(i LearnerIntent, path string, knownProposalIDs []string) (LearnerPolicy, error) {
 	var req learnerPolicyRequest
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -456,7 +502,7 @@ func evaluateLearnerPolicy(i LearnerIntent, path string) (LearnerPolicy, error) 
 	if err := contracts.DecodeStrict(raw, &req); err != nil {
 		return LearnerPolicy{}, err
 	}
-	ctx := corem08.PolicyContext{PolicyVersion: req.PolicyVersion, Now: req.Now, KnownDecisionIDs: []string{i.DecisionID}, KnownEvidenceIDs: append([]string(nil), i.EvidenceIDs...), AllowedHosts: req.AllowedHosts, ActionRisk: req.ActionRisk, SeenIdempotency: req.SeenIdempotency}
+	ctx := corem08.PolicyContext{PolicyVersion: req.PolicyVersion, Now: req.Now, KnownDecisionIDs: []string{i.DecisionID}, KnownEvidenceIDs: append([]string(nil), i.EvidenceIDs...), KnownProposalIDs: knownProposalIDs, AllowedHosts: req.AllowedHosts, ActionRisk: req.ActionRisk, SeenIdempotency: req.SeenIdempotency}
 	return LearnerPolicy(corem08.EvaluatePolicy(corem08.Intent(i), ctx)), nil
 }
 
@@ -496,29 +542,37 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "m08-intent", "intent":
-		if len(args) != 4 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT"), 2)
+		if len(args) != 4 && len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | bot mission m08-intent HISTORY REQUEST M07_PROPOSAL OUT"), 2)
 		}
 		if err := distinctPaths(args[1:]...); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
-		i, err := buildLearnerIntent(args[1], args[2])
+		proposalPath, outputPath := "", args[3]
+		if len(args) == 5 {
+			proposalPath, outputPath = args[3], args[4]
+		}
+		i, err := buildLearnerIntent(args[1], args[2], proposalPath)
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		status, err := writeNewJSON(args[3], i)
+		status, err := writeNewJSON(outputPath, i)
 		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}
 		return emit(status, i, nil, 0)
 	case "m08-policy", "policy":
-		if len(args) != 4 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-policy INTENT POLICY OUT"), 2)
+		if len(args) != 4 && len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-policy INTENT POLICY OUT | bot mission m08-policy HISTORY INTENT POLICY M07_PROPOSAL OUT"), 2)
 		}
 		if err := distinctPaths(args[1:]...); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[1])
+		intentPath, policyPath, outputPath := args[1], args[2], args[3]
+		if len(args) == 6 {
+			intentPath, policyPath, outputPath = args[2], args[3], args[5]
+		}
+		raw, err := os.ReadFile(intentPath)
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -527,11 +581,26 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
 		}
 		i := LearnerIntent(decoded)
-		p, err := evaluateLearnerPolicy(i, args[2])
+		knownProposalIDs := []string{}
+		if i.ProposedBy == "agent" {
+			if len(args) != 6 {
+				return emit("INPUT_ERROR", nil, fmt.Errorf("agent intent policy requires HISTORY and persisted M07 proposal"), 1)
+			}
+			record, err := resolveCanonicalRecord(args[1], i.DecisionID)
+			if err != nil {
+				return emit("INPUT_ERROR", nil, err, 1)
+			}
+			proposal, output, err := resolveM07Proposal(record, args[4])
+			if err != nil || proposal.ProposalID != i.ProposalRef || output.ProposedAction == nil || i.ActionType != output.ProposedAction.ActionType || i.Target != output.ProposedAction.Target || !sameParameters(output.ProposedAction.Parameters, i.Parameters) {
+				return emit("INPUT_ERROR", nil, fmt.Errorf("agent intent does not resolve to its persisted M07 proposal"), 1)
+			}
+			knownProposalIDs = []string{proposal.ProposalID}
+		}
+		p, err := evaluateLearnerPolicy(i, policyPath, knownProposalIDs)
 		if err != nil {
 			return emit("DENY", nil, err, 1)
 		}
-		status, err := writeNewJSON(args[3], p)
+		status, err := writeNewJSON(outputPath, p)
 		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}

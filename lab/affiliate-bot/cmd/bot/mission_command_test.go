@@ -240,7 +240,7 @@ func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	p, err := evaluateLearnerPolicy(i, path)
+	p, err := evaluateLearnerPolicy(i, path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

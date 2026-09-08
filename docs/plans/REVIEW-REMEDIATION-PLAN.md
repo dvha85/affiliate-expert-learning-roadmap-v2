@@ -120,8 +120,9 @@ nghiệm thu trên `main`**.
   ghi artifact immutable có trace hash rồi `m07 validate` resolve lại hash và
   record binding trước khi body `unknown` được cite. Test learner trực tiếp,
   regression M07 và smoke shared workspace tạo/cite trace rồi reject trace giả.
-  `m07 register-proposal` persist raw validated output với canonical digest và
-  record binding, nhưng M08 chưa resolve artifact đó. Chưa có canonical
+  `m07 register-proposal` persist raw validated output/proposed action với
+  canonical digest và record binding; M08 agent intent/policy resolve lại
+  artifact và reject target/parameters đổi ngoài proposal. Chưa có canonical
   tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
   vẫn mở, R01/R05 chưa đóng toàn phạm vi.
 

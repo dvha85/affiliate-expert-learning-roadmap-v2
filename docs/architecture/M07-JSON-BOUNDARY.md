@@ -62,9 +62,17 @@ bot m07 register-proposal HISTORY.jsonl RECORD_ID MODEL_OUTPUT.json REGISTRY.jso
 ```
 
 Artifact giữ raw model output, canonical digest/proposal ID và `record_id`.
-Khi resolve, digest được tính lại và raw output được validate lại với canonical
-context; output `ABSTAIN`, output đã bị sửa hoặc record khác đều bị từ chối.
-Artifact này vẫn proposal-only, không phải approval hoặc execution authority.
+Proposal phải có `proposed_action` gồm `action_type`, `target` và parameters
+JSON object. Khi resolve, digest được tính lại và raw output được validate lại
+với canonical context; output `ABSTAIN`, output đã bị sửa hoặc record khác đều
+bị từ chối. Artifact này vẫn proposal-only, không phải approval hoặc execution
+authority.
+
+M08 agent path dùng thêm proposal artifact: `m08-intent HISTORY REQUEST
+M07_PROPOSAL OUT`, và `m08-policy HISTORY INTENT POLICY M07_PROPOSAL OUT`.
+`proposal_ref`, action type, target, exact parameters và evidence của intent
+phải bind với proposal khi tạo intent; policy resolve lại artifact sau đó. Đường
+human cũ không nhận proposal artifact.
 
 ## Kiểm offline
 
@@ -83,8 +91,7 @@ phải authoritative proof cho path learner hoặc workflow.
 
 ## Giới hạn còn mở
 
-Blueprint n8n hiện chưa gọi CLI/core registration adapter; M08 cũng chưa
-resolve `AgentProposal` artifact này. Chưa có transport seam kiểm
+Blueprint n8n hiện chưa gọi CLI/core registration adapter. Chưa có transport seam kiểm
 timeout/response size/private-address policy, ACK vào canonical tool-evidence
 store chung, hoặc parity thực thi code node blueprint. Vì vậy BR-15/RP-05 vẫn
 **chưa hoàn tất**; không dùng tài liệu này để tuyên bố model/n8n/provider đã
