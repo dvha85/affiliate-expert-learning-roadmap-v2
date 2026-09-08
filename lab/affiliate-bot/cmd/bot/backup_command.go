@@ -9,11 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
 
 type backupManifest struct {
-	Version string            `json:"version"`
-	Files   map[string]string `json:"files"`
+	Version  string            `json:"version"`
+	Files    map[string]string `json:"files"`
+	Required []string          `json:"required"`
 }
 
 func fileDigest(path string) (string, error) {
@@ -57,12 +60,105 @@ func backupFiles(source string) ([]string, error) {
 	sort.Strings(out)
 	return out, nil
 }
+
+func requiredBackupFiles(source string) ([]string, error) {
+	required := []string{"history.jsonl", "mission-state.json"}
+	state, err := loadMissionState(source)
+	if err != nil {
+		return nil, err
+	}
+	if state.Canary == nil {
+		return required, nil
+	}
+	required = append(required, filepath.Base(m10ArtifactRegistryPath(source)))
+	entries, err := loadM10ArtifactRegistry(source)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
+			continue
+		}
+		record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+		if err != nil {
+			return nil, err
+		}
+		if record.Status == "FAILED" {
+			required = append(required, filepath.Base(m10OutcomeStorePath(source)))
+			break
+		}
+	}
+	sort.Strings(required)
+	return required, nil
+}
+
+func validateM10BackupGraph(dir string) error {
+	state, err := loadMissionState(dir)
+	if err != nil || state.Canary == nil {
+		return err
+	}
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return err
+	}
+	executions := map[string]corem10.ExecutionRecord{}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
+			continue
+		}
+		record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+		if err != nil || !reservationForExecution(state, record.ExecutionID) {
+			return fmt.Errorf("M10 execution record is orphaned from restored reservation")
+		}
+		executions[record.ExecutionID] = record
+	}
+	outcomes, err := loadM10FixtureOutcomes(dir, state)
+	if err != nil {
+		return err
+	}
+	failedOutcomeIDs := map[string]bool{}
+	for _, outcome := range outcomes {
+		failedOutcomeIDs[outcome.EffectRef.EffectID] = true
+	}
+	for executionID, record := range executions {
+		if record.Status == "FAILED" && !failedOutcomeIDs[executionID] {
+			return fmt.Errorf("failed execution is missing restored fixture outcome")
+		}
+	}
+	return nil
+}
+
+func sameFileSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func containsAll(files, required []string) bool {
+	present := map[string]bool{}
+	for _, file := range files {
+		present[file] = true
+	}
+	for _, file := range required {
+		if !present[file] {
+			return false
+		}
+	}
+	return true
+}
+
 func verifyBackup(dir string) (backupManifest, error) {
 	var m backupManifest
 	if err := readJSON(filepath.Join(dir, "manifest.json"), &m); err != nil {
 		return m, err
 	}
-	if m.Version != "affiliate-bot-backup/v1" || len(m.Files) == 0 {
+	if m.Version != "affiliate-bot-backup/v2" || len(m.Files) == 0 {
 		return m, fmt.Errorf("invalid backup manifest")
 	}
 	for name, want := range m.Files {
@@ -78,7 +174,15 @@ func verifyBackup(dir string) (backupManifest, error) {
 			return m, fmt.Errorf("backup checksum mismatch for %s", name)
 		}
 	}
-	for _, required := range []string{"history.jsonl", "mission-state.json"} {
+	expectedRequired, err := requiredBackupFiles(dir)
+	if err != nil {
+		return m, fmt.Errorf("backup required artifact graph is invalid: %w", err)
+	}
+	sort.Strings(m.Required)
+	if !sameFileSet(m.Required, expectedRequired) {
+		return m, fmt.Errorf("backup required artifact inventory does not match runtime graph")
+	}
+	for _, required := range expectedRequired {
 		if _, ok := m.Files[required]; !ok {
 			return m, fmt.Errorf("backup is missing required %s", required)
 		}
@@ -111,7 +215,17 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e = os.MkdirAll(args[2], 0700); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
-		m := backupManifest{Version: "affiliate-bot-backup/v1", Files: map[string]string{}}
+		required, e := requiredBackupFiles(args[1])
+		if e != nil {
+			return emit("INPUT_ERROR", nil, e, 1)
+		}
+		if !containsAll(files, required) {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime is missing required backup artifacts"), 1)
+		}
+		if e = validateM10BackupGraph(args[1]); e != nil {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime M10 graph is invalid: %w", e), 1)
+		}
+		m := backupManifest{Version: "affiliate-bot-backup/v2", Files: map[string]string{}, Required: required}
 		for _, name := range files {
 			b, e := os.ReadFile(filepath.Join(args[1], name))
 			if e != nil {
@@ -165,6 +279,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if _, e = loadMissionState(args[2]); e != nil {
 			return emit("STATE_FAILED", nil, e, 1)
 		}
+	}
+	if e = validateM10BackupGraph(args[2]); e != nil {
+		return emit("GRAPH_FAILED", nil, e, 1)
 	}
 	return emit("RESTORED", m, nil, 0)
 }

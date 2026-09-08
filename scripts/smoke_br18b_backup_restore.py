@@ -36,6 +36,18 @@ def write_canary_grant(path, intent, policy, approval, max_executions, max_cost)
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_cost_bound(path, intent, amount, expires_at, bound_id):
+    payload = {
+        "cost_bound_id": bound_id, "intent_id": intent["intent_id"], "intent_hash": intent["intent_hash"],
+        "max_cost_minor": amount, "currency": "USD", "source_ref": "fixture:br18-cost-registry",
+        "observed_at": "2026-09-07T01:06:00Z", "expires_at": expires_at,
+        "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
+    }
+    digest = hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    payload["cost_bound_hash"] = "sha256:" + digest
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br18b-runtime-") as directory:
@@ -55,16 +67,51 @@ def main():
         i = json.loads(intent.read_text()); p = json.loads(policy.read_text()); approval = root / "approval.json"
         approval.write_text(json.dumps({"approval_id":"br18-ap","intent_id":i["intent_id"],"intent_hash":i["intent_hash"],"policy_version":p["policy_version"],"decision":"APPROVE","approved_by":"human","approver_id":"pilot-human","approved_at":"2026-09-07T01:05:00Z","expires_at":"2099-09-03T02:50:00Z","correlation_id":i["correlation_id"],"one_time":True}), encoding="utf-8")
         assert invoke(bot, "mission", "m09-approval", runtime, approval, env=env)["status"] == "ACK"
-        grant = root / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 2, 10)
+        grant = root / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 1, 4)
         assert invoke(bot, "mission", "m10-canary", runtime, grant, env=env)["status"] == "ACK"
-        assert invoke(bot, "mission", "m10-reserve", runtime, "4", env=env)["status"] == "RESERVED"
+        cost = root / "cost-bound.json"; write_cost_bound(cost, i, 4, "2099-09-03T02:45:00Z", "br18-cost")
+        assert invoke(bot, "mission", "m10-cost-register", runtime, cost, env=env)["status"] == "APPENDED"
+        gate = root / "canary-gate.json"; gate_time = "2026-09-08T00:00:00Z"
+        assert invoke(bot, "mission", "m10-gate", runtime, cost, gate, gate_time, env=env)["status"] == "ALLOW_CANARY"
+        authorization = root / "canary-authorization.json"
+        authorization_result = invoke(bot, "mission", "m10-authorize", runtime, cost, gate, authorization, gate_time, "local_sandbox", env=env)
+        assert authorization_result["status"] == "AUTHORIZED"
+        reservation = invoke(bot, "mission", "m10-reserve-authorization", runtime, authorization, "br18-governed-r1", env=env)
+        assert reservation["status"] == "RESERVED"
+        failed_execution = root / "fixture-failed-execution.json"
+        failed = invoke(bot, "mission", "m10-record-failed", runtime, authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor", env=env)
+        assert failed["status"] == "APPENDED" and failed["artifact"]["status"] == "FAILED"
+        machine_outcome = root / "machine-outcome.json"
+        machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
-        assert invoke(bot, "backup", "create", runtime, backup, env=env)["status"] == "BACKED_UP"
+        backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
+        assert backup_result["status"] == "BACKED_UP"
+        assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v2"
+        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
+        invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
+        (invalid_source / "m10-outcomes.jsonl").unlink()
+        assert invoke(bot, "backup", "create", invalid_source, root / "invalid-source-backup", expected=1, env=env)["status"] == "INPUT_ERROR"
         (backup / "history.jsonl").write_text("tampered\n", encoding="utf-8")
         assert invoke(bot, "backup", "restore", backup, restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
         # Recreate the backup from the unchanged runtime, then restore into a
-        # fresh directory and let a new process validate the artifacts.
+        # fresh directory and validate checksum, inventory, and semantic graph.
         invoke(bot, "backup", "create", runtime, backup, env=env)
+        missing_manifest_backup = root / "missing-manifest-backup"; shutil.copytree(backup, missing_manifest_backup)
+        missing_manifest = json.loads((missing_manifest_backup / "manifest.json").read_text(encoding="utf-8"))
+        del missing_manifest["files"]["m10-outcomes.jsonl"]
+        missing_manifest["required"].remove("m10-outcomes.jsonl")
+        (missing_manifest_backup / "manifest.json").write_text(json.dumps(missing_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", missing_manifest_backup, root / "missing-manifest-restored", expected=1, env=env)["status"] == "VERIFY_FAILED"
+        invalid_graph_backup = root / "invalid-graph-backup"; shutil.copytree(backup, invalid_graph_backup)
+        invalid_outcome = json.loads((invalid_graph_backup / "m10-outcomes.jsonl").read_text(encoding="utf-8"))
+        invalid_outcome["effect_ref"]["effect_id"] = "orphaned-execution-after-checksum"
+        invalid_outcome_bytes = (json.dumps(invalid_outcome) + "\n").encode()
+        (invalid_graph_backup / "m10-outcomes.jsonl").write_bytes(invalid_outcome_bytes)
+        invalid_manifest = json.loads((invalid_graph_backup / "manifest.json").read_text(encoding="utf-8"))
+        invalid_manifest["files"]["m10-outcomes.jsonl"] = hashlib.sha256(invalid_outcome_bytes).hexdigest()
+        (invalid_graph_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", invalid_graph_backup, root / "invalid-graph-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", backup, restored, env=env)["status"] == "RESTORED"
         assert "replay=MATCH" in run([bot, "history", "replay", restored / "history.jsonl"], env=env).stdout
         status = invoke(bot, "mission", "status", restored, env=env)
@@ -72,14 +119,19 @@ def main():
         assert restored_state["stop"] is True and restored_state["stop_reason"] == "backup-drill"
         assert restored_state["approval"]["approval_id"] == "br18-ap"
         assert restored_state["canary"]["executions_used"] == 1 and restored_state["canary"]["cost_used_minor"] == 4
-        assert (restored / "actions.jsonl").exists()
+        assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists()
+        assert invoke(bot, "mission", "m10-resolve", restored, "EXECUTION_RECORD", failed["artifact"]["execution_id"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
-        invalid_state = json.loads((runtime / "mission-state.json").read_text(encoding="utf-8")); invalid_state["canary"]["executions_used"] = -1
-        (runtime / "mission-state.json").write_text(json.dumps(invalid_state), encoding="utf-8")
-        invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"
-        invoke(bot, "backup", "create", runtime, invalid_backup, env=env)
-        assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "STATE_FAILED"
-    print("BR-18b PASS: runtime-created history/state/STOP backed up with manifest, tamper rejected, fresh-process replay and durable STOP verified")
+        invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)
+        invalid_state = json.loads((invalid_backup / "mission-state.json").read_text(encoding="utf-8")); invalid_state["canary"]["executions_used"] = -1
+        invalid_state_bytes = json.dumps(invalid_state).encode()
+        (invalid_backup / "mission-state.json").write_bytes(invalid_state_bytes)
+        invalid_manifest = json.loads((invalid_backup / "manifest.json").read_text(encoding="utf-8"))
+        invalid_manifest["files"]["mission-state.json"] = hashlib.sha256(invalid_state_bytes).hexdigest()
+        (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
+    print("BR-18b PASS: runtime-created M10 graph uses a v2 manifest; checksum, required inventory, and orphaned outcome are rejected; fresh-process replay, resolve, budget, and durable STOP verified")
 
 
 if __name__ == "__main__":

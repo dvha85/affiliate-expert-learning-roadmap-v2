@@ -152,10 +152,12 @@ doanh hay mở đường live executor.
 
 Các artifact M10 của learner được sao chép canonical vào registry bất biến
 `m10-artifacts.jsonl` trong state directory. Grant, trusted cost bound, gate,
-authorization và cancellation record chỉ được ACK sau khi registry nhận chúng;
-authorization/cancellation resolve lại input từ registry và từ chối artifact
-hợp schema nhưng không phải bản đã đăng ký. Registry hiện chưa thay thế graph
-outcome/EffectRef hoặc executor.
+authorization và execution record chỉ được ACK sau khi registry nhận chúng;
+authorization/execution resolve lại input từ registry và từ chối artifact hợp
+schema nhưng không phải bản đã đăng ký. `m10-outcomes.jsonl` giữ fixture
+outcome riêng; khi restore, Bot resolve lại execution record, reservation và
+EffectRef trước khi chấp nhận graph. Registry/outcome fixture vẫn không phải
+executor hay bằng chứng outcome kinh doanh.
 
 Có thể chỉ đọc một artifact đã được registry sở hữu theo loại/ID (và tùy chọn
 content hash); lệnh không tạo quyền thực thi:
@@ -183,6 +185,15 @@ go run ./cmd/bot mission status /tmp/affiliate-runtime
 go run ./cmd/bot backup create /tmp/affiliate-runtime /tmp/affiliate-backup
 go run ./cmd/bot backup restore /tmp/affiliate-backup /tmp/affiliate-restored
 ```
+
+Backup profile hiện là `affiliate-bot-backup/v2`. Với runtime đã khởi tạo
+canary, manifest bắt buộc có `m10-artifacts.jsonl`; nếu có execution `FAILED`
+thì bắt buộc có thêm `m10-outcomes.jsonl`. Restore kiểm checksum, inventory bắt
+buộc, replay history, mission state, rồi kiểm link reservation → execution và
+FAILED execution → fixture outcome/`MACHINE_EXECUTION` EffectRef. Một backup
+checksum hợp lệ nhưng orphan outcome vẫn bị từ chối với `GRAPH_FAILED`. Phạm vi
+này chỉ là flat M10 learner graph: chưa là snapshot transaction, inventory
+recursive M00–M10 hay lifecycle M11.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
