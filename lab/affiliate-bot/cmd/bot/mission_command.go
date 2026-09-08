@@ -461,6 +461,27 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 	if marker && !s.Stop {
 		return fmt.Errorf("STOP marker is active but mission state is not stopped")
 	}
+	// A crash can occur after M11 has durably written a stopped ledger but
+	// before mission-state/STOP is committed. Never let that inconsistent
+	// directory resume on the stale mutable state.
+	if !s.Stop {
+		entries, loadErr := loadM11ArtifactRegistry(dir)
+		if loadErr != nil {
+			return fmt.Errorf("M11 registry integrity check failed: %w", loadErr)
+		}
+		for _, entry := range entries {
+			if entry.ArtifactKind != corem11.ArtifactKindLedger {
+				continue
+			}
+			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 ledger integrity check failed")
+			}
+			if value.(*corem11.ProductionLedger).ControlMode == "STOPPED" {
+				return fmt.Errorf("stopped M11 ledger requires durable mission STOP")
+			}
+		}
+	}
 	if s.Intent != nil {
 		if s.Intent.IntentHash == "" || s.Intent.IntentHash != learnerIntentHash(*s.Intent) || s.Intent.ExecutionAuthorized || s.Intent.IntentMode != "PROPOSAL_ONLY" {
 			return fmt.Errorf("mission intent integrity/authority check failed")
