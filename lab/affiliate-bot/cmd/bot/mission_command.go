@@ -12,6 +12,7 @@ import (
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
 
 const missionStateVersion = "learner-m08-m11/v1"
@@ -83,8 +84,52 @@ type LearnerReservation struct {
 	IntentID      string `json:"intent_id"`
 	IntentHash    string `json:"intent_hash"`
 	CostMinor     int64  `json:"cost_minor"`
+	CostBoundID   string `json:"cost_bound_id,omitempty"`
+	CostBoundHash string `json:"cost_bound_hash,omitempty"`
 	ReservedAt    string `json:"reserved_at"`
 }
+
+func trustedCostBoundsPath(dir string) string { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
+
+func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
+	raw, err := os.ReadFile(trustedCostBoundsPath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var bounds []corem10.TrustedCostBound
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		bound, status := corem10.DecodeTrustedCostBound(line)
+		if status != "VALID" {
+			return nil, fmt.Errorf("invalid trusted cost-bound registry entry: %s", status)
+		}
+		bounds = append(bounds, bound)
+	}
+	return bounds, nil
+}
+
+func resolveTrustedCostBound(dir string, bound corem10.TrustedCostBound) bool {
+	if bound.CostBoundHash == "" || bound.CostBoundHash != corem10.ComputeTrustedCostBoundHash(bound) {
+		return false
+	}
+	bounds, err := loadTrustedCostBounds(dir)
+	if err != nil {
+		return false
+	}
+	for _, registered := range bounds {
+		if registered.CostBoundID == bound.CostBoundID && registered.CostBoundHash == bound.CostBoundHash {
+			return true
+		}
+	}
+	return false
+}
+
 type LearnerMissionState struct {
 	Version      string               `json:"version"`
 	Intent       *LearnerIntent       `json:"intent,omitempty"`
@@ -440,12 +485,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -624,6 +669,55 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("ACK", c, nil, 0)
+	case "m10-cost-register":
+		if len(args) != 3 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cost-register STATE_DIR COST_BOUND"), 2)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent and canary grant required"), 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(raw)
+		if status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+		}
+		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()); status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+		}
+		bounds, err := loadTrustedCostBounds(args[1])
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		for _, old := range bounds {
+			if old.CostBoundID == bound.CostBoundID {
+				if old.CostBoundHash == bound.CostBoundHash {
+					return emit("EXACT_DUPLICATE", bound, nil, 0)
+				}
+				return emit("CONFLICT", nil, fmt.Errorf("cost_bound_id reused with different content"), 1)
+			}
+		}
+		f, err := os.OpenFile(trustedCostBoundsPath(args[1]), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		_, err = f.Write(append(bytes.TrimSpace(raw), '\n'))
+		if syncErr := f.Sync(); err == nil {
+			err = syncErr
+		}
+		if closeErr := f.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("APPENDED", bound, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)
@@ -642,7 +736,24 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("REJECTED", nil, err, 1)
 		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)
-		if parseErr != nil || cost < 0 {
+		boundID, boundHash := "", ""
+		if parseErr != nil {
+			raw, err := os.ReadFile(args[2])
+			if err != nil {
+				return emit("INPUT_ERROR", nil, err, 1)
+			}
+			bound, status := corem10.DecodeTrustedCostBound(raw)
+			if status != "VALID" {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+			}
+			if !resolveTrustedCostBound(args[1], bound) {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound is not registered"), 1)
+			}
+			if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()); status != "VALID" {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+			}
+			cost, boundID, boundHash = bound.MaxCostMinor, bound.CostBoundID, bound.CostBoundHash
+		} else if cost < 0 {
 			return emit("REJECTED", nil, fmt.Errorf("cost must be a non-negative integer"), 1)
 		}
 		reservationID := "legacy:" + args[2]
@@ -666,7 +777,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += cost
-		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
+		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		if err := saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}

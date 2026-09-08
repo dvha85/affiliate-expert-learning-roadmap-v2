@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
 
 func missionCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -207,6 +209,26 @@ func TestMissionAuthorityRejectsExpiredApprovalBeforeReserve(t *testing.T) {
 	}
 	if err := missionAuthorityActive(s, now); err == nil {
 		t.Fatal("expired approval was accepted")
+	}
+}
+
+func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
+	dir := t.TempDir()
+	bound := corem10.TrustedCostBound{CostBoundID: "cost-1", IntentID: "intent-1", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "corr-1", HashVersion: "go-json-v1"}
+	bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+	raw, err := json.Marshal(bound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(trustedCostBoundsPath(dir), append(raw, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if !resolveTrustedCostBound(dir, bound) {
+		t.Fatal("registered canonical bound did not resolve")
+	}
+	bound.MaxCostMinor = 1
+	if resolveTrustedCostBound(dir, bound) {
+		t.Fatal("tampered bound resolved from registry")
 	}
 }
 
