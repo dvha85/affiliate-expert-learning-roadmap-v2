@@ -2,17 +2,16 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 )
 
 const missionStateVersion = "learner-m08-m11/v1"
@@ -108,12 +107,7 @@ type intentHashPayload struct {
 }
 
 func learnerIntentHash(i LearnerIntent) string {
-	ids := append([]string(nil), i.EvidenceIDs...)
-	// Evidence IDs are already canonical in HistoryRecord; preserve order to
-	// make tampering visible instead of silently normalizing a submitted intent.
-	b, _ := json.Marshal(intentHashPayload{i.IntentID, i.DecisionID, ids, i.ActionType, i.Target, i.Parameters, i.ProposedBy, i.ProposalRef, i.CreatedAt, i.ExpiresAt, i.CorrelationID, i.IdempotencyKey, i.IntentMode, i.ExecutionAuthorized})
-	s := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(s[:])
+	return corem08.ComputeIntentHash(corem08.Intent(i))
 }
 
 func writeJSON(path string, value any) error {
@@ -264,9 +258,26 @@ type learnerIntentRequest struct {
 
 func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) {
 	var req learnerIntentRequest
-	if err := readJSON(requestPath, &req); err != nil {
+	raw, err := os.ReadFile(requestPath)
+	if err != nil {
 		return LearnerIntent{}, err
 	}
+	if err := contracts.DecodeStrict(raw, &req); err != nil {
+		return LearnerIntent{}, err
+	}
+	decoded, err := contracts.Decode(raw)
+	if err != nil {
+		return LearnerIntent{}, err
+	}
+	object, ok := decoded.(map[string]any)
+	if !ok {
+		return LearnerIntent{}, fmt.Errorf("intent request must be an object")
+	}
+	parameters, ok := object["parameters"].(map[string]any)
+	if !ok {
+		return LearnerIntent{}, fmt.Errorf("parameters must be a JSON object")
+	}
+	req.Parameters = parameters
 	history, err := LoadHistory(historyPath)
 	if err != nil {
 		return LearnerIntent{}, err
@@ -296,6 +307,9 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 	if req.IntentID == "" || req.ActionType == "" || req.Target == "" || (req.ProposedBy != "human" && req.ProposedBy != "agent") || req.CorrelationID == "" || req.IdempotencyKey == "" || req.CreatedAt == "" || req.ExpiresAt == "" {
 		return LearnerIntent{}, fmt.Errorf("intent request missing required field")
 	}
+	if req.ProposedBy == "agent" {
+		return LearnerIntent{}, fmt.Errorf("agent proposal_ref must resolve in the canonical proposal store")
+	}
 	created, err := time.Parse(time.RFC3339, req.CreatedAt)
 	if err != nil {
 		return LearnerIntent{}, err
@@ -304,9 +318,8 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 	if err != nil || !expires.After(created) {
 		return LearnerIntent{}, fmt.Errorf("expires_at must be after created_at")
 	}
-	i := LearnerIntent{IntentID: req.IntentID, DecisionID: req.DecisionID, EvidenceIDs: req.EvidenceIDs, ActionType: strings.ToUpper(req.ActionType), Target: req.Target, Parameters: req.Parameters, ProposedBy: req.ProposedBy, ProposalRef: req.ProposalRef, CreatedAt: req.CreatedAt, ExpiresAt: req.ExpiresAt, CorrelationID: req.CorrelationID, IdempotencyKey: req.IdempotencyKey, IntentMode: "PROPOSAL_ONLY", ExecutionAuthorized: false}
-	i.IntentHash = learnerIntentHash(i)
-	return i, nil
+	sealed := corem08.SealIntent(corem08.Intent{IntentID: req.IntentID, DecisionID: req.DecisionID, EvidenceIDs: req.EvidenceIDs, ActionType: req.ActionType, Target: req.Target, Parameters: req.Parameters, ProposedBy: req.ProposedBy, ProposalRef: req.ProposalRef, CreatedAt: req.CreatedAt, ExpiresAt: req.ExpiresAt, CorrelationID: req.CorrelationID, IdempotencyKey: req.IdempotencyKey})
+	return LearnerIntent(sealed), nil
 }
 
 type learnerPolicyRequest struct {
@@ -319,61 +332,15 @@ type learnerPolicyRequest struct {
 
 func evaluateLearnerPolicy(i LearnerIntent, path string) (LearnerPolicy, error) {
 	var req learnerPolicyRequest
-	if err := readJSON(path, &req); err != nil {
-		return LearnerPolicy{}, err
-	}
-	if req.PolicyVersion == "" {
-		return LearnerPolicy{}, fmt.Errorf("policy_version required")
-	}
-	if i.IntentHash != learnerIntentHash(i) {
-		return LearnerPolicy{}, fmt.Errorf("intent hash mismatch")
-	}
-	now, err := time.Parse(time.RFC3339, req.Now)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return LearnerPolicy{}, err
 	}
-	expires, _ := time.Parse(time.RFC3339, i.ExpiresAt)
-	if expires.IsZero() {
-		return LearnerPolicy{}, fmt.Errorf("intent expires_at is invalid")
+	if err := contracts.DecodeStrict(raw, &req); err != nil {
+		return LearnerPolicy{}, err
 	}
-	decision := "DENY"
-	reason := "UNKNOWN_ACTION_POLICY"
-	risk := req.ActionRisk[i.ActionType]
-	if risk != "RISK0" && risk != "RISK1" && risk != "RISK2" {
-		return LearnerPolicy{}, fmt.Errorf("unknown action risk %q", risk)
-	}
-	if risk == "RISK0" {
-		decision = "ALLOW"
-		reason = "SHADOW_POLICY_ALLOW"
-	} else {
-		decision = "HUMAN_REVIEW"
-		reason = risk + "_REQUIRES_REVIEW"
-	}
-	target, parseErr := url.Parse(i.Target)
-	hostAllowed := parseErr == nil && target.Scheme == "https" && target.Hostname() != "" && target.Port() == "" && target.User == nil && target.RawQuery == "" && target.Fragment == ""
-	if hostAllowed {
-		hostAllowed = false
-		for _, host := range req.AllowedHosts {
-			if strings.EqualFold(strings.TrimSpace(host), target.Hostname()) {
-				hostAllowed = true
-				break
-			}
-		}
-	}
-	if !hostAllowed {
-		decision = "DENY"
-		reason = "TARGET_HOST_DENIED"
-	}
-	if _, seen := req.SeenIdempotency[i.IdempotencyKey]; seen {
-		decision = "DENY"
-		reason = "IDEMPOTENCY_REPLAY"
-	}
-	if !expires.After(now) {
-		decision = "DENY"
-		reason = "INTENT_EXPIRED"
-	}
-	p := LearnerPolicy{PolicyVersion: req.PolicyVersion, IntentID: i.IntentID, IntentHash: i.IntentHash, Decision: decision, RiskClass: risk, Reason: reason, PolicyReviewRequired: decision == "HUMAN_REVIEW", PolicyMode: "NON_AUTHORIZING", ExecutionAuthorized: false, PolicyCheckedAt: req.Now}
-	return p, nil
+	ctx := corem08.PolicyContext{PolicyVersion: req.PolicyVersion, Now: req.Now, KnownDecisionIDs: []string{i.DecisionID}, KnownEvidenceIDs: append([]string(nil), i.EvidenceIDs...), AllowedHosts: req.AllowedHosts, ActionRisk: req.ActionRisk, SeenIdempotency: req.SeenIdempotency}
+	return LearnerPolicy(corem08.EvaluatePolicy(corem08.Intent(i), ctx)), nil
 }
 
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
@@ -417,10 +384,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1:]...); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
-		var i LearnerIntent
-		if err := readJSON(args[1], &i); err != nil {
+		raw, err := os.ReadFile(args[1])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
+		decoded, state := corem08.DecodeIntent(raw)
+		if state != "VALID" {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
+		}
+		i := LearnerIntent(decoded)
 		p, err := evaluateLearnerPolicy(i, args[2])
 		if err != nil {
 			return emit("DENY", nil, err, 1)
@@ -532,9 +504,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		c.IntentHash = s.Intent.IntentHash
 		c.ApprovalID = s.Approval.ApprovalID
 		c.Status = "ACTIVE"
-			if c.GrantedAt == "" {
-				c.GrantedAt = time.Now().UTC().Format(time.RFC3339Nano)
-			}
+		if c.GrantedAt == "" {
+			c.GrantedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		}
 		s.Canary = &c
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	"io"
 	"os"
 	"strings"
@@ -11,24 +12,21 @@ import (
 )
 
 func DecodeM08Intent(raw []byte) (ShadowActionIntent, string) {
-	var i ShadowActionIntent
-	if contracts.ValidateRaw("action-intent.schema.json", raw) != nil || contracts.DecodeStrict(raw, &i) != nil {
-		return i, "INVALID_SCHEMA"
+	decoded, status := corem08.DecodeIntent(raw)
+	if status != "VALID" {
+		return ShadowActionIntent{}, "INVALID_SCHEMA"
 	}
-	// Preserve arbitrary JSON numbers in parameters rather than rounding float64.
-	value, err := contracts.Decode(raw)
-	if err != nil {
-		return i, "INVALID_SCHEMA"
-	}
-	i.Parameters = value.(map[string]any)["parameters"].(map[string]any)
+	i := ShadowActionIntent{IntentID: decoded.IntentID, DecisionID: decoded.DecisionID, EvidenceIDs: decoded.EvidenceIDs, ActionType: decoded.ActionType, Target: decoded.Target, Parameters: decoded.Parameters, ProposedBy: decoded.ProposedBy, ProposalRef: decoded.ProposalRef, CreatedAt: decoded.CreatedAt, ExpiresAt: decoded.ExpiresAt, CorrelationID: decoded.CorrelationID, IdempotencyKey: decoded.IdempotencyKey, IntentHash: decoded.IntentHash, IntentMode: decoded.IntentMode, ExecutionAuthorized: decoded.ExecutionAuthorized}
+	i.ShadowOnly = i.IntentMode == "PROPOSAL_ONLY" && !i.ExecutionAuthorized
+	i.DryRun = i.ShadowOnly
 	return i, missionValid
 }
 func DecodeM08Policy(raw []byte) (ShadowPolicyDecision, string) {
-	var p ShadowPolicyDecision
-	if contracts.ValidateRaw("policy-decision.schema.json", raw) != nil || contracts.DecodeStrict(raw, &p) != nil {
-		return p, "INVALID_SCHEMA"
+	decoded, status := corem08.DecodePolicy(raw)
+	if status != "VALID" {
+		return ShadowPolicyDecision{}, "INVALID_SCHEMA"
 	}
-	return p, missionValid
+	return ShadowPolicyDecision{PolicyVersion: decoded.PolicyVersion, IntentID: decoded.IntentID, IntentHash: decoded.IntentHash, Decision: decoded.Decision, RiskClass: decoded.RiskClass, Reason: decoded.Reason, PolicyReviewRequired: decoded.PolicyReviewRequired, PolicyMode: decoded.PolicyMode, ExecutionAuthorized: decoded.ExecutionAuthorized, PolicyCheckedAt: decoded.PolicyCheckedAt, ApprovalRequired: decoded.PolicyReviewRequired, ShadowOnly: true}, missionValid
 }
 func DecodeM08Context(raw []byte) (ShadowPolicyContext, string) {
 	var ctx ShadowPolicyContext

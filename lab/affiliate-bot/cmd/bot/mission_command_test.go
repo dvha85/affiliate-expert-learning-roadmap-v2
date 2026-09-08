@@ -140,8 +140,40 @@ func TestMissionM08ArtifactOutputHasCreateRetryConflictSemantics(t *testing.T) {
 	}
 }
 
+func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	records, err := LoadHistory(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := bytes.Replace([]byte(`{"intent_id":"number-intent","decision_id":"br11-decision","evidence_ids":["EVIDENCE_ID"],"action_type":"DRAFT","target":"https://example.com/draft","parameters":{"id":9007199254740993},"proposed_by":"human","created_at":"2026-09-07T00:00:00Z","expires_at":"2099-09-07T03:00:00Z","correlation_id":"number-correlation","idempotency_key":"number-key"}`), []byte("EVIDENCE_ID"), []byte(records[0].RecordedResult.EvidenceIDs[0]), 1)
+	if err := os.WriteFile(request, valid, 0600); err != nil {
+		t.Fatal(err)
+	}
+	intent := filepath.Join(dir, "number-intent.json")
+	if code, response := missionCall(t, "m08-intent", history, request, intent); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("large-number intent rejected: code=%d response=%+v", code, response)
+	}
+	stored, err := os.ReadFile(intent)
+	if err != nil || !bytes.Contains(stored, []byte(`9007199254740993`)) {
+		t.Fatalf("large number was not preserved: %s, %v", stored, err)
+	}
+	if err := os.WriteFile(request, bytes.Replace(valid, []byte(`"parameters":{"id":9007199254740993}`), []byte(`"parameters":null`), 1), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, filepath.Join(dir, "null.json")); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("null parameters accepted: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(request, bytes.Replace(valid, []byte(`"proposed_by":"human"`), []byte(`"proposed_by":"agent"`), 1), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, request, filepath.Join(dir, "agent.json")); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("unresolved agent proposal accepted: code=%d response=%+v", code, response)
+	}
+}
+
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
-	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
+	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
 	i.IntentHash = learnerIntentHash(i)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "policy.json")
