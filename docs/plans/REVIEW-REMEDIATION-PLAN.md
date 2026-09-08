@@ -320,9 +320,11 @@ decoder/semantic checks cho M11 artifact; harness gọi decoder này thay vì pa
 semantic riêng. Learner có `m11-register`/`m11-resolve` và registry append-only
 `m11-artifacts.jsonl`, reject hash/schema/link hỏng, và backup v2 snapshot/verify
 registry nếu có. `m11-activate` chỉ tạo activation từ lease + approval đã
-register, trong thời hạn và khi chưa STOP. Smoke backup tạo lease/approval/
-activation qua learner, restore rồi resolve bằng process mới. Đây chưa phải
-production lifecycle; phần 07a bên dưới vẫn còn bắt buộc trước khi đóng.
+register, trong thời hạn và khi chưa STOP; `m11-ledger-init` chỉ tạo ledger
+rỗng sau activation này và không reset được bằng retry. Smoke backup tạo
+lease/approval/activation/ledger qua learner, restore rồi resolve bằng process
+mới. Đây chưa phải production lifecycle; phần 07a bên dưới vẫn còn bắt buộc
+trước khi đóng.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 

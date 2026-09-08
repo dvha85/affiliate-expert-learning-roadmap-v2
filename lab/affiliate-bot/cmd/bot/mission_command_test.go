@@ -297,6 +297,12 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
 		t.Fatalf("M11 activation retry failed: code=%d response=%+v", code, response)
 	}
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("M11 ledger initialization failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("M11 ledger retry failed: code=%d response=%+v", code, response)
+	}
 	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindLease, lease.LeaseID); code != 0 || response["status"] != "RESOLVED" {
 		t.Fatalf("M11 lease did not resolve: code=%d response=%+v", code, response)
 	}

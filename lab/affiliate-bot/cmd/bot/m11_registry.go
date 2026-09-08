@@ -157,3 +157,59 @@ func activateM11Lease(dir, leaseID, activatedAt string) (corem11.ProductionActiv
 	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindActivation, raw)
 	return record, status, err
 }
+
+func initializeM11Ledger(dir, leaseID, initializedAt string) (corem11.ProductionLedger, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	var lease *corem11.ProductionLease
+	var activation *corem11.ProductionActivationRecord
+	for _, entry := range entries {
+		profile := ""
+		if entry.ArtifactKind == corem11.ArtifactKindLease {
+			profile = "lease"
+		}
+		if entry.ArtifactKind == corem11.ArtifactKindActivation {
+			profile = "activation"
+		}
+		if profile == "" {
+			continue
+		}
+		value, status := corem11.DecodeArtifact(profile, entry.Artifact)
+		if status != corem11.Valid {
+			return corem11.ProductionLedger{}, "", fmt.Errorf("invalid M11 registry artifact")
+		}
+		if candidate, ok := value.(*corem11.ProductionLease); ok && candidate.LeaseID == leaseID {
+			copied := *candidate
+			lease = &copied
+		}
+		if candidate, ok := value.(*corem11.ProductionActivationRecord); ok && candidate.LeaseID == leaseID {
+			copied := *candidate
+			activation = &copied
+		}
+	}
+	if lease == nil || activation == nil || activation.LeaseVersion != lease.LeaseVersion || activation.LeaseHash != lease.LeaseHash {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("ledger initialization requires registered activation")
+	}
+	now, errNow := time.Parse(time.RFC3339, initializedAt)
+	activated, errActivated := time.Parse(time.RFC3339, activation.ActivatedAt)
+	expires, errExpires := time.Parse(time.RFC3339, lease.ExpiresAt)
+	if errNow != nil || errActivated != nil || errExpires != nil || now.Before(activated) || !now.Before(expires) {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("ledger initialization time is outside active lease")
+	}
+	ledger := corem11.ProductionLedger{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ControlMode: "NORMAL", WindowStartedAt: initializedAt, PendingExecutionIDs: []string{}, SuccessfulIdempotencyKeys: []string{}, OutcomeLinks: []corem11.ProductionOutcomeLink{}, ReconciliationResolutionIDs: []string{}, UpdatedAt: initializedAt}
+	raw, err := json.Marshal(ledger)
+	if err != nil {
+		return ledger, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, raw)
+	return ledger, status, err
+}

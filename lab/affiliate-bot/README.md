@@ -207,7 +207,10 @@ lifecycle đầy đủ.
 `m11-activate STATE_DIR LEASE_ID ACTIVATED_AT` chỉ tạo `ProductionActivation`
 khi lease và lease approval khớp exact đã có trong registry, thời điểm còn nằm
 trong lease và runtime chưa STOP. Retry cùng activation trả `EXACT_DUPLICATE`.
-Lệnh này chưa thay thế health gate, ledger hay cấp phép/executor production.
+`m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT` chỉ tạo durable ledger
+rỗng sau activation đã resolve, trong thời hạn lease và khi chưa STOP; retry
+exact cũng không reset usage. Các lệnh này chưa thay thế health gate hay cấp
+phép/executor production.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
