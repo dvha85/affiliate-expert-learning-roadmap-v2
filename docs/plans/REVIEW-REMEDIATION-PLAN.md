@@ -130,8 +130,10 @@ nghiệm thu trên `main`**.
   `/v1/m07/register-proposal`. Chúng resolve history canonical, lưu artifact
   trace/proposal bất biến dưới store dẫn xuất từ history và ACK sau validation;
   validate chỉ resolve tool trace bằng ID đã persist. Test handler cover ACK,
-  validate, proposal persistence và trace ID giả. Blueprint n8n chưa được đổi
-  sang endpoint nên adapter này chưa là parity/workflow evidence.
+  validate, proposal persistence và trace ID giả. Blueprint n8n đã chuyển flow
+  sang preflight/full-response/no-redirect/register/context/validate/proposal
+  endpoints và static validator kiểm wiring, nhưng chưa có n8n instance chạy
+  workflow hay parity execution thật nên chưa là operated evidence.
 - **BR-16a continuity:** smoke shared workspace nay dùng `M07
   register-proposal → M08 agent intent → M08 policy`, có ca target bị thay đổi
   bị reject. Số `9007199254740993` đi qua proposal/intent/bind/state; `bind`

@@ -178,11 +178,12 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 // POST endpoint; all validation and append semantics remain in the learner
 // store implementation.
 type m07AdapterRequest struct {
-	RecordID     string             `json:"record_id"`
-	Registry     []corem07.ToolSpec `json:"registry"`
-	ToolResult   json.RawMessage    `json:"tool_result,omitempty"`
-	ModelOutput  json.RawMessage    `json:"model_output,omitempty"`
-	ToolResultID string             `json:"tool_result_id,omitempty"`
+	RecordID     string               `json:"record_id"`
+	Registry     []corem07.ToolSpec   `json:"registry"`
+	ToolRequest  *corem07.ToolRequest `json:"tool_request,omitempty"`
+	ToolResult   json.RawMessage      `json:"tool_result,omitempty"`
+	ModelOutput  json.RawMessage      `json:"model_output,omitempty"`
+	ToolResultID string               `json:"tool_result_id,omitempty"`
 }
 
 func m07ArtifactPath(historyPath, kind, id string) (string, error) {
@@ -260,6 +261,20 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 			return
 		}
 		switch r.URL.Path {
+		case "/v1/m07/context":
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": ctx, "execution_permitted": false})
+		case "/v1/m07/preflight":
+			if request.ToolRequest == nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_REQUEST_REQUIRED", "execution_permitted": false})
+				return
+			}
+			if err := corem07.ValidateToolRequest(*request.ToolRequest, request.Registry); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_REQUEST_REJECTED", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ALLOW_READ_ONLY", "artifact": *request.ToolRequest, "execution_permitted": false})
 		case "/v1/m07/register-tool-result":
 			if len(request.ToolResult) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -359,6 +374,8 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/m07/context", m07AdapterHandler(historyPath))
+	mux.HandleFunc("/v1/m07/preflight", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/register-tool-result", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/validate", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/register-proposal", m07AdapterHandler(historyPath))

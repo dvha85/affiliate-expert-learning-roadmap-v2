@@ -59,6 +59,14 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 		m07AdapterHandler(history).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw)))
 		return recorder
 	}
+	preflight := call("/v1/m07/preflight", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolRequest: &corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}})
+	if preflight.Code != http.StatusOK {
+		t.Fatal(preflight.Code, preflight.Body.String())
+	}
+	writeAttempt := call("/v1/m07/preflight", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolRequest: &corem07.ToolRequest{ToolName: "public_http", Method: "POST", Target: "https://example.com/a"}})
+	if writeAttempt.Code == http.StatusOK {
+		t.Fatal("write request passed adapter preflight")
+	}
 	tool := corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-03T00:01:00Z", Body: json.RawMessage(`{"price":100}`)}
 	registered := call("/v1/m07/register-tool-result", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolResult: mustRawJSON(t, tool)})
 	if registered.Code != http.StatusOK {

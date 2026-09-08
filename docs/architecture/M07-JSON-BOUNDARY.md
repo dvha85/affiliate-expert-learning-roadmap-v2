@@ -91,8 +91,10 @@ phải authoritative proof cho path learner hoặc workflow.
 
 ## Giới hạn còn mở
 
-Blueprint n8n hiện chưa gọi CLI/core registration adapter. Chưa có transport seam kiểm
-timeout/response size/private-address policy, ACK vào canonical tool-evidence
-store chung, hoặc parity thực thi code node blueprint. Vì vậy BR-15/RP-05 vẫn
-**chưa hoàn tất**; không dùng tài liệu này để tuyên bố model/n8n/provider đã
-grounded hoặc operated.
+Blueprint n8n gọi các endpoint loopback chung theo thứ tự `preflight → GET
+full response/no redirect → register tool result → context → model → validate
+→ register proposal`. Nó không còn có code node tự quyết định registry hoặc
+grounding. Tuy nhiên repo chưa import/chạy blueprint trên một n8n instance,
+chưa có transport seam kiểm response-size/private-address policy hoặc parity
+execution thật với CLI. Vì vậy BR-15/RP-05 vẫn **chưa hoàn tất**; không dùng
+tài liệu này để tuyên bố model/n8n/provider đã grounded hoặc operated.
