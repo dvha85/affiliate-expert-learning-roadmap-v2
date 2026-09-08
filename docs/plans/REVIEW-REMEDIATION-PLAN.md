@@ -1,12 +1,17 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-- Mã: RR-2026-09-07; phiên bản kế hoạch: 1.
+- Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
 - Baseline: `ece6a32619e5b9a05d0599b87f50023f38931cb9`.
 - Trạng thái: **PROPOSED** — PR này chỉ đề xuất kế hoạch và đính chính trạng thái; chưa triển khai các sửa lỗi R01–R16.
 - Cơ sở: [sổ phát hiện và bằng chứng baseline](evidence/REVIEW-ECE6A32.md).
 - Liên kết kế hoạch gốc: [BR-2026-09](BEGINNER-READINESS-PLAN.md); trạng thái tích hợp BR: [readiness matrix](READINESS-MATRIX.json).
 - Người lập kế hoạch: Codex theo yêu cầu chủ repo. Người triển khai/reviewer từng đợt: chưa phân công; điền khi nhận việc. Không mặc định chủ repo đã nghiệm thu kế hoạch hoặc cho phép live operation.
+
+Cập nhật sau review PR #94: bổ sung dependency RP-05 cho RP-06, tách nghiệm thu
+restore M00–M10 khỏi phần mở rộng M11 bắt buộc ở RP-07a, và giao rõ việc tạo/lưu/
+kiểm chuỗi cost-bound, gate, authorization, execution và EffectRef. Đây vẫn là
+sửa kế hoạch; các implementation gaps R01–R16 chưa được đóng.
 
 ## 1. Mục tiêu và giới hạn
 
@@ -53,9 +58,9 @@ Tất cả hàng dưới đây còn OPEN. “Kiểm chứng bắt buộc” là 
 | R09 / P1 | Approval hết hạn vẫn reserve | RP-03 | Before/at/after expiry, process mới và restore; hết hạn chặn operation |
 | R10 / P1 | Concurrent reserve vượt cap | RP-03 | Barrier đồng bộ 24 process, cap=1: đúng một reservation, ledger khớp ACK; crash injection không làm mở budget |
 | R11 / P1 | Output ghi đè history đầu vào | RP-01 | Same path, symlink, hardlink, output tồn tại: reject trước ghi; input bytes không đổi |
-| R12 / P1 | Backup bỏ nested artifact | RP-06 | Bundle advisor do Bot tạo được restore đầy đủ hoặc backup từ chối layout rõ ràng |
-| R13 / P1 | RESTORED dù graph bị hỏng | RP-06 | Orphan action/outcome/evaluation/proposal/mission bị từ chối; đích không được công bố sẵn dùng |
-| R14 / P1 | Chain M00–M11 thiếu chặng/artifact | RP-07 | Không bỏ M04/M05/M06; proposal M07 thật là input M08; lifecycle M11 và restart có quan hệ resolve được |
+| R12 / P1 | Backup bỏ nested artifact | RP-06 + RP-07a | Restore đủ inventory M00–M10 và phần mở rộng M11; layout chưa hỗ trợ bị từ chối, không bỏ artifact |
+| R13 / P1 | RESTORED dù graph bị hỏng | RP-06 + RP-07a | Orphan action/outcome/proposal, cost-bound/gate/authorization/execution và artifact M11 bị từ chối; chỉ đóng toàn phạm vi sau gate restore RP-07a |
+| R14 / P1 | Chain M00–M11 thiếu chặng/artifact | RP-07 | Không bỏ chặng; proposal M07 → M08 → cost-bound/gate/authorization/execution → outcome có EffectRef thật; lifecycle M11 và restore resolve được |
 | R15 / P2 | CI chưa chạy smoke/blueprint implementation | RP-08 | Required workflow gọi smoke và code blueprint thật; mutation implementation làm đúng job fail |
 | R16 / P2 | Readiness mâu thuẫn và thiếu code gaps | RP-09 | Matrix/plan/evidence thiếu hoặc mâu thuẫn làm audit fail; không suy “file tồn tại” thành nghiệm thu |
 
@@ -68,16 +73,16 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | PROPOSED |
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | TODO |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | TODO |
-| RP-03 | Shared M09/M10 guard, ledger, expiry, concurrency, STOP durability | RP-02 | L; chia 03a/03b | TODO |
+| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | TODO |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | TODO |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | TODO |
-| RP-06 | Snapshot/restore đầy đủ và graph validation | RP-03, RP-04 | M | TODO |
-| RP-07 | Learner M11 lifecycle, full shared-artifact chain và walkthrough | RP-02…RP-06 | L; chia 07a/07b | TODO |
+| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
+| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
 
-Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-05 theo RP-04; RP-06 theo ledger/resolver. RP-07 gom chain đã sửa, không lấp khoảng trống bằng fixture không liên quan. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
+Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 
@@ -112,6 +117,10 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 - Bind giữ ledger/grant/consumed-approval/idempotency history tách khỏi current intent. Grant version/hash và cap/currency là bất biến; thay đổi cần grant mới được phê duyệt, không tái nhập cùng ID.
 - Approval không đồng nghĩa grant budget approval. Kiểm tất cả liên kết, decision và hiệu lực intent/policy/approval/grant trước mỗi operation; grant không kéo dài quyền quá hạn dependency.
 - Retry cùng reservation ID trả kết quả idempotent, không charge hai lần; retry khác ID sau hết cap bị chặn; consumed marker không bị mất qua bind/restart/restore.
+- RP-03 sở hữu entrypoint/store cho M09 `ApprovalRecord → ExecutionAuthorization → ExecutionRecord` và M10 `CanaryGrant/CanaryGrantApproval + TrustedCostBound + pre-gate ledger → CanaryGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → post-ledger`. Tái sử dụng [authorization schema](../../contracts/execution-authorization.schema.json), [execution schema](../../contracts/execution-record.schema.json), [cost-bound schema](../../contracts/trusted-cost-bound.schema.json) và [canary gate schema](../../contracts/canary-gate-decision.schema.json). Không dùng grant approval thay per-action approval của M09 hoặc ngược lại.
+- Cost bound phải resolve tới đúng intent/hash, currency, source và thời hạn; gate/authorization/execution giữ đúng cost-bound ID/hash/amount, grant ID/version/hash, executor, correlation và idempotency. Không lấy số cost caller tự nhập làm trusted bound. Reservation phải link tới attempt/execution identity; `RESERVED` không phải bằng chứng đã thực thi.
+- Chạy executor stub cô lập để sinh execution result đúng schema và side-effect state; ghi provenance fixture trong envelope/bundle, giữ `execution_permitted=false` và không có external side effect. Các authority fields bên trong artifact mô phỏng tuân theo canonical schema, không được hiểu thành quyền live.
+- Loader/adapter outcome của máy phải resolve [EffectRef](../../contracts/effect-ref.schema.json) `MACHINE_EXECUTION` tới đúng `ExecutionRecord.execution_id`, rồi kiểm authorization/intent/ledger của nó. Không dùng reservation ID, approval ID hoặc human action ID thay execution ID; không tạo outcome thành công chỉ từ ACK reservation.
 
 **03b: transaction và crash safety.**
 
@@ -120,7 +129,15 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 - Fault injection tại trước/sau write, sync, rename/commit, ACK và STOP; cross-process barrier cap=1, cost boundary/overflow, đồng thời STOP/reserve, process restart, malformed/missing state, recovery chưa review.
 - Inject clock cho unit tests; adapter production không nhận timestamp caller để lùi thời gian. Có ít nhất một smoke process mới sau expiry thật ngắn; không dùng hạn 2099 thay kiểm boundary.
 
-**Nghiệm thu:** R08/R09/R10 đóng, state/ledger/ACK đối soát đúng; STOP vẫn chặn sau restart/restore. Test kill-process không tự được gọi là power-loss proof. **Migration/rollback:** snapshot trước migration, dừng writer, giữ STOP; không downgrade ledger format bằng binary cũ hay xóa usage.
+**Ca bắt buộc cho execution chain:**
+
+- `EC-01`: happy path M09 và M10 sinh/lưu/load lại đầy đủ artifact bằng runtime + stub; kiểm cùng graph bằng checker shared/harness, không tự viết JSON để bỏ qua bước issuance.
+- `EC-02`: thiếu/sai/hết hạn cost bound, sai currency/source/intent/hash hoặc sửa amount → reject trước reservation/authorization/stub; usage không đổi.
+- `EC-03`: thiếu/sai/hết hạn authorization, gate bị DENY/tamper, sai executor/grant/correlation/idempotency, execution tham chiếu authorization khác → reject; không có simulated execution thành công.
+- `EC-04`: thiếu execution record, outcome trỏ reservation ID/approval ID/execution không tồn tại hoặc sai effect kind → reject; không đóng outcome/reconciliation/cycle.
+- `EC-05`: execution UNKNOWN hoặc thiếu cost/result giữ reservation và reconciliation mở; retry không double-reserve, không tự refund hoặc tạo success outcome. Có cross-process restart để kiểm lại ID và usage.
+
+**Nghiệm thu:** R08/R09/R10 có regression guard/state/ledger/ACK và STOP sau restart; EC-01…EC-05 PASS trên đường learner/harness dùng chung. Kiểm lại các bất biến này qua restore là gate bổ sung bắt buộc ở RP-06, không phải dependency ngược để bắt đầu RP-03. Test kill-process không tự được gọi là power-loss proof. **Migration/rollback:** snapshot trước migration, dừng writer, giữ STOP; không downgrade ledger format bằng binary cũ hay xóa usage.
 
 ### RP-04 — Builder và resolver canonical dùng chung
 
@@ -154,21 +171,31 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 
 **Nghiệm thu:** R01/R05 đóng; không yêu cầu provider trả phí để chứng minh guard offline. **Rollback:** vô hiệu hóa tool/proposal handoff khi version không tương thích, không quay lại behavior “tự gắn evidence IDs”.
 
-### RP-06 — Backup/restore là snapshot và graph có thể dùng lại
+### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
 **Chạm tới:** `backup_command.go`, runtime store inventory, canonical loaders, manifest version và deployment runbook.
 
-- Định nghĩa layout được hỗ trợ: history, action, outcome, evaluation, improvement/review, agent proposal, intent/policy/approval, grant/reservation/ledger/STOP, và nested advisor bundle. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
+- Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.
-- Restore vào staging trống, verify manifest rồi load từng artifact bằng canonical decoder và resolver; replay history, kiểm full graph, usage, consumed approval, expiry và STOP. Không emit RESTORED trước các gate.
-- Test bundle từ `advisor fixture-run`, orphan từng loại artifact, corrupted payload có checksum đúng do backup create, expired approval, missing ledger, nonempty target, interrupted copy và concurrent writer. Restart process để list/replay/status/reserve, không chỉ so JSON field.
+- Restore vào staging trống, verify manifest rồi load từng artifact bằng canonical decoder và resolver; replay history, kiểm full graph trong inventory M00–M10, gồm proposal→intent và cost-bound→gate→authorization→execution→outcome/EffectRef, usage, consumed approval, expiry và STOP. Không emit RESTORED trước các gate.
+- Test bundle từ `advisor fixture-run`, AgentProposal từ RP-05, execution chain EC-01 từ RP-03; orphan từng loại artifact, corrupted payload có checksum đúng do backup create, expired approval, missing ledger, nonempty target, interrupted copy và concurrent writer. Sau restore chạy lại EC-02…EC-05 bằng process mới, kiểm list/replay/status/reserve/resolve, không chỉ so JSON field. Hết hạn tại thời điểm restore không làm mất historical artifact hợp lệ: vẫn đọc/replay được, nhưng operation mới phải bị chặn; không gia hạn hoặc reissue quyền.
+- Profile manifest phải nêu rõ phạm vi/version. Trước phần mở rộng RP-07a, gặp artifact M11 chưa được hỗ trợ thì reject tường minh; không skip hoặc báo restore toàn M00–M11. Không tạo lease/activation placeholder để đạt test.
 
-**Nghiệm thu:** R12/R13 đóng, restore hợp lệ không reset budget/STOP và không cấp quyền lại. **Rollback:** giữ source/backup nguyên trạng; staging lỗi không trở thành active runtime; người vận hành quyết định cleanup/recovery, không tự ghi đè đích cũ.
+**Nghiệm thu RP-06:** snapshot/restore M00–M10 PASS và giữ budget/STOP, proposal/authorization/execution/EffectRef resolve đúng. R12/R13 được ghi evidence cho phạm vi này nhưng **chưa đóng toàn phạm vi M00–M11**; chỉ đóng sau gate mở rộng restore RP-07a dưới đây. **Rollback:** giữ source/backup nguyên trạng; staging lỗi không trở thành active runtime; người vận hành quyết định cleanup/recovery, không tự ghi đè đích cũ.
 
 ### RP-07a/07b — M11 lifecycle và chain learner đầy đủ
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
+
+RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.
+
+**Gate restore M11 bắt buộc trước khi đóng RP-07a:**
+
+- Mở rộng inventory/manifest version, decoder, graph resolver và snapshot/restore của RP-06 trong cùng gói RP-07a. Bao phủ lease/lease approval/promotion refs, activation, health, cost bound, gate, authorization, execution, pre/post/STOP ledgers, outcome/evaluation/cycle và reconciliation/recovery artifacts; giữ nguyên các artifact M00–M10.
+- Sinh artifact bằng learner + executor stub, snapshot, restore vào đích trống rồi process mới replay/resolve đầy đủ. Kiểm `closed_cycle` và `resolved_stop` theo harness; STOP vẫn chặn, expiry không mở quyền mới, usage/consumed markers không reset. Mở rộng EC-01…EC-05 cho production profile.
+- Negative cases: thiếu hoặc sai lease/activation/health/cost/gate/authorization/execution/EffectRef/cycle/resolution; dữ liệu bị sửa nhưng checksum backup hợp lệ; phiên bản manifest không hỗ trợ. Reject graph hỏng, không publish runtime sẵn dùng. Lịch sử đã hết hạn vẫn phục hồi được ở chế độ không cấp quyền; recovery chưa review phải bị chặn.
+- Chỉ ghi đóng R12/R13 toàn phạm vi khi cả evidence RP-06 và gate restore M11 này PASS trên head tương thích. RP-07b và RP-09 không được nghiệm thu full chain/readiness nếu gate này chưa đạt. Dependency là RP-06 → RP-07a → RP-07b, không có vòng lặp.
 
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
@@ -177,14 +204,14 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 3. M05 evaluation → improvement proposal → human review/isolated regression; không auto-apply.
 4. M06 watcher cập nhật đúng subject, đưa record ID mới vào context tiếp theo.
 5. M07 adapter/model fixture → validated persisted AgentProposal → M08 intent tham chiếu proposal và original evidence IDs.
-6. M08 policy → M09 approval → M10 grant/reservation và outcome/reconciliation có giới hạn.
-7. M11 offline lease/health/cycle → STOP → restart → reviewed recovery bị giới hạn; backup/restore cùng workspace.
+6. M09: M08 intent/policy → human approval fixture → ExecutionAuthorization → executor stub → ExecutionRecord → outcome/EffectRef. M10: intent/policy và grant/grant approval + TrustedCostBound + pre-ledger → gate → reservation/authorization → stub/execution → outcome/EffectRef → reconciliation/post-ledger. Mỗi attempt/profile có ID/idempotency riêng nhưng giữ lineage về proposal/evidence; không dùng lại one-time approval đã consumed.
+7. M11: lease/approval/activation + intent/policy/health/cost/pre-ledger → gate → reservation/authorization → stub/execution → outcome/EffectRef/evaluation/cycle/post-ledger → STOP → restart → reviewed recovery bị giới hạn. Backup/restore cùng workspace phải qua gate mở rộng M11 của RP-07a trước khi công nhận chain hoàn tất.
 
 Mỗi bước phải đọc artifact từ bước trước, không tạo ID/context thay thế để test pass. Khi vòng đời cần một human input mới, lưu reviewer fixture riêng và link đúng artifact; không giả làm approval thật. Kiểm toàn graph sau restart, có negative break-link tại từng seam và no-write assertions khi reject.
 
 Walkthrough phải có lệnh build, input paths/fixtures được version control, expected outputs, retry/conflict, deliberate FAIL/fix, restart/STOP/restore và cleanup có phạm vi rõ. Người mới không phải tự đọc smoke Python để suy ra input JSON.
 
-**Nghiệm thu:** R14 đóng ở phạm vi offline; report liệt kê rõ fixture/model stub/executor stub, không in “M00–M11 PASS” nếu bỏ chặng. **Rollback:** không promote state chưa đóng cycle; giữ STOP và artifacts để chẩn đoán.
+**Nghiệm thu:** R14 đóng ở phạm vi offline chỉ khi gate lifecycle/restore RP-07a và chain RP-07b đều PASS, mọi authorization/execution/cost/gate/EffectRef resolve được sau restart/restore. Report liệt kê rõ fixture/model stub/executor stub; `RESERVED` không thay ExecutionRecord, không in “M00–M11 PASS” nếu bỏ chặng/artifact. **Rollback:** không promote state chưa đóng cycle; giữ STOP và artifacts để chẩn đoán.
 
 ### RP-08 — CI bắt được implementation sai
 

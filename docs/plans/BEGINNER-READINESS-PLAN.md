@@ -93,8 +93,8 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-14 | D | n8n M06 import/smoke/static-data đúng | P1 / M | BR-13 | PARTIAL | Có adapter/ACK nhưng JS record chưa khớp core, test chưa chạy node thật; RP-04/RP-08 trước n8n operated run |
 | BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | PARTIAL | R01/R03/R05: free-text grounding, canonical IDs và tool-result registration còn thiếu; RP-04/RP-05 trước provider/n8n evidence |
 | BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | PARTIAL | Shared workspace/restart đã có nhưng R14 chain còn bỏ chặng; RP-07/RP-08 trước pilot máy sạch |
-| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | PARTIAL | R06–R11/R14: schema/policy, exact-number, budget/expiry/concurrency, path safety và M11 lifecycle; RP-01…RP-07; chưa có live executor |
-| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | PARTIAL | R12/R13: backup bỏ nested artifacts, restore chưa kiểm full graph; RP-03/RP-06 trước drill trên target host |
+| BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | PARTIAL | R06–R11/R14: schema/policy, exact-number, budget/expiry/concurrency, path safety; RP-03/RP-07 phải nối cost-bound/gate/authorization/execution/EffectRef và M11 lifecycle; chưa có live executor |
+| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | PARTIAL | R12/R13: RP-06 kiểm snapshot/graph M00–M10 sau RP-03/RP-04/RP-05; RP-07a bắt buộc mở rộng inventory/restore M11 trước khi đóng toàn phạm vi; drill target host còn mở |
 | BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | PARTIAL | R15/R16: CI/blueprint coverage và audit graph còn thiếu; RP-08/RP-09. PR kế hoạch chỉ đính chính trạng thái, overall `NOT_READY_FOR_PRODUCTION` |
 
 Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này mô tả dependency công việc, không giao việc cho agent hay tạo lịch tự động.
