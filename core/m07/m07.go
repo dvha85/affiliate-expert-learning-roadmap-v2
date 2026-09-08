@@ -83,9 +83,14 @@ type ToolResult struct {
 // adapter to the model boundary. A model cannot choose its trace ID or its
 // evidence ID: both are derived by RegisterToolResult.
 type RegisteredToolResult struct {
-	Version  string     `json:"version"`
-	RecordID string     `json:"record_id"`
-	TraceID  string     `json:"trace_id"`
+	Version  string `json:"version"`
+	RecordID string `json:"record_id"`
+	TraceID  string `json:"trace_id"`
+	// Registry is the reviewed policy that admitted Result. Keeping it with
+	// the immutable trace lets a backup loader rerun the same read-only
+	// host/method/redirect checks instead of reconstructing policy from a
+	// request after restore.
+	Registry []ToolSpec `json:"registry"`
 	Result   ToolResult `json:"result"`
 }
 
@@ -301,7 +306,7 @@ func RegisterToolResult(raw []byte, registry []ToolSpec) (RegisteredToolResult, 
 	if err != nil {
 		return RegisteredToolResult{}, err
 	}
-	return RegisteredToolResult{Version: "m07-tool-result/v1", RecordID: result.RecordID, TraceID: id, Result: result}, nil
+	return RegisteredToolResult{Version: "m07-tool-result/v1", RecordID: result.RecordID, TraceID: id, Registry: append([]ToolSpec(nil), registry...), Result: result}, nil
 }
 
 // ValidateRegisteredToolResult recomputes the adapter-owned trace ID from the
@@ -312,7 +317,7 @@ func ValidateRegisteredToolResult(raw []byte, registry []ToolSpec, recordID stri
 	if err := contracts.DecodeStrict(raw, &registered); err != nil {
 		return RegisteredToolResult{}, fmt.Errorf("registered tool result schema: %w", err)
 	}
-	if registered.Version != "m07-tool-result/v1" || registered.RecordID != recordID || registered.Result.RecordID != recordID {
+	if registered.Version != "m07-tool-result/v1" || registered.RecordID != recordID || registered.Result.RecordID != recordID || !reflect.DeepEqual(registered.Registry, registry) {
 		return RegisteredToolResult{}, fmt.Errorf("registered tool result record binding is invalid")
 	}
 	resultRaw, err := json.Marshal(registered.Result)
@@ -327,6 +332,18 @@ func ValidateRegisteredToolResult(raw []byte, registry []ToolSpec, recordID stri
 		return RegisteredToolResult{}, fmt.Errorf("registered tool result trace_id does not match result")
 	}
 	return recomputed, nil
+}
+
+// ValidateStoredRegisteredToolResult validates a durable adapter trace with
+// the policy captured by that trace. Restore code uses this rather than
+// guessing an allowlist from a URL; callers that still hold a reviewed policy
+// should use ValidateRegisteredToolResult to require an exact policy match.
+func ValidateStoredRegisteredToolResult(raw []byte, recordID string) (RegisteredToolResult, error) {
+	var registered RegisteredToolResult
+	if err := contracts.DecodeStrict(raw, &registered); err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result schema: %w", err)
+	}
+	return ValidateRegisteredToolResult(raw, registered.Registry, recordID)
 }
 
 // Evidence exposes the complete response body under an adapter-derived ID.

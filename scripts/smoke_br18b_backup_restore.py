@@ -184,7 +184,10 @@ def main():
         (backup / "history.jsonl").write_text("tampered\n", encoding="utf-8")
         assert invoke(bot, "backup", "restore", backup, restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
         # Recreate the backup from the unchanged runtime, then restore into a
-        # fresh directory and validate checksum, inventory, and semantic graph.
+        # fresh empty directory and validate checksum, inventory, and semantic
+        # graph. A non-empty backup target is rejected so stale artifacts can
+        # never be mistaken for the current snapshot.
+        shutil.rmtree(backup)
         invoke(bot, "backup", "create", runtime, backup, env=env)
         missing_manifest_backup = root / "missing-manifest-backup"; shutil.copytree(backup, missing_manifest_backup)
         missing_manifest = json.loads((missing_manifest_backup / "manifest.json").read_text(encoding="utf-8"))

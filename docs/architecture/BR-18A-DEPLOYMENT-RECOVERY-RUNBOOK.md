@@ -54,12 +54,17 @@ SHA-256 phải được kiểm trước khi chép file; target restore phải tr
 `python3 scripts/smoke_br18b_backup_restore.py` để kiểm cả tamper, process mới,
 budget/canary link và STOP durable trong môi trường tạm.
 
+Target của `backup create` cũng phải trống và không được là runtime hoặc thư
+mục con của runtime; tạo backup mới vào một thư mục khác thay vì ghi đè snapshot
+cũ.
+
 ## Gates bắt buộc
 
 - health check fail hoặc lease hết hạn → không activate;
 - STOP durable được ghi trước, đọc lại sau restart và chặn mọi attempt;
-- backup append-only history + ledger, kiểm tra checksum và restore vào thư mục
-  cô lập;
+- backup history + ledger và, nếu M07 adapter đã persist, toàn bộ sidecar
+  `history.jsonl.m07/`; manifest chỉ nhận relative path chuẩn hóa, checksum và
+  restore vào thư mục cô lập;
 - restore xong phải replay khớp, không reset reservation/STOP;
 - recovery cần human review, không tự mở lại executor.
 - restore không được tự tạo lại ledger, reservation, approval hoặc lease đã
