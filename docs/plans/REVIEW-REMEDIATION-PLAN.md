@@ -365,6 +365,13 @@ giả lập partial reconciliation write (UNKNOWN execution + resolution còn nh
 reviewed stopped-ledger mất) với checksum manifest hợp lệ; restore fail-closed
 `GRAPH_FAILED`. Chưa có crash hook thực thi tại từng `write/sync/rename`.
 
+**Cập nhật fault seam (2026-09-08):** registry M11 có hook nội bộ chỉ dùng trong
+test (không nhận từ CLI/env). Test inject lỗi sau `write` nhưng trước khi caller
+nhận success: loader vẫn đọc được artifact hoàn chỉnh và retry trả
+`EXACT_DUPLICATE`. Đây chứng minh recovery cho một append artifact; không suy
+ra transaction cho cặp registry/ledger/outcome/STOP hoặc lỗi trước/giữa partial
+filesystem write.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

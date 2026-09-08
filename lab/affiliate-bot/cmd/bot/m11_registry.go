@@ -15,6 +15,18 @@ import (
 
 func m11ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m11-artifacts.jsonl") }
 
+// m11RegistryAppendFault is a test-only seam for deterministic failure drills.
+// Production leaves it nil; it is deliberately not controlled by CLI input or
+// environment variables.
+var m11RegistryAppendFault func(phase string, entry corem11.ArtifactEntry) error
+
+func m11AppendFault(phase string, entry corem11.ArtifactEntry) error {
+	if m11RegistryAppendFault == nil {
+		return nil
+	}
+	return m11RegistryAppendFault(phase, entry)
+}
+
 func loadM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 	raw, err := os.ReadFile(m11ArtifactRegistryPath(dir))
 	if os.IsNotExist(err) {
@@ -79,12 +91,23 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 	if err != nil {
 		return entry, "", err
 	}
+	if err := m11AppendFault("before_write", entry); err != nil {
+		_ = f.Close()
+		return entry, "", err
+	}
 	_, err = f.Write(append(line, '\n'))
+	faultErr := m11AppendFault("after_write", entry)
 	if syncErr := f.Sync(); err == nil {
 		err = syncErr
 	}
+	if faultErr == nil {
+		faultErr = m11AppendFault("after_sync", entry)
+	}
 	if closeErr := f.Close(); err == nil {
 		err = closeErr
+	}
+	if err == nil && faultErr != nil {
+		err = faultErr
 	}
 	if err != nil {
 		return entry, "", err
