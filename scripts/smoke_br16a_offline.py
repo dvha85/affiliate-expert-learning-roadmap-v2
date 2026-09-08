@@ -52,6 +52,48 @@ def write_canary_grant(path, intent, policy, approval, max_executions, max_cost,
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_production_lease(path, grant, policy, intent):
+    payload = {
+        "lease_id": "br16-production-lease", "lease_version": "v1", "policy_version": policy["policy_version"],
+        "approval_ref": "br16-production-approval", "reviewed_by": "human", "reviewer_id": "pilot-human",
+        "reviewed_at": "2026-09-07T01:05:00Z", "promotion_review_ref": "fixture:br16-promotion-review",
+        "source_canary_grant_id": grant["grant_id"], "source_canary_grant_version": grant["grant_version"],
+        "source_canary_grant_hash": grant["grant_hash"], "valid_from": "2026-09-07T01:05:00Z",
+        "expires_at": "2099-09-03T02:50:00Z", "allowed_risk_classes": [policy["risk_class"]],
+        "allowed_action_types": [intent["action_type"]], "allowed_hosts": ["example.com"], "executor_ids": ["fixture_stub"],
+        "max_executions_total": 1, "max_executions_per_window": 1, "window_seconds": 60,
+        "max_cost_minor_total": 100, "currency": "USD", "max_pending_outcomes": 1,
+        "max_consecutive_failures": 1, "max_outcome_age_seconds": 60, "max_health_snapshot_age_seconds": 60,
+        "kill_switch_required": True, "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
+    }
+    payload["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_production_approval(path, lease):
+    payload = {
+        "approval_id": lease["approval_ref"], "lease_id": lease["lease_id"], "lease_version": lease["lease_version"],
+        "lease_hash": lease["lease_hash"], "promotion_review_ref": lease["promotion_review_ref"],
+        "source_canary_grant_id": lease["source_canary_grant_id"], "source_canary_grant_version": lease["source_canary_grant_version"],
+        "source_canary_grant_hash": lease["source_canary_grant_hash"], "source_e5_refs": ["fixture:br16-e5"],
+        "validated_risk_classes": ["RISK0"], "reviewed_by": "human", "reviewer_id": lease["reviewer_id"],
+        "reviewed_at": lease["reviewed_at"], "decision": "APPROVE_PRODUCTION_LEASE",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_production_health(path, lease):
+    payload = {
+        "snapshot_id": "br16-production-health", "lease_id": lease["lease_id"], "lease_version": lease["lease_version"],
+        "lease_hash": lease["lease_hash"], "observed_at": "2026-09-08T00:00:00Z", "source_refs": ["fixture:br16-health"],
+        "dependency_state": "HEALTHY", "telemetry_complete": True, "consecutive_failures": 0,
+        "reconciliation_required": False, "compliance_alert_count": 0, "oldest_pending_outcome_age_seconds": 0,
+        "hash_version": "go-json-v1",
+    }
+    payload["snapshot_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def grounded_claim(field, value, evidence_id):
     value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
     rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
@@ -160,6 +202,35 @@ def main():
         forged_outcome = work / "forged-machine-outcome.json"
         forged_outcome.write_text(machine_outcome.read_text(encoding="utf-8").replace(failed["artifact"]["execution_id"], "canary-exec-orphan"), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", state, forged_outcome, expected=1)["status"] == "ORPHAN_EXECUTION"
+
+        # M11 continues on exactly the same state, intent/policy/approval,
+        # canary grant and trusted cost-bound—not a separately constructed lab.
+        production_lease_path = work / "production-lease.json"
+        grant_value = json.loads(grant.read_text(encoding="utf-8"))
+        write_production_lease(production_lease_path, grant_value, p, i)
+        production_lease = json.loads(production_lease_path.read_text(encoding="utf-8"))
+        production_approval_path = work / "production-approval.json"; write_production_approval(production_approval_path, production_lease)
+        production_health_path = work / "production-health.json"; write_production_health(production_health_path, production_lease)
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_LEASE", production_lease_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_LEASE_APPROVAL", production_approval_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", state, production_lease["lease_id"], gate_time)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", state, production_lease["lease_id"], gate_time)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_HEALTH_SNAPSHOT", production_health_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", state, "TRUSTED_COST_BOUND", cost)["status"] == "APPENDED"
+        production_gate = invoke(bot, "mission", "m11-gate", state, production_lease["lease_id"], "br16-production-health", "br16-cost", production_lease["lease_id"] + "/" + gate_time, gate_time)
+        assert production_gate["status"] == "ALLOW_PRODUCTION" and production_gate["artifact"]["execution_authorized"] is False
+        production_authorization = invoke(bot, "mission", "m11-authorize", state, production_lease["lease_id"], production_gate["artifact"]["gate_id"], "fixture_stub", gate_time)
+        assert production_authorization["status"] == "APPENDED" and production_authorization["artifact"]["intent_id"] == i["intent_id"]
+        production_reservation = invoke(bot, "mission", "m11-reserve-authorization", state, production_authorization["artifact"]["authorization_id"], production_lease["lease_id"] + "/" + gate_time, "2026-09-08T00:00:01Z")
+        assert production_reservation["status"] == "APPENDED"
+        production_failed = invoke(bot, "mission", "m11-record-failed", state, production_authorization["artifact"]["authorization_id"], production_lease["lease_id"] + "/2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z", "fixture-dispatch-failed-before-executor")
+        assert production_failed["status"] == "APPENDED" and production_failed["artifact"]["execution"]["side_effect_state"] == "NOT_PERFORMED"
+        production_outcome = work / "production-outcome.json"
+        production_outcome.write_text(json.dumps({"outcome_id":"br16-production-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br16-failed"}), encoding="utf-8")
+        execution_ledger = production_failed["artifact"]["execution_ledger"]
+        execution_ledger_id = execution_ledger["lease_id"] + "/" + execution_ledger["updated_at"]
+        assert invoke(bot, "mission", "m11-outcome", state, production_outcome, execution_ledger_id)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-resolve", state, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"])["status"] == "RESOLVED"
         resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
         assert resolved["status"] == "RESOLVED" and resolved["artifact"] == cancellation["artifact"]
         assert invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", "canary-exec-not-registered", expected=1)["status"] == "REJECTED"
