@@ -126,7 +126,7 @@ go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGIST
 
 Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
 `m08-policy`, `m09-approval`, `m10-canary`, `m10-cost-register`, `m10-gate`,
-`m10-reserve`, `m11-stop` và
+`m10-authorize`, `m10-reserve`, `m11-stop` và
 `status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
 và STOP không bị `init` ghi đè; đây vẫn không phải live executor.

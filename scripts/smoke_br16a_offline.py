@@ -120,6 +120,10 @@ def main():
         gate_response = invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)
         assert gate_response["status"] == "ALLOW_CANARY" and gate_response["artifact"]["execution_authorized"] is False
         assert invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)["status"] == "EXACT_DUPLICATE"
+        authorization = work / "canary-authorization.json"
+        authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")
+        assert authorization_response["status"] == "AUTHORIZED" and authorization_response["artifact"]["execution_authorized"] is True
+        assert invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")["status"] == "EXACT_DUPLICATE"
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
         assert invoke(bot, "mission", "m10-gate", state, tampered, work / "tampered-gate.json", gate_time, expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
@@ -146,6 +150,7 @@ def main():
         assert invoke(bot, "mission", "m10-reserve", state, cost, winner)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
         assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
+        assert invoke(bot, "mission", "m10-authorize", state, cost, gate, work / "stale-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout

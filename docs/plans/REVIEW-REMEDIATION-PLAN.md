@@ -116,6 +116,13 @@ nghiệm thu trên `main`**.
   grant sealed, gate ALLOW/retry và cost-bound tamper reject. Grant còn embedded
   trong mutable state, gate chưa được registry/authorization/execution resolve
   và không có side effect; RP-03 vẫn mở.
+- **RP-03 authorization foundation:** `m10-authorize` load gate artifact,
+  cost-bound registered và state hiện tại, buộc `AUTHORIZED_AT` khớp gate rồi
+  evaluate lại snapshot trước khi emit immutable `ExecutionAuthorization`.
+  Authorization bind grant/gate/cost/intent/executor và hạn dùng là minimum của
+  intent/grant/cost expiry; không reserve budget hay gọi executor. Smoke cover
+  authorization retry và reject gate stale sau reserve. Artifact chưa được
+  đăng ký trong graph state và execution record/effect link còn mở.
 - **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
   read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
   một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng

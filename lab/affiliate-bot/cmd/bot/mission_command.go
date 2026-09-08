@@ -503,6 +503,27 @@ func evaluateLearnerPolicy(i LearnerIntent, path string, knownProposalIDs []stri
 	return LearnerPolicy(corem08.EvaluatePolicy(corem08.Intent(i), ctx)), nil
 }
 
+func evaluateLearnerCanaryGate(s LearnerMissionState, bound corem10.TrustedCostBound, evaluatedAt string) (corem10.CanaryGateDecision, error) {
+	if s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+		return corem10.CanaryGateDecision{}, fmt.Errorf("active intent, policy, approval and canary grant required")
+	}
+	gate := corem10.EvaluateCanaryGate(corem10.CanaryGateInput{
+		Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash,
+		PolicyVersion: s.Policy.PolicyVersion, PolicyDecision: s.Policy.Decision, RiskClass: s.Policy.RiskClass,
+		ApprovalID: s.Approval.ApprovalID, ApproverID: s.Approval.ApproverID, CorrelationID: s.Intent.CorrelationID,
+		ActionType: s.Intent.ActionType, Target: s.Intent.Target, Now: evaluatedAt,
+		Ledger: corem10.CanaryLedgerSnapshot{ExecutionsTotal: s.Canary.ExecutionsUsed, ExecutionsInWindow: s.Canary.ExecutionsUsed, CostMinorTotal: s.Canary.CostUsedMinor},
+	})
+	raw, err := json.Marshal(gate)
+	if err != nil {
+		return corem10.CanaryGateDecision{}, err
+	}
+	if _, err := corem10.ValidateCanaryGateDecision(raw); err != nil {
+		return corem10.CanaryGateDecision{}, err
+	}
+	return gate, nil
+}
+
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -518,7 +539,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
@@ -795,18 +816,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
 		}
-		gate := corem10.EvaluateCanaryGate(corem10.CanaryGateInput{
-			Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash,
-			PolicyVersion: s.Policy.PolicyVersion, PolicyDecision: s.Policy.Decision, RiskClass: s.Policy.RiskClass,
-			ApprovalID: s.Approval.ApprovalID, ApproverID: s.Approval.ApproverID, CorrelationID: s.Intent.CorrelationID,
-			ActionType: s.Intent.ActionType, Target: s.Intent.Target, Now: args[4],
-			Ledger: corem10.CanaryLedgerSnapshot{ExecutionsTotal: s.Canary.ExecutionsUsed, ExecutionsInWindow: s.Canary.ExecutionsUsed, CostMinorTotal: s.Canary.CostUsedMinor},
-		})
-		gateRaw, err := json.Marshal(gate)
+		gate, err := evaluateLearnerCanaryGate(s, bound, args[4])
 		if err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
-		}
-		if _, err := corem10.ValidateCanaryGateDecision(gateRaw); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		status, err = writeNewJSON(args[3], gate)
@@ -817,6 +828,65 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit(status, gate, nil, 0)
 		}
 		return emit(gate.Decision, gate, nil, 0)
+	case "m10-authorize":
+		if len(args) != 7 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
+		}
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		boundRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(boundRaw)
+		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
+		}
+		gateRaw, err := os.ReadFile(args[3])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		storedGate, err := corem10.ValidateCanaryGateDecision(gateRaw)
+		if err != nil {
+			return emit("REJECTED", nil, fmt.Errorf("invalid persisted canary gate"), 1)
+		}
+		if storedGate.EvaluatedAt != args[5] {
+			return emit("REJECTED", nil, fmt.Errorf("authorization time must exactly match persisted gate evaluation"), 1)
+		}
+		currentGate, err := evaluateLearnerCanaryGate(s, bound, args[5])
+		if err != nil || storedGate != currentGate {
+			return emit("REJECTED", nil, fmt.Errorf("persisted canary gate is stale or does not match current state"), 1)
+		}
+		authorization, err := corem10.AuthorizeCanary(corem10.CanaryAuthorizationInput{Gate: storedGate, Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, PolicyVersion: s.Policy.PolicyVersion, IdempotencyKey: s.Intent.IdempotencyKey, CorrelationID: s.Intent.CorrelationID, IntentExpiresAt: s.Intent.ExpiresAt, ExecutorID: args[6], AuthorizedAt: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		authorizationRaw, err := json.Marshal(authorization)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionAuthorization(authorizationRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		status, err = writeNewJSON(args[4], authorization)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, authorization, nil, 0)
+		}
+		return emit("AUTHORIZED", authorization, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)

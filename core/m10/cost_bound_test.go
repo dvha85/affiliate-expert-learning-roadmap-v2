@@ -74,3 +74,24 @@ func TestCanaryGateIsNonAuthorizingAndBounded(t *testing.T) {
 		t.Fatal(denied)
 	}
 }
+
+func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
+	g := CanaryGrant{GrantID: "g", GrantVersion: "v1", PolicyVersion: "p1", ApprovalRef: "approval-1", ApprovedBy: "human", ApproverID: "learner", ApprovedAt: "2026-09-08T00:00:00Z", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T02:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"local_sandbox"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 100, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: "corr", HashVersion: "go-json-v1"}
+	g.GrantHash = ComputeCanaryGrantHash(g)
+	cost := TrustedCostBound{CostBoundID: "cost", IntentID: "intent", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:cost", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:30:00Z", CorrelationID: "corr", HashVersion: "go-json-v1"}
+	cost.CostBoundHash = ComputeTrustedCostBoundHash(cost)
+	gateInput := CanaryGateInput{Grant: g, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", PolicyDecision: "ALLOW", RiskClass: "RISK0", ApprovalID: "approval-1", ApproverID: "learner", CorrelationID: "corr", ActionType: "DRAFT", Target: "https://example.com/draft", Now: "2026-09-08T01:00:00Z"}
+	gate := EvaluateCanaryGate(gateInput)
+	auth, err := AuthorizeCanary(CanaryAuthorizationInput{Gate: gate, Grant: g, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", IdempotencyKey: "key", CorrelationID: "corr", IntentExpiresAt: "2026-09-08T01:45:00Z", ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T01:00:00Z"})
+	if err != nil || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_CANARY" || auth.CanaryGateID != gate.GateID {
+		t.Fatal(err, auth)
+	}
+	raw, _ := json.Marshal(auth)
+	if _, err := ValidateExecutionAuthorization(raw); err != nil {
+		t.Fatal(err)
+	}
+	gate.Decision = "DENY"
+	if _, err := AuthorizeCanary(CanaryAuthorizationInput{Gate: gate, Grant: g, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", IdempotencyKey: "key", CorrelationID: "corr", IntentExpiresAt: "2026-09-08T01:45:00Z", ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T01:00:00Z"}); err == nil {
+		t.Fatal("denied gate authorized execution")
+	}
+}
