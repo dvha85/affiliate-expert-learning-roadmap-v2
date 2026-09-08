@@ -355,6 +355,13 @@ mới và không gọi executor. Handoff đã có smoke; workflow tạo runtime 
 mới và approval mới vẫn phải được thiết kế như một canonical artifact boundary
 riêng, không thể suy ra chỉ từ export proof.
 
+**Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
+quét canonical registry trước khi append. Exact retry của cùng artifact trả
+`EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
+khác bị reject, nên không thể charge budget hai lần chỉ bằng cách dùng lại
+pre-ledger. Smoke BR-18b chạy trực tiếp ca âm này. Fault injection giữa nhiều
+file append vẫn là việc riêng, chưa được coi là transaction đa-file.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

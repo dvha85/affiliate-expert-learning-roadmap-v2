@@ -452,6 +452,36 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 	if err != nil {
 		return next, "", err
 	}
+	// The caller supplies an immutable predecessor ledger. Checking that single
+	// artifact is insufficient: a second request could reuse it with a different
+	// timestamp and reserve the same authorization twice. Search the canonical
+	// registry before append, while still recognizing an exact retry.
+	expected, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, raw)
+	if err != nil {
+		return next, "", err
+	}
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
+		return next, "", err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem11.ArtifactKindLedger {
+			continue
+		}
+		value, decodeStatus := corem11.DecodeArtifact("ledger", entry.Artifact)
+		if decodeStatus != corem11.Valid {
+			return next, "", fmt.Errorf("invalid registered production ledger")
+		}
+		for _, pendingID := range value.(*corem11.ProductionLedger).PendingExecutionIDs {
+			if pendingID != executionID {
+				continue
+			}
+			if entry.ArtifactID == expected.ArtifactID && entry.ContentHash == expected.ContentHash {
+				return next, appendDuplicate, nil
+			}
+			return next, "", fmt.Errorf("production authorization already reserved")
+		}
+	}
 	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, raw)
 	return next, status, err
 }
