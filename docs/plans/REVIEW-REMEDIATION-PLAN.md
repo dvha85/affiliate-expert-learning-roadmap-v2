@@ -125,6 +125,12 @@ nghiệm thu trên `main`**.
   artifact và reject target/parameters đổi ngoài proposal. Chưa có canonical
   tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
   vẫn mở, R01/R05 chưa đóng toàn phạm vi.
+- **BR-16a continuity:** smoke shared workspace nay dùng `M07
+  register-proposal → M08 agent intent → M08 policy`, có ca target bị thay đổi
+  bị reject. Số `9007199254740993` đi qua proposal/intent/bind/state; `bind`
+  và state loader dùng shared decoder/`UseNumber` để không làm tròn trước khi
+  kiểm intent hash. Chuỗi vẫn chưa có execution/EffectRef/M11 graph đầy đủ,
+  nên không đổi trạng thái RP-02/RP-07 hay BR-16a.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 

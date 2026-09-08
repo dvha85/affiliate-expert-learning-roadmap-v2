@@ -232,7 +232,9 @@ func readJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, value)
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	return decoder.Decode(value)
 }
 func missionStatePath(dir string) string { return filepath.Join(dir, "mission-state.json") }
 func loadMissionState(dir string) (LearnerMissionState, error) {
@@ -612,11 +614,16 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission bind STATE_DIR INTENT POLICY"), 2)
 		}
-		var i LearnerIntent
 		var p LearnerPolicy
-		if err := readJSON(args[2], &i); err != nil {
+		intentRaw, err := os.ReadFile(args[2])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
+		decodedIntent, state := corem08.DecodeIntent(intentRaw)
+		if state != "VALID" {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
+		}
+		i := LearnerIntent(decodedIntent)
 		if err := readJSON(args[3], &p); err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}

@@ -75,11 +75,22 @@ def main():
         config = work / "evaluation.json"; config.write_text(json.dumps({"evaluation_id":"br16-e","decision_id":"br16-d","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"br16-a"},"outcome_ids":["br16-o"],"evaluated_at":"2026-09-06T00:00:00Z"}), encoding="utf-8")
         assert invoke(bot, "evaluation", "create", history, actions, outcomes, evaluations, config)["status"] == "APPENDED"
 
+        # The subsequent M08 intent must come from the persisted M07 proposal,
+        # not a caller-declared human intent or a replacement target.
+        proposal_model, agent_proposal = work / "agent-model.json", work / "agent-proposal.json"
+        proposal_answer, proposal_claim = grounded_claim(evidence["field_or_claim"], evidence["value"], evidence_id)
+        proposal_model.write_text(json.dumps({"state":"HUMAN_REVIEW","answer":proposal_answer,"claims":[proposal_claim],"evidence_ids":[evidence_id],"tool_calls":[],"authority":"A2-RO","write_permission":False,"proposed_action":{"action_type":"DRAFT","target":"https://example.com/draft","parameters":{"id":9007199254740993}}}), encoding="utf-8")
+        proposal = invoke(bot, "m07", "register-proposal", history, "br16-d", proposal_model, REGISTRY, agent_proposal)
+        assert proposal["status"] == "APPENDED"
+        proposal_id = proposal["artifact"]["proposal_id"]
         request = work / "intent-request.json"; intent = work / "intent.json"; policy_config = work / "policy.json"; policy = work / "policy-output.json"; state = work / "runtime"
-        request.write_text(json.dumps({"intent_id":"br16-i","decision_id":"br16-d","evidence_ids":[evidence_id],"action_type":"DRAFT","target":"https://example.com/draft","parameters":{},"proposed_by":"human","created_at":"2026-09-07T00:00:00Z","expires_at":"2099-09-03T03:00:00Z","correlation_id":"br16-c","idempotency_key":"br16-k"}), encoding="utf-8")
-        assert invoke(bot, "mission", "m08-intent", history, request, intent)["status"] == "APPENDED"
+        request.write_text(json.dumps({"intent_id":"br16-i","decision_id":"br16-d","evidence_ids":[evidence_id],"action_type":"DRAFT","target":"https://example.com/draft","parameters":{"id":9007199254740993},"proposed_by":"agent","proposal_ref":proposal_id,"created_at":"2026-09-07T00:00:00Z","expires_at":"2099-09-03T03:00:00Z","correlation_id":"br16-c","idempotency_key":"br16-k"}), encoding="utf-8")
+        tampered_request = work / "intent-request-tampered.json"
+        tampered_request.write_text(request.read_text(encoding="utf-8").replace("https://example.com/draft", "https://example.com/changed"), encoding="utf-8")
+        assert invoke(bot, "mission", "m08-intent", history, tampered_request, agent_proposal, work / "tampered-intent.json", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m08-intent", history, request, agent_proposal, intent)["status"] == "APPENDED"
         policy_config.write_text(json.dumps({"policy_version":"br16-v1","now":"2026-09-07T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}), encoding="utf-8")
-        assert invoke(bot, "mission", "m08-policy", intent, policy_config, policy)["status"] == "ALLOW"
+        assert invoke(bot, "mission", "m08-policy", history, intent, policy_config, agent_proposal, policy)["status"] == "ALLOW"
         assert invoke(bot, "mission", "bind", state, intent, policy)["status"] == "BOUND"
         i = json.loads(intent.read_text()); p = json.loads(policy.read_text())
         approval = work / "approval.json"; approval.write_text(json.dumps({"approval_id":"br16-ap","intent_id":i["intent_id"],"intent_hash":i["intent_hash"],"policy_version":p["policy_version"],"decision":"APPROVE","approved_by":"human","approver_id":"pilot-human","approved_at":"2026-09-07T01:05:00Z","expires_at":"2099-09-03T02:50:00Z","correlation_id":i["correlation_id"],"one_time":True}), encoding="utf-8")
