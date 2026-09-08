@@ -95,10 +95,10 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 register-proposal HISTORY RECORD_ID MODEL_OUTPUT REGISTRY OUTPUT [REGISTERED_TOOL_RESULT] | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
 	}
-	if (args[0] == "context" && len(args) != 3) || (args[0] == "register-tool-result" && len(args) != 6) || (args[0] == "validate" && len(args) != 5 && len(args) != 6) || (args[0] != "context" && args[0] != "register-tool-result" && args[0] != "validate") {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
+	if (args[0] == "context" && len(args) != 3) || (args[0] == "register-tool-result" && len(args) != 6) || (args[0] == "register-proposal" && len(args) != 6 && len(args) != 7) || (args[0] == "validate" && len(args) != 5 && len(args) != 6) || (args[0] != "context" && args[0] != "register-tool-result" && args[0] != "register-proposal" && args[0] != "validate") {
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 register-proposal HISTORY RECORD_ID MODEL_OUTPUT REGISTRY OUTPUT [REGISTERED_TOOL_RESULT] | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
 	}
 	record, err := resolveCanonicalRecord(args[1], args[2])
 	if err != nil {
@@ -135,6 +135,45 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 			return emit("PERSISTENCE_ERROR", nil, err, 1)
 		}
 		return emit(status, map[string]any{"registered": registered, "evidence": registered.Evidence()}, nil, 0)
+	case "register-proposal":
+		raw, err := os.ReadFile(args[3])
+		if err != nil {
+			return emit("OUTPUT_ERROR", nil, err, 1)
+		}
+		text := strings.TrimSpace(string(raw))
+		if strings.HasPrefix(text, "```json") && strings.HasSuffix(text, "```") {
+			text = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(text, "```json"), "```"))
+		}
+		registry, err := loadM07Registry(args[4])
+		if err != nil {
+			return emit("REGISTRY_ERROR", nil, err, 1)
+		}
+		if len(args) == 7 {
+			toolRaw, err := os.ReadFile(args[6])
+			if err != nil {
+				return emit("TOOL_RESULT_ERROR", nil, err, 1)
+			}
+			ctx, err = appendRegisteredToolEvidence(ctx, toolRaw, registry)
+			if err != nil {
+				return emit("TOOL_RESULT_REJECTED", nil, err, 1)
+			}
+		}
+		proposal, err := corem07.RegisterAgentProposal([]byte(text), ctx.Evidence, registry, record.RecordID)
+		if err != nil {
+			return emit("PROPOSAL_REJECTED", nil, err, 1)
+		}
+		paths := []string{args[1], args[3], args[4], args[5]}
+		if len(args) == 7 {
+			paths = append(paths, args[6])
+		}
+		if err := distinctPaths(paths...); err != nil {
+			return emit("PATH_CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[5], proposal)
+		if err != nil {
+			return emit("PERSISTENCE_ERROR", nil, err, 1)
+		}
+		return emit(status, proposal, nil, 0)
 	case "validate":
 		raw, err := os.ReadFile(args[3])
 		if err != nil {

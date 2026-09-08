@@ -80,6 +80,17 @@ type RegisteredToolResult struct {
 	Result   ToolResult `json:"result"`
 }
 
+// RegisteredAgentProposal preserves the exact model JSON only after the M07
+// boundary has validated it against a canonical context. It is proposal-only:
+// it grants no approval or execution authority.
+type RegisteredAgentProposal struct {
+	Version      string          `json:"version"`
+	ProposalID   string          `json:"proposal_id"`
+	RecordID     string          `json:"record_id"`
+	OutputDigest string          `json:"output_digest"`
+	RawOutput    json.RawMessage `json:"raw_output"`
+}
+
 func uniqueNonEmpty(values []string) bool {
 	seen := map[string]bool{}
 	for _, value := range values {
@@ -186,6 +197,65 @@ func traceID(result ToolResult) (string, error) {
 	}
 	sum := sha256.Sum256(b)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+func digest(raw []byte) string {
+	sum := sha256.Sum256(bytes.TrimSpace(raw))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func canonicalJSONDigest(raw []byte) (string, error) {
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return "", err
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return digest(canonical), nil
+}
+
+// RegisterAgentProposal validates the actual model JSON before persisting it.
+// An ABSTAIN result is intentionally not a proposal that M08 may resolve.
+func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID string) (RegisteredAgentProposal, error) {
+	output, err := ValidateAgentOutput(raw, evidence, registry)
+	if err != nil {
+		return RegisteredAgentProposal{}, err
+	}
+	if output.State != "HUMAN_REVIEW" {
+		return RegisteredAgentProposal{}, fmt.Errorf("only HUMAN_REVIEW output can become an agent proposal")
+	}
+	trimmed := bytes.TrimSpace(raw)
+	outputDigest, err := canonicalJSONDigest(trimmed)
+	if err != nil {
+		return RegisteredAgentProposal{}, err
+	}
+	return RegisteredAgentProposal{Version: "m07-agent-proposal/v1", ProposalID: outputDigest, RecordID: recordID, OutputDigest: outputDigest, RawOutput: append(json.RawMessage(nil), trimmed...)}, nil
+}
+
+// ValidateRegisteredAgentProposal recomputes the raw-output digest and reruns
+// the M07 grounding boundary against the current canonical record context.
+func ValidateRegisteredAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID string) (RegisteredAgentProposal, AgentOutput, error) {
+	var registered RegisteredAgentProposal
+	if err := contracts.DecodeStrict(raw, &registered); err != nil {
+		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal schema: %w", err)
+	}
+	if registered.Version != "m07-agent-proposal/v1" || registered.RecordID != recordID || len(bytes.TrimSpace(registered.RawOutput)) == 0 {
+		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal record binding is invalid")
+	}
+	recomputed, err := RegisterAgentProposal(registered.RawOutput, evidence, registry, recordID)
+	if err != nil {
+		return RegisteredAgentProposal{}, AgentOutput{}, err
+	}
+	if registered.ProposalID != recomputed.ProposalID || registered.OutputDigest != recomputed.OutputDigest {
+		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal digest does not match raw output")
+	}
+	var output AgentOutput
+	if err := json.Unmarshal(registered.RawOutput, &output); err != nil {
+		return RegisteredAgentProposal{}, AgentOutput{}, err
+	}
+	return recomputed, output, nil
 }
 
 // RegisterToolResult validates a response owned by the adapter before it can

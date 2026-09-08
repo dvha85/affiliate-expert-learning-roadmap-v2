@@ -53,6 +53,19 @@ host/port sai, redirect, status không thành công, claim ID/value sai, prose b
 và quyền ghi. Retry byte-identical của registration trả `EXACT_DUPLICATE`; file
 output khác nội dung không bị ghi đè.
 
+## Persist validated AgentProposal
+
+Chỉ output `HUMAN_REVIEW` đã qua cùng boundary mới có thể được persist:
+
+```text
+bot m07 register-proposal HISTORY.jsonl RECORD_ID MODEL_OUTPUT.json REGISTRY.json PROPOSAL.json [REGISTERED_TOOL_RESULT.json]
+```
+
+Artifact giữ raw model output, canonical digest/proposal ID và `record_id`.
+Khi resolve, digest được tính lại và raw output được validate lại với canonical
+context; output `ABSTAIN`, output đã bị sửa hoặc record khác đều bị từ chối.
+Artifact này vẫn proposal-only, không phải approval hoặc execution authority.
+
 ## Kiểm offline
 
 Từ root repo:
@@ -70,8 +83,9 @@ phải authoritative proof cho path learner hoặc workflow.
 
 ## Giới hạn còn mở
 
-Blueprint n8n hiện chưa gọi CLI/core registration adapter và chưa persist
-`AgentProposal` cho M08. Chưa có transport seam kiểm timeout/response size/
-private-address policy, ACK vào canonical tool-evidence store chung, hoặc parity
-thực thi code node blueprint. Vì vậy BR-15/RP-05 vẫn **chưa hoàn tất**; không
-dùng tài liệu này để tuyên bố model/n8n/provider đã grounded hoặc operated.
+Blueprint n8n hiện chưa gọi CLI/core registration adapter; M08 cũng chưa
+resolve `AgentProposal` artifact này. Chưa có transport seam kiểm
+timeout/response size/private-address policy, ACK vào canonical tool-evidence
+store chung, hoặc parity thực thi code node blueprint. Vì vậy BR-15/RP-05 vẫn
+**chưa hoàn tất**; không dùng tài liệu này để tuyên bố model/n8n/provider đã
+grounded hoặc operated.

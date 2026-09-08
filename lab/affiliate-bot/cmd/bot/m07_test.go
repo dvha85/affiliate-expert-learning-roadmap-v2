@@ -65,6 +65,19 @@ func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	if code := runM07([]string{"validate", historyPath, record.RecordID, modelPath, registryPath, registeredPath}, &out, &errOut); code != 0 {
 		t.Fatalf("registered evidence was not citable (%d): %s", code, errOut.String())
 	}
+	proposalPath := filepath.Join(dir, "proposal.json")
+	out.Reset()
+	errOut.Reset()
+	if code := runM07([]string{"register-proposal", historyPath, record.RecordID, modelPath, registryPath, proposalPath, registeredPath}, &out, &errOut); code != 0 {
+		t.Fatalf("validated agent output was not persisted (%d): %s", code, errOut.String())
+	}
+	proposalRaw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := corem07.ValidateRegisteredAgentProposal(proposalRaw, []corem07.Evidence{registered.Evidence()}, registry, record.RecordID); err != nil {
+		t.Fatal(err)
+	}
 
 	model.Answer = "guaranteed profit"
 	writeM07File(t, modelPath, model)

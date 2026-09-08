@@ -91,3 +91,24 @@ func TestRegisteredToolResultIsBoundToRequestAndRecord(t *testing.T) {
 		t.Fatal("cross-record result accepted")
 	}
 }
+
+func TestRegisteredAgentProposalRerunsGroundingAndDigest(t *testing.T) {
+	claim := Claim{FieldOrClaim: "price", Value: json.RawMessage("100"), EvidenceIDs: []string{"e1"}}
+	claim.Text = renderClaim(claim)
+	output := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{claim}, EvidenceIDs: []string{"e1"}, Authority: "A2-RO", WritePermission: false}
+	output.Answer = RenderGroundedAnswer(output.Claims)
+	raw, _ := json.Marshal(output)
+	registered, err := RegisterAgentProposal(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := json.Marshal(registered)
+	if _, _, err := ValidateRegisteredAgentProposal(stored, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err != nil {
+		t.Fatal(err)
+	}
+	registered.OutputDigest = "sha256:forged"
+	tampered, _ := json.Marshal(registered)
+	if _, _, err := ValidateRegisteredAgentProposal(tampered, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err == nil {
+		t.Fatal("forged proposal digest accepted")
+	}
+}
