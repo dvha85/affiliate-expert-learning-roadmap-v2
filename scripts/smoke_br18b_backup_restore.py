@@ -263,6 +263,19 @@ def main():
         invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"] = hashlib.sha256(changed_bytes).hexdigest()
         (invalid_reconciliation_backup / "manifest.json").write_text(json.dumps(invalid_reconciliation_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_reconciliation_backup, root / "invalid-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        partial_reconciliation_backup = root / "partial-reconciliation-backup"; shutil.copytree(recovery_backup, partial_reconciliation_backup)
+        partial_lines = []
+        for line in (partial_reconciliation_backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
+            entry = json.loads(line)
+            if entry["artifact_kind"] == "PRODUCTION_LEDGER" and entry["artifact"].get("stop_reason") == "RECOVERY_REVIEW_REQUIRED":
+                continue
+            partial_lines.append(line)
+        partial_bytes = ("\n".join(partial_lines) + "\n").encode()
+        (partial_reconciliation_backup / "m11-artifacts.jsonl").write_bytes(partial_bytes)
+        partial_manifest = json.loads((partial_reconciliation_backup / "manifest.json").read_text(encoding="utf-8"))
+        partial_manifest["files"]["m11-artifacts.jsonl"] = hashlib.sha256(partial_bytes).hexdigest()
+        (partial_reconciliation_backup / "manifest.json").write_text(json.dumps(partial_manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", partial_reconciliation_backup, root / "partial-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", recovery_backup, recovery_restored, env=env)["status"] == "RESTORED"
         assert invoke(bot, "mission", "status", recovery_restored, env=env)["artifact"]["stop"] is True
         assert invoke(bot, "mission", "m11-resolve", recovery_restored, "PRODUCTION_RECONCILIATION", "br18-production-resolution", env=env)["status"] == "RESOLVED"

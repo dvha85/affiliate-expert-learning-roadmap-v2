@@ -360,7 +360,10 @@ quét canonical registry trước khi append. Exact retry của cùng artifact t
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
 khác bị reject, nên không thể charge budget hai lần chỉ bằng cách dùng lại
 pre-ledger. Smoke BR-18b chạy trực tiếp ca âm này. Fault injection giữa nhiều
-file append vẫn là việc riêng, chưa được coi là transaction đa-file.
+file append vẫn là việc riêng, chưa được coi là transaction đa-file. Smoke cũng
+giả lập partial reconciliation write (UNKNOWN execution + resolution còn nhưng
+reviewed stopped-ledger mất) với checksum manifest hợp lệ; restore fail-closed
+`GRAPH_FAILED`. Chưa có crash hook thực thi tại từng `write/sync/rename`.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
