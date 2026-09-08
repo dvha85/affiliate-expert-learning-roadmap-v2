@@ -3,9 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
 
 func watchFixture() watcherFixture {
@@ -33,6 +38,63 @@ func watchRun(t *testing.T, h, input string, f watcherFixture, want string) {
 	if !success && env["artifact"] != nil {
 		t.Fatal("error artifact")
 	}
+}
+
+func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
+	watchRun(t, history, input, watchFixture(), "APPENDED")
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal(err, records)
+	}
+	record := records[0]
+	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	call := func(path string, payload any) *httptest.ResponseRecorder {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorder := httptest.NewRecorder()
+		m07AdapterHandler(history).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw)))
+		return recorder
+	}
+	tool := corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-03T00:01:00Z", Body: json.RawMessage(`{"price":100}`)}
+	registered := call("/v1/m07/register-tool-result", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolResult: mustRawJSON(t, tool)})
+	if registered.Code != http.StatusOK {
+		t.Fatal(registered.Code, registered.Body.String())
+	}
+	var registration struct {
+		ArtifactID string           `json:"artifact_id"`
+		Evidence   corem07.Evidence `json:"evidence"`
+	}
+	if err := json.Unmarshal(registered.Body.Bytes(), &registration); err != nil {
+		t.Fatal(err)
+	}
+	claim := corem07.Claim{FieldOrClaim: registration.Evidence.FieldOrClaim, Value: json.RawMessage(`{"price":100}`), EvidenceIDs: []string{registration.Evidence.EvidenceID}}
+	claim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{claim})
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: corem07.RenderGroundedAnswer([]corem07.Claim{claim}), Claims: []corem07.Claim{claim}, EvidenceIDs: []string{registration.Evidence.EvidenceID}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{}`)}}
+	valid := call("/v1/m07/validate", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: registration.ArtifactID})
+	if valid.Code != http.StatusOK {
+		t.Fatal(valid.Code, valid.Body.String())
+	}
+	proposal := call("/v1/m07/register-proposal", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: registration.ArtifactID})
+	if proposal.Code != http.StatusOK {
+		t.Fatal(proposal.Code, proposal.Body.String())
+	}
+	forged := call("/v1/m07/validate", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: "sha256:" + strings.Repeat("0", 64)})
+	if forged.Code == http.StatusOK {
+		t.Fatal("forged tool artifact id accepted")
+	}
+}
+
+func mustRawJSON(t *testing.T, value any) json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 func TestWatcherRetryAndRestart(t *testing.T) {
 	dir := t.TempDir()

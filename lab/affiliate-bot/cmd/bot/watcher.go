@@ -6,12 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m06"
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
 
 const watcherFixtureURL = "https://example.com/br13/offer"
@@ -175,6 +177,159 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 // blueprint. It accepts only complete HistoryRecord JSON on a loopback-bound
 // POST endpoint; all validation and append semantics remain in the learner
 // store implementation.
+type m07AdapterRequest struct {
+	RecordID     string             `json:"record_id"`
+	Registry     []corem07.ToolSpec `json:"registry"`
+	ToolResult   json.RawMessage    `json:"tool_result,omitempty"`
+	ModelOutput  json.RawMessage    `json:"model_output,omitempty"`
+	ToolResultID string             `json:"tool_result_id,omitempty"`
+}
+
+func m07ArtifactPath(historyPath, kind, id string) (string, error) {
+	if !strings.HasPrefix(id, "sha256:") || len(id) != len("sha256:")+64 {
+		return "", fmt.Errorf("invalid M07 artifact id")
+	}
+	for _, r := range strings.TrimPrefix(id, "sha256:") {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return "", fmt.Errorf("invalid M07 artifact id")
+		}
+	}
+	if kind != "tool-results" && kind != "proposals" {
+		return "", fmt.Errorf("invalid M07 artifact kind")
+	}
+	return filepath.Clean(historyPath) + ".m07/" + kind + "/" + strings.TrimPrefix(id, "sha256:") + ".json", nil
+}
+
+func decodeM07AdapterRequest(r *http.Request) (m07AdapterRequest, error) {
+	var request m07AdapterRequest
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		return request, err
+	}
+	if err := contracts.DecodeStrict(raw, &request); err != nil {
+		return request, err
+	}
+	if strings.TrimSpace(request.RecordID) == "" || corem07.ValidateRegistry(request.Registry) != nil {
+		return request, fmt.Errorf("invalid M07 adapter record or registry")
+	}
+	return request, nil
+}
+
+func m07AdapterContext(historyPath, recordID string) (m07Context, error) {
+	record, err := resolveCanonicalRecord(historyPath, recordID)
+	if err != nil {
+		return m07Context{}, err
+	}
+	return m07EvidenceContext(record)
+}
+
+func loadM07ToolArtifact(historyPath, id string, registry []corem07.ToolSpec, recordID string) (corem07.RegisteredToolResult, error) {
+	path, err := m07ArtifactPath(historyPath, "tool-results", id)
+	if err != nil {
+		return corem07.RegisteredToolResult{}, err
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return corem07.RegisteredToolResult{}, fmt.Errorf("registered M07 tool artifact not found")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return corem07.RegisteredToolResult{}, err
+	}
+	return corem07.ValidateRegisteredToolResult(raw, registry, recordID)
+}
+
+func m07AdapterHandler(historyPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "REJECT_METHOD", "execution_permitted": false})
+			return
+		}
+		request, err := decodeM07AdapterRequest(r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_REQUEST", "execution_permitted": false})
+			return
+		}
+		ctx, err := m07AdapterContext(historyPath, request.RecordID)
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "HISTORY_ERROR", "execution_permitted": false})
+			return
+		}
+		switch r.URL.Path {
+		case "/v1/m07/register-tool-result":
+			if len(request.ToolResult) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REQUIRED", "execution_permitted": false})
+				return
+			}
+			registered, err := corem07.RegisterToolResult(request.ToolResult, request.Registry)
+			if err != nil || registered.RecordID != ctx.RecordID {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REJECTED", "execution_permitted": false})
+				return
+			}
+			path, err := m07ArtifactPath(historyPath, "tool-results", registered.TraceID)
+			if err == nil {
+				_, err = writeNewJSON(path, registered)
+			}
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": registered.Evidence(), "execution_permitted": false})
+		case "/v1/m07/validate", "/v1/m07/register-proposal":
+			if request.ToolResultID != "" {
+				registered, err := loadM07ToolArtifact(historyPath, request.ToolResultID, request.Registry, ctx.RecordID)
+				if err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REJECTED", "execution_permitted": false})
+					return
+				}
+				ctx.Evidence = append(ctx.Evidence, registered.Evidence())
+			}
+			if len(request.ModelOutput) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "MODEL_OUTPUT_REQUIRED", "execution_permitted": false})
+				return
+			}
+			if r.URL.Path == "/v1/m07/validate" {
+				output, err := corem07.ValidateAgentOutput(request.ModelOutput, ctx.Evidence, request.Registry)
+				if err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(map[string]any{"status": "ABSTAIN", "execution_permitted": false})
+					return
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": output, "execution_permitted": false})
+				return
+			}
+			proposal, err := corem07.RegisterAgentProposal(request.ModelOutput, ctx.Evidence, request.Registry, ctx.RecordID)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PROPOSAL_REJECTED", "execution_permitted": false})
+				return
+			}
+			path, err := m07ArtifactPath(historyPath, "proposals", proposal.ProposalID)
+			if err == nil {
+				_, err = writeNewJSON(path, proposal)
+			}
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": proposal.ProposalID, "artifact": proposal, "execution_permitted": false})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "NOT_FOUND", "execution_permitted": false})
+		}
+	}
+}
+
 func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 || len(args) > 2 {
 		fmt.Fprintln(stderr, "usage: bot watcher serve HISTORY [127.0.0.1:8787]")
@@ -204,6 +359,9 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/m07/register-tool-result", m07AdapterHandler(historyPath))
+	mux.HandleFunc("/v1/m07/validate", m07AdapterHandler(historyPath))
+	mux.HandleFunc("/v1/m07/register-proposal", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"status":"OK","execution_permitted":false}`+"\n")
