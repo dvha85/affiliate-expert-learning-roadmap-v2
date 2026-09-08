@@ -95,3 +95,28 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 		t.Fatal("denied gate authorized execution")
 	}
 }
+
+func TestCancelledCanaryExecutionRecordHasNoSideEffect(t *testing.T) {
+	grant := CanaryGrant{GrantID: "g", GrantVersion: "v1", PolicyVersion: "p1", ApprovalRef: "approval-1", ApprovedBy: "human", ApproverID: "learner", ApprovedAt: "2026-09-08T00:00:00Z", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T02:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"local_sandbox"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 100, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: "corr", HashVersion: "go-json-v1"}
+	grant.GrantHash = ComputeCanaryGrantHash(grant)
+	cost := TrustedCostBound{CostBoundID: "cost", IntentID: "intent", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:cost", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:30:00Z", CorrelationID: "corr", HashVersion: "go-json-v1"}
+	cost.CostBoundHash = ComputeTrustedCostBoundHash(cost)
+	gate := EvaluateCanaryGate(CanaryGateInput{Grant: grant, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", PolicyDecision: "ALLOW", RiskClass: "RISK0", ApprovalID: "approval-1", ApproverID: "learner", CorrelationID: "corr", ActionType: "DRAFT", Target: "https://example.com/draft", Now: "2026-09-08T01:00:00Z"})
+	authorization, err := AuthorizeCanary(CanaryAuthorizationInput{Gate: gate, Grant: grant, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", IdempotencyKey: "key", CorrelationID: "corr", IntentExpiresAt: "2026-09-08T01:45:00Z", ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T01:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := CancelCanaryExecution(CancelledExecutionInput{Authorization: authorization, AttemptedAt: "2026-09-08T01:01:00Z", Reason: "learner cancelled before executor"})
+	if err != nil || record.Status != "CANCELLED" || record.SideEffectState != "NOT_PERFORMED" || record.ExecutionID == "" {
+		t.Fatal(err, record)
+	}
+	raw, _ := json.Marshal(record)
+	if _, err := ValidateExecutionRecord(raw); err != nil {
+		t.Fatal(err)
+	}
+	record.Status = "SUCCEEDED"
+	raw, _ = json.Marshal(record)
+	if _, err := ValidateExecutionRecord(raw); err == nil {
+		t.Fatal("accepted non-cancelled learner execution record")
+	}
+}

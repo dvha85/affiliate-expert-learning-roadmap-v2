@@ -126,10 +126,13 @@ go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGIST
 
 Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
 `m08-policy`, `m09-approval`, `m10-canary`, `m10-cost-register`, `m10-gate`,
-`m10-authorize`, `m10-reserve`, `m11-stop` và
+`m10-authorize`, `m10-cancel`, `m10-reserve`, `m11-stop` và
 `status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
-và STOP không bị `init` ghi đè; đây vẫn không phải live executor.
+và STOP không bị `init` ghi đè. `m10-cancel` chỉ phát hành execution record
+`CANCELLED`/`NOT_PERFORMED` được bind với authorization; nó không gọi executor,
+không reserve thêm budget và không tạo side effect. Đây vẫn không phải live
+executor.
 
 Mỗi lần reserve mới phải có `RESERVATION_ID` ổn định. Retry cùng ID, cost và
 binding trả `EXACT_DUPLICATE` thay vì charge lần hai; tái dùng ID với cost hay
@@ -138,6 +141,7 @@ không phù hợp cho attempt mới.
 
 ```bash
 go run ./cmd/bot mission m10-reserve /tmp/affiliate-runtime 100 attempt-001
+go run ./cmd/bot mission m10-cancel /tmp/affiliate-runtime authorization.json cancelled.json 2026-09-08T00:01:00Z learner-cancelled-before-executor
 ```
 
 ```bash

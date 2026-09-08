@@ -124,6 +124,10 @@ def main():
         authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")
         assert authorization_response["status"] == "AUTHORIZED" and authorization_response["artifact"]["execution_authorized"] is True
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")["status"] == "EXACT_DUPLICATE"
+        cancelled = work / "cancelled-execution.json"
+        cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")
+        assert cancellation["status"] == "APPENDED" and cancellation["artifact"]["status"] == "CANCELLED" and cancellation["artifact"]["side_effect_state"] == "NOT_PERFORMED"
+        assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
         assert invoke(bot, "mission", "m10-gate", state, tampered, work / "tampered-gate.json", gate_time, expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"

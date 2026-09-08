@@ -524,6 +524,16 @@ func evaluateLearnerCanaryGate(s LearnerMissionState, bound corem10.TrustedCostB
 	return gate, nil
 }
 
+func authorizationBindsMissionState(authorization corem10.ExecutionAuthorization, s LearnerMissionState) bool {
+	if s.Intent == nil || s.Policy == nil || s.Canary == nil {
+		return false
+	}
+	return authorization.IntentID == s.Intent.IntentID && authorization.IntentHash == s.Intent.IntentHash &&
+		authorization.PolicyVersion == s.Policy.PolicyVersion && authorization.CanaryGrantID == s.Canary.GrantID &&
+		authorization.CanaryGrantVersion == s.Canary.GrantVersion && authorization.CanaryGrantHash == s.Canary.GrantHash &&
+		authorization.CorrelationID == s.Intent.CorrelationID && authorization.IdempotencyKey == s.Intent.IdempotencyKey
+}
+
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -539,7 +549,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
@@ -887,6 +897,44 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit(status, authorization, nil, 0)
 		}
 		return emit("AUTHORIZED", authorization, nil, 0)
+	case "m10-cancel":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil {
+			return emit("REJECTED", nil, fmt.Errorf("invalid execution authorization: %w", err), 1)
+		}
+		if !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization does not bind to current mission state"), 1)
+		}
+		record, err := corem10.CancelCanaryExecution(corem10.CancelledExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		recordRaw, err := json.Marshal(record)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		return emit(status, record, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)

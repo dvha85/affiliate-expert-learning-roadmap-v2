@@ -123,6 +123,13 @@ nghiệm thu trên `main`**.
   intent/grant/cost expiry; không reserve budget hay gọi executor. Smoke cover
   authorization retry và reject gate stale sau reserve. Artifact chưa được
   đăng ký trong graph state và execution record/effect link còn mở.
+- **RP-03 cancelled-execution foundation:** learner `m10-cancel` resolve và
+  kiểm `ExecutionAuthorization` với mission state hiện tại rồi ghi artifact
+  bất biến `ExecutionRecord` chỉ có `CANCELLED`/`NOT_PERFORMED`. Core validator
+  và BR-16a smoke kiểm retry byte-identical; đường này không gọi executor,
+  không reserve budget hay tạo EffectRef. Execution thành công/thất bại, ledger
+  link, outcome và graph persistence vẫn thuộc RP-03/RP-06/RP-07, do đó RP-03
+  vẫn mở.
 - **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
   read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
   một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng
