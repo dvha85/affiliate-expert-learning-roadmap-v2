@@ -74,7 +74,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
-| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | TODO |
+| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — learner history resolver foundation, chưa tích hợp n8n/M06 |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | TODO |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
@@ -107,6 +107,10 @@ nghiệm thu trên `main`**.
   STOP và race cap. Grant/approval/ledger hiện chưa là graph canonical M09/M10,
   chưa có execution stub/outcome linkage hay fault-injection đầy đủ; RP-03 vẫn
   mở.
+- **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
+  read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
+  một lần từ history và replay `MATCH`. Chưa có core M06 builder chung, chưa
+  đổi n8n blueprint/HTTP adapter, và chưa có proposal resolver; RP-04 vẫn mở.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 

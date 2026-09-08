@@ -84,29 +84,11 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 	if (args[0] == "context" && len(args) != 3) || (args[0] == "validate" && len(args) != 5) || (args[0] != "context" && args[0] != "validate") {
 		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY"), 2)
 	}
-	history, err := LoadHistory(args[1])
+	record, err := resolveCanonicalRecord(args[1], args[2])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)
 	}
-	var record *HistoryRecord
-	matching := 0
-	for i := range history {
-		if history[i].RecordID == args[2] {
-			copy := history[i]
-			record = &copy
-			matching++
-		}
-	}
-	if record == nil {
-		return emit("NOT_FOUND", nil, fmt.Errorf("decision %s not found in canonical history", args[2]), 1)
-	}
-	if matching != 1 {
-		return emit("HISTORY_ERROR", nil, fmt.Errorf("decision %s resolves to %d records", args[2], matching), 1)
-	}
-	if replay := Replay(*record); replay.State != replayMatch {
-		return emit("HISTORY_ERROR", nil, fmt.Errorf("decision %s is not replay-stable: %s", args[2], replay.State), 1)
-	}
-	ctx, err := m07EvidenceContext(*record)
+	ctx, err := m07EvidenceContext(record)
 	if err != nil {
 		return emit("CONTEXT_ERROR", nil, err, 1)
 	}

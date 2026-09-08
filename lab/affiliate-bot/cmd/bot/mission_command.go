@@ -405,19 +405,9 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 		return LearnerIntent{}, fmt.Errorf("parameters must be a JSON object")
 	}
 	req.Parameters = parameters
-	history, err := LoadHistory(historyPath)
+	record, err := resolveCanonicalRecord(historyPath, req.DecisionID)
 	if err != nil {
-		return LearnerIntent{}, err
-	}
-	var record *HistoryRecord
-	for i := range history {
-		if history[i].RecordID == req.DecisionID {
-			copy := history[i]
-			record = &copy
-		}
-	}
-	if record == nil {
-		return LearnerIntent{}, fmt.Errorf("decision_id does not resolve in canonical history")
+		return LearnerIntent{}, fmt.Errorf("decision_id resolution: %w", err)
 	}
 	allowed := map[string]bool{}
 	for _, id := range record.RecordedResult.EvidenceIDs {
