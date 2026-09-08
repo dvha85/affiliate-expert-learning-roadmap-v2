@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
@@ -117,6 +118,11 @@ func backupFiles(source string) ([]string, error) {
 
 func requiredBackupFiles(source string) ([]string, error) {
 	required := []string{"history.jsonl", "mission-state.json"}
+	m00ToM05Files, err := m00ToM05BackupFiles(source)
+	if err != nil {
+		return nil, err
+	}
+	required = append(required, m00ToM05Files...)
 	m07Files, err := m07BackupFiles(source)
 	if err != nil {
 		return nil, err
@@ -177,6 +183,104 @@ func requiredBackupFiles(source string) ([]string, error) {
 	}
 	sort.Strings(required)
 	return required, nil
+}
+
+func optionalRuntimeFile(dir, name string) (bool, error) {
+	info, err := os.Lstat(filepath.Join(dir, name))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return false, fmt.Errorf("runtime artifact %s must be a regular file", name)
+	}
+	return true, nil
+}
+
+// m00ToM05BackupFiles resolves every optional M03–M05 store from the prior
+// store. A backup may legitimately contain history alone, but once a later
+// store exists its complete upstream lineage must be present and replayable.
+func m00ToM05BackupFiles(dir string) ([]string, error) {
+	history, err := LoadHistory(filepath.Join(dir, "history.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	files := []string{}
+	hasActions, err := optionalRuntimeFile(dir, "actions.jsonl")
+	if err != nil {
+		return nil, err
+	}
+	hasOutcomes, err := optionalRuntimeFile(dir, "outcomes.jsonl")
+	if err != nil {
+		return nil, err
+	}
+	hasEvaluations, err := optionalRuntimeFile(dir, "evaluations.jsonl")
+	if err != nil {
+		return nil, err
+	}
+	hasProposals, err := optionalRuntimeFile(dir, "proposals.jsonl")
+	if err != nil {
+		return nil, err
+	}
+	hasReviews, err := optionalRuntimeFile(dir, "reviews.jsonl")
+	if err != nil {
+		return nil, err
+	}
+	if (hasOutcomes || hasEvaluations || hasProposals || hasReviews) && !hasActions {
+		return nil, fmt.Errorf("M03+ store requires actions.jsonl")
+	}
+	if (hasEvaluations || hasProposals || hasReviews) && !hasOutcomes {
+		return nil, fmt.Errorf("M05 store requires outcomes.jsonl")
+	}
+	if (hasProposals || hasReviews) && !hasEvaluations {
+		return nil, fmt.Errorf("improvement store requires evaluations.jsonl")
+	}
+	if hasReviews && !hasProposals {
+		return nil, fmt.Errorf("review store requires proposals.jsonl")
+	}
+	if !hasActions {
+		return files, nil
+	}
+	actions, err := loadActions(filepath.Join(dir, "actions.jsonl"), history)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, "actions.jsonl")
+	if !hasOutcomes {
+		return files, nil
+	}
+	outcomes, err := loadOutcomes(filepath.Join(dir, "outcomes.jsonl"), actions)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, "outcomes.jsonl")
+	if !hasEvaluations {
+		return files, nil
+	}
+	evaluations, err := loadEvaluations(filepath.Join(dir, "evaluations.jsonl"), history, actions, outcomes)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, "evaluations.jsonl")
+	if !hasProposals {
+		return files, nil
+	}
+	decodeProposal := func(raw []byte) (m05.ImprovementProposal, error) { return linkedProposal(raw, evaluations) }
+	proposals, err := loadImprovementRecords(filepath.Join(dir, "proposals.jsonl"), decodeProposal, func(p m05.ImprovementProposal) string { return p.ProposalID })
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, "proposals.jsonl")
+	if !hasReviews {
+		return files, nil
+	}
+	_, err = loadImprovementRecords(filepath.Join(dir, "reviews.jsonl"), func(raw []byte) (m05.ReviewRecord, error) { return linkedReview(raw, proposals, evaluations) }, func(r m05.ReviewRecord) string { return r.ReviewID })
+	if err != nil {
+		return nil, err
+	}
+	return append(files, "reviews.jsonl"), nil
 }
 
 // m07BackupFiles lists durable adapter artifacts only when history is stored
@@ -678,6 +782,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if _, e = loadMissionState(args[2]); e != nil {
 			return emit("STATE_FAILED", nil, e, 1)
 		}
+	}
+	if _, e = m00ToM05BackupFiles(args[2]); e != nil {
+		return emit("GRAPH_FAILED", nil, e, 1)
 	}
 	if e = validateM10BackupGraph(args[2]); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)

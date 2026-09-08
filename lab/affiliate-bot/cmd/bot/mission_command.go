@@ -498,7 +498,8 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 	if s.Canary != nil {
 		grantRaw, marshalErr := json.Marshal(s.Canary.CanaryGrant)
 		_, grantStatus := corem10.DecodeCanaryGrant(grantRaw)
-		if marshalErr != nil || grantStatus != "VALID" || s.Intent == nil || s.Approval == nil || s.Policy == nil || s.Canary.GrantID == "" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutionsTotal || s.Canary.CostUsedMinor > s.Canary.MaxCostMinorTotal || corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, time.Now().UTC()) != "VALID" {
+		validFrom, validFromErr := time.Parse(time.RFC3339, s.Canary.ValidFrom)
+		if marshalErr != nil || grantStatus != "VALID" || validFromErr != nil || s.Intent == nil || s.Approval == nil || s.Policy == nil || s.Canary.GrantID == "" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutionsTotal || s.Canary.CostUsedMinor > s.Canary.MaxCostMinorTotal || corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, validFrom) != "VALID" {
 			return fmt.Errorf("mission canary integrity/binding/budget check failed")
 		}
 	}
@@ -607,6 +608,23 @@ func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
 	}
 	if s.Approval.Decision != "APPROVE" || !s.Approval.OneTime || s.Approval.IntentID != s.Intent.IntentID || s.Approval.IntentHash != s.Intent.IntentHash || s.Approval.PolicyVersion != s.Policy.PolicyVersion || s.Approval.CorrelationID != s.Intent.CorrelationID {
 		return fmt.Errorf("approval does not bind to current intent/policy")
+	}
+	return nil
+}
+
+// missionCanaryActive is deliberately separate from loadMissionState. A
+// restored historical grant may be expired yet still be a valid record to
+// replay and audit; only an operation that would create new authority or a
+// reservation must require it to be active now.
+func missionCanaryActive(s LearnerMissionState, now time.Time) error {
+	if err := missionAuthorityActive(s, now); err != nil {
+		return err
+	}
+	if s.Canary == nil {
+		return fmt.Errorf("canary grant is required")
+	}
+	if status := corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, now); status != "VALID" {
+		return fmt.Errorf("canary grant: %s", status)
 	}
 	return nil
 }
@@ -1303,7 +1321,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		raw, err := os.ReadFile(args[2])
@@ -1347,7 +1365,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		boundRaw, err := os.ReadFile(args[2])
@@ -1415,7 +1433,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		authorizationRaw, err := os.ReadFile(args[2])
@@ -1762,7 +1780,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)

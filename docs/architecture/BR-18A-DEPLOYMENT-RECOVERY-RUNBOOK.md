@@ -71,7 +71,8 @@ cũ.
 - restore xong phải replay khớp, không reset reservation/STOP;
 - recovery cần human review, không tự mở lại executor.
 - restore không được tự tạo lại ledger, reservation, approval hoặc lease đã
-  hết hạn; các artifact phải replay/resolve được từ store.
+  hết hạn; artifact đã hết hạn vẫn phải replay/resolve được từ store để audit,
+  nhưng gate/authorization/reservation mới phải bị chặn theo thời gian hiện tại.
 
 ## Evidence record
 

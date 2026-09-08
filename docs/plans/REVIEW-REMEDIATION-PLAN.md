@@ -339,6 +339,16 @@ giữ gate rồi thử backup/history write, và inject lỗi copy để xác nh
 partial không có manifest/không restore được. Chưa có filesystem snapshot
 transaction đa-host, kill/power-loss proof hoặc coverage mọi external store.
 
+**Cập nhật graph M00–M05 và expiry (2026-09-09):** backup profile bây giờ
+derive inventory action → outcome → evaluation → proposal → review từ file có
+thực, dùng canonical loader/link validator ở source và restored target. Một
+outcome orphan dù manifest checksum đã cập nhật bị reject. Loader state chỉ
+kiểm toàn vẹn/binding lịch sử khi restore; intent/approval/grant hết hạn vẫn
+replay được để audit nhưng gate/reservation mới kiểm thời gian thực và bị chặn.
+Regression tạo M03–M05 qua CLI, backup/restore, resolve review, rồi cover
+orphan và expired authority. Chưa có inventory profile typed cho mọi artifact
+M00–M10, fault injection đa-file hoặc evidence operated.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.

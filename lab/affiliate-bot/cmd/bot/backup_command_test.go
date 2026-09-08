@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
 
 func backupCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -67,6 +69,140 @@ func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	child.Env = append(os.Environ(), "GO_WANT_RUNTIME_GATE_HELPER=1")
 	if err := child.Run(); err == nil {
 		t.Fatal("child kept the runtime gate after it acquired it")
+	}
+}
+
+func copyFlatBackup(t *testing.T, source, target string) {
+	t.Helper()
+	if err := os.MkdirAll(target, 0700); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(source, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, entry.Name()), body, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestBackupRestoreReplaysM00ToM05Graph(t *testing.T) {
+	proposalArgs, reviewArgs := improvementFixture(t)
+	improvementRun(t, "proposal", proposalArgs, "APPENDED")
+	improvementRun(t, "review", reviewArgs, "APPENDED")
+	runtime := filepath.Dir(proposalArgs[5])
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
+	}
+	backup, restored := filepath.Join(filepath.Dir(runtime), "m00-m05-backup"), filepath.Join(filepath.Dir(runtime), "m00-m05-restored")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("M00-M05 backup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("M00-M05 restore failed: code=%d response=%+v", code, response)
+	}
+	if _, err := loadImprovementRecords(filepath.Join(restored, "reviews.jsonl"), func(raw []byte) (m05.ReviewRecord, error) {
+		history, loadErr := LoadHistory(filepath.Join(restored, "history.jsonl"))
+		if loadErr != nil {
+			return m05.ReviewRecord{}, loadErr
+		}
+		actions, loadErr := loadActions(filepath.Join(restored, "actions.jsonl"), history)
+		if loadErr != nil {
+			return m05.ReviewRecord{}, loadErr
+		}
+		outcomes, loadErr := loadOutcomes(filepath.Join(restored, "outcomes.jsonl"), actions)
+		if loadErr != nil {
+			return m05.ReviewRecord{}, loadErr
+		}
+		evaluations, loadErr := loadEvaluations(filepath.Join(restored, "evaluations.jsonl"), history, actions, outcomes)
+		if loadErr != nil {
+			return m05.ReviewRecord{}, loadErr
+		}
+		proposals, loadErr := loadImprovementRecords(filepath.Join(restored, "proposals.jsonl"), func(value []byte) (m05.ImprovementProposal, error) { return linkedProposal(value, evaluations) }, func(p m05.ImprovementProposal) string { return p.ProposalID })
+		if loadErr != nil {
+			return m05.ReviewRecord{}, loadErr
+		}
+		return linkedReview(raw, proposals, evaluations)
+	}, func(r m05.ReviewRecord) string { return r.ReviewID }); err != nil {
+		t.Fatalf("restored M05 review did not resolve from canonical graph: %v", err)
+	}
+
+	broken := filepath.Join(filepath.Dir(runtime), "m00-m05-broken")
+	copyFlatBackup(t, backup, broken)
+	outcomesPath := filepath.Join(broken, "outcomes.jsonl")
+	brokenOutcomes, err := os.ReadFile(outcomesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brokenOutcomes = bytes.Replace(brokenOutcomes, []byte("br11-action"), []byte("missing-action"), 1)
+	if err := os.WriteFile(outcomesPath, brokenOutcomes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["outcomes.jsonl"], err = fileDigest(outcomesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(filepath.Dir(runtime), "m00-m05-broken-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("checksum-valid orphan M03 outcome was restored: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupRestoreReplaysExpiredAuthorityButBlocksNewReservation(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(dir); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
+	}
+	intent := LearnerIntent{IntentID: "expired-intent", DecisionID: "br11-decision", EvidenceIDs: []string{"br11-observation"}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-01T00:00:00Z", ExpiresAt: "2026-09-08T00:00:00Z", CorrelationID: "expired-correlation", IdempotencyKey: "expired-key", IntentMode: "PROPOSAL_ONLY"}
+	intent.IntentHash = learnerIntentHash(intent)
+	approval := LearnerApproval{ApprovalID: "expired-approval", IntentID: intent.IntentID, IntentHash: intent.IntentHash, PolicyVersion: "expired-policy", Decision: "APPROVE", ApprovedBy: "human", ApproverID: "expired-reviewer", ApprovedAt: "2026-09-01T00:00:00Z", ExpiresAt: "2026-09-08T00:00:00Z", CorrelationID: intent.CorrelationID, OneTime: true}
+	grant := corem10.CanaryGrant{GrantID: "expired-grant", GrantVersion: "v1", PolicyVersion: "expired-policy", ApprovalRef: approval.ApprovalID, ApprovedBy: "human", ApproverID: approval.ApproverID, ApprovedAt: approval.ApprovedAt, ValidFrom: approval.ApprovedAt, ExpiresAt: approval.ExpiresAt, AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
+	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
+	state, err := loadMissionState(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Intent = &intent
+	state.Policy = &LearnerPolicy{PolicyVersion: approval.PolicyVersion, IntentID: intent.IntentID, IntentHash: intent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: approval.ApprovedAt}
+	state.Approval = &approval
+	state.Canary = &LearnerCanary{CanaryGrant: grant, Status: "ACTIVE"}
+	if err := saveMissionState(dir, state); err != nil {
+		t.Fatal(err)
+	}
+	grantRaw, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+		t.Fatal(err)
+	}
+	backup, restored := filepath.Join(filepath.Dir(dir), "expired-backup"), filepath.Join(filepath.Dir(dir), "expired-restored")
+	if code, response := backupCall(t, "create", dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("expired historical authority was not backed up: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("expired historical authority was not restored: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve", restored, "1", "must-remain-blocked"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("expired restored authority accepted a new reservation: code=%d response=%+v", code, response)
 	}
 }
 
