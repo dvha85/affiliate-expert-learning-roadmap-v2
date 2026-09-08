@@ -59,9 +59,11 @@ def main():
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
         grant = work / "grant.json"; grant.write_text(json.dumps({"grant_id":"br16-g","max_executions":1,"max_cost_minor":100,"currency":"USD"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
-        assert invoke(bot, "mission", "m10-reserve", state, "100")["status"] == "RESERVED"
+        assert invoke(bot, "mission", "m10-reserve", state, "100", "br16-r1")["status"] == "RESERVED"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
-        assert invoke(bot, "mission", "m10-reserve", state, "1", expected=1)["status"] == "BUDGET_DENIED"
+        assert invoke(bot, "mission", "m10-reserve", state, "100", "br16-r1")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 1
+        assert invoke(bot, "mission", "m10-reserve", state, "1", "br16-r2", expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout

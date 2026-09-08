@@ -77,16 +77,25 @@ type LearnerLease struct {
 	Status        string `json:"status"`
 	CreatedAt     string `json:"created_at"`
 }
+type LearnerReservation struct {
+	ReservationID string `json:"reservation_id"`
+	GrantID       string `json:"grant_id"`
+	IntentID      string `json:"intent_id"`
+	IntentHash    string `json:"intent_hash"`
+	CostMinor     int64  `json:"cost_minor"`
+	ReservedAt    string `json:"reserved_at"`
+}
 type LearnerMissionState struct {
-	Version    string           `json:"version"`
-	Intent     *LearnerIntent   `json:"intent,omitempty"`
-	Policy     *LearnerPolicy   `json:"policy,omitempty"`
-	Approval   *LearnerApproval `json:"approval,omitempty"`
-	Canary     *LearnerCanary   `json:"canary,omitempty"`
-	Lease      *LearnerLease    `json:"lease,omitempty"`
-	Stop       bool             `json:"stop"`
-	StopReason string           `json:"stop_reason,omitempty"`
-	UpdatedAt  string           `json:"updated_at"`
+	Version      string               `json:"version"`
+	Intent       *LearnerIntent       `json:"intent,omitempty"`
+	Policy       *LearnerPolicy       `json:"policy,omitempty"`
+	Approval     *LearnerApproval     `json:"approval,omitempty"`
+	Canary       *LearnerCanary       `json:"canary,omitempty"`
+	Reservations []LearnerReservation `json:"reservations,omitempty"`
+	Lease        *LearnerLease        `json:"lease,omitempty"`
+	Stop         bool                 `json:"stop"`
+	StopReason   string               `json:"stop_reason,omitempty"`
+	UpdatedAt    string               `json:"updated_at"`
 }
 
 type intentHashPayload struct {
@@ -232,6 +241,16 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 		if s.Intent == nil || s.Approval == nil || s.Canary.GrantID == "" || s.Canary.IntentID != s.Intent.IntentID || s.Canary.IntentHash != s.Intent.IntentHash || s.Canary.ApprovalID != s.Approval.ApprovalID || s.Canary.MaxExecutions <= 0 || s.Canary.MaxCostMinor < 0 || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutions || s.Canary.CostUsedMinor > s.Canary.MaxCostMinor {
 			return fmt.Errorf("mission canary integrity/binding/budget check failed")
 		}
+	}
+	seenReservations := map[string]bool{}
+	for _, r := range s.Reservations {
+		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Canary.IntentID || r.IntentHash != s.Canary.IntentHash || r.CostMinor < 0 {
+			return fmt.Errorf("mission reservation integrity/binding check failed")
+		}
+		if _, err := time.Parse(time.RFC3339, r.ReservedAt); err != nil {
+			return fmt.Errorf("mission reservation timestamp is invalid")
+		}
+		seenReservations[r.ReservationID] = true
 	}
 	return nil
 }
@@ -421,7 +440,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-reserve STATE_DIR COST_MINOR | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
@@ -516,6 +535,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			s.Approval = nil
 			s.Canary = nil
 			s.Lease = nil
+			s.Reservations = nil
 		}
 		s.Intent = &i
 		s.Policy = &p
@@ -585,6 +605,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			if s.Canary.GrantID != c.GrantID || s.Canary.IntentID != s.Intent.IntentID || s.Canary.ApprovalID != s.Approval.ApprovalID {
 				return emit("REJECTED", nil, fmt.Errorf("cannot replace an existing canary binding"), 1)
 			}
+			if s.Canary.MaxExecutions != c.MaxExecutions || s.Canary.MaxCostMinor != c.MaxCostMinor || s.Canary.Currency != c.Currency {
+				return emit("REJECTED", nil, fmt.Errorf("canary grant limits and currency are immutable"), 1)
+			}
 			c.ExecutionsUsed = s.Canary.ExecutionsUsed
 			c.CostUsedMinor = s.Canary.CostUsedMinor
 			c.GrantedAt = s.Canary.GrantedAt
@@ -602,8 +625,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		return emit("ACK", c, nil, 0)
 	case "m10-reserve", "reserve":
-		if len(args) != 3 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR"), 2)
+		if len(args) != 3 && len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)
 		}
 		s, err := loadMissionState(args[1])
 		if err != nil {
@@ -622,11 +645,28 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if parseErr != nil || cost < 0 {
 			return emit("REJECTED", nil, fmt.Errorf("cost must be a non-negative integer"), 1)
 		}
+		reservationID := "legacy:" + args[2]
+		if len(args) == 4 {
+			reservationID = args[3]
+		}
+		if reservationID == "" {
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id is required"), 1)
+		}
+		for _, prior := range s.Reservations {
+			if prior.ReservationID != reservationID {
+				continue
+			}
+			if prior.GrantID == s.Canary.GrantID && prior.IntentID == s.Intent.IntentID && prior.IntentHash == s.Intent.IntentHash && prior.CostMinor == cost {
+				return emit("EXACT_DUPLICATE", s.Canary, nil, 0)
+			}
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different binding or cost"), 1)
+		}
 		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutions || cost > s.Canary.MaxCostMinor-s.Canary.CostUsedMinor {
 			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
 		}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += cost
+		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		if err := saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}

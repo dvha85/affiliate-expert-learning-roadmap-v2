@@ -130,6 +130,15 @@ Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
 và STOP không bị `init` ghi đè; đây vẫn không phải live executor.
 
+Mỗi lần reserve mới phải có `RESERVATION_ID` ổn định. Retry cùng ID, cost và
+binding trả `EXACT_DUPLICATE` thay vì charge lần hai; tái dùng ID với cost hay
+binding khác bị từ chối. Dạng cũ không có ID chỉ còn tương thích tạm thời và
+không phù hợp cho attempt mới.
+
+```bash
+go run ./cmd/bot mission m10-reserve /tmp/affiliate-runtime 100 attempt-001
+```
+
 ```bash
 go run ./cmd/bot mission init /tmp/affiliate-runtime
 go run ./cmd/bot mission status /tmp/affiliate-runtime
