@@ -134,6 +134,12 @@ nghiệm thu trên `main`**.
   sang preflight/full-response/no-redirect/register/context/validate/proposal
   endpoints và static validator kiểm wiring, nhưng chưa có n8n instance chạy
   workflow hay parity execution thật nên chưa là operated evidence.
+- **RP-05 adapter-owned transport:** watcher thêm `fetch-and-register`; n8n
+  không còn gọi remote HTTP trực tiếp. Adapter validate registry trước fetch,
+  resolve DNS trước request và mỗi dial, reject non-public/mixed IP, proxy,
+  redirect và response vượt 256 KiB; timeout đến từ registry. Unit test cover
+  private/CGNAT/mixed DNS và body quá cỡ; chưa có n8n import/run, controlled
+  public-source integration hoặc sink-failure parity nên không đóng RP-05.
 - **BR-16a continuity:** smoke shared workspace nay dùng `M07
   register-proposal → M08 agent intent → M08 policy`, có ca target bị thay đổi
   bị reject. Số `9007199254740993` đi qua proposal/intent/bind/state; `bind`

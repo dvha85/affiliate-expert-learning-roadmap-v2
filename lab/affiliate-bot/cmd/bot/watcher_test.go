@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,6 +52,11 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	}
 	record := records[0]
 	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	wrongMethod := httptest.NewRecorder()
+	m07AdapterHandler(history).ServeHTTP(wrongMethod, httptest.NewRequest(http.MethodGet, "/v1/m07/fetch-and-register", nil))
+	if wrongMethod.Code != http.StatusMethodNotAllowed {
+		t.Fatal("M07 adapter accepted a non-POST request", wrongMethod.Code)
+	}
 	call := func(path string, payload any) *httptest.ResponseRecorder {
 		raw, err := json.Marshal(payload)
 		if err != nil {
@@ -93,6 +100,39 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	forged := call("/v1/m07/validate", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: "sha256:" + strings.Repeat("0", 64)})
 	if forged.Code == http.StatusOK {
 		t.Fatal("forged tool artifact id accepted")
+	}
+}
+
+func TestM07TransportRejectsPrivateDNSAndOversizedResponse(t *testing.T) {
+	for _, raw := range []string{"127.0.0.1", "10.0.0.1", "100.64.0.1", "169.254.1.1", "::1", "fe80::1"} {
+		if m07PublicAddress(net.ParseIP(raw)) {
+			t.Fatalf("non-public address accepted: %s", raw)
+		}
+	}
+	lookup := func(_ context.Context, _ string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	if _, err := m07ResolvePublicHost(context.Background(), "example.com", lookup); err == nil {
+		t.Fatal("private resolver result accepted")
+	}
+	mixedLookup := func(_ context.Context, _ string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	if _, err := m07ResolvePublicHost(context.Background(), "example.com", mixedLookup); err == nil {
+		t.Fatal("mixed public/private resolver result accepted")
+	}
+	publicLookup := func(_ context.Context, _ string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	if _, err := m07ResolvePublicHost(context.Background(), "example.com", publicLookup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m07ToolResponseBody(bytes.NewReader(bytes.Repeat([]byte("x"), m07MaxToolResponseBytes+1))); err == nil {
+		t.Fatal("oversized response accepted")
+	}
+	body, err := m07ToolResponseBody(bytes.NewBufferString("untrusted html"))
+	if err != nil || string(body) != `"untrusted html"` {
+		t.Fatalf("untrusted text was not retained as JSON data: %s %v", body, err)
 	}
 }
 

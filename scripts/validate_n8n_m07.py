@@ -8,10 +8,7 @@ nodes = {node["name"]: node for node in blueprint.get("nodes", [])}
 required = {
     "Manual Trigger",
     "M07 Adapter Input",
-    "Adapter Preflight",
-    "Preflighted Read-only HTTP GET",
-    "Build Tool Result Handoff",
-    "Register Tool Result Adapter",
+    "Fetch and Register Tool Adapter",
     "Canonical M07 Context Adapter",
     "Read-only Evidence Agent",
     "Validate Grounding Adapter",
@@ -20,7 +17,7 @@ required = {
 missing = required - nodes.keys()
 if missing:
     raise SystemExit(f"missing M07 adapter nodes: {sorted(missing)}")
-for retired in {"Grounding Boundary", "Registry Policy Preflight", "public_http GET only", "Resolve Canonical Evidence Payload"}:
+for retired in {"Grounding Boundary", "Registry Policy Preflight", "public_http GET only", "Resolve Canonical Evidence Payload", "Adapter Preflight", "Preflighted Read-only HTTP GET", "Build Tool Result Handoff", "Register Tool Result Adapter"}:
     if retired in nodes:
         raise SystemExit(f"retired local M07 policy node remains: {retired}")
 
@@ -35,23 +32,13 @@ for marker in ("untrusted data", "Never request or claim write authority", "prop
     if marker not in input_values["instruction"]:
         raise SystemExit(f"M07 instruction safety marker missing: {marker}")
 
-preflight = nodes["Adapter Preflight"]["parameters"]
-if "/v1/m07/preflight" not in preflight.get("url", "") or preflight.get("method") != "POST":
-    raise SystemExit("M07 preflight must call shared adapter before remote request")
-fetch = nodes["Preflighted Read-only HTTP GET"]["parameters"]
-if "Adapter Preflight" not in fetch.get("method", "") or "Adapter Preflight" not in fetch.get("url", ""):
-    raise SystemExit("remote request must consume adapter preflight artifact")
-response = fetch.get("options", {}).get("response", {}).get("response", {})
-redirect = fetch.get("options", {}).get("redirect", {}).get("redirect", {})
-if response.get("fullResponse") is not True or response.get("neverError") is not True or redirect.get("followRedirects") is not False:
-    raise SystemExit("remote request must preserve status and disable redirects")
-handoff = nodes["Build Tool Result Handoff"]["parameters"]["jsCode"]
-for marker in ("statusCode", "response.body", "tool_result", "ADAPTER_OR_FULL_RESPONSE_REQUIRED"):
-    if marker not in handoff:
-        raise SystemExit(f"tool result handoff marker missing: {marker}")
+fetch = nodes["Fetch and Register Tool Adapter"]["parameters"]
+if fetch.get("method") != "POST" or "/v1/m07/fetch-and-register" not in fetch.get("url", ""):
+    raise SystemExit("M07 fetch must be owned by the shared adapter")
+if "tool_request" not in fetch.get("jsonBody", "") or "tool_registry_json" not in fetch.get("jsonBody", ""):
+    raise SystemExit("adapter fetch must receive the request and registry")
 
 for name, endpoint in {
-    "Register Tool Result Adapter": "/v1/m07/register-tool-result",
     "Canonical M07 Context Adapter": "/v1/m07/context",
     "Validate Grounding Adapter": "/v1/m07/validate",
     "Persist Agent Proposal Adapter": "/v1/m07/register-proposal",
@@ -62,11 +49,8 @@ for name, endpoint in {
 
 connections = blueprint.get("connections", {})
 expected = [
-    ("M07 Adapter Input", "Adapter Preflight"),
-    ("Adapter Preflight", "Preflighted Read-only HTTP GET"),
-    ("Preflighted Read-only HTTP GET", "Build Tool Result Handoff"),
-    ("Build Tool Result Handoff", "Register Tool Result Adapter"),
-    ("Register Tool Result Adapter", "Canonical M07 Context Adapter"),
+    ("M07 Adapter Input", "Fetch and Register Tool Adapter"),
+    ("Fetch and Register Tool Adapter", "Canonical M07 Context Adapter"),
     ("Canonical M07 Context Adapter", "Read-only Evidence Agent"),
     ("Read-only Evidence Agent", "Validate Grounding Adapter"),
     ("Validate Grounding Adapter", "Persist Agent Proposal Adapter"),
@@ -76,4 +60,4 @@ for source, target in expected:
     if target not in destinations:
         raise SystemExit(f"missing M07 adapter flow {source} -> {target}")
 
-print("N8N M07 STATIC WIRING PASS: preflight, full-response handoff, trace registration, validation and proposal persistence use the shared adapter")
+print("N8N M07 STATIC WIRING PASS: adapter-owned fetch/transport, trace registration, validation and proposal persistence use the shared adapter")

@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +22,7 @@ import (
 )
 
 const watcherFixtureURL = "https://example.com/br13/offer"
+const m07MaxToolResponseBytes = 256 << 10
 
 // Deliberately no caller allowlist, endpoint option or network client.
 type watcherFixture struct {
@@ -240,6 +246,126 @@ func loadM07ToolArtifact(historyPath, id string, registry []corem07.ToolSpec, re
 	return corem07.ValidateRegisteredToolResult(raw, registry, recordID)
 }
 
+type m07LookupIPAddr func(context.Context, string) ([]net.IPAddr, error)
+
+func m07PublicAddress(ip net.IP) bool {
+	address, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	address = address.Unmap()
+	sharedAddressSpace := netip.MustParsePrefix("100.64.0.0/10")
+	if !address.IsValid() || !address.IsGlobalUnicast() || address.IsPrivate() || address.IsLoopback() || address.IsLinkLocalUnicast() || address.IsMulticast() || address.IsUnspecified() || sharedAddressSpace.Contains(address) {
+		return false
+	}
+	return true
+}
+
+func m07ResolvePublicHost(ctx context.Context, host string, lookup m07LookupIPAddr) ([]net.IPAddr, error) {
+	addresses, err := lookup(ctx, host)
+	if err != nil || len(addresses) == 0 {
+		return nil, fmt.Errorf("M07 DNS resolution failed")
+	}
+	for _, address := range addresses {
+		if !m07PublicAddress(address.IP) {
+			return nil, fmt.Errorf("M07 host resolves to a non-public address")
+		}
+	}
+	return addresses, nil
+}
+
+func m07ToolResponseBody(reader io.Reader) (json.RawMessage, error) {
+	body, err := io.ReadAll(io.LimitReader(reader, m07MaxToolResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > m07MaxToolResponseBytes {
+		return nil, fmt.Errorf("M07 tool response exceeds size limit")
+	}
+	// Preserve arbitrary read-only content as a JSON string when it is not a
+	// JSON value; it remains unknown/untrusted at the grounding boundary.
+	trimmed := bytes.TrimSpace(body)
+	if !json.Valid(trimmed) {
+		trimmed, err = json.Marshal(string(body))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return trimmed, nil
+}
+
+// fetchM07ToolResult owns the network transport used by M07. The hostname is
+// resolved before the request and again for every dial; every returned address
+// must be public. It disables redirects, proxies and connection reuse so an
+// n8n workflow cannot turn an allowlisted hostname into an SSRF hop.
+func fetchM07ToolResult(ctx context.Context, recordID string, request corem07.ToolRequest, registry []corem07.ToolSpec, lookup m07LookupIPAddr) (corem07.ToolResult, error) {
+	if err := corem07.ValidateToolRequest(request, registry); err != nil {
+		return corem07.ToolResult{}, err
+	}
+	parsed, err := url.Parse(request.Target)
+	if err != nil {
+		return corem07.ToolResult{}, err
+	}
+	var timeout time.Duration
+	for _, tool := range registry {
+		if tool.Name == request.ToolName {
+			timeout = time.Duration(tool.TimeoutMS) * time.Millisecond
+			break
+		}
+	}
+	if timeout <= 0 {
+		return corem07.ToolResult{}, fmt.Errorf("M07 tool timeout is required")
+	}
+	if _, err := m07ResolvePublicHost(ctx, parsed.Hostname(), lookup); err != nil {
+		return corem07.ToolResult{}, err
+	}
+	dialer := &net.Dialer{Timeout: timeout}
+	transport := &http.Transport{
+		Proxy:                 nil,
+		DisableKeepAlives:     true,
+		ForceAttemptHTTP2:     false,
+		TLSHandshakeTimeout:   timeout,
+		ResponseHeaderTimeout: timeout,
+		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(address)
+			if err != nil || !strings.EqualFold(host, parsed.Hostname()) || port != "443" {
+				return nil, fmt.Errorf("M07 dial target changed")
+			}
+			addresses, err := m07ResolvePublicHost(dialCtx, host, lookup)
+			if err != nil {
+				return nil, err
+			}
+			var lastErr error
+			for _, candidate := range addresses {
+				connection, err := dialer.DialContext(dialCtx, network, net.JoinHostPort(candidate.IP.String(), port))
+				if err == nil {
+					return connection, nil
+				}
+				lastErr = err
+			}
+			return nil, lastErr
+		},
+	}
+	client := &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	httpRequest, err := http.NewRequestWithContext(ctx, strings.ToUpper(request.Method), request.Target, nil)
+	if err != nil {
+		return corem07.ToolResult{}, err
+	}
+	response, err := client.Do(httpRequest)
+	if err != nil {
+		return corem07.ToolResult{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return corem07.ToolResult{}, fmt.Errorf("M07 tool returned non-success status")
+	}
+	body, err := m07ToolResponseBody(response.Body)
+	if err != nil {
+		return corem07.ToolResult{}, err
+	}
+	return corem07.ToolResult{RecordID: recordID, ToolCall: request, StatusCode: response.StatusCode, ReceivedAt: time.Now().UTC().Format(time.RFC3339), Redirected: false, Body: body}, nil
+}
+
 func m07AdapterHandler(historyPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -275,6 +401,40 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ALLOW_READ_ONLY", "artifact": *request.ToolRequest, "execution_permitted": false})
+		case "/v1/m07/fetch-and-register":
+			if request.ToolRequest == nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_REQUEST_REQUIRED", "execution_permitted": false})
+				return
+			}
+			result, err := fetchM07ToolResult(r.Context(), ctx.RecordID, *request.ToolRequest, request.Registry, net.DefaultResolver.LookupIPAddr)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_TRANSPORT_REJECTED", "execution_permitted": false})
+				return
+			}
+			rawResult, err := json.Marshal(result)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "SERIALIZATION_ERROR", "execution_permitted": false})
+				return
+			}
+			registered, err := corem07.RegisterToolResult(rawResult, request.Registry)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REJECTED", "execution_permitted": false})
+				return
+			}
+			path, err := m07ArtifactPath(historyPath, "tool-results", registered.TraceID)
+			if err == nil {
+				_, err = writeNewJSON(path, registered)
+			}
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": registered.Evidence(), "execution_permitted": false})
 		case "/v1/m07/register-tool-result":
 			if len(request.ToolResult) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -376,6 +536,7 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/m07/context", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/preflight", m07AdapterHandler(historyPath))
+	mux.HandleFunc("/v1/m07/fetch-and-register", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/register-tool-result", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/validate", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/register-proposal", m07AdapterHandler(historyPath))

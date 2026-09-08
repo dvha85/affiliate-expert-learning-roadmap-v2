@@ -14,7 +14,7 @@
       "name": "M07 Adapter Input",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [190, 0],
+      "position": [220, 0],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -53,75 +53,17 @@
       }
     },
     {
-      "id": "preflight",
-      "name": "Adapter Preflight",
+      "id": "fetch",
+      "name": "Fetch and Register Tool Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [400, 0],
+      "position": [450, 0],
       "parameters": {
         "method": "POST",
-        "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/preflight' }}",
+        "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/fetch-and-register' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_request:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)} }}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "fetch",
-      "name": "Preflighted Read-only HTTP GET",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [610, 0],
-      "parameters": {
-        "method": "={{ $('Adapter Preflight').item.json.body.artifact.method }}",
-        "url": "={{ $('Adapter Preflight').item.json.body.artifact.target }}",
-        "options": {
-          "timeout": "={{ JSON.parse($('M07 Adapter Input').item.json.tool_registry_json).find(t => t.name === $('Adapter Preflight').item.json.body.artifact.tool_name).timeout_ms }}",
-          "redirect": {
-            "redirect": {
-              "followRedirects": false
-            }
-          },
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true,
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "normalize-tool-result",
-      "name": "Build Tool Result Handoff",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [820, 0],
-      "parameters": {
-        "jsCode": "const preflight=$('Adapter Preflight').item.json.body; const response=$json; if(preflight.status!=='ALLOW_READ_ONLY'||!preflight.artifact||!Number.isInteger(response.statusCode)||!Object.prototype.hasOwnProperty.call(response,'body')) throw new Error('ADAPTER_OR_FULL_RESPONSE_REQUIRED'); return [{json:{record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_result:{record_id:$('M07 Adapter Input').item.json.record_id,tool_call:preflight.artifact,status_code:response.statusCode,received_at:new Date().toISOString(),redirected:false,body:response.body}}}];"
-      }
-    },
-    {
-      "id": "register-tool",
-      "name": "Register Tool Result Adapter",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1030, 0],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-tool-result' }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
         "options": {
           "response": {
             "response": {
@@ -137,7 +79,7 @@
       "name": "Canonical M07 Context Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1240, 0],
+      "position": [680, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/context' }}",
@@ -159,12 +101,12 @@
       "name": "Read-only Evidence Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [1450, 0],
+      "position": [920, 0],
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + JSON.stringify($('Canonical M07 Context Adapter').item.json.body.artifact) + '\nregistered_tool_evidence=' + JSON.stringify($('Register Tool Result Adapter').item.json.body.evidence) }}",
+        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + JSON.stringify($('Canonical M07 Context Adapter').item.json.body.artifact) + '\nregistered_tool_evidence=' + JSON.stringify($('Fetch and Register Tool Adapter').item.json.body.evidence) }}",
         "options": {
-          "systemMessage": "You are a read-only evidence analyst. The adapter, not you, owns request policy, tool trace and permissions. Do not call tools. Return only the required JSON contract."
+          "systemMessage": "You are a read-only evidence analyst. The shared adapter owns network policy, DNS validation, tool trace and permissions. Do not call tools. Return only the required JSON contract."
         }
       }
     },
@@ -173,7 +115,7 @@
       "name": "OpenAI Chat Model - configure credential locally",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
-      "position": [1410, 220],
+      "position": [880, 220],
       "parameters": {
         "options": {}
       }
@@ -183,13 +125,13 @@
       "name": "Validate Grounding Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1660, 0],
+      "position": [1150, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/validate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Register Tool Result Adapter').item.json.body.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Fetch and Register Tool Adapter').item.json.body.artifact_id} }}",
         "options": {
           "response": {
             "response": {
@@ -205,13 +147,13 @@
       "name": "Persist Agent Proposal Adapter",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1870, 0],
+      "position": [1380, 0],
       "parameters": {
         "method": "POST",
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-proposal' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Register Tool Result Adapter').item.json.body.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Fetch and Register Tool Adapter').item.json.body.artifact_id} }}",
         "options": {
           "response": {
             "response": {
@@ -225,11 +167,8 @@
   ],
   "connections": {
     "Manual Trigger": {"main": [[{"node": "M07 Adapter Input", "type": "main", "index": 0}]]},
-    "M07 Adapter Input": {"main": [[{"node": "Adapter Preflight", "type": "main", "index": 0}]]},
-    "Adapter Preflight": {"main": [[{"node": "Preflighted Read-only HTTP GET", "type": "main", "index": 0}]]},
-    "Preflighted Read-only HTTP GET": {"main": [[{"node": "Build Tool Result Handoff", "type": "main", "index": 0}]]},
-    "Build Tool Result Handoff": {"main": [[{"node": "Register Tool Result Adapter", "type": "main", "index": 0}]]},
-    "Register Tool Result Adapter": {"main": [[{"node": "Canonical M07 Context Adapter", "type": "main", "index": 0}]]},
+    "M07 Adapter Input": {"main": [[{"node": "Fetch and Register Tool Adapter", "type": "main", "index": 0}]]},
+    "Fetch and Register Tool Adapter": {"main": [[{"node": "Canonical M07 Context Adapter", "type": "main", "index": 0}]]},
     "Canonical M07 Context Adapter": {"main": [[{"node": "Read-only Evidence Agent", "type": "main", "index": 0}]]},
     "OpenAI Chat Model - configure credential locally": {"ai_languageModel": [[{"node": "Read-only Evidence Agent", "type": "ai_languageModel", "index": 0}]]},
     "Read-only Evidence Agent": {"main": [[{"node": "Validate Grounding Adapter", "type": "main", "index": 0}]]},

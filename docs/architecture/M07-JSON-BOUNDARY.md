@@ -32,10 +32,14 @@ bot m07 validate HISTORY.jsonl RECORD_ID MODEL_OUTPUT.json REGISTRY.json
 
 ## Tool-result evidence
 
-Adapter phải preflight request bằng registry **trước** khi request được thực
-hiện. Khi nhận response, adapter ghi JSON `ToolResult` (record ID, request,
-status 2xx, thời điểm, `redirected=false`, body JSON data), rồi learner Bot
-đăng ký artifact bất biến:
+Adapter phải kiểm request bằng registry **trước** khi request được thực hiện.
+Endpoint adapter `POST /v1/m07/fetch-and-register` là đường gọi được blueprint
+dùng: nó resolve hostname trước request và trước mỗi dial, từ chối mọi kết quả
+DNS không-public (gồm private, loopback, link-local và CGNAT), chỉ dùng HTTPS
+port 443, tắt proxy/redirect/connection reuse, áp timeout theo registry và giới
+hạn body ở 256 KiB. Response chỉ được nhận khi 2xx. Khi nhận response, adapter
+ghi JSON `ToolResult` (record ID, request, status 2xx, thời điểm,
+`redirected=false`, body JSON data), rồi learner Bot đăng ký artifact bất biến:
 
 ```text
 bot m07 register-tool-result HISTORY.jsonl RECORD_ID REGISTRY.json TOOL_RESULT.json REGISTERED.json
@@ -91,10 +95,11 @@ phải authoritative proof cho path learner hoặc workflow.
 
 ## Giới hạn còn mở
 
-Blueprint n8n gọi các endpoint loopback chung theo thứ tự `preflight → GET
-full response/no redirect → register tool result → context → model → validate
-→ register proposal`. Nó không còn có code node tự quyết định registry hoặc
-grounding. Tuy nhiên repo chưa import/chạy blueprint trên một n8n instance,
-chưa có transport seam kiểm response-size/private-address policy hoặc parity
-execution thật với CLI. Vì vậy BR-15/RP-05 vẫn **chưa hoàn tất**; không dùng
-tài liệu này để tuyên bố model/n8n/provider đã grounded hoặc operated.
+Blueprint n8n gọi endpoint loopback chung theo thứ tự `fetch-and-register →
+context → model → validate → register proposal`. Nó không còn trực tiếp gọi
+nguồn remote hoặc có code node tự quyết định registry, transport hay grounding.
+Repo có unit test cho DNS non-public/mixed, body quá cỡ và text untrusted, nhưng
+chưa import/chạy blueprint trên n8n, chưa có bài kiểm end-to-end với một nguồn
+công khai kiểm soát được, và chưa có evidence provider/model operated. Vì vậy
+BR-15/RP-05 vẫn **chưa hoàn tất**; không dùng tài liệu này để tuyên bố
+model/n8n/provider đã grounded hoặc operated.
