@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
@@ -100,4 +101,59 @@ func resolveM11Artifact(dir, kind, id, hash string) (corem11.ArtifactEntry, erro
 		}
 	}
 	return corem11.ArtifactEntry{}, fmt.Errorf("M11 artifact does not resolve")
+}
+
+func activateM11Lease(dir, leaseID, activatedAt string) (corem11.ProductionActivationRecord, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionActivationRecord{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionActivationRecord{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
+		return corem11.ProductionActivationRecord{}, "", err
+	}
+	var lease *corem11.ProductionLease
+	approvalExists := false
+	for _, entry := range entries {
+		profile := ""
+		if entry.ArtifactKind == corem11.ArtifactKindLease {
+			profile = "lease"
+		}
+		if entry.ArtifactKind == corem11.ArtifactKindLeaseApproval {
+			profile = "approval"
+		}
+		if profile == "" {
+			continue
+		}
+		value, status := corem11.DecodeArtifact(profile, entry.Artifact)
+		if status != corem11.Valid {
+			return corem11.ProductionActivationRecord{}, "", fmt.Errorf("invalid M11 registry artifact")
+		}
+		if candidate, ok := value.(*corem11.ProductionLease); ok && candidate.LeaseID == leaseID {
+			copied := *candidate
+			lease = &copied
+		}
+		if candidate, ok := value.(*corem11.ProductionLeaseApproval); ok && candidate.LeaseID == leaseID {
+			approvalExists = true
+		}
+	}
+	if lease == nil || !approvalExists {
+		return corem11.ProductionActivationRecord{}, "", fmt.Errorf("activation requires registered production lease and approval")
+	}
+	activated, errActivated := time.Parse(time.RFC3339, activatedAt)
+	validFrom, errValid := time.Parse(time.RFC3339, lease.ValidFrom)
+	expires, errExpires := time.Parse(time.RFC3339, lease.ExpiresAt)
+	if errActivated != nil || errValid != nil || errExpires != nil || activated.Before(validFrom) || !activated.Before(expires) {
+		return corem11.ProductionActivationRecord{}, "", fmt.Errorf("activation time is outside the registered lease")
+	}
+	record := corem11.ProductionActivationRecord{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ActivatedAt: activatedAt}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return record, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindActivation, raw)
+	return record, status, err
 }

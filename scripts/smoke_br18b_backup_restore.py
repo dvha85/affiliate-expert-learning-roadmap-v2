@@ -66,6 +66,19 @@ def write_production_lease(path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_production_lease_approval(path, lease_path):
+    lease = json.loads(lease_path.read_text(encoding="utf-8"))
+    payload = {
+        "approval_id": lease["approval_ref"], "lease_id": lease["lease_id"], "lease_version": lease["lease_version"],
+        "lease_hash": lease["lease_hash"], "promotion_review_ref": lease["promotion_review_ref"],
+        "source_canary_grant_id": lease["source_canary_grant_id"], "source_canary_grant_version": lease["source_canary_grant_version"],
+        "source_canary_grant_hash": lease["source_canary_grant_hash"], "source_e5_refs": ["fixture:br18-e5"],
+        "validated_risk_classes": ["RISK0"], "reviewed_by": "human", "reviewer_id": lease["reviewer_id"],
+        "reviewed_at": lease["reviewed_at"], "decision": "APPROVE_PRODUCTION_LEASE",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="br18b-runtime-") as directory:
@@ -104,6 +117,9 @@ def main():
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
         production_lease = root / "production-lease.json"; write_production_lease(production_lease)
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
+        production_approval = root / "production-approval.json"; write_production_lease_approval(production_approval, production_lease)
+        assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
@@ -142,6 +158,7 @@ def main():
         assert (restored / "actions.jsonl").exists() and (restored / "m10-artifacts.jsonl").exists() and (restored / "m10-outcomes.jsonl").exists() and (restored / "m11-artifacts.jsonl").exists()
         assert invoke(bot, "mission", "m10-resolve", restored, "EXECUTION_RECORD", failed["artifact"]["execution_id"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEASE", "br18-production-lease", env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_ACTIVATION", "br18-production-lease/v1", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)

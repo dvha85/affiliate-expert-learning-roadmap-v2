@@ -279,6 +279,24 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLease, input); code != 0 || response["status"] != "APPENDED" {
 		t.Fatalf("M11 lease registration failed: code=%d response=%+v", code, response)
 	}
+	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	approvalRaw, err := json.Marshal(approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalInput := filepath.Join(dir, "approval.json")
+	if err := os.WriteFile(approvalInput, approvalRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLeaseApproval, approvalInput); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("M11 approval registration failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("M11 activation failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("M11 activation retry failed: code=%d response=%+v", code, response)
+	}
 	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindLease, lease.LeaseID); code != 0 || response["status"] != "RESOLVED" {
 		t.Fatalf("M11 lease did not resolve: code=%d response=%+v", code, response)
 	}

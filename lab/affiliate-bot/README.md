@@ -127,7 +127,7 @@ go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGIST
 Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
 `m08-policy`, `m09-approval`, `m10-canary`, `m10-cost-register`, `m10-gate`,
 `m10-authorize`, `m10-reserve-authorization`, `m10-cancel`, `m10-reserve`,
-`m10-record-failed`, `m10-outcome`, `m11-register`, `m11-resolve`, `m11-stop` và
+`m10-record-failed`, `m10-outcome`, `m11-register`, `m11-resolve`, `m11-activate`, `m11-stop` và
 `status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
 và STOP không bị `init` ghi đè. `m10-cancel` chỉ phát hành execution record
@@ -203,6 +203,11 @@ execution, activation, reconciliation hoặc cycle). Backup v2 gồm registry n�
 nếu runtime đã có nó và kiểm lại graph trước `RESTORED`. Đây chưa phải lệnh
 lease activation, production gate, executor, reconciliation/recovery hay M11
 lifecycle đầy đủ.
+
+`m11-activate STATE_DIR LEASE_ID ACTIVATED_AT` chỉ tạo `ProductionActivation`
+khi lease và lease approval khớp exact đã có trong registry, thời điểm còn nằm
+trong lease và runtime chưa STOP. Retry cùng activation trả `EXACT_DUPLICATE`.
+Lệnh này chưa thay thế health gate, ledger hay cấp phép/executor production.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
