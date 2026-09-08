@@ -61,15 +61,8 @@ type LearnerApproval struct {
 	OneTime       bool   `json:"one_time"`
 }
 type LearnerCanary struct {
-	GrantID        string `json:"grant_id"`
-	IntentID       string `json:"intent_id"`
-	IntentHash     string `json:"intent_hash"`
-	ApprovalID     string `json:"approval_id"`
-	MaxExecutions  int    `json:"max_executions"`
-	MaxCostMinor   int64  `json:"max_cost_minor"`
-	Currency       string `json:"currency"`
+	corem10.CanaryGrant
 	Status         string `json:"status"`
-	GrantedAt      string `json:"granted_at"`
 	ExecutionsUsed int    `json:"executions_used"`
 	CostUsedMinor  int64  `json:"cost_used_minor"`
 }
@@ -286,13 +279,15 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 		}
 	}
 	if s.Canary != nil {
-		if s.Intent == nil || s.Approval == nil || s.Canary.GrantID == "" || s.Canary.IntentID != s.Intent.IntentID || s.Canary.IntentHash != s.Intent.IntentHash || s.Canary.ApprovalID != s.Approval.ApprovalID || s.Canary.MaxExecutions <= 0 || s.Canary.MaxCostMinor < 0 || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutions || s.Canary.CostUsedMinor > s.Canary.MaxCostMinor {
+		grantRaw, marshalErr := json.Marshal(s.Canary.CanaryGrant)
+		_, grantStatus := corem10.DecodeCanaryGrant(grantRaw)
+		if marshalErr != nil || grantStatus != "VALID" || s.Intent == nil || s.Approval == nil || s.Policy == nil || s.Canary.GrantID == "" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutionsTotal || s.Canary.CostUsedMinor > s.Canary.MaxCostMinorTotal || corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, time.Now().UTC()) != "VALID" {
 			return fmt.Errorf("mission canary integrity/binding/budget check failed")
 		}
 	}
 	seenReservations := map[string]bool{}
 	for _, r := range s.Reservations {
-		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Canary.IntentID || r.IntentHash != s.Canary.IntentHash || r.CostMinor < 0 {
+		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || s.Intent == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Intent.IntentID || r.IntentHash != s.Intent.IntentHash || r.CostMinor < 0 {
 			return fmt.Errorf("mission reservation integrity/binding check failed")
 		}
 		if _, err := time.Parse(time.RFC3339, r.ReservedAt); err != nil {
@@ -523,7 +518,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
@@ -702,33 +697,24 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		var c LearnerCanary
-		if err = readJSON(args[2], &c); err != nil {
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
-		if c.GrantID == "" || c.MaxExecutions <= 0 || c.MaxCostMinor < 0 || c.Currency == "" || c.ExecutionsUsed < 0 || c.CostUsedMinor < 0 {
-			return emit("REJECTED", nil, fmt.Errorf("bounded canary fields required"), 1)
+		grant, status := corem10.DecodeCanaryGrant(raw)
+		if status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant: %s", status), 1)
 		}
-		if c.ExecutionsUsed > c.MaxExecutions || c.CostUsedMinor > c.MaxCostMinor {
-			return emit("REJECTED", nil, fmt.Errorf("canary usage exceeds grant"), 1)
+		if status := corem10.ValidCanaryGrantFor(grant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, time.Now().UTC()); status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant: %s", status), 1)
 		}
+		c := LearnerCanary{CanaryGrant: grant, Status: "ACTIVE"}
 		if s.Canary != nil {
-			if s.Canary.GrantID != c.GrantID || s.Canary.IntentID != s.Intent.IntentID || s.Canary.ApprovalID != s.Approval.ApprovalID {
+			if s.Canary.GrantID != c.GrantID || s.Canary.GrantHash != c.GrantHash {
 				return emit("REJECTED", nil, fmt.Errorf("cannot replace an existing canary binding"), 1)
-			}
-			if s.Canary.MaxExecutions != c.MaxExecutions || s.Canary.MaxCostMinor != c.MaxCostMinor || s.Canary.Currency != c.Currency {
-				return emit("REJECTED", nil, fmt.Errorf("canary grant limits and currency are immutable"), 1)
 			}
 			c.ExecutionsUsed = s.Canary.ExecutionsUsed
 			c.CostUsedMinor = s.Canary.CostUsedMinor
-			c.GrantedAt = s.Canary.GrantedAt
-		}
-		c.IntentID = s.Intent.IntentID
-		c.IntentHash = s.Intent.IntentHash
-		c.ApprovalID = s.Approval.ApprovalID
-		c.Status = "ACTIVE"
-		if c.GrantedAt == "" {
-			c.GrantedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		}
 		s.Canary = &c
 		if err = saveMissionState(args[1], s); err != nil {
@@ -784,6 +770,53 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("APPENDED", bound, nil, 0)
+	case "m10-gate":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
+		}
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(raw)
+		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
+		}
+		gate := corem10.EvaluateCanaryGate(corem10.CanaryGateInput{
+			Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash,
+			PolicyVersion: s.Policy.PolicyVersion, PolicyDecision: s.Policy.Decision, RiskClass: s.Policy.RiskClass,
+			ApprovalID: s.Approval.ApprovalID, ApproverID: s.Approval.ApproverID, CorrelationID: s.Intent.CorrelationID,
+			ActionType: s.Intent.ActionType, Target: s.Intent.Target, Now: args[4],
+			Ledger: corem10.CanaryLedgerSnapshot{ExecutionsTotal: s.Canary.ExecutionsUsed, ExecutionsInWindow: s.Canary.ExecutionsUsed, CostMinorTotal: s.Canary.CostUsedMinor},
+		})
+		gateRaw, err := json.Marshal(gate)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateCanaryGateDecision(gateRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		status, err = writeNewJSON(args[3], gate)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, gate, nil, 0)
+		}
+		return emit(gate.Decision, gate, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)
@@ -838,7 +871,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			}
 			return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different binding or cost"), 1)
 		}
-		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutions || cost > s.Canary.MaxCostMinor-s.Canary.CostUsedMinor {
+		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutionsTotal || cost > s.Canary.MaxCostMinorTotal-s.Canary.CostUsedMinor {
 			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
 		}
 		s.Canary.ExecutionsUsed++

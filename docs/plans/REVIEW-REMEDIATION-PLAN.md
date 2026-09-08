@@ -107,6 +107,15 @@ nghiệm thu trên `main`**.
   STOP và race cap. Grant/approval/ledger hiện chưa là graph canonical M09/M10,
   chưa có execution stub/outcome linkage hay fault-injection đầy đủ; RP-03 vẫn
   mở.
+- **RP-03 canonical grant/gate foundation:** `core/m10` nay decode/hash
+  `CanaryGrant` theo contract, recheck approval/policy/risk/host/correlation/
+  expiry khi learner nhận grant, và recheck hash khi reload mission state.
+  `m10-gate` resolve cost-bound đã register rồi emit immutable,
+  non-authorizing `CanaryGateDecision` từ snapshot budget với
+  `EVALUATED_AT` explicit để retry byte-identical. Smoke shared chain cover
+  grant sealed, gate ALLOW/retry và cost-bound tamper reject. Grant còn embedded
+  trong mutable state, gate chưa được registry/authorization/execution resolve
+  và không có side effect; RP-03 vẫn mở.
 - **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
   read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
   một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng

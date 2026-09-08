@@ -36,6 +36,20 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_canary_grant(path, intent, policy, approval, max_executions, max_cost):
+    payload = {
+        "grant_id": "br16-g", "grant_version": "v1", "policy_version": policy["policy_version"],
+        "approval_ref": approval["approval_id"], "approved_by": "human", "approver_id": approval["approver_id"],
+        "approved_at": approval["approved_at"], "valid_from": approval["approved_at"], "expires_at": approval["expires_at"],
+        "allowed_risk_classes": [policy["risk_class"]], "allowed_action_types": [intent["action_type"]], "allowed_hosts": ["example.com"],
+        "executor_ids": ["local_sandbox"], "max_executions_total": max_executions, "max_executions_per_window": max_executions,
+        "window_seconds": 3600, "max_cost_minor_total": max_cost, "currency": "USD", "max_pending_outcomes": 1,
+        "kill_switch_required": True, "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
+    }
+    payload["grant_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def grounded_claim(field, value, evidence_id):
     value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
     rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
@@ -95,13 +109,19 @@ def main():
         i = json.loads(intent.read_text()); p = json.loads(policy.read_text())
         approval = work / "approval.json"; approval.write_text(json.dumps({"approval_id":"br16-ap","intent_id":i["intent_id"],"intent_hash":i["intent_hash"],"policy_version":p["policy_version"],"decision":"APPROVE","approved_by":"human","approver_id":"pilot-human","approved_at":"2026-09-07T01:05:00Z","expires_at":"2099-09-03T02:50:00Z","correlation_id":i["correlation_id"],"one_time":True}), encoding="utf-8")
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
-        grant = work / "grant.json"; grant.write_text(json.dumps({"grant_id":"br16-g","max_executions":1,"max_cost_minor":100,"currency":"USD"}), encoding="utf-8")
+        grant = work / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 1, 100)
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
         cost = work / "cost-bound.json"; write_cost_bound(cost, i, 100, "2099-09-03T02:45:00Z", "br16-cost")
         assert invoke(bot, "mission", "m10-reserve", state, cost, "unregistered", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "EXACT_DUPLICATE"
+        gate = work / "canary-gate.json"
+        gate_time = "2026-09-08T00:00:00Z"
+        gate_response = invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)
+        assert gate_response["status"] == "ALLOW_CANARY" and gate_response["artifact"]["execution_authorized"] is False
+        assert invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)["status"] == "EXACT_DUPLICATE"
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-gate", state, tampered, work / "tampered-gate.json", gate_time, expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
         expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
         assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
