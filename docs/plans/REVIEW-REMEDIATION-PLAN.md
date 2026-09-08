@@ -421,6 +421,15 @@ dưới.
 
 ### RP-09 — Audit readiness và nghiệm thu offline
 
+**Cập nhật audit (2026-09-08):** `audit_readiness.py` đọc matrix thay vì tìm từ
+khóa đơn lẻ: kiểm version/IDs/status, implementation/test refs tồn tại, remaining
+evidence bắt buộc cho non-final status, `IMPLEMENTED` không được còn gap, và hai
+smoke M00–M11/M11 restore đã wired trong CI. Nó cũng reject claim
+`ready for production` không có phủ định khi matrix giữ NOT_READY. Năm isolated
+negative fixtures chạy implementation thực cho ref hỏng, status final còn gap,
+CI regression mất, và prose overclaim. Audit vẫn chưa parse toàn bộ ngữ nghĩa
+mọi tài liệu/PR hoặc xác nhận remote CI run; các phần đó còn mở.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.
