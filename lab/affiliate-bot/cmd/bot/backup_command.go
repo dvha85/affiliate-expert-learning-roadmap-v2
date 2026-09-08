@@ -64,6 +64,13 @@ func backupFiles(source string) ([]string, error) {
 
 func requiredBackupFiles(source string) ([]string, error) {
 	required := []string{"history.jsonl", "mission-state.json"}
+	accesstradeReceiptRequired, err := accesstradeBackupReceiptRequired(source)
+	if err != nil {
+		return nil, err
+	}
+	if accesstradeReceiptRequired {
+		required = append(required, filepath.Base(accesstradeReceiptPath(filepath.Join(source, "outcomes.jsonl"))))
+	}
 	state, err := loadMissionState(source)
 	if err != nil {
 		return nil, err
@@ -298,6 +305,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot backup create RUNTIME_DIR BACKUP_DIR | bot backup restore BACKUP_DIR EMPTY_TARGET_DIR"), 2)
 	}
 	if args[0] == "create" {
+		if e := validateAccesstradeBackupGraph(args[1]); e != nil {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime ACCESSTRADE receipt graph is invalid: %w", e), 1)
+		}
 		files, e := backupFiles(args[1])
 		if e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
@@ -378,6 +388,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	if e = validateM11BackupGraph(args[2]); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
+	}
+	if e = validateAccesstradeBackupGraph(args[2]); e != nil {
+		return emit("GRAPH_FAILED", nil, fmt.Errorf("restored ACCESSTRADE receipt graph is invalid: %w", e), 1)
 	}
 	return emit("RESTORED", m, nil, 0)
 }

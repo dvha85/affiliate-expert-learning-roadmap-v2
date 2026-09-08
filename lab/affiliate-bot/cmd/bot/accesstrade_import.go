@@ -44,8 +44,8 @@ func decodeAccesstradeManifest(raw []byte) (AccesstradeReportManifest, error) {
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return manifest, fmt.Errorf("manifest contains trailing data")
 	}
-	if strings.TrimSpace(manifest.SnapshotID) == "" || strings.TrimSpace(manifest.SourceRef) == "" || manifest.Currency != "VND" || len(manifest.Mappings) == 0 {
-		return manifest, fmt.Errorf("manifest requires snapshot_id, source_ref, currency=VND and mappings")
+	if strings.TrimSpace(manifest.SnapshotID) == "" || !strings.HasPrefix(manifest.SourceRef, "accesstrade:") || manifest.Currency != "VND" || len(manifest.Mappings) == 0 {
+		return manifest, fmt.Errorf("manifest requires snapshot_id, source_ref beginning accesstrade:, currency=VND and mappings")
 	}
 	if _, err := parseRFC3339(manifest.ObservedAt); err != nil {
 		return manifest, fmt.Errorf("manifest observed_at: %w", err)
@@ -248,10 +248,10 @@ func decodeAccesstradeOutcomes(report []byte, manifest AccesstradeReportManifest
 	return outcomes, nil
 }
 
-// appendOutcomesAtomically commits a complete validated snapshot or preserves
-// the prior JSONL bytes. It intentionally does not create a missing parent
+// appendJSONLLinesAtomically commits a complete validated snapshot or preserves
+// prior JSONL bytes. It intentionally does not create a missing parent
 // directory, matching the existing append-store boundary.
-func appendOutcomesAtomically(path string, records [][]byte) error {
+func appendJSONLLinesAtomically(path string, records [][]byte) error {
 	directory := filepath.Dir(path)
 	info, err := os.Stat(directory)
 	if err != nil || !info.IsDir() {
@@ -309,6 +309,10 @@ func appendOutcomesAtomically(path string, records [][]byte) error {
 	return closeErr
 }
 
+func appendOutcomesAtomically(path string, records [][]byte) error {
+	return appendJSONLLinesAtomically(path, records)
+}
+
 func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -342,6 +346,10 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 	if err != nil && !os.IsNotExist(err) {
 		return emit("STORE_ERROR", nil, err, 1)
 	}
+	receipts, err := validateAccesstradeReceiptStore(args[3], existing)
+	if err != nil {
+		return emit("RECEIPT_STORE_ERROR", nil, err, 1)
+	}
 	reportInfo, err := os.Stat(args[4])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)
@@ -374,6 +382,10 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 			return emit(status, nil, fmt.Errorf("outcome rejected: %s", status), 1)
 		}
 	}
+	receipt := newAccesstradeReceipt(manifest, report, rawManifest, args[3], candidates)
+	if err := validateAccesstradeReceipt(receipt); err != nil {
+		return emit("INVALID_RECEIPT", nil, err, 1)
+	}
 	byID := map[string]m03.OutcomeRecord{}
 	for _, outcome := range existing {
 		byID[outcome.OutcomeID] = outcome
@@ -388,10 +400,23 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if duplicates == len(candidates) {
-		return emit("EXACT_DUPLICATE", candidates, nil, 0)
+		for _, existingReceipt := range receipts {
+			if existingReceipt.ReceiptID == receipt.ReceiptID {
+				if sameReceipt(existingReceipt, receipt) {
+					return emit("EXACT_DUPLICATE", map[string]any{"outcomes": candidates, "receipt": receipt}, nil, 0)
+				}
+				return emit("RECEIPT_CONFLICT", nil, fmt.Errorf("snapshot_id reused with different source bytes or metadata"), 1)
+			}
+		}
+		return emit("RECEIPT_MISSING", nil, fmt.Errorf("exact outcomes do not have their exact ACCESSTRADE receipt"), 1)
 	}
 	if duplicates > 0 {
 		return emit("PARTIAL_DUPLICATE", nil, fmt.Errorf("all rows in a snapshot must be new or exact duplicates"), 1)
+	}
+	for _, existingReceipt := range receipts {
+		if existingReceipt.ReceiptID == receipt.ReceiptID {
+			return emit("RECEIPT_CONFLICT", nil, fmt.Errorf("snapshot_id reused with different content"), 1)
+		}
 	}
 	encodedRecords := make([][]byte, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -401,8 +426,21 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 		}
 		encodedRecords = append(encodedRecords, encodedCandidate)
 	}
+	if err := writeJSONAtomic(accesstradeJournalPath(args[3]), receipt); err != nil {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
 	if err := appendOutcomesAtomically(args[3], encodedRecords); err != nil {
 		return emit("STORE_ERROR", nil, err, 1)
 	}
-	return emit("APPENDED", candidates, nil, 0)
+	encodedReceipt, err := json.Marshal(receipt)
+	if err != nil {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	if err := appendJSONLLinesAtomically(accesstradeReceiptPath(args[3]), [][]byte{encodedReceipt}); err != nil {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	if err := os.Remove(accesstradeJournalPath(args[3])); err != nil {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	return emit("APPENDED", map[string]any{"outcomes": candidates, "receipt": receipt}, nil, 0)
 }

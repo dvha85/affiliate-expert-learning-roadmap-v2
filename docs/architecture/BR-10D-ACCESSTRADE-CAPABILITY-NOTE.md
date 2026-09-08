@@ -34,6 +34,18 @@ Snapshot được validate hết trước khi ghi atomically vào outcome store.
 chỉ được chấp nhận khi **toàn bộ** snapshot là exact duplicate; một batch vừa
 cũ vừa mới bị từ chối để không che việc thay đổi dữ liệu nguồn.
 
+Mỗi snapshot mới còn có một receipt bất biến trong
+`accesstrade-receipts.jsonl`: receipt bind `snapshot_id`, `source_ref`, thời
+điểm, tiền tệ, hash SHA-256 của CSV/manifest và các canonical outcome/action
+IDs. Nó không lưu order ID, customer data hay tracking URL. CLI
+`outcome accesstrade-receipts` resolve lại history/action/outcome và fail nếu
+receipt mồ côi, thiếu outcome, khác store hoặc có outcome ACCESSTRADE thiếu
+receipt. Một journal pending được giữ fail-closed khi commit hai store bị ngắt.
+Backup/restore runtime tiêu chuẩn cũng derive receipt requirement từ
+`outcomes.jsonl`, nên không thể sửa manifest backup để bỏ receipt mà vẫn
+restore thành công. Đây là kiểm integrity/replay của fixture, **không** là
+chứng minh dữ liệu report là thật.
+
 ## Điều còn thiếu trước operated evidence
 
 1. Campaign và kênh được ACCESSTRADE duyệt.

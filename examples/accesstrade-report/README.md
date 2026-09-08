@@ -26,3 +26,11 @@ The current observed status mapping is intentionally narrow:
 An unknown status is rejected. In particular, report commission is stored as
 `reported_commission_vnd`, never `commission_paid_vnd`; this adapter has not
 verified a payment-status export and must not infer payment.
+
+On a successful import, the learner Bot writes a neighbouring
+`accesstrade-receipts.jsonl` record. It contains only snapshot metadata,
+canonical action/outcome IDs and SHA-256 hashes of this CSV and manifest—not
+the order keys themselves. Re-run verification with `bot outcome
+accesstrade-receipts HISTORY ACTIONS OUTCOMES`. A pending journal blocks a
+further import instead of guessing whether the outcome and receipt writes both
+finished. Standard runtime backup/restore verifies this receipt graph too.

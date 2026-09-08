@@ -101,6 +101,20 @@ hồng`; manifest phải map từng mã đơn **đã ẩn danh** tới `outcome_
 trùng, duplicate một phần, action không resolve và mọi attempt dùng UTM làm
 mapping ngầm. `reported_commission_vnd` không có nghĩa là đã thanh toán.
 
+Sau import, kiểm receipt bằng chính runtime trước khi coi snapshot là có thể
+replay:
+
+```text
+go run ./cmd/bot outcome accesstrade-receipts HISTORY.jsonl ACTIONS.jsonl OUTCOMES.jsonl
+```
+
+Receipt chỉ có `snapshot_id`, hash SHA-256 của CSV/manifest, IDs canonical và
+metadata; không giữ mã đơn hay URL tracking. Runtime để lại journal fail-closed
+nếu tiến trình dừng giữa outcome và receipt, khi đó phải điều tra/khôi phục chứ
+không import tiếp. `bot backup create RUNTIME_DIR BACKUP_DIR` buộc receipt vào
+backup khi `outcomes.jsonl` có source `accesstrade:`; restore kiểm lại toàn bộ
+graph. Các kiểm tra này vẫn không phải proof export thật hoặc payment.
+
 ## 9. Phần còn mở
 
 BR-06a: tài liệu trung lập + fixture/mapping có test, chờ review. BR-06b: tài khoản ACCESSTRADE và dashboard đã được xem read-only; CSV adapter fixture đã có, nhưng chưa có campaign được duyệt, export thật được review hoặc case link → báo cáo thật. BR-10d chưa có operated proof; fixture không chứng minh pipeline đã nhận business outcome.

@@ -227,7 +227,7 @@ executor; envelope command vẫn `execution_permitted=false`.
 
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
 
-`bot outcome accesstrade-import HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json` là adapter read-only cho export CSV đã khử dữ liệu riêng tư của Publisher. Nó chỉ nhận mapping tường minh từ mã đơn đã ẩn danh sang ActionRecord, không suy attribution từ UTM; xem [fixture và giới hạn](../../examples/accesstrade-report/README.md).
+`bot outcome accesstrade-import HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json` là adapter read-only cho export CSV đã khử dữ liệu riêng tư của Publisher. Nó chỉ nhận mapping tường minh từ mã đơn đã ẩn danh sang ActionRecord, không suy attribution từ UTM. Mỗi snapshot được ghi thêm receipt hash-only vào cạnh outcome store; đọc/kiểm receipt bằng `bot outcome accesstrade-receipts HISTORY ACTIONS OUTCOMES`. Backup runtime chuẩn buộc phải mang theo receipt này; xem [fixture và giới hạn](../../examples/accesstrade-report/README.md).
 
 [BR-10a: ghi nhận ActionRecord thủ công](../../docs/architecture/BR-10A-ACTION-STORE.md): `bot action record HISTORY.jsonl ACTIONS.jsonl ACTION.json`, đọc lại bằng `bot action list HISTORY.jsonl ACTIONS.jsonl`. Store action riêng, không đăng bài/thực thi; decision phải tồn tại và replay MATCH. Lệnh validate dưới đây vẫn chỉ đọc.
 
