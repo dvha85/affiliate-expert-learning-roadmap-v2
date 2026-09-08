@@ -38,7 +38,7 @@ Lưu riêng URL/bằng chứng action, người review, tracking/campaign mappin
 
 ## 4. Lấy báo cáo và giữ provenance
 
-Trong chương trình đã chọn, xác định chức năng báo cáo/xuất dữ liệu từ tài liệu chính thức. Ghi tên chức năng và đường dẫn màn hình thực tế vào ghi chú phần 1; hiện repo **chưa có hướng dẫn màn hình của platform cụ thể**. Chọn kỳ đo, timezone và campaign phù hợp; lưu thời điểm xuất, bộ lọc, phạm vi tài khoản/kênh và trạng thái đơn. Thời điểm xuất không tự là thời điểm dữ liệu đã đầy đủ; cần biết data-as-of/độ trễ của nguồn.
+Trong chương trình đã chọn, xác định chức năng báo cáo/xuất dữ liệu từ tài liệu chính thức. Với ACCESSTRADE, dashboard Publisher đã được xem read-only ngày 08/09/2026 và có adapter fixture ở phần 8; nó không thay hướng dẫn export thật. Ghi tên chức năng và đường dẫn màn hình thực tế vào ghi chú phần 1. Chọn kỳ đo, timezone và campaign phù hợp; lưu thời điểm xuất, bộ lọc, phạm vi tài khoản/kênh và trạng thái đơn. Thời điểm xuất không tự là thời điểm dữ liệu đã đầy đủ; cần biết data-as-of/độ trễ của nguồn.
 
 Giữ bản gốc riêng tư và bản đã loại dữ liệu riêng tư cho reviewer được phép. Không commit tên/email/điện thoại/địa chỉ khách, cookie, token, publisher ID, tracking link riêng hoặc mã đơn có thể truy người mua. Dùng source_ref nội bộ để reviewer được phép tìm lại bản gốc; source_ref fixture không được đổi nhãn thành platform export thật.
 
@@ -84,6 +84,23 @@ Trong bản sao bài tập, đổi `outcomes[0].metrics` từ `{"clicks":0}` san
 
 Reviewer cần giải thích được: vì sao null khác 0; vì sao window đủ chưa chắc báo cáo đã đầy đủ; vì sao PAID không là commission dự kiến; vì sao không cộng ba snapshot. Lưu output test và câu trả lời, không tự đánh dấu Mission PASS.
 
-## 8. Phần còn mở
+## 8. ACCESSTRADE CSV adapter (fixture only)
 
-BR-06a: tài liệu trung lập + fixture/mapping có test, chờ review. BR-06b: hướng dẫn một chương trình/kênh cụ thể và case link → báo cáo thật, BLOCKED do chưa có lựa chọn/quyền truy cập. BR-10 chưa có importer; fixture này chỉ là đầu vào thiết kế, không chứng minh pipeline đã chạy.
+Sau khi đã có History và Human ActionRecord hợp lệ, chạy từ
+`lab/affiliate-bot`:
+
+```text
+go run ./cmd/bot outcome accesstrade-import HISTORY.jsonl ACTIONS.jsonl OUTCOMES.jsonl \
+  ../../examples/accesstrade-report/sanitized-orders.csv \
+  ../../examples/accesstrade-report/manifest.json
+```
+
+Adapter nhận CSV UTF-8 có `Mã đơn`, `Trạng thái`, `Giá trị đơn hàng` và `Hoa
+hồng`; manifest phải map từng mã đơn **đã ẩn danh** tới `outcome_id` và
+`action_id` đã tồn tại. Nó reject trạng thái chưa map, CSV/mapping thiếu hoặc
+trùng, duplicate một phần, action không resolve và mọi attempt dùng UTM làm
+mapping ngầm. `reported_commission_vnd` không có nghĩa là đã thanh toán.
+
+## 9. Phần còn mở
+
+BR-06a: tài liệu trung lập + fixture/mapping có test, chờ review. BR-06b: tài khoản ACCESSTRADE và dashboard đã được xem read-only; CSV adapter fixture đã có, nhưng chưa có campaign được duyệt, export thật được review hoặc case link → báo cáo thật. BR-10d chưa có operated proof; fixture không chứng minh pipeline đã nhận business outcome.

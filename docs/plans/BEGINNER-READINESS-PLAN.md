@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: BR-2026-09.
 - Ngày lập: 05/09/2026.
-- Trạng thái: IN_PROGRESS — BR-03 DONE trong phạm vi lab/schema sau #46 `ac9e0dd`; [E-03 nghiệm thu](../architecture/E-03-ACCEPTANCE-REVIEW.md). H-01–H-04 vẫn mở; BR-06b chờ chương trình/kênh. Kế hoạch tổng thể chưa hoàn thành, không claim bot sẵn sàng live.
+- Trạng thái: IN_PROGRESS — BR-03 DONE trong phạm vi lab/schema sau #46 `ac9e0dd`; [E-03 nghiệm thu](../architecture/E-03-ACCEPTANCE-REVIEW.md). H-01–H-04 vẫn mở; BR-06b có account/dashboard ACCESSTRADE read-only nhưng còn chờ campaign/kênh được duyệt và export thật. Kế hoạch tổng thể chưa hoàn thành, không claim bot sẵn sàng live.
 - Bản gốc được đánh giá: commit `7d2a3ab938a609b43174ae5c38f02ff712b931dc`.
 - Cơ sở: [Review ngày 05/09/2026](../../REVIEW-2026-09-05.md).
 - Người phụ trách từng đầu việc: theo bảng theo dõi; phải điền khi nhận việc.
@@ -82,11 +82,11 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-03 | A | Đồng bộ schema và validator output | P1 / M | — | DONE | Chỉ phạm vi lab/schema; Codex review đạt, chủ repo yêu cầu chốt nếu review đạt; #46 merge `ac9e0dd`, CI 4/4 PASS; [E-03 nghiệm thu và giới hạn](../architecture/E-03-ACCEPTANCE-REVIEW.md); H-01–H-04 vẫn mở |
 | BR-04 | B | Chốt MVP và case affiliate xuyên suốt | P1 / S | — | DONE | Codex; chủ repo đã yêu cầu merge [PR #23](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/23); [MVP spec](../product/MVP-SPEC.md); chỉ nghiệm thu đặc tả fixture trung lập |
 | BR-05 | B | Quickstart từ máy mới | P2 / M | BR-01 | DONE | Codex; đã review/merge #25 `f438028`; [evidence](evidence/BR-05-QUICKSTART.md); giới hạn installer/Windows/pilot giữ mở ở BR-16 |
-| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; [hướng dẫn](../product/MANUAL-AFFILIATE-LOOP.md); BR-06b BLOCKED: chưa có chương trình/kênh |
+| BR-06 | B | Hướng dẫn link, campaign và báo cáo thật | P1 / M | BR-04 | IN_PROGRESS | Codex; BR-06a đã review/merge [PR #27](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/27) `09a2f50`; tài khoản ACCESSTRADE/dashboard đã xác minh read-only 08/09/2026, có [adapter fixture](../../examples/accesstrade-report/README.md); BR-06b vẫn thiếu campaign được duyệt/export thật được review |
 | BR-07 | B | Bài Go/JSON tối thiểu để tự viết adapter | P2 / M | BR-05 | DONE | Codex; đã review/merge #26 `ccf6c79`; [bài Go/JSON](../../curriculum/BOOT/GO-JSON-PRACTICE.md); chưa chứng minh năng lực học viên, pilot thuộc BR-16 |
 | BR-08 | C | Tổ chức shared core, CLI và store liên tục | P1 / L | BR-03, BR-04 | DONE | #47–#51 merged; shared M03 + learner CLI read-only + store seam M02, không phải full Bot/production |
 | BR-09 | C | Chuyển M00 packet sang M01/M02 | P1 / M | BR-07, BR-08 | DONE | Codex; [#52](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/52) merged `5fa86b9`; nghiệm thu lab JSON profile price/commission, không E1/live proof |
-| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d importer nền tảng/live proof còn mở cùng BR-06b |
+| BR-10 | C | Tích hợp action/outcome và nhập báo cáo M03 | P1 / M | BR-02, BR-06, BR-09 | IN_PROGRESS | Codex; lab/schema đã nghiệm thu #55 `6d311a8`, [audit](../architecture/BR-10C-ACCEPTANCE.md); BR-10d ACCESSTRADE CSV fixture/importer có test, live proof còn mở cùng BR-06b |
 | BR-11 | C | Advisor M04 có mock/live adapter | P1 / M | BR-03, BR-10 | DONE (lab/fixture) | #68 merged `395c728`, CI 4/4; Codex review bằng chứng canary do chủ repo chạy, 1 request/1150 tokens khớp dashboard; chưa đối soát phí chính xác hoặc chứng minh hiệu quả kinh doanh |
 | BR-12 | C | Đóng vòng evaluation/review M05 | P1 / M | BR-10, BR-11 | DONE (lab) | Nghiệm thu qua #73: M00→M05, store links, synthetic review, FAIL/PASS/rollback cô lập; không business/human-pilot proof; trạng thái merge/CI theo PR |
 | BR-13 | D | Watcher M06 normalize và lưu history thật | P1 / L | BR-09, BR-12 | PARTIAL | Fixture CLI có giá trị; R02/R04 còn lỗi canonical builder/replay gate; RP-04 trước operated source evidence |
@@ -250,7 +250,7 @@ Liên quan phát hiện 2.
 Tách phạm vi để không dùng fixture thay live proof:
 
 - BR-06a: bản trung lập [MANUAL-AFFILIATE-LOOP](../product/MANUAL-AFFILIATE-LOOP.md), [fixture](../../examples/affiliate-manual/manual-loop.json), test `TestManualAffiliateFixture` trong contracts. Người thực hiện Codex; reviewer chủ repo (chưa review); nhánh `codex/br-06-manual-affiliate-loop`. Không có importer/runtime mới.
-- BR-06b: chương trình/kênh cụ thể, màn hình export và case thật — BLOCKED vì chủ repo xác nhận chưa có chương trình. Không tự tạo account hoặc hành động ngoài hệ thống.
+- BR-06b: account ACCESSTRADE và dashboard Publisher đã được xem read-only; có adapter CSV fixture. Chưa có campaign/kênh được duyệt, export thật được review hoặc case thật; không tự tạo link/đăng nội dung/hành động ngoài hệ thống.
 - Test kiểm canonical action/outcome schemas và mapping fixture, thêm 7 mutation regressions: missing→0, zero trước end, orphan action, update sai, field lạ, số âm, duplicate snapshot. Đây không phải semantic runtime M03 hoặc proof affiliate.
 - Kiểm local BR-06a: tests/vet ba module PASS, 8 validators và 10 Python regressions PASS; diff check PASS. Test fixture được job `deterministic-runtime` hiện hữu chạy qua `go test ./...` trong contracts. Không suy trạng thái CI từ kết quả local.
 - Checklist gốc dưới đây giữ mở cho nghiệm thu đầy đủ trên chương trình đã chọn. BR-10 có thể dùng fixture trung lập nhưng không được claim live proof.
@@ -335,14 +335,14 @@ Nghiệm thu: packet → input → history → quyết định resolve được 
 
 Hiện hành: **BR-10 lab/schema DONE**, #55 review/merge `6d311a8`, audit chạy lại và CI 4/4 PASS. Chỉ canonical JSON trong workspace một writer. Phần chưa có importer chương trình cụ thể/live proof được tách BR-10d bên dưới, không bị đóng theo nghiệm thu lab. Các trạng thái cũ sau đây là lịch sử.
 
-#### BR-10d — Importer nền tảng và live proof (OPEN, phụ thuộc BR-06b)
+#### BR-10d — Importer nền tảng và live proof (PARTIAL, phụ thuộc BR-06b)
 
-- Chọn chương trình/kênh đã có quyền truy cập; hiện chưa có.
-- Map format export thực tế, transaction identity, timezone/window, pending/valid/cancel/refund/paid; không dùng UTM thay attribution.
+- ACCESSTRADE account và dashboard Publisher đã được kiểm read-only 08/09/2026. Adapter CSV fixture nhận bốn cột dashboard, mapping tường minh order→action, trạng thái hẹp và tiền VND; không dùng UTM thay attribution.
+- Cần campaign/kênh đã duyệt để review format export thật, transaction identity, timezone/window và status thực tế; `refund`/`paid` chưa được map.
 - Có fixture export khử dữ liệu riêng tư, tests mapping và thực hành nhập báo cáo; tách synthetic smoke khỏi live proof.
 - Nghiệm thu riêng sau adapter và proof được review; chưa chạy API, chưa nhận dữ liệu thật, không đánh DONE.
 
-BR-10c: [audit nghiệm thu toàn chain](../architecture/BR-10C-ACCEPTANCE.md) READY_FOR_REVIEW sau #54 merged `533cc6f`. Smoke bắt đầu từ M00 trong workspace tạm, kiểm decision/action/outcome exact IDs, restart/list/replay, đứt upstream, corruption/alias và payload limit. Chưa chốt BR-10 DONE; importer báo cáo nền tảng chưa có, giữ mở riêng cùng BR-06b. Những ghi chú BR-10b chờ review bên dưới là lịch sử.
+BR-10c: [audit nghiệm thu toàn chain](../architecture/BR-10C-ACCEPTANCE.md) READY_FOR_REVIEW sau #54 merged `533cc6f`. Smoke bắt đầu từ M00 trong workspace tạm, kiểm decision/action/outcome exact IDs, restart/list/replay, đứt upstream, corruption/alias và payload limit. ACCESSTRADE fixture adapter sau đó đã được tách tại BR-10d; operated evidence vẫn mở cùng BR-06b. Những ghi chú BR-10b chờ review bên dưới là lịch sử.
 
 Hiện hành: BR-10a #53 đã review/merge `765ac70`. [BR-10b outcome store/import/list](../architecture/BR-10B-OUTCOME-STORE.md) đang triển khai chờ review; canonical JSON synthetic, EffectRef/time/pending/zero/duplicate/conflict/orphan được kiểm. Chưa importer nền tảng/live report, chưa chốt BR-10 DONE. Ghi chú BR-10a chờ review bên dưới là lịch sử.
 
