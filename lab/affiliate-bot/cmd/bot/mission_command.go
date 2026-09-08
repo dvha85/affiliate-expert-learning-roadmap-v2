@@ -1,19 +1,24 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 const missionStateVersion = "learner-m08-m11/v1"
@@ -88,6 +93,7 @@ type LearnerReservation struct {
 
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
+func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
 
 // The registry lives beside mission-state.json and is append-only. It owns the
 // canonical compact JSON used for later resolution; user-supplied output files
@@ -743,6 +749,91 @@ func resolveAuthorizationCostBound(dir string, authorization corem10.ExecutionAu
 	return bound, nil
 }
 
+func reservationForExecution(s LearnerMissionState, executionID string) bool {
+	for _, reservation := range s.Reservations {
+		if reservation.ReservationMode == "GOVERNED_AUTHORIZATION" && reservation.ExecutionID == executionID {
+			return true
+		}
+	}
+	return false
+}
+
+func reservationIndexForAuthorization(s LearnerMissionState, authorizationID string) int {
+	for index, reservation := range s.Reservations {
+		if reservation.AuthorizationID == authorizationID && reservation.ReservationMode == "GOVERNED_AUTHORIZATION" {
+			return index
+		}
+	}
+	return -1
+}
+
+func validateExecutionReservation(s LearnerMissionState, authorization corem10.ExecutionAuthorization, record corem10.ExecutionRecord) (int, error) {
+	index := reservationIndexForAuthorization(s, authorization.AuthorizationID)
+	if index == -1 {
+		return -1, fmt.Errorf("governed authorization requires a bound reservation before execution record")
+	}
+	if priorExecutionID := s.Reservations[index].ExecutionID; priorExecutionID != "" && priorExecutionID != record.ExecutionID {
+		return -1, fmt.Errorf("reservation already binds a different execution record")
+	}
+	return index, nil
+}
+
+// validateM10FixtureOutcome deliberately permits only a terminal no-side-effect
+// record. It is a local fixture measurement, not evidence of business impact.
+func validateM10FixtureOutcome(dir string, s LearnerMissionState, raw []byte) (m03.OutcomeRecord, string) {
+	outcome, status := m03.DecodeM03Outcome(raw)
+	if status != "VALID" {
+		return outcome, status
+	}
+	if outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" {
+		return outcome, "REQUIRE_MACHINE_EXECUTION"
+	}
+	entry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindExecutionRecord, outcome.EffectRef.EffectID, "")
+	if err != nil {
+		return outcome, "ORPHAN_EXECUTION"
+	}
+	record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+	if err != nil || !reservationForExecution(s, record.ExecutionID) {
+		return outcome, "ORPHAN_EXECUTION"
+	}
+	attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	observedAt, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	if attemptedErr != nil || observedErr != nil || observedAt.Before(attemptedAt) {
+		return outcome, "OUTCOME_BEFORE_EXECUTION"
+	}
+	if record.SideEffectState != "NOT_PERFORMED" || outcome.Status != "CANCELLED" || len(outcome.Metrics) != 0 || !strings.HasPrefix(outcome.SourceRef, "fixture:m10-outcome/") {
+		return outcome, "INVALID_NO_SIDE_EFFECT_OUTCOME"
+	}
+	return outcome, "VALID"
+}
+
+func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRecord, error) {
+	f, err := (store.JSONL{}).Open(m10OutcomeStorePath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
+	outcomes := []m03.OutcomeRecord{}
+	seen := map[string]bool{}
+	for scanner.Scan() {
+		outcome, status := validateM10FixtureOutcome(dir, s, scanner.Bytes())
+		if status != "VALID" || seen[outcome.OutcomeID] {
+			return nil, fmt.Errorf("invalid M10 fixture outcome store")
+		}
+		seen[outcome.OutcomeID] = true
+		outcomes = append(outcomes, outcome)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return outcomes, nil
+}
+
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -758,12 +849,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-cancel": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -1196,6 +1287,54 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("RESERVED", reservation, nil, 0)
+	case "m10-record-failed":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil || !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) || !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is invalid, unregistered or mismatched"), 1)
+		}
+		record, err := corem10.FailCanaryExecutionFixture(corem10.FailedExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		reservationIndex, err := validateExecutionReservation(s, authorization, record)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		recordRaw, err := json.Marshal(record)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if s.Reservations[reservationIndex].ExecutionID == "" {
+			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
+			if err := saveMissionState(args[1], s); err != nil {
+				return emit("STORE_ERROR", nil, err, 1)
+			}
+		}
+		return emit(status, record, nil, 0)
 	case "m10-cancel":
 		if len(args) != 6 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON"), 2)
@@ -1221,22 +1360,13 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if !authorizationBindsMissionState(authorization, s) {
 			return emit("REJECTED", nil, fmt.Errorf("execution authorization does not bind to current mission state"), 1)
 		}
-		reservationIndex := -1
-		for index, reservation := range s.Reservations {
-			if reservation.AuthorizationID == authorization.AuthorizationID {
-				reservationIndex = index
-				break
-			}
-		}
-		if reservationIndex == -1 {
-			return emit("REJECTED", nil, fmt.Errorf("governed authorization requires a bound reservation before execution record"), 1)
-		}
 		record, err := corem10.CancelCanaryExecution(corem10.CancelledExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		if priorExecutionID := s.Reservations[reservationIndex].ExecutionID; priorExecutionID != "" && priorExecutionID != record.ExecutionID {
-			return emit("REJECTED", nil, fmt.Errorf("reservation already binds a different execution record"), 1)
+		reservationIndex, err := validateExecutionReservation(s, authorization, record)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
 		}
 		recordRaw, err := json.Marshal(record)
 		if err != nil {
@@ -1259,6 +1389,46 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			}
 		}
 		return emit(status, record, nil, 0)
+	case "m10-outcome":
+		if len(args) != 3 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-outcome STATE_DIR OUTCOME_INPUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		outcome, outcomeStatus := validateM10FixtureOutcome(args[1], s, raw)
+		if outcomeStatus != "VALID" {
+			return emit(outcomeStatus, nil, fmt.Errorf("M10 outcome rejected: %s", outcomeStatus), 1)
+		}
+		outcomes, err := loadM10FixtureOutcomes(args[1], s)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		for _, prior := range outcomes {
+			if prior.OutcomeID != outcome.OutcomeID {
+				continue
+			}
+			if reflect.DeepEqual(prior, outcome) {
+				return emit("EXACT_DUPLICATE", outcome, nil, 0)
+			}
+			return emit("CONFLICT", nil, fmt.Errorf("outcome_id reused with different content"), 1)
+		}
+		encoded, err := json.Marshal(outcome)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if err := (store.JSONL{}).AppendLine(m10OutcomeStorePath(args[1]), encoded); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("APPENDED", outcome, nil, 0)
 	case "m10-resolve":
 		if len(args) != 4 && len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)

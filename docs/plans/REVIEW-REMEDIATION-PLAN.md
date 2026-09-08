@@ -138,6 +138,14 @@ nghiệm thu trên `main`**.
   compatibility-only, không thể tạo execution binding. Chưa có transaction
   multi-artifact crash recovery, execution result/outcome/EffectRef hay ledger
   canonical ngoài learner state, nên RP-03 vẫn mở.
+- **RP-03 no-side-effect execution/outcome foundation:** `m10-record-failed`
+  tạo đúng `ExecutionRecord` `FAILED`/`NOT_PERFORMED` cho reservation governed
+  và không có executor/network. `m10-outcome` chỉ append fixture outcome
+  `CANCELLED`, metrics rỗng, `fixture:m10-outcome/…`, sau khi `EffectRef`
+  `MACHINE_EXECUTION` resolve record đã registry cấp và state xác nhận bind
+  reservation. Smoke cover record retry và forged EffectRef reject. Đây không
+  phải execution success, business outcome, cross-store canonical outcome graph
+  hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation

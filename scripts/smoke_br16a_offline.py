@@ -36,13 +36,15 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def write_canary_grant(path, intent, policy, approval, max_executions, max_cost):
+def write_canary_grant(path, intent, policy, approval, max_executions, max_cost, executor_ids=None):
+    if executor_ids is None:
+        executor_ids = ["local_sandbox"]
     payload = {
         "grant_id": "br16-g", "grant_version": "v1", "policy_version": policy["policy_version"],
         "approval_ref": approval["approval_id"], "approved_by": "human", "approver_id": approval["approver_id"],
         "approved_at": approval["approved_at"], "valid_from": approval["approved_at"], "expires_at": approval["expires_at"],
         "allowed_risk_classes": [policy["risk_class"]], "allowed_action_types": [intent["action_type"]], "allowed_hosts": ["example.com"],
-        "executor_ids": ["local_sandbox"], "max_executions_total": max_executions, "max_executions_per_window": max_executions,
+        "executor_ids": executor_ids, "max_executions_total": max_executions, "max_executions_per_window": max_executions,
         "window_seconds": 3600, "max_cost_minor_total": max_cost, "currency": "USD", "max_pending_outcomes": 1,
         "kill_switch_required": True, "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
     }
@@ -109,7 +111,7 @@ def main():
         i = json.loads(intent.read_text()); p = json.loads(policy.read_text())
         approval = work / "approval.json"; approval.write_text(json.dumps({"approval_id":"br16-ap","intent_id":i["intent_id"],"intent_hash":i["intent_hash"],"policy_version":p["policy_version"],"decision":"APPROVE","approved_by":"human","approver_id":"pilot-human","approved_at":"2026-09-07T01:05:00Z","expires_at":"2099-09-03T02:50:00Z","correlation_id":i["correlation_id"],"one_time":True}), encoding="utf-8")
         assert invoke(bot, "mission", "m09-approval", state, approval)["status"] == "ACK"
-        grant = work / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 2, 200)
+        grant = work / "grant.json"; write_canary_grant(grant, i, p, json.loads(approval.read_text()), 3, 300, ["fixture_stub", "local_sandbox"])
         assert invoke(bot, "mission", "m10-canary", state, grant)["status"] == "ACK"
         cost = work / "cost-bound.json"; write_cost_bound(cost, i, 100, "2099-09-03T02:45:00Z", "br16-cost")
         assert invoke(bot, "mission", "m10-reserve", state, cost, "unregistered", expected=1)["status"] == "REJECTED"
@@ -128,6 +130,9 @@ def main():
         authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")
         assert authorization_response["status"] == "AUTHORIZED" and authorization_response["artifact"]["execution_authorized"] is True
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")["status"] == "EXACT_DUPLICATE"
+        failed_authorization = work / "fixture-failed-authorization.json"
+        failed_authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, failed_authorization, gate_time, "fixture_stub")
+        assert failed_authorization_response["status"] == "AUTHORIZED" and failed_authorization_response["artifact"]["executor_id"] == "fixture_stub"
         cancelled = work / "cancelled-execution.json"
         forged_authorization = work / "forged-authorization.json"
         forged_authorization_data = json.loads(authorization.read_text(encoding="utf-8")); forged_authorization_data["authorization_id"] = "canary-auth-forged-but-schema-valid"
@@ -138,10 +143,23 @@ def main():
         assert reservation["status"] == "RESERVED" and reservation["artifact"]["authorization_id"] == authorization_response["artifact"]["authorization_id"] and reservation["artifact"]["reservation_mode"] == "GOVERNED_AUTHORIZATION"
         assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r2", expected=1)["status"] == "REJECTED"
+        failed_reservation = invoke(bot, "mission", "m10-reserve-authorization", state, failed_authorization, "br16-governed-r2")
+        assert failed_reservation["status"] == "RESERVED" and failed_reservation["artifact"]["authorization_id"] == failed_authorization_response["artifact"]["authorization_id"]
         cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")
         assert cancellation["status"] == "APPENDED" and cancellation["artifact"]["status"] == "CANCELLED" and cancellation["artifact"]["side_effect_state"] == "NOT_PERFORMED"
         assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "different-execution.json", "2026-09-08T00:02:00Z", "different-execution-is-rejected", expected=1)["status"] == "REJECTED"
+        failed_execution = work / "fixture-failed-execution.json"
+        failed = invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor")
+        assert failed["status"] == "APPENDED" and failed["artifact"]["status"] == "FAILED" and failed["artifact"]["side_effect_state"] == "NOT_PERFORMED"
+        assert invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor")["status"] == "EXACT_DUPLICATE"
+        machine_outcome = work / "machine-outcome.json"
+        machine_outcome.write_text(json.dumps({"outcome_id":"br16-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br16-failed"}), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "EXACT_DUPLICATE"
+        forged_outcome = work / "forged-machine-outcome.json"
+        forged_outcome.write_text(machine_outcome.read_text(encoding="utf-8").replace(failed["artifact"]["execution_id"], "canary-exec-orphan"), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-outcome", state, forged_outcome, expected=1)["status"] == "ORPHAN_EXECUTION"
         resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
         assert resolved["status"] == "RESOLVED" and resolved["artifact"] == cancellation["artifact"]
         assert invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", "canary-exec-not-registered", expected=1)["status"] == "REJECTED"
@@ -173,9 +191,9 @@ def main():
         assert all(response["status"] in {"RESERVED", "BUSY", "BUDGET_DENIED"} for response in responses.values())
         winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
         loser = "br16-r2" if winner == "br16-r1" else "br16-r1"
-        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 2
+        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 3
         assert invoke(bot, "mission", "m10-reserve", state, cost, winner)["status"] == "EXACT_DUPLICATE"
-        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 2
+        assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 3
         assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, work / "stale-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"

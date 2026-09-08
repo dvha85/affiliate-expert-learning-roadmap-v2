@@ -136,6 +136,14 @@ func TestCancelledCanaryExecutionRecordHasNoSideEffect(t *testing.T) {
 	if _, err := ValidateExecutionRecord(raw); err != nil {
 		t.Fatal(err)
 	}
+	failed, err := FailCanaryExecutionFixture(FailedExecutionInput{Authorization: authorization, AttemptedAt: "2026-09-08T01:02:00Z", Reason: "fixture executor unavailable before dispatch"})
+	if err != nil || failed.Status != "FAILED" || failed.SideEffectState != "NOT_PERFORMED" || failed.ExecutionID == record.ExecutionID {
+		t.Fatal(err, failed)
+	}
+	raw, _ = json.Marshal(failed)
+	if _, err := ValidateExecutionRecord(raw); err != nil {
+		t.Fatal(err)
+	}
 	record.Status = "SUCCEEDED"
 	raw, _ = json.Marshal(record)
 	if _, err := ValidateExecutionRecord(raw); err == nil {

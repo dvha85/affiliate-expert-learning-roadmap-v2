@@ -11,8 +11,8 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
 
-// ExecutionRecord is an immutable audit artifact. This learner implementation
-// only records a cancelled canary operation; it never invokes an executor.
+// ExecutionRecord is an immutable audit artifact. The learner profile records
+// only terminal no-side-effect outcomes; it never invokes an executor.
 type ExecutionRecord struct {
 	ExecutionID          string `json:"execution_id"`
 	AuthorizationID      string `json:"authorization_id"`
@@ -40,42 +40,59 @@ type CancelledExecutionInput struct {
 	Reason        string
 }
 
-func cancelledExecutionID(in CancelledExecutionInput) string {
-	raw, _ := json.Marshal([]string{in.Authorization.AuthorizationID, in.AttemptedAt, in.Reason})
+type FailedExecutionInput struct {
+	Authorization ExecutionAuthorization
+	AttemptedAt   string
+	Reason        string
+}
+
+func terminalExecutionID(authorization ExecutionAuthorization, attemptedAt, status, reason string) string {
+	raw, _ := json.Marshal([]string{authorization.AuthorizationID, attemptedAt, status, reason})
 	sum := sha256.Sum256(raw)
 	return "canary-exec-" + hex.EncodeToString(sum[:])
 }
 
-// CancelCanaryExecution creates a terminal audit record. It deliberately does
-// not reserve budget, mutate a ledger, or contact the named executor.
-func CancelCanaryExecution(in CancelledExecutionInput) (ExecutionRecord, error) {
-	authorizationRaw, err := json.Marshal(in.Authorization)
+func terminalNoSideEffectExecution(authorization ExecutionAuthorization, attemptedAt, status, reason string) (ExecutionRecord, error) {
+	authorizationRaw, err := json.Marshal(authorization)
 	if err != nil {
 		return ExecutionRecord{}, err
 	}
-	authorization, err := ValidateExecutionAuthorization(authorizationRaw)
+	authorization, err = ValidateExecutionAuthorization(authorizationRaw)
 	if err != nil {
 		return ExecutionRecord{}, fmt.Errorf("invalid execution authorization: %w", err)
 	}
-	attempted, attemptedErr := time.Parse(time.RFC3339, in.AttemptedAt)
+	attempted, attemptedErr := time.Parse(time.RFC3339, attemptedAt)
 	authorized, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
 	if attemptedErr != nil || authorizedErr != nil || attempted.Before(authorized) {
-		return ExecutionRecord{}, fmt.Errorf("cancellation timestamp is invalid")
+		return ExecutionRecord{}, fmt.Errorf("execution timestamp is invalid")
 	}
-	reason := strings.TrimSpace(in.Reason)
+	reason = strings.TrimSpace(reason)
 	if reason == "" {
-		return ExecutionRecord{}, fmt.Errorf("cancellation reason is required")
+		return ExecutionRecord{}, fmt.Errorf("execution reason is required")
 	}
 	return ExecutionRecord{
-		ExecutionID:     cancelledExecutionID(CancelledExecutionInput{Authorization: authorization, AttemptedAt: in.AttemptedAt, Reason: reason}),
+		ExecutionID:     terminalExecutionID(authorization, attemptedAt, status, reason),
 		AuthorizationID: authorization.AuthorizationID, CanaryGrantID: authorization.CanaryGrantID,
 		CanaryGrantVersion: authorization.CanaryGrantVersion, CanaryGrantHash: authorization.CanaryGrantHash,
 		CanaryGateID: authorization.CanaryGateID, CanaryCostBoundID: authorization.CanaryCostBoundID,
 		CanaryCostBoundHash: authorization.CanaryCostBoundHash, CanaryCostBoundMinor: authorization.CanaryCostBoundMinor,
 		IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, ExecutorID: authorization.ExecutorID,
-		IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: in.AttemptedAt, Status: "CANCELLED",
+		IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: attemptedAt, Status: status,
 		SideEffectState: "NOT_PERFORMED", Error: reason, CorrelationID: authorization.CorrelationID,
 	}, nil
+}
+
+// CancelCanaryExecution creates a terminal audit record. It deliberately does
+// not reserve budget, mutate a ledger, or contact the named executor.
+func CancelCanaryExecution(in CancelledExecutionInput) (ExecutionRecord, error) {
+	return terminalNoSideEffectExecution(in.Authorization, in.AttemptedAt, "CANCELLED", in.Reason)
+}
+
+// FailCanaryExecutionFixture is a deterministic local stub. It models a
+// failed attempt before an executor was contacted and cannot represent a live
+// execution or a performed side effect.
+func FailCanaryExecutionFixture(in FailedExecutionInput) (ExecutionRecord, error) {
+	return terminalNoSideEffectExecution(in.Authorization, in.AttemptedAt, "FAILED", in.Reason)
 }
 
 func ValidateExecutionRecord(raw []byte) (ExecutionRecord, error) {
@@ -86,8 +103,8 @@ func ValidateExecutionRecord(raw []byte) (ExecutionRecord, error) {
 	if err := contracts.DecodeStrict(raw, &record); err != nil {
 		return ExecutionRecord{}, err
 	}
-	if record.Status != "CANCELLED" || record.SideEffectState != "NOT_PERFORMED" || record.AuthorizationID == "" || record.CanaryGrantID == "" || record.CanaryGrantVersion == "" || record.CanaryGrantHash == "" || record.CanaryGateID == "" || record.CanaryCostBoundID == "" || record.CanaryCostBoundHash == "" || record.Error == "" {
-		return ExecutionRecord{}, fmt.Errorf("invalid cancelled governed-canary execution record")
+	if (record.Status != "CANCELLED" && record.Status != "FAILED") || record.SideEffectState != "NOT_PERFORMED" || record.AuthorizationID == "" || record.CanaryGrantID == "" || record.CanaryGrantVersion == "" || record.CanaryGrantHash == "" || record.CanaryGateID == "" || record.CanaryCostBoundID == "" || record.CanaryCostBoundHash == "" || record.Error == "" {
+		return ExecutionRecord{}, fmt.Errorf("invalid terminal no-side-effect governed-canary execution record")
 	}
 	return record, nil
 }
