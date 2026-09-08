@@ -641,3 +641,34 @@ func mustM11Time(raw string) time.Time {
 	}
 	return parsed
 }
+
+// m11RecoveryHandoff is deliberately read-only. It proves that a stopped lease
+// was reconciled by a human, but it carries no authority to resume it. A new
+// runtime must still bind a separately reviewed lease through normal commands.
+func m11RecoveryHandoff(dir, resolutionID, ledgerID string) (map[string]any, error) {
+	state, err := loadMissionState(dir)
+	if err != nil || !state.Stop {
+		return nil, fmt.Errorf("recovery handoff requires durable STOP")
+	}
+	resolutionValue, err := m11ArtifactValue(dir, corem11.ArtifactKindReconciliation, resolutionID)
+	if err != nil {
+		return nil, err
+	}
+	resolution := resolutionValue.(*corem11.ProductionReconciliationResolution)
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	if err != nil {
+		return nil, err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	if ledger.ControlMode != "STOPPED" || ledger.StopReason != "RECOVERY_REVIEW_REQUIRED" || ledger.ReconciliationRequired || ledger.LeaseID != resolution.LeaseID || ledger.LeaseVersion != resolution.LeaseVersion || ledger.LeaseHash != resolution.LeaseHash {
+		return nil, fmt.Errorf("recovery handoff does not bind a reviewed stopped ledger")
+	}
+	linked := false
+	for _, id := range ledger.ReconciliationResolutionIDs {
+		linked = linked || id == resolution.ResolutionID
+	}
+	if !linked {
+		return nil, fmt.Errorf("recovery resolution is not linked from stopped ledger")
+	}
+	return map[string]any{"profile": "M11_RECOVERY_HANDOFF/v1", "prior_lease_id": ledger.LeaseID, "prior_lease_version": ledger.LeaseVersion, "prior_lease_hash": ledger.LeaseHash, "resolution_id": resolution.ResolutionID, "execution_id": resolution.ExecutionID, "resolved_by": resolution.ResolvedBy, "resolver_id": resolution.ResolverID, "resolved_at": resolution.ResolvedAt, "effect_state": resolution.EffectState, "prior_stop_reason": ledger.StopReason, "requires_new_runtime": true, "requires_new_lease": true, "execution_permitted": false}, nil
+}

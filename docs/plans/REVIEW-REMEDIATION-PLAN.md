@@ -347,6 +347,14 @@ xác nhận restore trả `GRAPH_FAILED`. Cần thêm trace fault-injection/
 concurrent-writer và reviewed recovery bằng **lease mới** trước khi coi RP-07a
 hoàn tất.
 
+**Cập nhật recovery handoff (2026-09-08):** `m11-recovery-export` chỉ đọc
+stopped ledger + registered human resolution và xuất proof có
+`requires_new_runtime=true`, `requires_new_lease=true`,
+`execution_permitted=false`. Nó không reset STOP, không copy state sang runtime
+mới và không gọi executor. Handoff đã có smoke; workflow tạo runtime mới, lease
+mới và approval mới vẫn phải được thiết kế như một canonical artifact boundary
+riêng, không thể suy ra chỉ từ export proof.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

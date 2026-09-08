@@ -970,7 +970,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON | m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON | m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID | m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
@@ -1664,6 +1664,22 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("REJECTED", nil, err, 1)
 		}
 		return emit(status, map[string]any{"resolution": resolution, "stopped_ledger": ledger}, nil, 0)
+	case "m11-recovery-export":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[4]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		handoff, err := m11RecoveryHandoff(args[1], args[2], args[3])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[4], handoff)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		return emit(status, handoff, nil, 0)
 	case "m11-outcome":
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID"), 2)

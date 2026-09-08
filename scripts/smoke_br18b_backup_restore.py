@@ -242,6 +242,10 @@ def main():
         recovery_resolution = invoke(bot, "mission", "m11-reconcile", recovery_runtime, "br18-production-resolution", stopped_ledger_id, env=env)
         assert recovery_resolution["status"] == "APPENDED" and recovery_resolution["artifact"]["stopped_ledger"]["control_mode"] == "STOPPED" and recovery_resolution["artifact"]["stopped_ledger"]["reconciliation_required"] is False
         assert invoke(bot, "mission", "m11-reconcile", recovery_runtime, "br18-production-resolution", stopped_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
+        recovery_handoff = root / "recovery-handoff.json"
+        reviewed_ledger_id = recovery_resolution["artifact"]["stopped_ledger"]["lease_id"] + "/" + recovery_resolution["artifact"]["stopped_ledger"]["updated_at"]
+        handoff = invoke(bot, "mission", "m11-recovery-export", recovery_runtime, "br18-production-resolution", reviewed_ledger_id, recovery_handoff, env=env)
+        assert handoff["status"] == "APPENDED" and handoff["artifact"]["requires_new_runtime"] is True and handoff["artifact"]["execution_permitted"] is False
         assert invoke(bot, "backup", "create", recovery_runtime, recovery_backup, env=env)["status"] == "BACKED_UP"
         invalid_reconciliation_backup = root / "invalid-reconciliation-backup"; shutil.copytree(recovery_backup, invalid_reconciliation_backup)
         changed_lines = []
