@@ -118,8 +118,9 @@ nghiệm thu trên `main`**.
   là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`
   tự khai bị reject. `m07 register-tool-result` preflight/validate response,
   ghi artifact immutable có trace hash rồi `m07 validate` resolve lại hash và
-  record binding trước khi body `unknown` được cite. Test learner trực tiếp và
-  regression M07 cover prose/trace giả. Chưa persist AgentProposal, chưa có canonical
+  record binding trước khi body `unknown` được cite. Test learner trực tiếp,
+  regression M07 và smoke shared workspace tạo/cite trace rồi reject trace giả.
+  Chưa persist AgentProposal, chưa có canonical
   tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
   vẫn mở, R01/R05 chưa đóng toàn phạm vi.
 

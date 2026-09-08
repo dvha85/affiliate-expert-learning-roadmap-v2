@@ -48,6 +48,7 @@ def main():
         work = Path(directory); bot = work / "bot"; env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"))
         run([go, "build", "-o", bot, "./cmd/bot"], BOT_DIR, env=env)
         history, observations, model = [work / name for name in ("history.jsonl", "observations.json", "model.json")]
+        tool_result, registered_tool = work / "tool-result.json", work / "registered-tool-result.json"
         action, actions = work / "action.json", work / "actions.jsonl"
         outcome, outcomes = work / "outcome.json", work / "outcomes.jsonl"
         evaluations, proposals, reviews = [work / name for name in ("evaluations.jsonl", "proposals.jsonl", "reviews.jsonl")]
@@ -58,9 +59,15 @@ def main():
         context = invoke(bot, "m07", "context", history, "br16-d")["artifact"]
         evidence_id = context["evidence_ids"][0]
         evidence = next(item for item in context["evidence"] if item["evidence_id"] == evidence_id)
-        answer, claim = grounded_claim(evidence["field_or_claim"], evidence.get("value"), evidence_id)
-        model.write_text(json.dumps({"state":"HUMAN_REVIEW","answer":answer,"claims":[claim],"evidence_ids":[evidence_id],"tool_calls":[],"authority":"A2-RO","write_permission":False}), encoding="utf-8")
-        assert invoke(bot, "m07", "validate", history, "br16-d", model, REGISTRY)["status"] == "VALID"
+        # Synthetic adapter fixture: registration must happen before the model
+        # can cite the returned body, even in this offline shared workspace.
+        tool_result.write_text(json.dumps({"record_id":"br16-d","tool_call":{"tool_name":"public_http","method":"GET","target":"https://example.com/a"},"status_code":200,"received_at":"2026-09-03T00:01:00Z","redirected":False,"body":{"fixture_price":100}}), encoding="utf-8")
+        registration = invoke(bot, "m07", "register-tool-result", history, "br16-d", REGISTRY, tool_result, registered_tool)
+        assert registration["status"] == "APPENDED"
+        tool_evidence = registration["artifact"]["evidence"]
+        answer, claim = grounded_claim(tool_evidence["field_or_claim"], tool_evidence["value"], tool_evidence["evidence_id"])
+        model.write_text(json.dumps({"state":"HUMAN_REVIEW","answer":answer,"claims":[claim],"evidence_ids":[tool_evidence["evidence_id"]],"tool_calls":[],"authority":"A2-RO","write_permission":False}), encoding="utf-8")
+        assert invoke(bot, "m07", "validate", history, "br16-d", model, REGISTRY, registered_tool)["status"] == "VALID"
         action.write_text(json.dumps({"action_id":"br16-a","decision_id":"br16-d","action_type":"synthetic_manual","target":"fixture:br16","performed_by":"human","performed_at":"2026-09-04T00:00:00Z","measurement_window_end":"2026-09-05T00:00:00Z","compliance_reviewed":True}), encoding="utf-8")
         assert invoke(bot, "action", "record", history, actions, action)["status"] == "APPENDED"
         outcome.write_text(json.dumps({"outcome_id":"br16-o","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"br16-a"},"observed_at":"2026-09-05T00:00:00Z","status":"PENDING","metrics":{},"source_ref":"fixture:br16"}), encoding="utf-8")
