@@ -223,12 +223,40 @@ func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
 	if err := os.WriteFile(trustedCostBoundsPath(dir), append(raw, '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, raw); err != nil {
+		t.Fatal(err)
+	}
 	if !resolveTrustedCostBound(dir, bound) {
 		t.Fatal("registered canonical bound did not resolve")
 	}
 	bound.MaxCostMinor = 1
 	if resolveTrustedCostBound(dir, bound) {
 		t.Fatal("tampered bound resolved from registry")
+	}
+}
+
+func TestM10ArtifactRegistryRejectsOrphanAuthorization(t *testing.T) {
+	dir := t.TempDir()
+	authorization := corem10.ExecutionAuthorization{
+		AuthorizationID: "canary-auth-orphan", IntentID: "intent-1", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", PolicyVersion: "p1",
+		CanaryGrantID: "grant-1", CanaryGrantVersion: "v1", CanaryGrantHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", CanaryGateID: "gate-1",
+		CanaryCostBoundID: "cost-1", CanaryCostBoundHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", CanaryCostBoundMinor: 100,
+		ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:00:00Z", IdempotencyKey: "key", CorrelationID: "corr", ExecutionMode: "GOVERNED_CANARY", ExecutionAuthorized: true,
+	}
+	raw, err := json.Marshal(authorization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := corem10.NewArtifactEntry(corem10.ArtifactKindExecutionAuthorization, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, _ := json.Marshal(entry)
+	if err := os.WriteFile(m10ArtifactRegistryPath(dir), append(line, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM10ArtifactRegistry(dir); err == nil {
+		t.Fatal("orphan authorization was accepted into M10 graph")
 	}
 }
 

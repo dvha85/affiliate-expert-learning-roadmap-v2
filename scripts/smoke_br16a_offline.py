@@ -120,14 +120,27 @@ def main():
         gate_response = invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)
         assert gate_response["status"] == "ALLOW_CANARY" and gate_response["artifact"]["execution_authorized"] is False
         assert invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)["status"] == "EXACT_DUPLICATE"
+        forged_gate = work / "forged-canary-gate.json"
+        forged_gate_data = json.loads(gate.read_text(encoding="utf-8")); forged_gate_data["gate_id"] = "gate-forged-but-schema-valid"
+        forged_gate.write_text(json.dumps(forged_gate_data), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-authorize", state, cost, forged_gate, work / "forged-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
         authorization = work / "canary-authorization.json"
         authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")
         assert authorization_response["status"] == "AUTHORIZED" and authorization_response["artifact"]["execution_authorized"] is True
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")["status"] == "EXACT_DUPLICATE"
         cancelled = work / "cancelled-execution.json"
+        forged_authorization = work / "forged-authorization.json"
+        forged_authorization_data = json.loads(authorization.read_text(encoding="utf-8")); forged_authorization_data["authorization_id"] = "canary-auth-forged-but-schema-valid"
+        forged_authorization.write_text(json.dumps(forged_authorization_data), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-cancel", state, forged_authorization, work / "forged-execution.json", "2026-09-08T00:01:00Z", "must-not-resolve-forged-authorization", expected=1)["status"] == "REJECTED"
         cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")
         assert cancellation["status"] == "APPENDED" and cancellation["artifact"]["status"] == "CANCELLED" and cancellation["artifact"]["side_effect_state"] == "NOT_PERFORMED"
         assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
+        resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
+        assert resolved["status"] == "RESOLVED" and resolved["artifact"] == cancellation["artifact"]
+        assert invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", "canary-exec-not-registered", expected=1)["status"] == "REJECTED"
+        artifact_kinds = {entry["artifact_kind"] for entry in map(json.loads, (state / "m10-artifacts.jsonl").read_text(encoding="utf-8").splitlines()) if entry}
+        assert {"CANARY_GRANT", "TRUSTED_COST_BOUND", "CANARY_GATE", "EXECUTION_AUTHORIZATION", "EXECUTION_RECORD"}.issubset(artifact_kinds)
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
         assert invoke(bot, "mission", "m10-gate", state, tampered, work / "tampered-gate.json", gate_time, expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"

@@ -27,6 +27,28 @@ func TestTrustedCostBoundDecodeAndBinding(t *testing.T) {
 	}
 }
 
+func TestArtifactRegistryEntryCanonicalizesAndRejectsTamper(t *testing.T) {
+	bound := TrustedCostBound{CostBoundID: "c", IntentID: "i", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:00:00Z", CorrelationID: "x", HashVersion: "go-json-v1"}
+	bound.CostBoundHash = ComputeTrustedCostBoundHash(bound)
+	raw, err := json.Marshal(bound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := NewArtifactEntry(ArtifactKindTrustedCostBound, raw)
+	if err != nil || entry.ArtifactID != bound.CostBoundID || entry.ContentHash == "" {
+		t.Fatal(err, entry)
+	}
+	entryRaw, _ := json.Marshal(entry)
+	if _, err := ValidateArtifactEntry(entryRaw); err != nil {
+		t.Fatal(err)
+	}
+	entry.ContentHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	entryRaw, _ = json.Marshal(entry)
+	if _, err := ValidateArtifactEntry(entryRaw); err == nil {
+		t.Fatal("accepted tampered artifact registry entry")
+	}
+}
+
 func TestCanaryGrantDecodeAndBinding(t *testing.T) {
 	g := CanaryGrant{
 		GrantID: "g", GrantVersion: "v1", PolicyVersion: "p1", ApprovalRef: "approval-1", ApprovedBy: "human", ApproverID: "learner",

@@ -134,6 +134,20 @@ và STOP không bị `init` ghi đè. `m10-cancel` chỉ phát hành execution r
 không reserve thêm budget và không tạo side effect. Đây vẫn không phải live
 executor.
 
+Các artifact M10 của learner được sao chép canonical vào registry bất biến
+`m10-artifacts.jsonl` trong state directory. Grant, trusted cost bound, gate,
+authorization và cancellation record chỉ được ACK sau khi registry nhận chúng;
+authorization/cancellation resolve lại input từ registry và từ chối artifact
+hợp schema nhưng không phải bản đã đăng ký. Registry hiện chưa thay thế graph
+outcome/EffectRef hoặc executor.
+
+Có thể chỉ đọc một artifact đã được registry sở hữu theo loại/ID (và tùy chọn
+content hash); lệnh không tạo quyền thực thi:
+
+```bash
+go run ./cmd/bot mission m10-resolve /tmp/affiliate-runtime EXECUTION_RECORD canary-exec-IDENTIFIER
+```
+
 Mỗi lần reserve mới phải có `RESERVATION_ID` ổn định. Retry cùng ID, cost và
 binding trả `EXACT_DUPLICATE` thay vì charge lần hai; tái dùng ID với cost hay
 binding khác bị từ chối. Dạng cũ không có ID chỉ còn tương thích tạm thời và

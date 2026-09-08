@@ -83,7 +83,188 @@ type LearnerReservation struct {
 	ReservedAt    string `json:"reserved_at"`
 }
 
-func trustedCostBoundsPath(dir string) string { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
+func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
+func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
+
+// The registry lives beside mission-state.json and is append-only. It owns the
+// canonical compact JSON used for later resolution; user-supplied output files
+// are only portable views of those registered artifacts.
+func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
+	raw, err := os.ReadFile(m10ArtifactRegistryPath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries := []corem10.ArtifactEntry{}
+	seen := map[string]string{}
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, err := corem10.ValidateArtifactEntry(line)
+		if err != nil {
+			return nil, fmt.Errorf("invalid M10 artifact registry entry: %w", err)
+		}
+		key := entry.ArtifactKind + "\x00" + entry.ArtifactID
+		if prior, exists := seen[key]; exists {
+			if prior == entry.ContentHash {
+				return nil, fmt.Errorf("duplicate M10 artifact registry entry")
+			}
+			return nil, fmt.Errorf("M10 artifact ID reused with different content")
+		}
+		seen[key] = entry.ContentHash
+		entries = append(entries, entry)
+	}
+	if err := validateM10ArtifactGraph(entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
+	grants := map[string]corem10.CanaryGrant{}
+	bounds := map[string]corem10.TrustedCostBound{}
+	gates := map[string]corem10.CanaryGateDecision{}
+	authorizations := map[string]corem10.ExecutionAuthorization{}
+	records := []corem10.ExecutionRecord{}
+	for _, entry := range entries {
+		switch entry.ArtifactKind {
+		case corem10.ArtifactKindCanaryGrant:
+			grant, status := corem10.DecodeCanaryGrant(entry.Artifact)
+			if status != "VALID" {
+				return fmt.Errorf("invalid registered canary grant")
+			}
+			grants[grant.GrantID] = grant
+		case corem10.ArtifactKindTrustedCostBound:
+			bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
+			if status != "VALID" {
+				return fmt.Errorf("invalid registered trusted cost bound")
+			}
+			bounds[bound.CostBoundID] = bound
+		case corem10.ArtifactKindCanaryGate:
+			gate, err := corem10.ValidateCanaryGateDecision(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered canary gate: %w", err)
+			}
+			gates[gate.GateID] = gate
+		case corem10.ArtifactKindExecutionAuthorization:
+			authorization, err := corem10.ValidateExecutionAuthorization(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered execution authorization: %w", err)
+			}
+			authorizations[authorization.AuthorizationID] = authorization
+		case corem10.ArtifactKindExecutionRecord:
+			record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered execution record: %w", err)
+			}
+			records = append(records, record)
+		default:
+			return fmt.Errorf("unsupported registered M10 artifact kind")
+		}
+	}
+	for _, gate := range gates {
+		grant, grantOK := grants[gate.GrantID]
+		bound, boundOK := bounds[gate.CostBoundID]
+		if !grantOK || !boundOK || grant.GrantVersion != gate.GrantVersion || grant.GrantHash != gate.GrantHash || bound.CostBoundHash != gate.CostBoundHash || bound.MaxCostMinor != gate.CostBoundMinor || bound.IntentID != gate.IntentID || bound.IntentHash != gate.IntentHash || grant.PolicyVersion != gate.PolicyVersion {
+			return fmt.Errorf("canary gate has an orphaned or mismatched registry link")
+		}
+	}
+	for _, authorization := range authorizations {
+		grant, grantOK := grants[authorization.CanaryGrantID]
+		gate, gateOK := gates[authorization.CanaryGateID]
+		bound, boundOK := bounds[authorization.CanaryCostBoundID]
+		if !grantOK || !gateOK || !boundOK || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
+			return fmt.Errorf("execution authorization has an orphaned or mismatched registry link")
+		}
+	}
+	for _, record := range records {
+		authorization, exists := authorizations[record.AuthorizationID]
+		if !exists || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
+			return fmt.Errorf("execution record has an orphaned or mismatched registry link")
+		}
+	}
+	return nil
+}
+
+func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, string, error) {
+	entry, err := corem10.NewArtifactEntry(kind, raw)
+	if err != nil {
+		return entry, "", err
+	}
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return entry, "", err
+	}
+	for _, registered := range entries {
+		if registered.ArtifactKind != entry.ArtifactKind || registered.ArtifactID != entry.ArtifactID {
+			continue
+		}
+		if registered.ContentHash == entry.ContentHash {
+			return entry, appendDuplicate, nil
+		}
+		return entry, "", fmt.Errorf("M10 artifact ID reused with different content")
+	}
+	if err := validateM10ArtifactGraph(append(entries, entry)); err != nil {
+		return entry, "", err
+	}
+	line, err := json.Marshal(entry)
+	if err != nil {
+		return entry, "", err
+	}
+	f, err := os.OpenFile(m10ArtifactRegistryPath(dir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return entry, "", err
+	}
+	_, err = f.Write(append(line, '\n'))
+	if syncErr := f.Sync(); err == nil {
+		err = syncErr
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return entry, "", err
+	}
+	return entry, appendAdded, nil
+}
+
+func resolveM10Artifact(dir, kind string, raw []byte) bool {
+	expected, err := corem10.NewArtifactEntry(kind, raw)
+	if err != nil {
+		return false
+	}
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind == expected.ArtifactKind && entry.ArtifactID == expected.ArtifactID && entry.ContentHash == expected.ContentHash {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveM10ArtifactByID(dir, kind, artifactID, contentHash string) (corem10.ArtifactEntry, error) {
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return corem10.ArtifactEntry{}, err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != kind || entry.ArtifactID != artifactID {
+			continue
+		}
+		if contentHash != "" && entry.ContentHash != contentHash {
+			return corem10.ArtifactEntry{}, fmt.Errorf("M10 artifact content hash does not match")
+		}
+		return entry, nil
+	}
+	return corem10.ArtifactEntry{}, fmt.Errorf("M10 artifact is not registered")
+}
 
 func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
 	raw, err := os.ReadFile(trustedCostBoundsPath(dir))
@@ -110,6 +291,10 @@ func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
 
 func resolveTrustedCostBound(dir string, bound corem10.TrustedCostBound) bool {
 	if bound.CostBoundHash == "" || bound.CostBoundHash != corem10.ComputeTrustedCostBoundHash(bound) {
+		return false
+	}
+	raw, err := json.Marshal(bound)
+	if err != nil || !resolveM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, raw) {
 		return false
 	}
 	bounds, err := loadTrustedCostBounds(dir)
@@ -549,12 +734,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-cancel": true, "m10-reserve": true, "reserve": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -747,6 +932,13 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			c.ExecutionsUsed = s.Canary.ExecutionsUsed
 			c.CostUsedMinor = s.Canary.CostUsedMinor
 		}
+		grantRaw, err := json.Marshal(c.CanaryGrant)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
 		s.Canary = &c
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -778,13 +970,21 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
+		boundAlreadyRegistered := false
 		for _, old := range bounds {
 			if old.CostBoundID == bound.CostBoundID {
 				if old.CostBoundHash == bound.CostBoundHash {
-					return emit("EXACT_DUPLICATE", bound, nil, 0)
+					boundAlreadyRegistered = true
+					break
 				}
 				return emit("CONFLICT", nil, fmt.Errorf("cost_bound_id reused with different content"), 1)
 			}
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindTrustedCostBound, raw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if boundAlreadyRegistered {
+			return emit("EXACT_DUPLICATE", bound, nil, 0)
 		}
 		f, err := os.OpenFile(trustedCostBoundsPath(args[1]), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
@@ -830,6 +1030,13 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
+		gateRaw, err := json.Marshal(gate)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
 		status, err = writeNewJSON(args[3], gate)
 		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
@@ -871,6 +1078,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("REJECTED", nil, fmt.Errorf("invalid persisted canary gate"), 1)
 		}
+		if !resolveM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw) {
+			return emit("REJECTED", nil, fmt.Errorf("canary gate is not a registered canonical artifact"), 1)
+		}
 		if storedGate.EvaluatedAt != args[5] {
 			return emit("REJECTED", nil, fmt.Errorf("authorization time must exactly match persisted gate evaluation"), 1)
 		}
@@ -888,6 +1098,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		if _, err := corem10.ValidateExecutionAuthorization(authorizationRaw); err != nil {
 			return emit("REJECTED", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
 		}
 		status, err = writeNewJSON(args[4], authorization)
 		if err != nil {
@@ -916,6 +1129,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("REJECTED", nil, fmt.Errorf("invalid execution authorization: %w", err), 1)
 		}
+		if !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is not a registered canonical artifact"), 1)
+		}
 		if !authorizationBindsMissionState(authorization, s) {
 			return emit("REJECTED", nil, fmt.Errorf("execution authorization does not bind to current mission state"), 1)
 		}
@@ -930,11 +1146,27 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
 		status, err := writeNewJSON(args[3], record)
 		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}
 		return emit(status, record, nil, 0)
+	case "m10-resolve":
+		if len(args) != 4 && len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
+		}
+		contentHash := ""
+		if len(args) == 5 {
+			contentHash = args[4]
+		}
+		entry, err := resolveM10ArtifactByID(args[1], args[2], args[3], contentHash)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit("RESOLVED", entry.Artifact, nil, 0)
 	case "m10-reserve", "reserve":
 		if len(args) != 3 && len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)

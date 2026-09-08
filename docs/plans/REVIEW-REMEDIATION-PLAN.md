@@ -130,6 +130,15 @@ nghiệm thu trên `main`**.
   không reserve budget hay tạo EffectRef. Execution thành công/thất bại, ledger
   link, outcome và graph persistence vẫn thuộc RP-03/RP-06/RP-07, do đó RP-03
   vẫn mở.
+- **RP-03 M10 registry foundation:** state directory nay có registry append-only
+  `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
+  `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation
+  record sau khi registry validate toàn bộ link grant → cost/gate → authorization
+  → record. `m10-resolve` chỉ đọc artifact canonical theo kind/ID/(tùy chọn)
+  content hash. Gate/authorization hợp schema nhưng không có entry chính xác bị
+  smoke BR-16a từ chối. Registry chưa có reservation-to-attempt link, execution
+  result/outcome/EffectRef, migration/restore graph hoặc fault injection đầy
+  đủ, vì vậy không đóng RP-03/RP-06/RP-07.
 - **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
   read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
   một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng
