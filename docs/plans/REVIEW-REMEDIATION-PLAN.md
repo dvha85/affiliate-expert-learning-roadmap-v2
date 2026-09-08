@@ -335,6 +335,14 @@ pending execution; `m11-record-failed` chỉ có đường fixture `FAILED`/
 Business outcome, reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc
 trước khi đóng.
 
+**Cập nhật reconciliation (2026-09-08):** learner có `m11-record-unknown` cho
+fixture effect không xác định. Nó ghi `RECONCILIATION_REQUIRED`/`UNKNOWN`,
+ledger STOPPED và durable STOP trước khi trả kết quả. `m11-reconcile` chỉ nhận
+resolution đã nằm trong registry, do `human` xác nhận đúng unknown execution và
+chỉ chốt ledger ở `RECOVERY_REVIEW_REQUIRED`; lệnh không thể kích hoạt lại lease
+hoặc cấp authorization mới. Cần thêm trace fault-injection và full restore test
+cho nhánh này trước khi coi RP-07a hoàn tất.
+
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
 RP-07a sở hữu graph M11: source canary/promotion review → lease + lease approval → activation; intent/policy + health snapshot + TrustedCostBound + pre-ledger → ProductionGateDecision → reservation/ExecutionAuthorization → ExecutionRecord → outcome có `MACHINE_EXECUTION` EffectRef → evaluation/cycle/post-ledger; trường hợp UNKNOWN/STOP có reconciliation resolution và reviewed recovery riêng. Tái sử dụng [M11 chain checker](../../lab/mission-runtime/cmd/demo/m11_chain.go), [production gate](../../contracts/production-gate-decision.schema.json) và canonical schemas; không bỏ gate/authorization/execution chỉ vì chạy offline.

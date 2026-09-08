@@ -221,7 +221,7 @@ func m11ArtifactValue(dir, kind, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation"}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation", corem11.ArtifactKindReconciliation: "resolution"}
 	profile := profiles[kind]
 	if profile == "" {
 		return nil, fmt.Errorf("unsupported M11 gate artifact")
@@ -512,4 +512,132 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 		return record, next, ledgerStatus, err
 	}
 	return record, next, status, nil
+}
+
+// recordUnknownM11Execution is the only learner fixture that can model an
+// indeterminate external effect. It fails closed: the mission STOP marker and
+// immutable stopped ledger are written before returning the record. A later
+// reconciliation can establish facts, but never reactivates this lease.
+func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemptedAt, reason string) (corem11.ProductionExecutionRecord, corem11.ProductionLedger, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	now, err := time.Parse(time.RFC3339, attemptedAt)
+	if err != nil || strings.TrimSpace(reason) == "" {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("invalid unknown execution input")
+	}
+	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	auth := authValue.(*corem11.ProductionExecutionAuthorization)
+	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
+	if err != nil || !expires.After(now) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is inactive")
+	}
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, reservationLedgerID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	executionID := "prod-exec-" + auth.AuthorizationID
+	pending := false
+	for _, id := range ledger.PendingExecutionIDs {
+		pending = pending || id == executionID
+	}
+	if !pending || ledger.PendingOutcomes < 1 || ledger.LeaseID != auth.ProductionLeaseID || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("execution has no governed reservation")
+	}
+	record := corem11.ProductionExecutionRecord{ExecutionID: executionID, AuthorizationID: auth.AuthorizationID, ProductionLeaseID: auth.ProductionLeaseID, ProductionLeaseVersion: auth.ProductionLeaseVersion, ProductionLeaseHash: auth.ProductionLeaseHash, ProductionGateID: auth.ProductionGateID, ProductionHealthSnapshotID: auth.ProductionHealthSnapshotID, ProductionHealthSnapshotHash: auth.ProductionHealthSnapshotHash, ProductionCostBoundID: auth.ProductionCostBoundID, ProductionCostBoundHash: auth.ProductionCostBoundHash, ProductionCostBoundMinor: auth.ProductionCostBoundMinor, IntentID: auth.IntentID, IntentHash: auth.IntentHash, ExecutorID: auth.ExecutorID, IdempotencyKey: auth.IdempotencyKey, AttemptedAt: attemptedAt, Status: "RECONCILIATION_REQUIRED", SideEffectState: "UNKNOWN", Error: reason, CorrelationID: auth.CorrelationID}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return record, corem11.ProductionLedger{}, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindExecution, raw)
+	if err != nil {
+		return record, corem11.ProductionLedger{}, status, err
+	}
+	next := *ledger
+	next.ControlMode = "STOPPED"
+	next.StopReason = "RECONCILIATION_REQUIRED"
+	next.ReconciliationRequired = true
+	next.LastExecutionAt = attemptedAt
+	next.UpdatedAt = attemptedAt
+	ledgerRaw, err := json.Marshal(next)
+	if err != nil {
+		return record, next, status, err
+	}
+	if _, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+		return record, next, ledgerStatus, err
+	}
+	state.Stop, state.StopReason = true, "RECONCILIATION_REQUIRED"
+	if err := saveMissionState(dir, state); err != nil {
+		return record, next, status, err
+	}
+	if err := writeJSONAtomic(filepath.Join(dir, "STOP"), map[string]any{"active": true, "reason": state.StopReason}); err != nil {
+		return record, next, status, err
+	}
+	return record, next, status, nil
+}
+
+// reconcileM11Execution requires an already registered, human-authored
+// resolution. It preserves durable STOP: the old lease can never resume.
+func reconcileM11Execution(dir, resolutionID, ledgerID string) (corem11.ProductionReconciliationResolution, corem11.ProductionLedger, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil || !state.Stop {
+		return corem11.ProductionReconciliationResolution{}, corem11.ProductionLedger{}, "", fmt.Errorf("reconciliation requires durable STOP")
+	}
+	value, err := m11ArtifactValue(dir, corem11.ArtifactKindReconciliation, resolutionID)
+	if err != nil {
+		return corem11.ProductionReconciliationResolution{}, corem11.ProductionLedger{}, "", err
+	}
+	resolution := value.(*corem11.ProductionReconciliationResolution)
+	if resolution.ResolvedBy != "human" || strings.TrimSpace(resolution.ResolverID) == "" || strings.TrimSpace(resolution.Reason) == "" || resolution.EffectState != "NOT_PERFORMED" {
+		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("reconciliation requires a human NOT_PERFORMED resolution")
+	}
+	resolvedAt, err := time.Parse(time.RFC3339, resolution.ResolvedAt)
+	if err != nil {
+		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("invalid reconciliation time")
+	}
+	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	if err != nil {
+		return *resolution, corem11.ProductionLedger{}, "", err
+	}
+	ledger := ledgerValue.(*corem11.ProductionLedger)
+	executionValue, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, resolution.ExecutionID)
+	if err != nil {
+		return *resolution, corem11.ProductionLedger{}, "", err
+	}
+	execution := executionValue.(*corem11.ProductionExecutionRecord)
+	if ledger.ControlMode != "STOPPED" || !ledger.ReconciliationRequired || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || ledger.LeaseID != resolution.LeaseID || ledger.LeaseVersion != resolution.LeaseVersion || ledger.LeaseHash != resolution.LeaseHash || execution.ProductionLeaseID != resolution.LeaseID || resolvedAt.Before(mustM11Time(execution.AttemptedAt)) {
+		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("reconciliation does not bind the stopped unknown execution")
+	}
+	for _, id := range ledger.ReconciliationResolutionIDs {
+		if id == resolution.ResolutionID {
+			return *resolution, *ledger, appendDuplicate, nil
+		}
+	}
+	next := *ledger
+	next.ReconciliationRequired = false
+	next.StopReason = "RECOVERY_REVIEW_REQUIRED"
+	next.ReconciliationResolutionIDs = append(append([]string(nil), ledger.ReconciliationResolutionIDs...), resolution.ResolutionID)
+	next.UpdatedAt = resolution.ResolvedAt
+	raw, err := json.Marshal(next)
+	if err != nil {
+		return *resolution, next, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, raw)
+	return *resolution, next, status, err
+}
+
+func mustM11Time(raw string) time.Time {
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }
