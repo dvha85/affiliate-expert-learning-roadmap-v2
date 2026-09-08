@@ -60,3 +60,42 @@ func TestRawFixtureBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestOfferFixtureBuildUsesOneCanonicalPacket(t *testing.T) {
+	profile := m06.OfferFixtureProfile{
+		FixtureURL: "https://example.com/br13/offer",
+		SourceURL:  "https://example.com/br13/offer",
+		AllowHost:  "example.com",
+		Access:     "local_fixture",
+		Role:       "synthetic_fixture",
+		Limitation: "offline only",
+	}
+	raw := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"Fixture A\",\"currency\":\"USD\",\"price\":100,\"commission_rate\":0.08}"}`)
+	built, err := m06.BuildOfferFixture(raw, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(built.RecordID, "watch-") || built.ObservedAt != "2026-09-03T00:00:00Z" {
+		t.Fatal(built)
+	}
+	var packet struct {
+		Products []struct {
+			Fields []struct {
+				Field string `json:"field_or_claim"`
+				Value any    `json:"value"`
+			} `json:"fields"`
+		} `json:"products"`
+	}
+	if err := json.Unmarshal(built.Packet, &packet); err != nil || len(packet.Products) != 1 || len(packet.Products[0].Fields) != 2 || packet.Products[0].Fields[0].Field != "price" {
+		t.Fatal(err, string(built.Packet))
+	}
+	if _, err := m06.BuildOfferFixture([]byte(strings.Replace(string(raw), `"status_code":200`, `"status_code":201`, 1)), profile); err == nil {
+		t.Fatal("non-200 fixture accepted")
+	}
+	wrongProfile := profile
+	wrongProfile.SourceURL = "https://other.invalid/offer"
+	wrongProfile.AllowHost = "example.com"
+	if _, err := m06.BuildOfferFixture(raw, wrongProfile); err == nil {
+		t.Fatal("source/profile mismatch accepted")
+	}
+}

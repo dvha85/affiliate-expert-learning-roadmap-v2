@@ -113,6 +113,15 @@ nghiệm thu trên `main`**.
   resolve lại record từ store sau append trước khi ACK/return artifact. Chưa
   có core M06 builder chung, chưa đổi n8n blueprint/HTTP adapter, và chưa có
   proposal resolver; RP-04 vẫn mở.
+- **RP-04 M06 shared fixture path:** `core/m06` nay owns strict
+  `br13-offer-fixture/v1` decoding, timestamp/identity/provenance normalization
+  và M00 packet construction. Learner CLI local/pinned fetch cùng n8n endpoint
+  `/v1/m06/fixture-import` dùng profile này; endpoint append rồi resolve/replay
+  canonical record trước ACK. Blueprint không còn GET/parse/hash/build history
+  bằng JavaScript. Unit test cover adapter APPENDED/EXACT_DUPLICATE/replay và
+  reject không mutate history. Đây chỉ là fixed synthetic profile; generic
+  source profile, n8n operated execution và full shared HistoryRecord type vẫn
+  còn mở, nên RP-04 chưa đóng.
 - **RP-05 foundation:** core/learner M07 nay kiểm output thực: chỉ
   `HUMAN_REVIEW`/`ABSTAIN`, claim/evidence/value và `answer`/`claim.text` phải
   là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`

@@ -42,6 +42,54 @@ func watchRun(t *testing.T, h, input string, f watcherFixture, want string) {
 	}
 }
 
+func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	call := func(method string, fixture watcherFixture) *httptest.ResponseRecorder {
+		raw, err := json.Marshal(m06AdapterRequest{Fixture: mustRawJSON(t, fixture)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorder := httptest.NewRecorder()
+		m06AdapterHandler(history).ServeHTTP(recorder, httptest.NewRequest(method, "/v1/m06/fixture-import", bytes.NewReader(raw)))
+		return recorder
+	}
+	wrongMethod := call(http.MethodGet, watchFixture())
+	if wrongMethod.Code != http.StatusMethodNotAllowed {
+		t.Fatal(wrongMethod.Code, wrongMethod.Body.String())
+	}
+	first := call(http.MethodPost, watchFixture())
+	if first.Code != http.StatusOK {
+		t.Fatal(first.Code, first.Body.String())
+	}
+	var response struct {
+		Status                    string `json:"status"`
+		RecordID                  string `json:"record_id"`
+		CanonicalHistoryACK       bool   `json:"canonical_history_ack"`
+		CanonicalHistoryPersisted bool   `json:"canonical_history_persisted"`
+	}
+	if err := json.Unmarshal(first.Body.Bytes(), &response); err != nil || response.Status != appendAdded || response.RecordID == "" || !response.CanonicalHistoryACK || !response.CanonicalHistoryPersisted {
+		t.Fatal(err, first.Body.String())
+	}
+	second := call(http.MethodPost, watchFixture())
+	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), appendDuplicate) {
+		t.Fatal(second.Code, second.Body.String())
+	}
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 || records[0].RecordID != response.RecordID || Replay(records[0]).State != replayMatch {
+		t.Fatal(err, records)
+	}
+	bad := watchFixture()
+	bad.URL = "https://other.invalid/offer"
+	if result := call(http.MethodPost, bad); result.Code != http.StatusBadRequest {
+		t.Fatal("unrecognized fixture source accepted", result.Code, result.Body.String())
+	}
+	records, err = LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal("rejected fixture changed canonical history", err, records)
+	}
+}
+
 func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	dir := t.TempDir()
 	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")

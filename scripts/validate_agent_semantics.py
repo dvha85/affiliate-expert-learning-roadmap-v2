@@ -48,6 +48,7 @@ runtime += "\n" + (ROOT / "core/m03/m03.go").read_text(encoding="utf-8")
 runtime += "\n" + (ROOT / "core/m04/advisor.go").read_text(encoding="utf-8")
 runtime += "\n" + (ROOT / "core/m05/m05.go").read_text(encoding="utf-8")
 runtime += "\n" + (ROOT / "core/m06/m06.go").read_text(encoding="utf-8")
+runtime += "\n" + (ROOT / "core/m08/m08.go").read_text(encoding="utf-8")
 for marker in [
     "DRY_RUN_ONLY", "BROKEN_LINK", "REJECT_MACHINE_EXECUTION", "REJECT_WRITE_REQUEST", "ABSTAIN_FUTURE", "REJECT_AUTO_APPLY",
     "EffectRef", "HUMAN_ACTION", "MACHINE_EXECUTION", "REJECT_WRITE_METHOD", "REJECT_TOOL", "REJECT_UNGROUNDED",
@@ -73,31 +74,35 @@ for rel in ["contracts/outcome-record.schema.json", "contracts/evaluation-record
     if schema.get("properties", {}).get("effect_ref", {}).get("$ref") != "effect-ref.schema.json":
         errors.append(f"{rel} must reference canonical EffectRef")
 
-# M06 watcher: exact canonical snapshot determines change state; fingerprint is diagnostic only.
+# M06 watcher: the shared adapter, rather than blueprint JavaScript, determines
+# the canonical record and persistence acknowledgement.
 m06 = load_json(missions.get("M06", {}).get("orchestration_blueprint", "lab/n8n/M06-readonly-watcher.blueprint.json"))
 nodes = {node.get("name"): node for node in m06.get("nodes", [])}
-for name in ["Schedule Trigger", "Allowed Source + Canonical Store", "Read-only HTTP GET", "Parse Provenance + Change Detect", "Build Canonical History Record", "Canonical History Adapter", "Require Canonical Store ACK", "Report NEW UNCHANGED CHANGED"]:
+for name in ["Schedule Trigger", "M06 Adapter Input", "Build and Append Canonical M06 Adapter", "Require Canonical Store ACK", "Report Canonical M06 Result"]:
     if name not in nodes:
         errors.append(f"M06 blueprint missing node: {name}")
-if nodes.get("Read-only HTTP GET", {}).get("parameters", {}).get("method") != "GET":
-    errors.append("M06 n8n HTTP node must be GET-only")
-normalize = nodes.get("Parse Provenance + Change Detect", {}).get("parameters", {}).get("jsCode", "")
-for marker in ["previous===content_hash", "200000", "watcher_fingerprint", "content_hash", "observation_id", "claim_kind"]:
-    if marker not in normalize:
-        errors.append(f"M06 exact change-detection marker missing: {marker}")
-for obsolete in ["let h=5381", "previous===fingerprint", "canonical_history_handoff:'REQUIRED'"]:
-    if obsolete in normalize:
-        errors.append(f"M06 must not decide change state from collision-prone fingerprint: {obsolete}")
+for retired in ["Read-only HTTP GET", "Parse Provenance + Change Detect", "Build Canonical History Record", "Canonical History Adapter"]:
+    if retired in nodes:
+        errors.append(f"M06 blueprint retains a local builder node: {retired}")
+handoff = nodes.get("Build and Append Canonical M06 Adapter", {}).get("parameters", {})
+if handoff.get("method") != "POST" or "/v1/m06/fixture-import" not in handoff.get("url", ""):
+    errors.append("M06 n8n must call the shared fixture-import adapter")
+ack = nodes.get("Require Canonical Store ACK", {}).get("parameters", {}).get("jsCode", "")
+for marker in ["CANONICAL_HISTORY_NOT_ACKNOWLEDGED", "canonical_history_ack!==true", "canonical_history_persisted!==true"]:
+    if marker not in ack:
+        errors.append(f"M06 canonical ACK marker missing: {marker}")
 
 # M07 read-only Agent boundary.
 m07 = load_json(missions.get("M07", {}).get("orchestration_blueprint", "lab/n8n/M07-readonly-evidence-agent.blueprint.json"))
 types = {node.get("type") for node in m07.get("nodes", [])}
-for node_type in ["@n8n/n8n-nodes-langchain.agent", "@n8n/n8n-nodes-langchain.lmChatOpenAi", "n8n-nodes-base.httpRequestTool"]:
+for node_type in ["@n8n/n8n-nodes-langchain.agent", "@n8n/n8n-nodes-langchain.lmChatOpenAi"]:
     if node_type not in types:
         errors.append(f"M07 blueprint missing Agent component: {node_type}")
-tool = next((node for node in m07.get("nodes", []) if node.get("type") == "n8n-nodes-base.httpRequestTool"), {})
-if tool.get("parameters", {}).get("method") != "GET":
-    errors.append("M07 connected HTTP tool must be GET-only")
+if "n8n-nodes-base.httpRequestTool" in types:
+    errors.append("M07 Agent must not receive a direct HTTP tool; the shared adapter owns fetch policy")
+fetch = next((node for node in m07.get("nodes", []) if node.get("name") == "Fetch and Register Tool Adapter"), {})
+if fetch.get("parameters", {}).get("method") != "POST" or "/v1/m07/fetch-and-register" not in fetch.get("parameters", {}).get("url", ""):
+    errors.append("M07 must use the shared fetch-and-register adapter")
 
 # M08 proposal-only policy semantics.
 intent = load_json("contracts/action-intent.schema.json")

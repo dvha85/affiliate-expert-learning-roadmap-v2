@@ -24,16 +24,7 @@ import (
 const watcherFixtureURL = "https://example.com/br13/offer"
 const m07MaxToolResponseBytes = 256 << 10
 
-// Deliberately no caller allowlist, endpoint option or network client.
-type watcherFixture struct {
-	Version       string `json:"version"`
-	Method        string `json:"method"`
-	URL           string `json:"url"`
-	ObservedAt    string `json:"observed_at"`
-	CorrelationID string `json:"correlation_id"`
-	StatusCode    int    `json:"status_code"`
-	Body          string `json:"body"`
-}
+type watcherFixture = m06.OfferFixture
 
 func watcherRecord(raw []byte) (HistoryRecord, error) {
 	return watcherRecordSource(raw, "")
@@ -41,89 +32,41 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 
 // Remote source is supplied only by the fixed, hash-verified fetch adapter.
 func watcherRecordSource(raw []byte, remote string) (HistoryRecord, error) {
-	fail := func(s string) (HistoryRecord, error) { return HistoryRecord{}, fmt.Errorf("watcher: %s", s) }
-	var f watcherFixture
-	if err := contracts.DecodeStrict(raw, &f); err != nil {
-		return fail("invalid fixture envelope")
+	profile := m06.OfferFixtureProfile{
+		FixtureURL: watcherFixtureURL,
+		SourceURL:  watcherFixtureURL,
+		AllowHost:  "example.com",
+		Access:     "local_fixture",
+		Role:       "synthetic_fixture",
+		Limitation: "Fixture supplied locally; no fetch, seller authority or business truth verified.",
 	}
-	if f.Version != "br13-offer-fixture/v1" || f.Method != "GET" || f.URL != watcherFixtureURL {
-		return fail("unsupported fixture profile/source/method")
-	}
-	if f.StatusCode != 200 {
-		return fail("response status must be 200")
-	}
-	access, limitation := "local_fixture", "Fixture supplied locally; no fetch, seller authority or business truth verified."
-	host := "example.com"
 	if remote != "" {
 		if remote != watcherPinnedURL {
-			return fail("unsupported remote source")
+			return HistoryRecord{}, fmt.Errorf("watcher: unsupported remote source")
 		}
-		f.URL, host = remote, "raw.githubusercontent.com"
-		access, limitation = "GET", "Fetched pinned synthetic fixture over HTTPS; scenario observed_at is not fetch time; no seller authority or business truth verified."
+		profile.SourceURL = remote
+		profile.AllowHost = "raw.githubusercontent.com"
+		profile.Access = "GET"
+		profile.Limitation = "Fetched pinned synthetic fixture over HTTPS; scenario observed_at is not fetch time; no seller authority or business truth verified."
 	}
-	if strings.TrimSpace(f.CorrelationID) == "" || f.CorrelationID != strings.TrimSpace(f.CorrelationID) {
-		return fail("stable correlation_id required")
-	}
-	at, err := time.Parse(time.RFC3339, f.ObservedAt)
+	built, err := m06.BuildOfferFixture(raw, profile)
 	if err != nil {
-		return fail("invalid observed_at")
+		return HistoryRecord{}, fmt.Errorf("watcher: %w", err)
 	}
-	f.ObservedAt = at.UTC().Format(time.RFC3339Nano)
-	var offer struct {
-		ProductID   string          `json:"product_id"`
-		ProductName string          `json:"product_name"`
-		Currency    string          `json:"currency"`
-		Price       json.RawMessage `json:"price"`
-		Commission  json.RawMessage `json:"commission_rate"`
-	}
-	if err := contracts.DecodeStrict([]byte(f.Body), &offer); err != nil {
-		return fail("malformed offer body")
-	}
-	if strings.TrimSpace(offer.ProductID) == "" || strings.TrimSpace(offer.ProductName) == "" || offer.Currency != "USD" {
-		return fail("product identity/name and USD required")
-	}
-	request := m06.WatchRequest{Method: f.Method, URL: f.URL, AllowHosts: []string{host}, ObservedAt: f.ObservedAt, CorrelationID: f.CorrelationID, Body: f.Body}
-	normalized, status := m06.NormalizeWatchObservation(request, offer.ProductID)
-	if status != "NEW" {
-		return fail("normalization rejected")
-	}
-	// Record identity pins a declared observation event, not body bytes. Changed
-	// content/time for the same correlation ID conflicts instead of silently
-	// turning a retry into a new history record.
-	event, _ := json.Marshal([]string{f.Version, f.URL, f.CorrelationID})
-	recordID := "watch-" + m06.ContentHash(string(event))
-	fields := []map[string]any{}
-	for _, item := range []struct {
-		name  string
-		value json.RawMessage
-	}{{"price", offer.Price}, {"commission_rate", offer.Commission}} {
-		value := item.value
-		state, claim := "observed", "assumption"
-		if len(value) == 0 || string(value) == "null" {
-			value = json.RawMessage("null")
-			state, claim = "missing", "unknown"
-		}
-		fields = append(fields, map[string]any{"observation_id": normalized.ObservationID + "-" + item.name, "subject_id": offer.ProductID, "source_url": f.URL, "observed_at": f.ObservedAt, "access_method": access, "evidence_kind": "synthetic", "use_context": "test", "field_or_claim": item.name, "claim_kind": claim, "value": value, "state": state, "source_authority_or_role": "synthetic_fixture", "transformation_or_method": "br13-offer-fixture/v1; body_sha256=" + normalized.ContentHash + "; correlation_id=" + f.CorrelationID, "limitation": limitation})
-	}
-	packet := map[string]any{"version": "m00-input/v1", "question": "Synthetic watcher scenario; no business recommendation.", "products": []any{map[string]any{"observation_id": normalized.ObservationID, "subject_id": offer.ProductID, "product_name": offer.ProductName, "currency": offer.Currency, "fields": fields}}}
-	packetRaw, err := json.Marshal(packet)
+	converted, err := m00.Convert(built.Packet)
 	if err != nil {
-		return fail("projection encoding")
-	}
-	converted, err := m00.Convert(packetRaw)
-	if err != nil {
-		return fail("invalid offer fields or numeric precision")
+		return HistoryRecord{}, fmt.Errorf("watcher: invalid offer fields or numeric precision: %w", err)
 	}
 	projection, err := json.Marshal(converted)
 	if err != nil {
-		return fail("projection encoding")
+		return HistoryRecord{}, fmt.Errorf("watcher: projection encoding: %w", err)
 	}
 	var observations []Observation
 	if err := json.Unmarshal(projection, &observations); err != nil {
-		return fail("projection decoding")
+		return HistoryRecord{}, fmt.Errorf("watcher: projection decoding: %w", err)
 	}
 	// In fixture mode both timestamps are declared scenario time, not wall clock.
-	return NewHistoryRecord(recordID, f.ObservedAt, f.ObservedAt, observations)
+	return NewHistoryRecord(built.RecordID, built.ObservedAt, built.ObservedAt, observations)
 }
 
 func runWatcher(args []string, stdout, stderr io.Writer) int {
@@ -172,17 +115,20 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("FIXTURE_ERROR", nil, err, 1)
 	}
-	status, err := AppendHistory(args[1], record)
+	status, resolved, err := appendResolvedHistory(args[1], record)
 	if err != nil {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": record.RecordID, "decision_id": record.RecordedResult.DecisionID, "state": record.RecordedResult.State, "observation_ids": record.RecordedResult.EvidenceIDs}, nil, 0)
+	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "observation_ids": resolved.RecordedResult.EvidenceIDs}, nil, 0)
 }
 
-// runWatcherServer exposes the local BR-13 canonical adapter used by the n8n
-// blueprint. It accepts only complete HistoryRecord JSON on a loopback-bound
-// POST endpoint; all validation and append semantics remain in the learner
-// store implementation.
+// m06AdapterRequest deliberately carries only a local synthetic fixture. The
+// adapter, rather than n8n JavaScript, builds the M00 input and HistoryRecord
+// from the shared M06 profile before it can append to canonical history.
+type m06AdapterRequest struct {
+	Fixture json.RawMessage `json:"fixture"`
+}
+
 type m07AdapterRequest struct {
 	RecordID     string               `json:"record_id"`
 	Registry     []corem07.ToolSpec   `json:"registry"`
@@ -190,6 +136,60 @@ type m07AdapterRequest struct {
 	ToolResult   json.RawMessage      `json:"tool_result,omitempty"`
 	ModelOutput  json.RawMessage      `json:"model_output,omitempty"`
 	ToolResultID string               `json:"tool_result_id,omitempty"`
+}
+
+func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
+	var request m06AdapterRequest
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+	if err != nil {
+		return request, err
+	}
+	if err := contracts.DecodeStrict(raw, &request); err != nil || len(request.Fixture) == 0 {
+		return request, fmt.Errorf("invalid M06 adapter request")
+	}
+	return request, nil
+}
+
+func appendResolvedHistory(historyPath string, record HistoryRecord) (string, HistoryRecord, error) {
+	status, err := AppendHistory(historyPath, record)
+	if err != nil {
+		return "", HistoryRecord{}, err
+	}
+	resolved, err := resolveCanonicalRecord(historyPath, record.RecordID)
+	if err != nil {
+		return "", HistoryRecord{}, err
+	}
+	return status, resolved, nil
+}
+
+func m06AdapterHandler(historyPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "REJECT_METHOD", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		request, err := decodeM06AdapterRequest(r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_M06_INPUT", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		record, err := watcherRecord(request.Fixture)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "FIXTURE_ERROR", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		status, resolved, err := appendResolvedHistory(historyPath, record)
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "HANDOFF_ERROR", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false})
+	}
 }
 
 func m07ArtifactPath(historyPath, kind, id string) (string, error) {
@@ -534,6 +534,7 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/m06/fixture-import", m06AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/context", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/preflight", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/fetch-and-register", m07AdapterHandler(historyPath))
@@ -650,13 +651,9 @@ func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
 	if err := validateHistoryRecord(record); err != nil {
 		return emit("INVALID_HISTORY", nil, err, 1)
 	}
-	status, err := AppendHistory(args[0], record)
+	status, resolved, err := appendResolvedHistory(args[0], record)
 	if err != nil {
 		return emit("HANDOFF_ERROR", nil, err, 1)
-	}
-	resolved, err := resolveCanonicalRecord(args[0], record.RecordID)
-	if err != nil {
-		return emit("RESOLUTION_ERROR", nil, err, 1)
 	}
 	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved}, nil, 0)
 }
