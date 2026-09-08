@@ -109,8 +109,10 @@ nghiệm thu trên `main`**.
   mở.
 - **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
   read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
-  một lần từ history và replay `MATCH`. Chưa có core M06 builder chung, chưa
-  đổi n8n blueprint/HTTP adapter, và chưa có proposal resolver; RP-04 vẫn mở.
+  một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng
+  resolve lại record từ store sau append trước khi ACK/return artifact. Chưa
+  có core M06 builder chung, chưa đổi n8n blueprint/HTTP adapter, và chưa có
+  proposal resolver; RP-04 vẫn mở.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 

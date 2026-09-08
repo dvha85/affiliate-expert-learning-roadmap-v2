@@ -238,7 +238,13 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			_, _ = io.WriteString(w, `{"status":"HANDOFF_ERROR","canonical_history_ack":false}`+"\n")
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": record.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false})
+		resolved, err := resolveCanonicalRecord(historyPath, record.RecordID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "RESOLUTION_ERROR", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
 	})
 	mux.HandleFunc("/v1/history", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -253,20 +259,8 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			_, _ = io.WriteString(w, `{"status":"RECORD_ID_REQUIRED"}`+"\n")
 			return
 		}
-		records, err := LoadHistory(historyPath)
+		found, err := resolveCanonicalRecord(historyPath, recordID)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = io.WriteString(w, `{"status":"HISTORY_ERROR"}`+"\n")
-			return
-		}
-		var found *HistoryRecord
-		for i := range records {
-			if records[i].RecordID == recordID {
-				copy := records[i]
-				found = &copy
-			}
-		}
-		if found == nil {
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = io.WriteString(w, `{"status":"NOT_FOUND"}`+"\n")
 			return
@@ -324,5 +318,9 @@ func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": record.RecordID, "decision_id": record.RecordedResult.DecisionID, "state": record.RecordedResult.State, "evidence_ids": record.RecordedResult.EvidenceIDs}, nil, 0)
+	resolved, err := resolveCanonicalRecord(args[0], record.RecordID)
+	if err != nil {
+		return emit("RESOLUTION_ERROR", nil, err, 1)
+	}
+	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved}, nil, 0)
 }
