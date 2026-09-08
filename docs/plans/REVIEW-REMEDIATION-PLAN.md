@@ -365,6 +365,12 @@ giả lập partial reconciliation write (UNKNOWN execution + resolution còn nh
 reviewed stopped-ledger mất) với checksum manifest hợp lệ; restore fail-closed
 `GRAPH_FAILED`. Chưa có crash hook thực thi tại từng `write/sync/rename`.
 
+**Cập nhật multi-process reservation (2026-09-08):** BR-18b chạy hai process
+cùng `m11-reserve-authorization` với cùng authorization và timestamps khác.
+Chỉ một process được `APPENDED`; process còn lại `BUSY` hoặc `REJECTED`, và retry
+sau `BUSY` bị reject. Đây kiểm lock + canonical registry guard; không thay CAS
+hoặc transaction đa-file.
+
 **Cập nhật fault seam (2026-09-08):** registry M11 có hook nội bộ chỉ dùng trong
 test (không nhận từ CLI/env). Test inject lỗi sau `write` nhưng trước khi caller
 nhận success: loader vẫn đọc được artifact hoàn chỉnh và retry trả

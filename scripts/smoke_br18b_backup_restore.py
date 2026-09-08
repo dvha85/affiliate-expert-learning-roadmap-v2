@@ -98,7 +98,7 @@ def write_production_resolution(path, lease_path, execution_id):
         "resolution_id": "br18-production-resolution", "lease_id": lease["lease_id"],
         "lease_version": lease["lease_version"], "lease_hash": lease["lease_hash"],
         "execution_id": execution_id, "resolved_by": "human", "resolver_id": "pilot-human",
-        "resolved_at": "2026-09-08T00:00:03Z", "effect_state": "NOT_PERFORMED",
+        "resolved_at": "2026-09-08T00:00:05Z", "effect_state": "NOT_PERFORMED",
         "reason": "fixture provider audit confirmed no side effect",
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -232,9 +232,24 @@ def main():
         assert recovery_gate["status"] == "ALLOW_PRODUCTION"
         recovery_authorization = invoke(bot, "mission", "m11-authorize", recovery_runtime, "br18-production-lease", recovery_gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
         assert recovery_authorization["status"] == "APPENDED"
-        recovery_reservation = invoke(bot, "mission", "m11-reserve-authorization", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
-        assert recovery_reservation["status"] == "APPENDED"
-        recovery_unknown = invoke(bot, "mission", "m11-record-unknown", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z", "fixture provider timeout after dispatch", env=env)
+        reservation_attempts = [
+            subprocess.Popen([str(bot), "mission", "m11-reserve-authorization", str(recovery_runtime), recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", reserved_at], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            for reserved_at in ("2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z")
+        ]
+        reservation_responses = []
+        for process in reservation_attempts:
+            stdout, stderr = process.communicate()
+            if process.returncode not in (0, 1):
+                raise AssertionError((stdout, stderr))
+            reservation_responses.append(json.loads(stdout))
+        assert sum(response["status"] == "APPENDED" for response in reservation_responses) == 1
+        assert all(response["status"] in {"APPENDED", "BUSY", "REJECTED"} for response in reservation_responses)
+        recovery_reservation = next(response for response in reservation_responses if response["status"] == "APPENDED")
+        for reserved_at, response in zip(("2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z"), reservation_responses):
+            if response["status"] == "BUSY":
+                assert invoke(bot, "mission", "m11-reserve-authorization", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", reserved_at, expected=1, env=env)["status"] == "REJECTED"
+        recovery_ledger_id = recovery_reservation["artifact"]["lease_id"] + "/" + recovery_reservation["artifact"]["updated_at"]
+        recovery_unknown = invoke(bot, "mission", "m11-record-unknown", recovery_runtime, recovery_authorization["artifact"]["authorization_id"], recovery_ledger_id, "2026-09-08T00:00:03Z", "fixture provider timeout after dispatch", env=env)
         assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
         stopped_state_backup = root / "stopped-state-backup"; stopped_state_partial = root / "stopped-state-partial"
         assert invoke(bot, "backup", "create", recovery_runtime, stopped_state_backup, env=env)["status"] == "BACKED_UP"
