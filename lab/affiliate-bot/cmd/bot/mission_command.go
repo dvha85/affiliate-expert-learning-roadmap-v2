@@ -508,6 +508,18 @@ func saveMissionState(dir string, s LearnerMissionState) error {
 	return writeJSONAtomic(missionStatePath(dir), s)
 }
 
+// missionStateWriteFault is a test-only fault seam. It is never set from CLI
+// input or environment and lets tests prove that the atomic rename boundary
+// preserves the prior state on a failed write.
+var missionStateWriteFault func(phase string) error
+
+func missionWriteFault(phase string) error {
+	if missionStateWriteFault == nil {
+		return nil
+	}
+	return missionStateWriteFault(phase)
+}
+
 // Mission state is mutable, unlike M08 artifacts. Commit it by atomic rename
 // while the mission directory lock is held; never truncate the prior state.
 func writeJSONAtomic(path string, value any) error {
@@ -537,7 +549,14 @@ func writeJSONAtomic(path string, value any) error {
 		_ = f.Close()
 		return err
 	}
+	if err := missionWriteFault("after_temp_sync"); err != nil {
+		_ = f.Close()
+		return err
+	}
 	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := missionWriteFault("before_rename"); err != nil {
 		return err
 	}
 	if err := os.Rename(temporary, path); err != nil {
