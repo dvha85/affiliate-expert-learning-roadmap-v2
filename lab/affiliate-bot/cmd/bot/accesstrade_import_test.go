@@ -98,3 +98,16 @@ func TestParseAccesstradeCSVQuotedFields(t *testing.T) {
 		t.Fatalf("rows=%q err=%v", rows, err)
 	}
 }
+
+func TestAccesstradeReportRejectsUnverifiedShape(t *testing.T) {
+	manifest := AccesstradeReportManifest{SnapshotID: "snapshot", ObservedAt: "2026-09-08T00:00:00Z", SourceRef: "fixture", Currency: "VND", Mappings: []AccesstradeReportMapping{{OrderID: "order-1", OutcomeID: "outcome-1", ActionID: "action-1"}}}
+	for _, report := range []string{
+		"Mã đơn,Trạng thái,Giá trị đơn hàng\norder-1,Tạm duyệt,1\n",
+		"Mã đơn,Trạng thái,Giá trị đơn hàng,Hoa hồng\norder-1,Hoàn tiền,1,0\n",
+		"Mã đơn,Trạng thái,Giá trị đơn hàng,Hoa hồng\norder-1,Tạm duyệt,1,-2\n",
+	} {
+		if _, err := decodeAccesstradeOutcomes([]byte(report), manifest); err == nil {
+			t.Fatal("accepted an unverified CSV shape or status")
+		}
+	}
+}
