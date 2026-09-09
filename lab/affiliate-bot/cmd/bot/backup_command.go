@@ -47,6 +47,21 @@ type backupManifest struct {
 // advertises itself as a restorable backup.
 var backupCopyFault func(relativePath string) error
 
+// restoreTargetGate serializes managed restores to one destination. Rename(2)
+// can replace an empty directory on POSIX, so the preceding exists check alone
+// is not a no-clobber guarantee when two Bot processes restore concurrently.
+func acquireRestoreTargetGate(target string) (func(), error) {
+	identity := sha256.Sum256([]byte(filepath.Clean(target)))
+	path := filepath.Join(filepath.Dir(target), ".restore-target-"+hex.EncodeToString(identity[:16])+".lock")
+	if err := os.Mkdir(path, 0700); err != nil {
+		if os.IsExist(err) {
+			return nil, fmt.Errorf("restore target is busy or has an unrecovered publisher")
+		}
+		return nil, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
 func fileDigest(path string) (string, error) {
 	b, e := os.ReadFile(path)
 	if e != nil {
@@ -640,8 +655,23 @@ func validateM11BackupGraph(dir string) error {
 	if err != nil {
 		return fmt.Errorf("M11 outcome store is invalid: %w", err)
 	}
+	history, err := LoadHistory(filepath.Join(dir, "history.jsonl"))
+	if err != nil {
+		return fmt.Errorf("M11 canonical history is invalid: %w", err)
+	}
+	historyByID := map[string]HistoryRecord{}
+	for _, record := range history {
+		if replay := Replay(record); replay.State != replayMatch {
+			return fmt.Errorf("M11 canonical history does not replay: %s", record.RecordID)
+		}
+		if _, exists := historyByID[record.RecordID]; exists {
+			return fmt.Errorf("M11 canonical history has an ambiguous record ID")
+		}
+		historyByID[record.RecordID] = record
+	}
 	linked := map[string]bool{}
 	outcomesByID := map[string]m03.OutcomeRecord{}
+	outcomeExecutionIDs := map[string]string{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	executions := []corem11.ProductionExecutionRecord{}
@@ -649,6 +679,10 @@ func validateM11BackupGraph(dir string) error {
 	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
 	cycles := []corem11.ProductionCycleRecord{}
 	for _, outcome := range outcomes {
+		if prior, exists := outcomeExecutionIDs[outcome.EffectRef.EffectID]; exists && prior != outcome.OutcomeID {
+			return fmt.Errorf("M11 execution has more than one restored fixture outcome")
+		}
+		outcomeExecutionIDs[outcome.EffectRef.EffectID] = outcome.OutcomeID
 		linked[outcome.EffectRef.EffectID] = true
 		outcomesByID[outcome.OutcomeID] = outcome
 	}
@@ -730,7 +764,19 @@ func validateM11BackupGraph(dir string) error {
 		execution, executionOK := executionsByID[cycle.ExecutionID]
 		closedAt, closedTimeErr := time.Parse(time.RFC3339, cycle.ClosedAt)
 		evaluatedAt, evaluatedTimeErr := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
-		if !evaluationOK || !executionOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID {
+		record, recordOK := historyByID[cycle.DecisionID]
+		observations := map[string]bool{}
+		for _, observation := range record.Observations {
+			observations[observation.ObservationID] = true
+		}
+		cycleObservations := map[string]bool{}
+		for _, id := range cycle.ObservationIDs {
+			if id == "" || cycleObservations[id] {
+				return fmt.Errorf("M11 cycle has duplicate or empty canonical observation link")
+			}
+			cycleObservations[id] = true
+		}
+		if !evaluationOK || !executionOK || !recordOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID || cycle.IntentID != execution.IntentID || cycle.IntentHash != execution.IntentHash || cycle.GateID != execution.ProductionGateID || cycle.AuthorizationID != execution.AuthorizationID || !reflect.DeepEqual(observations, cycleObservations) {
 			return fmt.Errorf("M11 cycle does not resolve its outcome evaluation")
 		}
 	}
@@ -875,6 +921,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, lockErr, 1)
 		}
 		defer release()
+		if e := recoverM11OutcomeJournal(args[1]); e != nil {
+			return emit("RECOVERY_REQUIRED", nil, e, 1)
+		}
 		if e := validateAccesstradeBackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime ACCESSTRADE receipt graph is invalid: %w", e), 1)
 		}
@@ -953,21 +1002,44 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	if e != nil {
 		return emit("VERIFY_FAILED", nil, e, 1)
 	}
-	if info, statErr := os.Lstat(args[2]); statErr == nil {
-		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			return emit("TARGET_ERROR", nil, fmt.Errorf("restore target must be a non-symlink directory"), 1)
-		}
-		entries, _ := os.ReadDir(args[2])
-		if len(entries) > 0 {
-			return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("restore target must be empty"), 1)
-		}
-	} else if os.IsNotExist(statErr) {
-		if e = os.MkdirAll(args[2], 0700); e != nil {
-			return emit("STORE_ERROR", nil, e, 1)
-		}
-	} else {
+	// A restore is not a usable runtime until every loader and cross-store
+	// validator has accepted it. Materialize into an owned sibling directory so
+	// a failed replay/graph check never publishes a partial target.
+	if _, statErr := os.Lstat(args[2]); statErr == nil {
+		return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("restore target must not already exist"), 1)
+	} else if !os.IsNotExist(statErr) {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
+	parent := filepath.Dir(args[2])
+	if e = os.MkdirAll(parent, 0700); e != nil {
+		return emit("STORE_ERROR", nil, e, 1)
+	}
+	parentInfo, statErr := os.Lstat(parent)
+	if statErr != nil || !parentInfo.IsDir() || parentInfo.Mode()&os.ModeSymlink != 0 {
+		return emit("TARGET_ERROR", nil, fmt.Errorf("restore target parent must be a non-symlink directory"), 1)
+	}
+	releaseTargetGate, gateErr := acquireRestoreTargetGate(args[2])
+	if gateErr != nil {
+		return emit("BUSY", nil, gateErr, 1)
+	}
+	defer releaseTargetGate()
+	// Claiming the per-target gate precedes staging and the final existence
+	// check, so two managed restores cannot race into a clobbering Rename.
+	if _, statErr := os.Lstat(args[2]); statErr == nil {
+		return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("restore target appeared while acquiring its gate"), 1)
+	} else if !os.IsNotExist(statErr) {
+		return emit("TARGET_ERROR", nil, statErr, 1)
+	}
+	staging, stageErr := os.MkdirTemp(parent, ".restore-staging-")
+	if stageErr != nil {
+		return emit("STORE_ERROR", nil, stageErr, 1)
+	}
+	published := false
+	defer func() {
+		if !published {
+			_ = os.RemoveAll(staging)
+		}
+	}()
 	fileNames := make([]string, 0, len(m.Files))
 	for name := range m.Files {
 		fileNames = append(fileNames, name)
@@ -978,8 +1050,11 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if pathErr != nil {
 			return emit("VERIFY_FAILED", nil, pathErr, 1)
 		}
-		b, _ := os.ReadFile(filepath.Join(args[1], clean))
-		target := filepath.Join(args[2], clean)
+		b, readErr := os.ReadFile(filepath.Join(args[1], clean))
+		if readErr != nil {
+			return emit("VERIFY_FAILED", nil, readErr, 1)
+		}
+		target := filepath.Join(staging, clean)
 		if e = os.MkdirAll(filepath.Dir(target), 0700); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
@@ -989,7 +1064,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	if _, ok := m.Files["history.jsonl"]; ok {
 		var records []HistoryRecord
-		if records, e = LoadHistory(filepath.Join(args[2], "history.jsonl")); e != nil {
+		if records, e = LoadHistory(filepath.Join(staging, "history.jsonl")); e != nil {
 			return emit("REPLAY_FAILED", nil, e, 1)
 		}
 		for _, record := range records {
@@ -999,24 +1074,33 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if _, ok := m.Files["mission-state.json"]; ok {
-		if _, e = loadMissionState(args[2]); e != nil {
+		if _, e = loadMissionState(staging); e != nil {
 			return emit("STATE_FAILED", nil, e, 1)
 		}
 	}
-	if _, e = m00ToM05BackupFiles(args[2]); e != nil {
+	if _, e = m00ToM05BackupFiles(staging); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
 	}
-	if e = validateM10BackupGraph(args[2]); e != nil {
+	if e = validateM10BackupGraph(staging); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
 	}
-	if e = validateM07BackupGraph(args[2]); e != nil {
+	if e = validateM07BackupGraph(staging); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
 	}
-	if e = validateM11BackupGraph(args[2]); e != nil {
+	if e = validateM11BackupGraph(staging); e != nil {
 		return emit("GRAPH_FAILED", nil, e, 1)
 	}
-	if e = validateAccesstradeBackupGraph(args[2]); e != nil {
+	if e = validateAccesstradeBackupGraph(staging); e != nil {
 		return emit("GRAPH_FAILED", nil, fmt.Errorf("restored ACCESSTRADE receipt graph is invalid: %w", e), 1)
 	}
+	if _, statErr := os.Lstat(args[2]); statErr == nil {
+		return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("restore target appeared while staging"), 1)
+	} else if !os.IsNotExist(statErr) {
+		return emit("TARGET_ERROR", nil, statErr, 1)
+	}
+	if e = os.Rename(staging, args[2]); e != nil {
+		return emit("STORE_ERROR", nil, fmt.Errorf("publish restored runtime: %w", e), 1)
+	}
+	published = true
 	return emit("RESTORED", m, nil, 0)
 }

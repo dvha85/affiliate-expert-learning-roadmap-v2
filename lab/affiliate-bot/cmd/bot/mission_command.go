@@ -96,6 +96,26 @@ func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "tru
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
 func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
+func m11OutcomeJournalPath(dir string) string   { return filepath.Join(dir, "m11-outcome-journal.json") }
+
+// m11OutcomeAppendFault is a test-only seam for the two-file M11 outcome
+// commit. It is never configurable through the CLI.
+var m11OutcomeAppendFault func(phase string) error
+
+func m11OutcomeWriteFault(phase string) error {
+	if m11OutcomeAppendFault == nil {
+		return nil
+	}
+	return m11OutcomeAppendFault(phase)
+}
+
+type m11OutcomeJournal struct {
+	Version                string                   `json:"version"`
+	PredecessorArtifactID  string                   `json:"predecessor_artifact_id"`
+	PredecessorContentHash string                   `json:"predecessor_content_hash"`
+	Outcome                m03.OutcomeRecord        `json:"outcome"`
+	Ledger                 corem11.ProductionLedger `json:"ledger"`
+}
 
 // The registry lives beside mission-state.json and is append-only. It owns the
 // canonical compact JSON used for later resolution; user-supplied output files
@@ -955,7 +975,156 @@ func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
 	return outcomes, nil
 }
 
+func appendM11FixtureOutcome(dir string, outcome m03.OutcomeRecord) (string, error) {
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, prior := range outcomes {
+		if prior.OutcomeID == outcome.OutcomeID {
+			if reflect.DeepEqual(prior, outcome) {
+				return appendDuplicate, nil
+			}
+			return "", fmt.Errorf("outcome_id reused with different content")
+		}
+		if prior.EffectRef.EffectID == outcome.EffectRef.EffectID {
+			return "", fmt.Errorf("M11 execution already has an outcome")
+		}
+	}
+	encoded, err := json.Marshal(outcome)
+	if err != nil {
+		return "", err
+	}
+	if err := m11OutcomeWriteFault("before_append"); err != nil {
+		return "", err
+	}
+	if err := (store.JSONL{}).AppendLine(m11OutcomeStorePath(dir), encoded); err != nil {
+		return "", err
+	}
+	if err := m11OutcomeWriteFault("after_append"); err != nil {
+		return "", err
+	}
+	return appendAdded, nil
+}
+
+func nextM11FixtureOutcomeLedger(ledger corem11.ProductionLedger, outcome m03.OutcomeRecord, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {
+	if ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ReconciliationRequired {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 ledger cannot accept the outcome")
+	}
+	observed, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	updated, updatedErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+	if observedErr != nil || updatedErr != nil || !observed.After(updated) {
+		return corem11.ProductionLedger{}, fmt.Errorf("outcome time must advance the ledger")
+	}
+	pendingIndex := -1
+	for index, id := range ledger.PendingExecutionIDs {
+		if id == record.ExecutionID {
+			pendingIndex = index
+		}
+	}
+	if pendingIndex < 0 || ledger.PendingOutcomes < 1 {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 outcome has no pending execution")
+	}
+	for _, link := range ledger.OutcomeLinks {
+		if link.OutcomeID == outcome.OutcomeID || link.ExecutionID == record.ExecutionID {
+			return corem11.ProductionLedger{}, fmt.Errorf("M11 execution already has an outcome")
+		}
+	}
+	next := ledger
+	next.PendingOutcomes--
+	// Keep the in-memory transition in the same canonical form as its JSON
+	// artifact. In particular, an empty list must be [] rather than nil, or a
+	// journal replay would correctly reject its own decoded snapshot.
+	next.PendingExecutionIDs = make([]string, 0, len(ledger.PendingExecutionIDs)-1)
+	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[:pendingIndex]...)
+	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[pendingIndex+1:]...)
+	next.OutcomeLinks = append(append([]corem11.ProductionOutcomeLink(nil), ledger.OutcomeLinks...), corem11.ProductionOutcomeLink{OutcomeID: outcome.OutcomeID, ExecutionID: record.ExecutionID, ObservedAt: outcome.ObservedAt})
+	next.ConsecutiveFailures = 0
+	next.LastOutcomeAt = outcome.ObservedAt
+	next.UpdatedAt = outcome.ObservedAt
+	return next, nil
+}
+
+// recoverM11OutcomeJournal completes a durable two-file outcome transition.
+// The journal is written before either file is changed. Each replay step is
+// idempotent, so a crash after the ledger append or after the outcome append
+// cannot leave a caller with a false ACK or a permanently orphaned transition.
+func recoverM11OutcomeJournal(dir string) error {
+	raw, err := os.ReadFile(m11OutcomeJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m11OutcomeJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m11-outcome-journal/v1" {
+		return fmt.Errorf("M11 outcome journal is invalid")
+	}
+	ledgerRaw, err := json.Marshal(journal.Ledger)
+	if err != nil {
+		return err
+	}
+	if _, status := corem11.DecodeArtifact("ledger", ledgerRaw); status != corem11.Valid {
+		return fmt.Errorf("M11 outcome journal ledger is invalid")
+	}
+	outcomeRaw, err := json.Marshal(journal.Outcome)
+	if err != nil {
+		return err
+	}
+	_, record, status := validateM11FixtureOutcome(dir, outcomeRaw)
+	if status != "VALID" {
+		return fmt.Errorf("M11 outcome journal outcome is invalid")
+	}
+	predecessorEntry, err := resolveM11Artifact(dir, corem11.ArtifactKindLedger, journal.PredecessorArtifactID, journal.PredecessorContentHash)
+	if err != nil {
+		return fmt.Errorf("M11 outcome journal predecessor does not resolve: %w", err)
+	}
+	predecessorValue, predecessorStatus := corem11.DecodeArtifact("ledger", predecessorEntry.Artifact)
+	if predecessorStatus != corem11.Valid {
+		return fmt.Errorf("M11 outcome journal predecessor is invalid")
+	}
+	expectedLedger, err := nextM11FixtureOutcomeLedger(*predecessorValue.(*corem11.ProductionLedger), journal.Outcome, record)
+	if err != nil || !reflect.DeepEqual(expectedLedger, journal.Ledger) {
+		return fmt.Errorf("M11 outcome journal transition does not match its predecessor")
+	}
+	expectedEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		return err
+	}
+	currentEntry, _, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil {
+		return err
+	}
+	if currentEntry.ArtifactID == predecessorEntry.ArtifactID && currentEntry.ContentHash == predecessorEntry.ContentHash {
+		if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+			return fmt.Errorf("M11 outcome journal ledger recovery failed: %w", err)
+		}
+	} else if currentEntry.ArtifactID != expectedEntry.ArtifactID || currentEntry.ContentHash != expectedEntry.ContentHash {
+		return fmt.Errorf("M11 outcome journal is no longer the active ledger transition")
+	}
+	if _, err := appendM11FixtureOutcome(dir, journal.Outcome); err != nil {
+		return fmt.Errorf("M11 outcome journal outcome recovery failed: %w", err)
+	}
+	if err := os.Remove(m11OutcomeJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	parent, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = parent.Sync()
+	closeErr := parent.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
 func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecord, corem11.ProductionLedger, string, error) {
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		return m03.OutcomeRecord{}, corem11.ProductionLedger{}, "", err
+	}
 	outcome, record, validation := validateM11FixtureOutcome(dir, raw)
 	if validation != "VALID" {
 		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome rejected: %s", validation)
@@ -966,6 +1135,9 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 	}
 	for _, prior := range outcomes {
 		if prior.OutcomeID != outcome.OutcomeID {
+			if prior.EffectRef.EffectID == record.ExecutionID {
+				return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 execution already has an outcome")
+			}
 			continue
 		}
 		if reflect.DeepEqual(prior, outcome) {
@@ -973,48 +1145,22 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 		}
 		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("outcome_id reused with different content")
 	}
-	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	ledgerEntry, ledger, err := m11LedgerHead(dir, record.ProductionLeaseID)
 	if err != nil {
 		return outcome, corem11.ProductionLedger{}, "", err
 	}
-	ledger := ledgerValue.(*corem11.ProductionLedger)
-	if ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ReconciliationRequired {
-		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 ledger cannot accept the outcome")
+	if ledgerEntry.ArtifactID != ledgerID {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
 	}
-	pendingIndex := -1
-	for index, id := range ledger.PendingExecutionIDs {
-		if id == record.ExecutionID {
-			pendingIndex = index
-		}
-	}
-	if pendingIndex < 0 || ledger.PendingOutcomes < 1 {
-		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome has no pending execution")
-	}
-	for _, link := range ledger.OutcomeLinks {
-		if link.OutcomeID == outcome.OutcomeID || link.ExecutionID == record.ExecutionID {
-			return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 execution already has an outcome")
-		}
-	}
-	next := *ledger
-	next.PendingOutcomes--
-	next.PendingExecutionIDs = append([]string(nil), ledger.PendingExecutionIDs[:pendingIndex]...)
-	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[pendingIndex+1:]...)
-	next.OutcomeLinks = append(append([]corem11.ProductionOutcomeLink(nil), ledger.OutcomeLinks...), corem11.ProductionOutcomeLink{OutcomeID: outcome.OutcomeID, ExecutionID: record.ExecutionID, ObservedAt: outcome.ObservedAt})
-	next.ConsecutiveFailures = 0
-	next.LastOutcomeAt = outcome.ObservedAt
-	next.UpdatedAt = outcome.ObservedAt
-	ledgerRaw, err := json.Marshal(next)
+	next, err := nextM11FixtureOutcomeLedger(ledger, outcome, record)
 	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	journal := m11OutcomeJournal{Version: "m11-outcome-journal/v1", PredecessorArtifactID: ledgerEntry.ArtifactID, PredecessorContentHash: ledgerEntry.ContentHash, Outcome: outcome, Ledger: next}
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
 		return outcome, next, "", err
 	}
-	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
-		return outcome, next, status, err
-	}
-	encoded, err := json.Marshal(outcome)
-	if err != nil {
-		return outcome, next, "", err
-	}
-	if err := (store.JSONL{}).AppendLine(m11OutcomeStorePath(dir), encoded); err != nil {
+	if err := recoverM11OutcomeJournal(dir); err != nil {
 		return outcome, next, "", err
 	}
 	return outcome, next, appendAdded, nil
@@ -1058,6 +1204,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		defer os.Remove(lockPath)
+		if err := recoverM11OutcomeJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
+		if err := recoverM11DurableStop(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 	}
 	switch args[0] {
 	case "m08-intent", "intent":
@@ -1640,6 +1792,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[3]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
+		managedKinds := map[string]bool{
+			corem11.ArtifactKindActivation: true, corem11.ArtifactKindLedger: true,
+			corem11.ArtifactKindGate: true, corem11.ArtifactKindAuthorization: true,
+			corem11.ArtifactKindExecution: true, corem11.ArtifactKindEvaluation: true,
+			corem11.ArtifactKindCycle: true,
+		}
+		if managedKinds[args[2]] {
+			return emit("REJECTED", nil, fmt.Errorf("M11 lifecycle artifact must be created by its dedicated command"), 1)
+		}
 		raw, err := os.ReadFile(args[3])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
@@ -1868,6 +2029,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	case "status", "m11-status":
 		if len(args) != 2 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission status STATE_DIR"), 2)
+		}
+		if _, err := os.Stat(m11OutcomeJournalPath(args[1])); err == nil {
+			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 outcome journal requires a locked writer recovery"), 1)
+		} else if !os.IsNotExist(err) {
+			return emit("STATE_ERROR", nil, err, 1)
 		}
 		s, err := loadMissionState(args[1])
 		if err != nil {

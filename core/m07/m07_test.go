@@ -49,6 +49,27 @@ func TestValidateAgentOutputRejectsForgedMeaningWithKnownID(t *testing.T) {
 	}
 }
 
+func TestValidateAgentOutputPreservesExactJSONNumbers(t *testing.T) {
+	claim := Claim{FieldOrClaim: "amount", Value: json.RawMessage("9007199254740992"), EvidenceIDs: []string{"e1"}}
+	claim.Text = renderClaim(claim)
+	output := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{claim}, EvidenceIDs: []string{"e1"}, ToolCalls: []ToolRequest{}, Authority: "A2-RO", WritePermission: false}
+	output.Answer = RenderGroundedAnswer(output.Claims)
+	raw, _ := json.Marshal(output)
+	if _, err := ValidateAgentOutput(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "amount", Value: json.Number("9007199254740993"), ClaimKind: "fact", Limitation: "exact fixture"}}, registry()); err == nil {
+		t.Fatal("rounded large number was accepted as grounded evidence")
+	}
+	claim.Value = json.RawMessage("9007199254740993")
+	claim.Text = renderClaim(claim)
+	output.Claims, output.Answer = []Claim{claim}, RenderGroundedAnswer([]Claim{claim})
+	raw, _ = json.Marshal(output)
+	if _, err := ValidateAgentOutput(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "amount", Value: json.Number("9007199254740993"), ClaimKind: "fact", Limitation: "exact fixture"}}, registry()); err != nil {
+		t.Fatal(err)
+	}
+	if output.Answer != "amount=9007199254740993 [evidence:e1]" {
+		t.Fatalf("large number was rendered imprecisely: %s", output.Answer)
+	}
+}
+
 func TestValidateAgentOutputRequiresLiteralFalseWritePermission(t *testing.T) {
 	raw := []byte(`{"state":"ABSTAIN","answer":"insufficient","evidence_ids":[],"claims":[],"tool_calls":[],"authority":"A2-RO","write_permission":null}`)
 	if _, err := ValidateAgentOutput(raw, []Evidence{{EvidenceID: "e1", ClaimKind: "assumption", Limitation: "synthetic"}}, registry()); err == nil {

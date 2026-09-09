@@ -298,8 +298,7 @@ func RegisterToolResult(raw []byte, registry []ToolSpec) (RegisteredToolResult, 
 	if _, err := time.Parse(time.RFC3339, result.ReceivedAt); err != nil {
 		return RegisteredToolResult{}, fmt.Errorf("tool result received_at is invalid: %w", err)
 	}
-	var body any
-	if err := json.Unmarshal(result.Body, &body); err != nil {
+	if _, err := contracts.Decode(result.Body); err != nil {
 		return RegisteredToolResult{}, fmt.Errorf("tool result body must be JSON data: %w", err)
 	}
 	id, err := traceID(result)
@@ -350,8 +349,12 @@ func ValidateStoredRegisteredToolResult(raw []byte, recordID string) (Registered
 // Field extraction is deliberately deferred: an untrusted arbitrary response
 // must not be silently reclassified into product facts by this boundary.
 func (registered RegisteredToolResult) Evidence() Evidence {
-	var body any
-	_ = json.Unmarshal(registered.Result.Body, &body)
+	body, err := contracts.Decode(registered.Result.Body)
+	if err != nil {
+		// RegisterToolResult rejects this state; retain a nil value if a caller
+		// constructs an invalid struct directly rather than rounding or guessing.
+		body = nil
+	}
 	return Evidence{
 		EvidenceID: registered.TraceID + "#body", FieldOrClaim: "tool_result.body", Value: body,
 		ClaimKind: "unknown", SourceAuthorityOrRole: "registered_readonly_tool",
@@ -372,8 +375,7 @@ func RenderGroundedAnswer(claims []Claim) string {
 
 func renderClaim(claim Claim) string {
 	value := bytes.TrimSpace(claim.Value)
-	var decoded any
-	if json.Unmarshal(value, &decoded) == nil {
+	if decoded, err := contracts.Decode(value); err == nil {
 		if canonical, err := json.Marshal(decoded); err == nil {
 			value = canonical
 		}
@@ -461,13 +463,16 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 			if !ok {
 				return output, fmt.Errorf("claim cites unknown evidence id %q", id)
 			}
-			var claimValue any
-			if err := json.Unmarshal(claim.Value, &claimValue); err != nil {
+			claimValue, err := contracts.Decode(claim.Value)
+			if err != nil {
 				return output, fmt.Errorf("claim value is not valid JSON: %w", err)
 			}
-			var evidenceValue any
 			evidenceRaw, err := json.Marshal(item.Value)
-			if err != nil || json.Unmarshal(evidenceRaw, &evidenceValue) != nil {
+			if err != nil {
+				return output, fmt.Errorf("evidence %q has an unserializable value", id)
+			}
+			evidenceValue, err := contracts.Decode(evidenceRaw)
+			if err != nil {
 				return output, fmt.Errorf("evidence %q has an unserializable value", id)
 			}
 			claimRaw, _ := json.Marshal(claimValue)

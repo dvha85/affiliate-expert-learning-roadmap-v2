@@ -46,6 +46,19 @@ func m07AdapterCall(t *testing.T, history, endpoint string, request m07AdapterRe
 	return response
 }
 
+func TestRestoreTargetGateRejectsConcurrentManagedPublisher(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "restored")
+	release, err := acquireRestoreTargetGate(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if _, err := acquireRestoreTargetGate(target); err == nil {
+		t.Fatal("second restore acquired the same target gate")
+	}
+}
+
 func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
 		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])

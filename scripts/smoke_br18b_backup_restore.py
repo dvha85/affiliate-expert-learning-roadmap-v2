@@ -184,15 +184,22 @@ def main():
         assert invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "missing-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", expected=1, env=env)["status"] == "REJECTED"
         gate = invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", env=env)
         assert gate["status"] == "ALLOW_PRODUCTION" and gate["artifact"]["execution_authorized"] is False
+        refreshed_gate = invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
+        assert refreshed_gate["status"] == "ALLOW_PRODUCTION" and refreshed_gate["artifact"]["gate_id"] != gate["artifact"]["gate_id"]
+        assert invoke(bot, "mission", "m11-authorize", runtime, "br18-production-lease", gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:02:00Z", expected=1, env=env)["status"] == "REJECTED"
         authorization = invoke(bot, "mission", "m11-authorize", runtime, "br18-production-lease", gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
         assert authorization["status"] == "APPENDED" and authorization["artifact"]["execution_authorized"] is True
         reservation_ledger_id = "br18-production-lease/2026-09-08T00:00:01Z"
         reservation = invoke(bot, "mission", "m11-reserve-authorization", runtime, authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
         assert reservation["status"] == "APPENDED" and reservation["artifact"]["pending_outcomes"] == 1
+        assert invoke(bot, "mission", "m11-ledger-init", runtime, "br18-production-lease", "2026-09-08T00:00:04Z", expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-reserve-authorization", runtime, authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m11-reserve-authorization", runtime, authorization["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:09Z", expected=1, env=env)["status"] == "REJECTED"
         production_failed = invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)
         assert production_failed["status"] == "APPENDED" and production_failed["artifact"]["execution"]["status"] == "FAILED" and production_failed["artifact"]["execution"]["side_effect_state"] == "NOT_PERFORMED"
+        # A FAILED transition changes the ledger safety state without changing
+        # the four budget counters. The older gate must still be stale.
+        assert invoke(bot, "mission", "m11-authorize", runtime, "br18-production-lease", gate["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:02Z", expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-record-failed", runtime, authorization["artifact"]["authorization_id"], reservation_ledger_id, "2026-09-08T00:00:02Z", "fixture-production-dispatch-failed", env=env)["status"] == "EXACT_DUPLICATE"
         production_outcome = root / "production-outcome.json"
         production_outcome.write_text(json.dumps({"outcome_id":"br18-production-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br18-failed"}), encoding="utf-8")
@@ -203,6 +210,27 @@ def main():
         production_outcome_result = invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)
         assert production_outcome_result["status"] == "APPENDED" and production_outcome_result["artifact"]["post_ledger"]["pending_outcomes"] == 0
         assert invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
+        duplicate_execution_outcome = root / "duplicate-execution-outcome.json"
+        duplicate_execution_outcome.write_text(json.dumps({"outcome_id":"br18-production-o-duplicate","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:04Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/duplicate"}), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-outcome", runtime, duplicate_execution_outcome, execution_ledger_id, expected=1, env=env)["status"] == "REJECTED"
+        # A second approved intent cannot select the genesis ledger to reopen a
+        # lease already charged by the first intent. The same runtime state is
+        # copied so the main M11 evaluation/cycle chain remains continuous.
+        budget_runtime = root / "budget-runtime"; shutil.copytree(runtime, budget_runtime)
+        budget_request = root / "budget-intent-request.json"; budget_intent = root / "budget-intent.json"; budget_policy = root / "budget-policy.json"
+        budget_request.write_text(json.dumps({"intent_id":"br18-budget-i","decision_id":"br18-d","action_type":"DRAFT","target":"https://example.com/draft","parameters":{},"proposed_by":"human","created_at":"2026-09-07T00:00:00Z","expires_at":"2099-09-03T03:00:00Z","correlation_id":"br18-c","idempotency_key":"br18-budget-k"}), encoding="utf-8")
+        assert invoke(bot, "mission", "m08-intent", budget_runtime / "history.jsonl", budget_request, budget_intent, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m08-policy", budget_intent, policy_config, budget_policy, env=env)["status"] == "ALLOW"
+        assert invoke(bot, "mission", "bind", budget_runtime, budget_intent, budget_policy, env=env)["status"] == "BOUND"
+        budget_intent_value = json.loads(budget_intent.read_text(encoding="utf-8")); budget_approval = json.loads(approval.read_text(encoding="utf-8"))
+        budget_approval.update({"approval_id":"br18-budget-ap","intent_id":budget_intent_value["intent_id"],"intent_hash":budget_intent_value["intent_hash"]})
+        budget_approval_path = root / "budget-approval.json"; budget_approval_path.write_text(json.dumps(budget_approval), encoding="utf-8")
+        assert invoke(bot, "mission", "m09-approval", budget_runtime, budget_approval_path, env=env)["status"] == "ACK"
+        budget_cost = root / "budget-cost.json"; write_cost_bound(budget_cost, budget_intent_value, 4, "2099-09-03T02:45:00Z", "br18-budget-cost")
+        assert invoke(bot, "mission", "m11-register", budget_runtime, "TRUSTED_COST_BOUND", budget_cost, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-gate", budget_runtime, "br18-production-lease", "br18-production-health", "br18-budget-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:04Z", expected=1, env=env)["status"] == "REJECTED"
+        budget_gate = invoke(bot, "mission", "m11-gate", budget_runtime, "br18-production-lease", "br18-production-health", "br18-budget-cost", production_outcome_result["artifact"]["post_ledger"]["lease_id"] + "/" + production_outcome_result["artifact"]["post_ledger"]["updated_at"], "2026-09-08T00:00:04Z", env=env)
+        assert budget_gate["status"] == "DENY" and budget_gate["artifact"]["reason"] == "BUDGET_EXCEEDED"
         evaluation = invoke(bot, "mission", "m11-evaluate", runtime, "br18-production-o", "br18-production-e", "2026-09-08T00:00:04Z", env=env)
         assert evaluation["status"] == "APPENDED" and evaluation["artifact"]["source_profile"] == "OFFLINE_FIXTURE"
         assert invoke(bot, "mission", "m11-evaluate", runtime, "br18-production-o", "br18-production-e", "2026-09-08T00:00:04Z", env=env)["status"] == "EXACT_DUPLICATE"
@@ -241,7 +269,9 @@ def main():
         invalid_manifest["files"]["m10-outcomes.jsonl"]["sha256"] = hashlib.sha256(invalid_outcome_bytes).hexdigest()
         invalid_manifest["files"]["m10-outcomes.jsonl"]["size_bytes"] = len(invalid_outcome_bytes)
         (invalid_graph_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
-        assert invoke(bot, "backup", "restore", invalid_graph_backup, root / "invalid-graph-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        invalid_graph_restored = root / "invalid-graph-restored"
+        assert invoke(bot, "backup", "restore", invalid_graph_backup, invalid_graph_restored, expected=1, env=env)["status"] == "GRAPH_FAILED"
+        assert not invalid_graph_restored.exists()
         orphan_evaluation_backup = root / "orphan-evaluation-backup"; shutil.copytree(backup, orphan_evaluation_backup)
         orphan_outcome = json.loads((orphan_evaluation_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8"))
         orphan_outcome["outcome_id"] = "br18-production-o-missing"
@@ -253,6 +283,15 @@ def main():
         reversed_cycle_time_backup = root / "reversed-cycle-time-backup"; shutil.copytree(backup, reversed_cycle_time_backup)
         rewrite_m11_registry(reversed_cycle_time_backup, replace_m11_field("PRODUCTION_CYCLE", "closed_at", "2026-09-08T00:00:03Z"))
         assert invoke(bot, "backup", "restore", reversed_cycle_time_backup, root / "reversed-cycle-time-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_history_cycle_backup = root / "orphan-history-cycle-backup"; shutil.copytree(backup, orphan_history_cycle_backup)
+        def orphan_history_change(entry):
+            if entry["artifact_kind"] != "PRODUCTION_CYCLE":
+                return False
+            entry["artifact"]["decision_id"] = "missing-canonical-decision"
+            entry["artifact"]["observation_ids"] = ["missing-canonical-observation"]
+            return True
+        rewrite_m11_registry(orphan_history_cycle_backup, orphan_history_change)
+        assert invoke(bot, "backup", "restore", orphan_history_cycle_backup, root / "orphan-history-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", backup, restored, env=env)["status"] == "RESTORED"
         assert "replay=MATCH" in run([bot, "history", "replay", restored / "history.jsonl"], env=env).stdout
         status = invoke(bot, "mission", "status", restored, env=env)

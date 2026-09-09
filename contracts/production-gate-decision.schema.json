@@ -3,9 +3,11 @@
   "$id":"production-gate-decision.schema.json",
   "title":"ProductionGateDecision",
   "type":"object",
-  "required":["gate_id","lease_id","lease_version","lease_hash","intent_id","intent_hash","policy_version","risk_class","health_snapshot_id","health_snapshot_hash","cost_bound_id","cost_bound_hash","cost_bound_minor","decision","reason","evaluated_at","executions_total_before","executions_in_window_before","cost_minor_total_before","pending_outcomes_before","execution_authorized"],
+  "required":["gate_id","ledger_artifact_id","ledger_content_hash","lease_id","lease_version","lease_hash","intent_id","intent_hash","policy_version","risk_class","health_snapshot_id","health_snapshot_hash","cost_bound_id","cost_bound_hash","cost_bound_minor","decision","reason","evaluated_at","executions_total_before","executions_in_window_before","cost_minor_total_before","pending_outcomes_before","execution_authorized"],
   "properties":{
     "gate_id":{"type":"string","minLength":1},
+    "ledger_artifact_id":{"type":"string","minLength":1},
+    "ledger_content_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
     "lease_id":{"type":"string","minLength":1},
     "lease_version":{"type":"string","minLength":1},
     "lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},

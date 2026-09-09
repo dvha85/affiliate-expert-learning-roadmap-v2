@@ -1,5 +1,11 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
+> Cập nhật 09/09/2026: xem [kế hoạch sửa trước merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md)
+> cho bảy phát hiện PMR-01…07, thứ tự triển khai, regression và merge gate mới.
+> Các mục triển khai bên dưới là lịch sử; không dùng kết quả PASS cũ để đóng
+> các phát hiện này. Các sửa PMR đang ở worktree và chờ review/CI; chưa được
+> commit, push hay đề xuất merge.
+
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
 - Baseline: `ece6a32619e5b9a05d0599b87f50023f38931cb9`.

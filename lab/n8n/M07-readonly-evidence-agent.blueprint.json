@@ -81,7 +81,7 @@
       "typeVersion": 2,
       "position": [680, 0],
       "parameters": {
-        "jsCode": "const response=$json.body||$json; if(response.status!=='ACK'||!response.artifact_id||!response.evidence||!response.evidence.evidence_id) throw new Error('REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
+        "jsCode": "const response=$json.body||$json; if(response.status!=='ACK'||!response.artifact_id||!response.evidence||!response.evidence.evidence_id||typeof response.evidence_raw_json!=='string') throw new Error('REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
       }
     },
     {
@@ -113,7 +113,7 @@
       "typeVersion": 2,
       "position": [1140, 0],
       "parameters": {
-        "jsCode": "const response=$json.body||$json; const expected=$('M07 Adapter Input').item.json.record_id; if(response.status!=='VALID'||!response.artifact||response.artifact.record_id!==expected||!Array.isArray(response.artifact.evidence)) throw new Error('CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
+        "jsCode": "const response=$json.body||$json; const expected=$('M07 Adapter Input').item.json.record_id; if(response.status!=='VALID'||!response.artifact||response.artifact.record_id!==expected||!Array.isArray(response.artifact.evidence)||typeof response.artifact_raw_json!=='string') throw new Error('CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED'); return [{json:{...response,execution_permitted:false}}];"
       }
     },
     {
@@ -124,7 +124,7 @@
       "position": [1370, 0],
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + JSON.stringify($('Require Canonical M07 Context').item.json.artifact) + '\nregistered_tool_evidence=' + JSON.stringify($('Require Registered Tool ACK').item.json.evidence) }}",
+        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + $('Require Canonical M07 Context').item.json.artifact_raw_json + '\nregistered_tool_evidence=' + $('Require Registered Tool ACK').item.json.evidence_raw_json }}",
         "options": {
           "systemMessage": "You are a read-only evidence analyst. The shared adapter owns network policy, DNS validation, tool trace and permissions. Do not call tools. Return only the required JSON contract."
         }
@@ -151,7 +151,7 @@
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/validate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output_text:($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
           "response": {
             "response": {
@@ -183,7 +183,7 @@
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-proposal' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output:JSON.parse($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
+        "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output_text:($('Read-only Evidence Agent').item.json.output || $('Read-only Evidence Agent').item.json.text),tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
           "response": {
             "response": {

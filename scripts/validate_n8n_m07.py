@@ -48,8 +48,8 @@ if "tool_request" not in fetch.get("jsonBody", "") or "tool_registry_json" not i
     raise SystemExit("adapter fetch must receive the request and registry")
 
 for name, markers in {
-    "Require Registered Tool ACK": {"REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED", "response.status!=='ACK'", "response.artifact_id", "response.evidence.evidence_id"},
-    "Require Canonical M07 Context": {"CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED", "response.status!=='VALID'", "response.artifact.record_id!==expected", "Array.isArray(response.artifact.evidence)"},
+    "Require Registered Tool ACK": {"REGISTERED_TOOL_TRACE_NOT_ACKNOWLEDGED", "response.status!=='ACK'", "response.artifact_id", "response.evidence.evidence_id", "response.evidence_raw_json"},
+    "Require Canonical M07 Context": {"CANONICAL_M07_CONTEXT_NOT_ACKNOWLEDGED", "response.status!=='VALID'", "response.artifact.record_id!==expected", "Array.isArray(response.artifact.evidence)", "response.artifact_raw_json"},
     "Require Grounded Proposal": {"GROUNDING_NOT_A_PERSISTABLE_PROPOSAL", "response.artifact.state!=='HUMAN_REVIEW'", "response.artifact.proposed_action", "response.execution_permitted!==false"},
     "Require Persisted Agent Proposal ACK": {"AGENT_PROPOSAL_NOT_ACKNOWLEDGED", "response.status!=='ACK'", "response.artifact_id", "execution_permitted:false"},
 }.items():
@@ -84,5 +84,13 @@ for source, target in expected:
     destinations = {item["node"] for branch in connections.get(source, {}).get("main", []) for item in branch}
     if target not in destinations:
         raise SystemExit(f"missing M07 adapter flow {source} -> {target}")
+
+agent_text = nodes["Read-only Evidence Agent"]["parameters"].get("text", "")
+if "artifact_raw_json" not in agent_text or "evidence_raw_json" not in agent_text or "JSON.stringify" in agent_text:
+    raise SystemExit("M07 agent must receive adapter-preserved JSON text, not reserialized numeric values")
+for name in ("Validate Grounding Adapter", "Persist Agent Proposal Adapter"):
+    body = nodes[name]["parameters"].get("jsonBody", "")
+    if "model_output_text" not in body or "model_output:JSON.parse" in body:
+        raise SystemExit(f"{name} must send model JSON as exact text to the adapter")
 
 print("N8N M07 STATIC WIRING PASS: fixed loopback adapter, registered trace/context/grounding/proposal ACKs, and persistence handoff are mandatory")

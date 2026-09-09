@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
@@ -108,6 +109,8 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
+	ledgerHeads := map[string]ProductionLedger{}
+	ledgerEntries := map[string]ArtifactEntry{}
 	for _, entry := range entries {
 		profile := kindProfile(entry.ArtifactKind)
 		value, status := DecodeArtifact(profile, entry.Artifact)
@@ -135,6 +138,15 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !ok || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
 				return fmt.Errorf("production ledger has an orphaned lease link")
 			}
+			if previous, exists := ledgerHeads[x.LeaseID]; exists {
+				previousAt, previousErr := time.Parse(time.RFC3339, previous.UpdatedAt)
+				currentAt, currentErr := time.Parse(time.RFC3339, x.UpdatedAt)
+				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.ExecutionsTotal < previous.ExecutionsTotal || x.CostMinorTotal < previous.CostMinorTotal {
+					return fmt.Errorf("production ledger is not a monotonic lease history")
+				}
+			}
+			ledgerHeads[x.LeaseID] = *x
+			ledgerEntries[entry.ArtifactID] = entry
 		case *ProductionActivationRecord:
 			lease, ok := leases[x.LeaseID]
 			if !ok || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
@@ -144,7 +156,8 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			lease, leaseOK := leases[x.LeaseID]
 			snapshot, healthOK := health[x.HealthSnapshotID]
 			bound, costOK := costs[x.CostBoundID]
-			if !leaseOK || !healthOK || !costOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash {
+			ledger, ledgerOK := ledgerEntries[x.LedgerArtifactID]
+			if !leaseOK || !healthOK || !costOK || !ledgerOK || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			gates[x.GateID] = *x
@@ -182,7 +195,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			auth, authOK := authorizations[x.AuthorizationID]
 			execution, executionOK := executions[x.ExecutionID]
 			evaluation, evaluationOK := evaluations[x.EvaluationID]
-			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID {
+			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || auth.ProductionGateID != x.GateID || execution.AuthorizationID != x.AuthorizationID || execution.ProductionGateID != x.GateID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID {
 				return fmt.Errorf("production cycle has an orphaned or mismatched link")
 			}
 		}

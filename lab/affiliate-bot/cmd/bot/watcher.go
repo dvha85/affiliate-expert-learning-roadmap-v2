@@ -130,12 +130,15 @@ type m06AdapterRequest struct {
 }
 
 type m07AdapterRequest struct {
-	RecordID     string               `json:"record_id"`
-	Registry     []corem07.ToolSpec   `json:"registry"`
-	ToolRequest  *corem07.ToolRequest `json:"tool_request,omitempty"`
-	ToolResult   json.RawMessage      `json:"tool_result,omitempty"`
-	ModelOutput  json.RawMessage      `json:"model_output,omitempty"`
-	ToolResultID string               `json:"tool_result_id,omitempty"`
+	RecordID    string               `json:"record_id"`
+	Registry    []corem07.ToolSpec   `json:"registry"`
+	ToolRequest *corem07.ToolRequest `json:"tool_request,omitempty"`
+	ToolResult  json.RawMessage      `json:"tool_result,omitempty"`
+	ModelOutput json.RawMessage      `json:"model_output,omitempty"`
+	// ModelOutputText preserves model JSON through workflow engines that would
+	// otherwise parse large JSON numbers as IEEE-754 values before validation.
+	ModelOutputText string `json:"model_output_text,omitempty"`
+	ToolResultID    string `json:"tool_result_id,omitempty"`
 }
 
 func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
@@ -398,7 +401,13 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 		}
 		switch r.URL.Path {
 		case "/v1/m07/context":
-			_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": ctx, "execution_permitted": false})
+			contextRaw, marshalErr := json.Marshal(ctx)
+			if marshalErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "SERIALIZATION_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": ctx, "artifact_raw_json": string(contextRaw), "execution_permitted": false})
 		case "/v1/m07/preflight":
 			if request.ToolRequest == nil {
 				w.WriteHeader(http.StatusBadRequest)
@@ -444,7 +453,14 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": registered.Evidence(), "execution_permitted": false})
+			evidence := registered.Evidence()
+			evidenceRaw, marshalErr := json.Marshal(evidence)
+			if marshalErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "SERIALIZATION_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": evidence, "evidence_raw_json": string(evidenceRaw), "execution_permitted": false})
 		case "/v1/m07/register-tool-result":
 			if len(request.ToolResult) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -466,7 +482,14 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": registered.Evidence(), "execution_permitted": false})
+			evidence := registered.Evidence()
+			evidenceRaw, marshalErr := json.Marshal(evidence)
+			if marshalErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "SERIALIZATION_ERROR", "execution_permitted": false})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": evidence, "evidence_raw_json": string(evidenceRaw), "execution_permitted": false})
 		case "/v1/m07/validate", "/v1/m07/register-proposal":
 			if request.ToolResultID != "" {
 				registered, err := loadM07ToolArtifact(historyPath, request.ToolResultID, request.Registry, ctx.RecordID)
@@ -477,13 +500,22 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				}
 				ctx.Evidence = append(ctx.Evidence, registered.Evidence())
 			}
-			if len(request.ModelOutput) == 0 {
+			modelOutput := request.ModelOutput
+			if request.ModelOutputText != "" {
+				if len(modelOutput) != 0 {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(map[string]any{"status": "MODEL_OUTPUT_AMBIGUOUS", "execution_permitted": false})
+					return
+				}
+				modelOutput = json.RawMessage(request.ModelOutputText)
+			}
+			if len(modelOutput) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "MODEL_OUTPUT_REQUIRED", "execution_permitted": false})
 				return
 			}
 			if r.URL.Path == "/v1/m07/validate" {
-				output, err := corem07.ValidateAgentOutput(request.ModelOutput, ctx.Evidence, request.Registry)
+				output, err := corem07.ValidateAgentOutput(modelOutput, ctx.Evidence, request.Registry)
 				if err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					_ = json.NewEncoder(w).Encode(map[string]any{"status": "ABSTAIN", "execution_permitted": false})
@@ -492,7 +524,7 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": output, "execution_permitted": false})
 				return
 			}
-			proposal, err := corem07.RegisterAgentProposal(request.ModelOutput, ctx.Evidence, request.Registry, ctx.RecordID)
+			proposal, err := corem07.RegisterAgentProposal(modelOutput, ctx.Evidence, request.Registry, ctx.RecordID)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PROPOSAL_REJECTED", "execution_permitted": false})

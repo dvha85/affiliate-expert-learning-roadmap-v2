@@ -132,6 +132,8 @@ func (l ProductionLedger) MarshalJSON() ([]byte, error) {
 
 type ProductionGateDecision struct {
 	GateID                   string `json:"gate_id"`
+	LedgerArtifactID         string `json:"ledger_artifact_id"`
+	LedgerContentHash        string `json:"ledger_content_hash"`
 	LeaseID                  string `json:"lease_id"`
 	LeaseVersion             string `json:"lease_version"`
 	LeaseHash                string `json:"lease_hash"`
