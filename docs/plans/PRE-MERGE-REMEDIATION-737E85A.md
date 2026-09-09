@@ -58,6 +58,7 @@ Kết quả kiểm local sau triển khai, không phải nghiệm thu/merge appr
 - PASS tại worktree hiện tại: `go test`/`go vet` cho `contracts`, `core`, `lab/mission-runtime`; full learner Bot và full learner `-race`; BR-16a; learner tests M11/journal/backup được chọn, kể cả `-race`; smoke BR-18b; 15 Python unit tests và các validator M06/M07/adversarial/output; readiness audit; `git diff --check`.
 - Lần thử sandbox trước đó không thể bind `::1`/`127.0.0.1`, nhưng đã chạy lại thành công full learner, full learner race và BR-16a ở worktree hiện tại khi môi trường cho phép loopback. Mutation suite, n8n engine operated run và CI remote tại head mới vẫn chưa có evidence. Các hạng mục này vẫn là merge gate mở.
 - Đã rà soát wiring CI: `curriculum-ci.yml` chạy full learner Bot, learner race, BR-16a, BR-18b, M06/M07 validators và readiness audit trên mọi pull request; `mission-agent-path-ci.yml` chạy core/harness test+vet. Đây chỉ là bằng chứng workflow đã khai báo, không thay thế một CI run PASS ở exact head sắp merge.
+- PR #95 đã chạy CI cho `a5d3ad0`: ba job PASS, nhưng `Curriculum CI / deterministic-runtime` fail tại BR-12d vì smoke so sánh SHA toàn file baseline đã stale sau thay đổi hợp lệ. Follow-up thay SHA bằng kiểm chứng before/after/rollback theo targeted behavior; BR-12d PASS local. Chưa coi CI là PASS cho đến khi commit follow-up có run hoàn tất.
 - Các kết quả local chỉ cho thấy bảy regression hiện có bị chặn trên các đường đã kiểm; không là chứng cứ production readiness hoặc business outcome.
 
 ## 3. Thứ tự triển khai
