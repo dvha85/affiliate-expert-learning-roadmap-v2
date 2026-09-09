@@ -413,7 +413,7 @@ func m11ArtifactValue(dir, kind, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation", corem11.ArtifactKindReconciliation: "resolution", corem11.ArtifactKindEvaluation: "evaluation", corem11.ArtifactKindCycle: "cycle"}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation", corem11.ArtifactKindReconciliation: "resolution", corem11.ArtifactKindRecoveryAdmission: "recovery_admission", corem11.ArtifactKindEvaluation: "evaluation", corem11.ArtifactKindCycle: "cycle"}
 	profile := profiles[kind]
 	if profile == "" {
 		return nil, fmt.Errorf("unsupported M11 gate artifact")
@@ -970,7 +970,130 @@ func m11RecoveryHandoff(dir, resolutionID, ledgerID string) (map[string]any, err
 	if !linked {
 		return nil, fmt.Errorf("recovery resolution is not linked from stopped ledger")
 	}
-	return map[string]any{"profile": "M11_RECOVERY_HANDOFF/v1", "prior_lease_id": ledger.LeaseID, "prior_lease_version": ledger.LeaseVersion, "prior_lease_hash": ledger.LeaseHash, "resolution_id": resolution.ResolutionID, "execution_id": resolution.ExecutionID, "resolved_by": resolution.ResolvedBy, "resolver_id": resolution.ResolverID, "resolved_at": resolution.ResolvedAt, "effect_state": resolution.EffectState, "prior_stop_reason": ledger.StopReason, "requires_new_runtime": true, "requires_new_lease": true, "execution_permitted": false}, nil
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, ledger.LeaseID)
+	if err != nil {
+		return nil, err
+	}
+	lease := leaseValue.(*corem11.ProductionLease)
+	if lease.LeaseVersion != ledger.LeaseVersion || lease.LeaseHash != ledger.LeaseHash {
+		return nil, fmt.Errorf("recovery handoff lease does not match stopped ledger")
+	}
+	return map[string]any{"profile": "M11_RECOVERY_HANDOFF/v1", "prior_lease_id": ledger.LeaseID, "prior_lease_version": ledger.LeaseVersion, "prior_lease_hash": ledger.LeaseHash, "prior_approval_id": lease.ApprovalRef, "resolution_id": resolution.ResolutionID, "execution_id": resolution.ExecutionID, "resolved_by": resolution.ResolvedBy, "resolver_id": resolution.ResolverID, "resolved_at": resolution.ResolvedAt, "effect_state": resolution.EffectState, "prior_stop_reason": ledger.StopReason, "requires_new_runtime": true, "requires_new_lease": true, "execution_permitted": false}, nil
+}
+
+func m11DistinctRuntimeDirs(oldDir, newDir string) (string, string, error) {
+	oldAbs, err := filepath.Abs(oldDir)
+	if err != nil {
+		return "", "", err
+	}
+	newAbs, err := filepath.Abs(newDir)
+	if err != nil {
+		return "", "", err
+	}
+	oldResolved, err := filepath.EvalSymlinks(oldAbs)
+	if err == nil {
+		oldAbs = oldResolved
+	}
+	newResolved, err := filepath.EvalSymlinks(newAbs)
+	if err == nil {
+		newAbs = newResolved
+	}
+	separator := string(os.PathSeparator)
+	if oldAbs == newAbs || strings.HasPrefix(newAbs, oldAbs+separator) || strings.HasPrefix(oldAbs, newAbs+separator) {
+		return "", "", fmt.Errorf("recovery requires a separate runtime directory")
+	}
+	return oldAbs, newAbs, nil
+}
+
+// admitM11Recovery persists an audit link only in the new runtime. It checks
+// the old runtime read-only, and it never clears its durable STOP or grants an
+// authorization in the new runtime.
+func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (corem11.ArtifactEntry, string, error) {
+	oldAbs, newAbs, err := m11DistinctRuntimeDirs(oldDir, newDir)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	providedRaw, err := os.ReadFile(handoffPath)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	var provided map[string]any
+	if err := json.Unmarshal(providedRaw, &provided); err != nil {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("invalid recovery handoff input")
+	}
+	resolutionID, _ := provided["resolution_id"].(string)
+	if resolutionID == "" {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery handoff has no resolution_id")
+	}
+	entries, err := loadM11ArtifactRegistry(oldDir)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	var stoppedLedgerID string
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem11.ArtifactKindLedger {
+			continue
+		}
+		value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
+		if status == corem11.Valid {
+			ledger := value.(*corem11.ProductionLedger)
+			if ledger.ControlMode == "STOPPED" && ledger.StopReason == "RECOVERY_REVIEW_REQUIRED" {
+				for _, linkedID := range ledger.ReconciliationResolutionIDs {
+					if linkedID == resolutionID {
+						stoppedLedgerID = entry.ArtifactID
+					}
+				}
+			}
+		}
+	}
+	if stoppedLedgerID == "" {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery handoff does not resolve a reviewed stopped ledger")
+	}
+	expected, err := m11RecoveryHandoff(oldDir, resolutionID, stoppedLedgerID)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	expectedRaw, _ := json.Marshal(expected)
+	providedCanonical, _ := json.Marshal(provided)
+	if !bytes.Equal(expectedRaw, providedCanonical) {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery handoff does not match the stopped runtime")
+	}
+	state, err := loadMissionState(newDir)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	if state.Stop {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("new runtime is durably stopped")
+	}
+	value, status := corem11.DecodeArtifact("recovery_admission", admissionRaw)
+	if status != corem11.Valid {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("invalid recovery admission: %s", status)
+	}
+	admission := value.(*corem11.ProductionRecoveryAdmission)
+	leaseValue, err := m11ArtifactValue(newDir, corem11.ArtifactKindLease, admission.NewLeaseID)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	lease := leaseValue.(*corem11.ProductionLease)
+	approvalValue, err := m11ArtifactValue(newDir, corem11.ArtifactKindLeaseApproval, admission.NewApprovalID)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	approval := approvalValue.(*corem11.ProductionLeaseApproval)
+	if _, err := m11ArtifactValue(newDir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion); err != nil {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery admission requires new runtime activation: %w", err)
+	}
+	_, ledger, err := m11LedgerHead(newDir, lease.LeaseID)
+	if err != nil || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery admission requires a normal new runtime ledger")
+	}
+	resolvedAt, resolvedErr := time.Parse(time.RFC3339, expected["resolved_at"].(string))
+	approvalAt, approvalErr := time.Parse(time.RFC3339, approval.ReviewedAt)
+	admissionAt, admissionErr := time.Parse(time.RFC3339, admission.ReviewedAt)
+	if resolvedErr != nil || approvalErr != nil || admissionErr != nil || !approvalAt.After(resolvedAt) || !admissionAt.After(approvalAt) || lease.ApprovalRef != approval.ApprovalID || lease.LeaseVersion != admission.NewLeaseVersion || lease.LeaseHash != admission.NewLeaseHash || admission.PriorRuntimeDir != oldAbs || admission.NewRuntimeDir != newAbs || admission.PriorLeaseID != expected["prior_lease_id"] || admission.PriorLeaseVersion != expected["prior_lease_version"] || admission.PriorLeaseHash != expected["prior_lease_hash"] || admission.PriorApprovalID != expected["prior_approval_id"] || admission.ResolutionID != expected["resolution_id"] || admission.NewLeaseID != lease.LeaseID || admission.NewApprovalID != approval.ApprovalID || admission.ExecutionPermitted {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery admission does not bind a separately reviewed new runtime and lease")
+	}
+	return registerM11Artifact(newDir, corem11.ArtifactKindRecoveryAdmission, admissionRaw)
 }
 
 // evaluateM11FixtureOutcome is deliberately narrow: it only evaluates the

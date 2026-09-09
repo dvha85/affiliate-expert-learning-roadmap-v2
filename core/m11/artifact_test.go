@@ -77,3 +77,42 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 		t.Fatal("later ledger reset was accepted")
 	}
 }
+
+func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing.T) {
+	valid := ProductionRecoveryAdmission{
+		RecoveryAdmissionID: "recovery-1", PriorRuntimeDir: "/runtime/old", PriorLeaseID: "lease-old", PriorLeaseVersion: "v1",
+		PriorLeaseHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", PriorApprovalID: "approval-old",
+		ResolutionID: "resolution-1", NewRuntimeID: "runtime-new", NewRuntimeDir: "/runtime/new", NewLeaseID: "lease-new",
+		NewLeaseVersion: "v1", NewLeaseHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		NewApprovalID: "approval-new", ReviewedBy: "human", ReviewerID: "reviewer-new", ReviewedAt: "2026-09-08T00:00:07Z", ExecutionPermitted: false,
+	}
+	raw, err := json.Marshal(valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeArtifact("recovery_admission", raw); status != Valid {
+		t.Fatalf("valid recovery admission rejected: %s", status)
+	}
+	entry, err := NewArtifactEntry(ArtifactKindRecoveryAdmission, raw)
+	if err != nil || entry.ArtifactID != valid.RecoveryAdmissionID {
+		t.Fatalf("recovery admission was not registered canonically: entry=%+v err=%v", entry, err)
+	}
+	badExecution := valid
+	badExecution.ExecutionPermitted = true
+	raw, _ = json.Marshal(badExecution)
+	if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
+		t.Fatal("execution-permitted recovery admission was accepted")
+	}
+	reusedLease := valid
+	reusedLease.NewLeaseID, reusedLease.NewLeaseHash = reusedLease.PriorLeaseID, reusedLease.PriorLeaseHash
+	raw, _ = json.Marshal(reusedLease)
+	if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
+		t.Fatal("prior lease reuse was accepted")
+	}
+	reusedApproval := valid
+	reusedApproval.NewApprovalID = reusedApproval.PriorApprovalID
+	raw, _ = json.Marshal(reusedApproval)
+	if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
+		t.Fatal("prior approval reuse was accepted")
+	}
+}
