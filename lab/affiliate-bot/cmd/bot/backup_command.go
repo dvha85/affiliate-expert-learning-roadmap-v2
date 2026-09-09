@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
@@ -288,7 +289,7 @@ func requiredBackupFiles(source string) ([]string, error) {
 	}
 	if _, err := os.Stat(m11ArtifactRegistryPath(source)); err == nil {
 		required = append(required, filepath.Base(m11ArtifactRegistryPath(source)))
-		entries, err := loadM11ArtifactRegistry(source)
+		entries, err := readM11ArtifactRegistry(source)
 		if err != nil {
 			return nil, err
 		}
@@ -718,13 +719,18 @@ func validateM11BackupGraph(dir string) error {
 	for _, evaluation := range evaluations {
 		outcome, outcomeOK := outcomesByID[evaluation.OutcomeID]
 		execution, executionOK := executionsByID[evaluation.ExecutionID]
-		if !outcomeOK || !executionOK || outcome.EffectRef.EffectID != execution.ExecutionID || execution.ProductionLeaseID != evaluation.LeaseID || execution.ProductionLeaseVersion != evaluation.LeaseVersion || execution.ProductionLeaseHash != evaluation.LeaseHash {
+		outcomeAt, outcomeTimeErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+		evaluatedAt, evaluatedTimeErr := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
+		if !outcomeOK || !executionOK || outcomeTimeErr != nil || evaluatedTimeErr != nil || evaluatedAt.Before(outcomeAt) || outcome.EffectRef.EffectID != execution.ExecutionID || execution.ProductionLeaseID != evaluation.LeaseID || execution.ProductionLeaseVersion != evaluation.LeaseVersion || execution.ProductionLeaseHash != evaluation.LeaseHash {
 			return fmt.Errorf("M11 outcome evaluation does not resolve its fixture outcome and execution")
 		}
 	}
 	for _, cycle := range cycles {
 		evaluation, evaluationOK := evaluations[cycle.EvaluationID]
-		if !evaluationOK || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID {
+		execution, executionOK := executionsByID[cycle.ExecutionID]
+		closedAt, closedTimeErr := time.Parse(time.RFC3339, cycle.ClosedAt)
+		evaluatedAt, evaluatedTimeErr := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
+		if !evaluationOK || !executionOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID {
 			return fmt.Errorf("M11 cycle does not resolve its outcome evaluation")
 		}
 	}

@@ -455,6 +455,12 @@ RP-07a sở hữu graph M11: source canary/promotion review → lease + lease ap
 - Negative cases: thiếu hoặc sai lease/activation/health/cost/gate/authorization/execution/EffectRef/cycle/resolution; dữ liệu bị sửa nhưng checksum backup hợp lệ; phiên bản manifest không hỗ trợ. Reject graph hỏng, không publish runtime sẵn dùng. Lịch sử đã hết hạn vẫn phục hồi được ở chế độ không cấp quyền; recovery chưa review phải bị chặn.
 - Chỉ ghi đóng R12/R13 toàn phạm vi khi cả evidence RP-06 và gate restore M11 này PASS trên head tương thích. RP-07b và RP-09 không được nghiệm thu full chain/readiness nếu gate này chưa đạt. Dependency là RP-06 → RP-07a → RP-07b, không có vòng lặp.
 
+**Cập nhật backup negative cases (2026-09-09):** `smoke_br18b_backup_restore.py`
+tạo evaluation/cycle bằng learner Bot rồi restore các bản sao có checksum hợp lệ
+nhưng outcome bị orphan khỏi evaluation, cycle trỏ evaluation không tồn tại, hoặc
+`closed_at` sớm hơn evaluation. Tất cả bị `GRAPH_FAILED`; bước inventory chỉ đọc
+envelope hợp lệ trước, còn graph chỉ quyết định sau staging restore.
+
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
 **Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00

@@ -194,7 +194,8 @@ canary, manifest bắt buộc có `m10-artifacts.jsonl`; nếu có execution `FA
 thì bắt buộc có thêm `m10-outcomes.jsonl`. Restore còn replay history, mission
 state và kiểm link reservation → execution, FAILED execution → fixture
 outcome/`MACHINE_EXECUTION` EffectRef. Một backup checksum hợp lệ nhưng orphan
-outcome vẫn bị từ chối với `GRAPH_FAILED`.
+outcome, M11 evaluation/cycle link sai, hoặc cycle đóng trước evaluation vẫn bị
+từ chối với `GRAPH_FAILED`.
 
 Snapshot `v2` không được restore như `v3`: tạo lại backup mới từ runtime còn
 nguyên vẹn trước khi nâng cấp, để có inventory typed thay vì suy diễn từ map

@@ -29,7 +29,12 @@ func m11AppendFault(phase string, entry corem11.ArtifactEntry) error {
 	return m11RegistryAppendFault(phase, entry)
 }
 
-func loadM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
+// readM11ArtifactRegistry verifies append-only envelopes without evaluating
+// their cross-artifact links. Backup inventory needs this narrow view so a
+// checksum-valid but semantically broken snapshot reaches the restore graph
+// gate and is reported as GRAPH_FAILED rather than masquerading as a manifest
+// verification problem.
+func readM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 	raw, err := os.ReadFile(m11ArtifactRegistryPath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -57,6 +62,14 @@ func loadM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 		}
 		seen[key] = entry.ContentHash
 		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
+func loadM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
+	entries, err := readM11ArtifactRegistry(dir)
+	if err != nil {
+		return nil, err
 	}
 	if err := corem11.ValidateArtifactGraph(entries); err != nil {
 		return nil, err

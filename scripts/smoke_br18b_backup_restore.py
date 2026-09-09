@@ -22,6 +22,36 @@ def invoke(bot, *args, expected=0, env=None):
     return json.loads(run([bot, *args], expected=expected, env=env).stdout)
 
 
+def replace_backup_file(backup, name, content):
+    path = backup / name
+    path.write_bytes(content)
+    manifest_path = backup / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][name]["sha256"] = hashlib.sha256(content).hexdigest()
+    manifest["files"][name]["size_bytes"] = len(content)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def rewrite_m11_registry(backup, change):
+    lines = []
+    for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        if change(entry):
+            canonical = json.dumps(entry["artifact"], separators=(",", ":"), ensure_ascii=False).encode()
+            entry["content_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
+        lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
+def replace_m11_field(kind, field, value):
+    def change(entry):
+        if entry["artifact_kind"] != kind:
+            return False
+        entry["artifact"][field] = value
+        return True
+    return change
+
+
 def write_canary_grant(path, intent, policy, approval, max_executions, max_cost):
     payload = {
         "grant_id": "br18-g", "grant_version": "v1", "policy_version": policy["policy_version"],
@@ -173,6 +203,13 @@ def main():
         production_outcome_result = invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)
         assert production_outcome_result["status"] == "APPENDED" and production_outcome_result["artifact"]["post_ledger"]["pending_outcomes"] == 0
         assert invoke(bot, "mission", "m11-outcome", runtime, production_outcome, execution_ledger_id, env=env)["status"] == "EXACT_DUPLICATE"
+        evaluation = invoke(bot, "mission", "m11-evaluate", runtime, "br18-production-o", "br18-production-e", "2026-09-08T00:00:04Z", env=env)
+        assert evaluation["status"] == "APPENDED" and evaluation["artifact"]["source_profile"] == "OFFLINE_FIXTURE"
+        assert invoke(bot, "mission", "m11-evaluate", runtime, "br18-production-o", "br18-production-e", "2026-09-08T00:00:04Z", env=env)["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m11-close-cycle", runtime, "br18-production-cycle-too-early", "br18-production-e", "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
+        cycle = invoke(bot, "mission", "m11-close-cycle", runtime, "br18-production-cycle", "br18-production-e", "2026-09-08T00:00:05Z", env=env)
+        assert cycle["status"] == "APPENDED" and cycle["artifact"]["status"] == "CLOSED"
+        assert invoke(bot, "mission", "m11-close-cycle", runtime, "br18-production-cycle", "br18-production-e", "2026-09-08T00:00:05Z", env=env)["status"] == "EXACT_DUPLICATE"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
@@ -205,6 +242,17 @@ def main():
         invalid_manifest["files"]["m10-outcomes.jsonl"]["size_bytes"] = len(invalid_outcome_bytes)
         (invalid_graph_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_graph_backup, root / "invalid-graph-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_evaluation_backup = root / "orphan-evaluation-backup"; shutil.copytree(backup, orphan_evaluation_backup)
+        orphan_outcome = json.loads((orphan_evaluation_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8"))
+        orphan_outcome["outcome_id"] = "br18-production-o-missing"
+        replace_backup_file(orphan_evaluation_backup, "m11-outcomes.jsonl", (json.dumps(orphan_outcome) + "\n").encode())
+        assert invoke(bot, "backup", "restore", orphan_evaluation_backup, root / "orphan-evaluation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
+        rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
+        assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        reversed_cycle_time_backup = root / "reversed-cycle-time-backup"; shutil.copytree(backup, reversed_cycle_time_backup)
+        rewrite_m11_registry(reversed_cycle_time_backup, replace_m11_field("PRODUCTION_CYCLE", "closed_at", "2026-09-08T00:00:03Z"))
+        assert invoke(bot, "backup", "restore", reversed_cycle_time_backup, root / "reversed-cycle-time-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", backup, restored, env=env)["status"] == "RESTORED"
         assert "replay=MATCH" in run([bot, "history", "replay", restored / "history.jsonl"], env=env).stdout
         status = invoke(bot, "mission", "status", restored, env=env)
@@ -219,6 +267,8 @@ def main():
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", "br18-production-lease/2026-09-08T00:00:00Z", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_AUTHORIZATION", authorization["artifact"]["authorization_id"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"], env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_OUTCOME_EVALUATION", "br18-production-e", env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_CYCLE", "br18-production-cycle", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", production_outcome_result["artifact"]["post_ledger"]["lease_id"] + "/" + production_outcome_result["artifact"]["post_ledger"]["updated_at"], env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m10-outcome", restored, machine_outcome, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve", restored, "1", expected=1, env=env)["status"] == "STOPPED"
@@ -323,7 +373,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, governed M11 failed-fixture outcome, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, orphaned outcome, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":
