@@ -255,6 +255,14 @@ validator bằng proposal/tool trace đã persist. Đây là coverage Agent th�
 secret/provider; không phải provider diversity hay received-redirect transport
 evidence.
 
+**M07 received-redirect transport regression (2026-09-09):** production wrapper
+luôn tự dựng transport DNS/proxy/redirect guard. Helper nội bộ chỉ nhận
+`RoundTripper` trong test để trả response `302 Location` có kiểm soát sau khi
+preflight DNS public giả lập. Adapter phải trả `TOOL_TRANSPORT_REJECTED`, không
+follow URL thứ hai và không ghi tool-result; test gọi adapter thật, không thay
+bằng parser độc lập hoặc endpoint Internet. Đây không là evidence cho một nguồn
+redirect live trong n8n engine.
+
 **Mở rộng M06 engine regression (2026-09-09):** cùng runner disposable nay
 thực thi copy của M06 blueprint với fixture có JSON key reorder, content đổi
 nhưng reuse correlation, URL ngoài profile, và content đổi với correlation mới.

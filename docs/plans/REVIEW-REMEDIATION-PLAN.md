@@ -545,6 +545,14 @@ nodes của blueprint. Stub phải nhận canonical context và tool evidence; o
 được validate, persist, rồi revalidate sau restart adapter. Điều này không đưa
 secret/provider vào CI và không là bằng chứng received-redirect hoặc provider
 diversity.
+
+**M07 received-redirect regression (2026-09-09):** transport helper có seam
+`RoundTripper` chỉ dùng test; wrapper production vẫn tạo transport guard của
+chính nó. Response `302 Location` có kiểm soát phải dừng tại adapter với
+`TOOL_TRANSPORT_REJECTED`, không follow request thứ hai và không persist trace.
+Test chạy HTTP adapter thật cùng core transport logic, không cần endpoint public
+hoặc fixture loopback bị policy cấm. Nó không thay operated evidence cho một
+redirect source live.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.
