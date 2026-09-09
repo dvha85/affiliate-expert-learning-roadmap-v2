@@ -245,6 +245,15 @@ cầu lỗi `TOOL_TRANSPORT_REJECTED`; registry redirect bị strict decoder rej
 Không có credential hoặc provider trong job này, nên M07 success qua model và
 received-redirect transport parity vẫn là gap mở.
 
+**Mở rộng M06 engine regression (2026-09-09):** cùng runner disposable nay
+thực thi copy của M06 blueprint với fixture có JSON key reorder, content đổi
+nhưng reuse correlation, URL ngoài profile, và content đổi với correlation mới.
+Key reorder phải trả `EXACT_DUPLICATE`; hai fixture không hợp lệ phải dừng tại
+HTTP adapter trước ACK/report và bytes canonical history không đổi; fixture mới
+hợp lệ phải `APPENDED` với record ID khác rồi replay `MATCH`. Đây là CI coverage
+cho fixed synthetic profile, chưa là schedule admission, parser nguồn thật hay
+operated selected-source evidence.
+
 ## 6. Compatibility, bàn giao và merge gate
 
 Trước khi sửa schema/store, mỗi changeset phải chốt: version mới nếu có, loader hỗ trợ bản nào, cách xử lý snapshot cũ, migration read-only hay explicit command, rollback code sau khi đã ghi format mới có an toàn không. Không tự migrate dữ liệu của người dùng trong lúc review/test. Thay đổi PMR-02 thêm ledger ref bắt buộc vào gate: gate cũ không đủ proof để authorize và sẽ fail closed; tạo lại gate từ ledger hiện hành qua luồng review thay vì rewrite artifact cũ. Bản backup cũ không đủ graph proof không được tự nhận là restore đầy đủ; runtime lịch sử chỉ đọc không được tự cấp quyền mới.
