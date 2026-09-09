@@ -46,7 +46,7 @@
       "criterion_id": "BR-18b",
       "claims": [
         {"id": "BR-18b-implementation", "kind": "implementation", "status": "PARTIAL", "matrix_field": "implementation_refs", "scope": "Backup v3 validates supported runtime graph and UNKNOWN-to-STOP has a bounded replay journal; this does not prove atomic multi-file crash recovery.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật UNKNOWN→STOP journal"}]},
-        {"id": "BR-18b-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Typed tampering, restored STOP-to-new-runtime admission, UNKNOWN journal replay and lifecycle faults run in deterministic CI; power-loss seams are excluded.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "python scripts/smoke_br18b_backup_restore.py"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật UNKNOWN→STOP journal"}]},
+        {"id": "BR-18b-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Typed tampering, restored STOP-to-new-runtime admission, UNKNOWN journal replay before/after stopped-ledger append, and lifecycle faults run in deterministic CI; power-loss seams are excluded.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "python scripts/smoke_br18b_backup_restore.py"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật UNKNOWN→STOP journal"}]},
         {"id": "BR-18b-external", "kind": "external", "status": "MISSING", "scope": "No deployment recovery drill on the target host is recorded.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
