@@ -245,6 +245,16 @@ cầu lỗi `TOOL_TRANSPORT_REJECTED`; registry redirect bị strict decoder rej
 Không có credential hoặc provider trong job này, nên M07 success qua model và
 received-redirect transport parity vẫn là gap mở.
 
+**Mở rộng M07 model-stub CI (2026-09-09):** runner import một credential OpenAI
+disposable chỉ trỏ loopback và chạy endpoint OpenAI-compatible in-process. Bản
+copy test thay fetch network bằng `register-tool-result` với fixture synthetic,
+nhưng giữ nguyên node Agent, canonical context, grounding và proposal persistence
+của blueprint. Stub phải nhận canonical context cùng registered-tool evidence và
+trả JSON contract được grounding; runner restart adapter, replay history và gọi
+validator bằng proposal/tool trace đã persist. Đây là coverage Agent thật không
+secret/provider; không phải provider diversity hay received-redirect transport
+evidence.
+
 **Mở rộng M06 engine regression (2026-09-09):** cùng runner disposable nay
 thực thi copy của M06 blueprint với fixture có JSON key reorder, content đổi
 nhưng reuse correlation, URL ngoài profile, và content đổi với correlation mới.
