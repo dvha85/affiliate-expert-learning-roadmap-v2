@@ -8,6 +8,8 @@ from pathlib import Path
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = {"IMPLEMENTED", "IMPLEMENTED_OFFLINE", "PARTIAL", "OPEN"}
 EXPECTED = {"BR-13", "BR-14", "BR-15", "BR-16a", "BR-17", "BR-18b", "BR-19"}
+CLAIM_KINDS = {"implementation", "test", "operated", "external"}
+CLAIM_STATUSES = {"IMPLEMENTED_OFFLINE", "VERIFIED_OFFLINE", "PARTIAL", "MISSING"}
 CI_REQUIRED = {
     "scripts/smoke_br16a_offline.py": ".github/workflows/curriculum-ci.yml",
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
@@ -17,6 +19,74 @@ CI_REQUIRED = {
 
 def fail(message):
     raise AssertionError(message)
+
+
+def audit_evidence_graph(root, criteria_by_id):
+    graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+    graph = json.loads(graph_path.read_text(encoding="utf-8"))
+    if graph.get("version") != "readiness-evidence-graph/v1":
+        fail("unsupported readiness evidence graph version")
+    entries = graph.get("criteria")
+    if not isinstance(entries, list) or not entries:
+        fail("readiness evidence graph requires non-empty criteria")
+    graph_ids, claim_ids = set(), set()
+    for entry in entries:
+        criterion_id = entry.get("criterion_id")
+        if criterion_id in graph_ids or criterion_id not in criteria_by_id:
+            fail(f"invalid or duplicate evidence graph criterion: {criterion_id}")
+        graph_ids.add(criterion_id)
+        claims = entry.get("claims")
+        if not isinstance(claims, list) or not claims:
+            fail(f"{criterion_id} has no evidence graph claims")
+        kinds = set()
+        for claim in claims:
+            claim_id, kind, status = claim.get("id"), claim.get("kind"), claim.get("status")
+            if not isinstance(claim_id, str) or not claim_id or claim_id in claim_ids:
+                fail(f"invalid or duplicate evidence claim: {claim_id}")
+            claim_ids.add(claim_id)
+            if kind not in CLAIM_KINDS or status not in CLAIM_STATUSES:
+                fail(f"{criterion_id} has invalid evidence claim kind/status: {claim_id}")
+            kinds.add(kind)
+            if not isinstance(claim.get("scope"), str) or not claim["scope"].strip():
+                fail(f"{claim_id} lacks evidence scope")
+            matrix_field = claim.get("matrix_field")
+            if kind in {"implementation", "test"}:
+                expected_field = f"{kind}_refs"
+                if matrix_field != expected_field:
+                    fail(f"{claim_id} must link {expected_field}")
+                if not criteria_by_id[criterion_id].get(matrix_field):
+                    fail(f"{claim_id} links an empty matrix field")
+            elif matrix_field is not None:
+                fail(f"{claim_id} must not link a matrix ref field")
+            plan_refs = claim.get("plan_refs")
+            if not isinstance(plan_refs, list) or not plan_refs:
+                fail(f"{claim_id} lacks plan refs")
+            for plan_ref in plan_refs:
+                if not isinstance(plan_ref, dict):
+                    fail(f"{claim_id} has invalid plan ref")
+                path, marker = plan_ref.get("path"), plan_ref.get("marker")
+                target = root / path if isinstance(path, str) else None
+                if target is None or not target.is_file() or not isinstance(marker, str) or marker not in target.read_text(encoding="utf-8"):
+                    fail(f"{claim_id} has unresolved plan ref")
+            ci = claim.get("ci", [])
+            if kind == "test" and status == "VERIFIED_OFFLINE" and (not isinstance(ci, list) or not ci):
+                fail(f"{claim_id} lacks CI evidence")
+            if not isinstance(ci, list):
+                fail(f"{claim_id} has invalid CI evidence")
+            for ci_ref in ci:
+                if not isinstance(ci_ref, dict):
+                    fail(f"{claim_id} has invalid CI ref")
+                workflow, command = ci_ref.get("workflow"), ci_ref.get("command")
+                workflow_path = root / workflow if isinstance(workflow, str) else None
+                if workflow_path is None or not workflow_path.is_file() or not isinstance(command, str) or command not in workflow_path.read_text(encoding="utf-8"):
+                    fail(f"{claim_id} has unresolved CI evidence")
+        if not {"implementation", "test"}.issubset(kinds) or not kinds.intersection({"operated", "external"}):
+            fail(f"{criterion_id} lacks a complete implementation/test/external evidence partition")
+        if criteria_by_id[criterion_id]["status"] == "IMPLEMENTED" and any(claim["status"] in {"PARTIAL", "MISSING"} for claim in claims):
+            fail(f"implemented criterion has incomplete evidence graph claims: {criterion_id}")
+    if graph_ids != set(criteria_by_id):
+        fail(f"evidence graph/matrix criterion mismatch: {sorted(graph_ids)}")
+    return len(claim_ids)
 
 
 def audit(root):
@@ -30,7 +100,7 @@ def audit(root):
     criteria = matrix.get("criteria")
     if not isinstance(criteria, list) or not criteria:
         fail("readiness matrix requires non-empty criteria")
-    seen, partial = set(), []
+    seen, partial, criteria_by_id = set(), [], {}
     for item in criteria:
         item_id, status = item.get("id"), item.get("status")
         if item_id in seen or status not in ALLOWED:
@@ -50,8 +120,10 @@ def audit(root):
             if not item["missing_evidence"]:
                 fail(f"non-final item lacks explicit remaining evidence: {item_id}")
             partial.append(item_id)
+        criteria_by_id[item_id] = item
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
+    claim_count = audit_evidence_graph(root, criteria_by_id)
     for script, workflow in CI_REQUIRED.items():
         if script not in (root / workflow).read_text(encoding="utf-8"):
             fail(f"required regression is not wired to CI: {script}")
@@ -59,15 +131,16 @@ def audit(root):
         normalized = line.casefold()
         if "ready for production" in normalized and not re.search(r"not[ _-]?ready|chưa|không", normalized):
             fail(f"plan overclaims production readiness at line {line_number}")
-    return matrix, partial
+    return matrix, partial, claim_count
 
 
 def main():
     root = Path(sys.argv[1]).resolve() if len(sys.argv) == 2 else DEFAULT_ROOT
-    matrix, partial = audit(root)
+    matrix, partial, claim_count = audit(root)
     print(f"READINESS AUDIT: {matrix['overall']}")
     print("- structured partial/open criteria: " + ", ".join(partial))
     print("- implementation/test refs exist; required M00-M11 regressions are wired to CI")
+    print(f"- evidence graph resolves {claim_count} scoped claims to matrix refs, plan markers and declared CI commands")
     print("- plan contains no unqualified production-readiness claim")
 
 

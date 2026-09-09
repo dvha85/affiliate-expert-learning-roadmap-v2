@@ -85,7 +85,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v3 typed inventory/profile, M07 replay và runtime gate cross-process; semantic coverage và fault/host proof còn mở |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | IN PROGRESS — CI engine regression M06 + M07 policy-reject đã có; mutation, model-success và full scope còn mở |
-| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
+| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | IN PROGRESS — graph claim/matrix/plan/CI command đã được audit; remote CI và evidence ngoài repo còn mở |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
@@ -562,6 +562,16 @@ smoke M00–M11/M11 restore đã wired trong CI. Nó cũng reject claim
 negative fixtures chạy implementation thực cho ref hỏng, status final còn gap,
 CI regression mất, và prose overclaim. Audit vẫn chưa parse toàn bộ ngữ nghĩa
 mọi tài liệu/PR hoặc xác nhận remote CI run; các phần đó còn mở.
+
+**Cập nhật evidence graph (2026-09-09):**
+`READINESS-EVIDENCE-GRAPH.json` chia mỗi BR thành các claim implementation,
+test và operated/external, với scope bắt buộc. Claim implementation/test link
+ngược vào field refs của matrix; mọi claim link marker trong plan, còn test đã
+`VERIFIED_OFFLINE` phải chỉ đúng command trong workflow CI. Audit từ chối graph
+thiếu partition, ID trùng, marker/CI command không resolve, hoặc criterion
+`IMPLEMENTED` còn claim `PARTIAL`/`MISSING`. Negative fixtures chạy audit thật
+trên isolated copy. Graph chỉ là evidence có trong checkout; nó không thay API
+GitHub, remote CI run hay independent/external evidence.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.

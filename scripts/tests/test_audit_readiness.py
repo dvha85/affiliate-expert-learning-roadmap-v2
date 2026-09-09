@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "docs/plans/READINESS-MATRIX.json", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -53,12 +53,33 @@ class ReadinessAuditTests(unittest.TestCase):
     def test_missing_ci_regression_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/smoke_br16a_offline.py", "python scripts/removed.py"), encoding="utf-8")
-        self.assertIn("not wired to CI", self.run_audit(False))
+        self.assertIn("unresolved CI evidence", self.run_audit(False))
 
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")
         self.assertIn("overclaims production readiness", self.run_audit(False))
+
+    def test_graph_claim_with_unwired_ci_command_is_rejected(self):
+        graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        graph["criteria"][0]["claims"][1]["ci"][0]["command"] = "python scripts/not-wired.py"
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        self.assertIn("unresolved CI evidence", self.run_audit(False))
+
+    def test_graph_claim_with_unresolved_plan_marker_is_rejected(self):
+        graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        graph["criteria"][0]["claims"][0]["plan_refs"][0]["marker"] = "missing-plan-marker"
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        self.assertIn("unresolved plan ref", self.run_audit(False))
+
+    def test_graph_without_external_partition_is_rejected(self):
+        graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        graph["criteria"][0]["claims"] = graph["criteria"][0]["claims"][:2]
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        self.assertIn("evidence partition", self.run_audit(False))
 
 
 if __name__ == "__main__":
