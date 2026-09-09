@@ -72,3 +72,25 @@ jobs:
           go run ./cmd/demo M11 | grep -q '"production_lease_hash": "sha256:'
           go run ./cmd/demo M11 | grep -q '"production_health_snapshot_hash": "sha256:'
           go run ./cmd/demo M11 | grep -q '"side_effect_state": "PERFORMED"'
+
+  n8n-engine-regression:
+    name: n8n-engine-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Install pinned n8n engine for disposable offline runtime
+        run: npm install --prefix "$RUNNER_TEMP/n8n-rp08" --no-audit --no-fund n8n@2.38.1
+      - name: Run M06 engine path and M07 policy-rejection path
+        run: |
+          python scripts/run_n8n_engine_regression.py \
+            --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"

@@ -11,6 +11,7 @@ EXPECTED = {"BR-13", "BR-14", "BR-15", "BR-16a", "BR-17", "BR-18b", "BR-19"}
 CI_REQUIRED = {
     "scripts/smoke_br16a_offline.py": ".github/workflows/curriculum-ci.yml",
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
 
 

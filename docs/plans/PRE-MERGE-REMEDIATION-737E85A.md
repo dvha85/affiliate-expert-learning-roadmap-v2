@@ -233,6 +233,15 @@ git diff --check
 
 Các script n8n ở trên không tự khởi tạo credential/provider và vì vậy không thay thế engine run. Operated M07 local ngày 09/09 đã PASS synthetic success path qua model, grounding và persistence; `validate_n8n_m07_operated_execution.py` kiểm capture/ACK/proposal store mà không đọc secret. Đây chưa là CI/containerized provider coverage hay full M07 acceptance ngoài fixture. Nếu sandbox không cho mở loopback, ghi test bị chặn, chạy phần không cần port và nghiệm thu phần còn lại trên môi trường được cấp quyền; không sửa test để bỏ qua guard.
 
+**Cập nhật RP-08 (2026-09-09):** `scripts/run_n8n_engine_regression.py`
+đã chạy n8n `2.38.1` trong runtime disposable và được wire vào
+`n8n-engine-regression` trên GitHub Actions. Nó import copy workflow với
+ID/loopback URL và Execute Workflow Trigger chỉ cho CLI, giữ nguyên blueprint
+gốc. Regression kiểm M06 append/duplicate/replay và sink failure; M07 dùng
+record M06 thật, ép `POST`, yêu cầu lỗi `TOOL_TRANSPORT_REJECTED` tại fetch và
+không cho Agent/proposal persistence chạy. Không có credential hoặc provider
+trong job này, nên M07 success qua model/redirect/sink parity vẫn là gap mở.
+
 ## 6. Compatibility, bàn giao và merge gate
 
 Trước khi sửa schema/store, mỗi changeset phải chốt: version mới nếu có, loader hỗ trợ bản nào, cách xử lý snapshot cũ, migration read-only hay explicit command, rollback code sau khi đã ghi format mới có an toàn không. Không tự migrate dữ liệu của người dùng trong lúc review/test. Thay đổi PMR-02 thêm ledger ref bắt buộc vào gate: gate cũ không đủ proof để authorize và sẽ fail closed; tạo lại gate từ ledger hiện hành qua luồng review thay vì rewrite artifact cũ. Bản backup cũ không đủ graph proof không được tự nhận là restore đầy đủ; runtime lịch sử chỉ đọc không được tự cấp quyền mới.
