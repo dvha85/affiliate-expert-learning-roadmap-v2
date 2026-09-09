@@ -113,20 +113,59 @@ func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.
 			if err := recoverM11UnknownStopJournal(fixture.dir); err != nil {
 				t.Fatalf("unknown STOP journal recovery failed: %v", err)
 			}
-			if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); !os.IsNotExist(err) {
-				t.Fatalf("unknown STOP journal remains after recovery: %v", err)
-			}
-			state, err = loadMissionState(fixture.dir)
-			if err != nil || !state.Stop || state.StopReason != "RECONCILIATION_REQUIRED" {
-				t.Fatalf("recovered mission is not durably stopped: state=%+v err=%v", state, err)
-			}
-			_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
-			if err != nil || head.ControlMode != "STOPPED" || !head.ReconciliationRequired {
-				t.Fatalf("recovered stopped ledger is invalid: ledger=%+v err=%v", head, err)
-			}
-			if _, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err != nil || status != appendDuplicate {
-				t.Fatalf("unknown retry was not exact duplicate: status=%s err=%v", status, err)
-			}
+			assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
 		})
+	}
+}
+
+func TestM11UnknownStopJournalRecoversAfterMissionStateWriteFailure(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
+	atomicWrites := 0
+	missionStateWriteFault = func(phase string) error {
+		if phase != "before_rename" {
+			return nil
+		}
+		atomicWrites++ // journal first, then mission-state after stopped ledger
+		if atomicWrites == 2 {
+			return errors.New("injected mission-state write failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+		t.Fatal("mission-state write fault was not surfaced")
+	}
+	if atomicWrites != 2 {
+		t.Fatalf("fault did not reach mission-state write: atomic writes=%d", atomicWrites)
+	}
+	if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); err != nil {
+		t.Fatalf("unknown STOP journal was removed before recovery: %v", err)
+	}
+	if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("status did not fail closed on mission-state write fault: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = nil
+	if err := recoverM11UnknownStopJournal(fixture.dir); err != nil {
+		t.Fatalf("unknown STOP journal did not recover mission-state write failure: %v", err)
+	}
+	assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
+}
+
+func assertM11UnknownStopRecovered(t *testing.T, fixture m11UnknownStopFixture, attemptedAt, reason string) {
+	t.Helper()
+	if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); !os.IsNotExist(err) {
+		t.Fatalf("unknown STOP journal remains after recovery: %v", err)
+	}
+	state, err := loadMissionState(fixture.dir)
+	if err != nil || !state.Stop || state.StopReason != "RECONCILIATION_REQUIRED" {
+		t.Fatalf("recovered mission is not durably stopped: state=%+v err=%v", state, err)
+	}
+	_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil || head.ControlMode != "STOPPED" || !head.ReconciliationRequired {
+		t.Fatalf("recovered stopped ledger is invalid: ledger=%+v err=%v", head, err)
+	}
+	if _, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err != nil || status != appendDuplicate {
+		t.Fatalf("unknown retry was not exact duplicate: status=%s err=%v", status, err)
 	}
 }

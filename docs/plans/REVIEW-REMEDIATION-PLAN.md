@@ -445,9 +445,10 @@ Replay kiểm exact predecessor ledger, UNKNOWN execution và stopped transition
 chỉ sau đó mới repair durable mission STOP/marker rồi xóa journal. Nếu journal
 malformed, stale hoặc competing thì mutation và `status` fail closed
 `RECOVERY_REQUIRED`, không tự đoán side effect. Fault test tiêm lỗi ngay trước
-và ngay sau stopped-ledger write sau execution append; restart replay append
-ledger/STOP exactly-once và retry trả duplicate. Backup create cũng chạy
-recovery dưới lock trước inventory. Journal là kế hoạch replay có fsync cho một
+và ngay sau stopped-ledger write sau execution append, và trước atomic rename
+mission state sau stopped ledger; restart replay append ledger/STOP exactly-once
+và retry trả duplicate. Backup create cũng chạy recovery dưới lock trước
+inventory. Journal là kế hoạch replay có fsync cho một
 transition, **không
 phải** transaction đa-file/power-loss proof.
 
