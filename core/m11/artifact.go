@@ -221,6 +221,30 @@ type ProductionReconciliationResolution struct {
 	EffectState  string `json:"effect_state"`
 	Reason       string `json:"reason"`
 }
+
+// ProductionRecoveryAdmission records a human-reviewed handoff from a
+// durably stopped runtime to a separately initialized runtime. It is an audit
+// boundary only: normal activation, gate, health, cost, and authorization
+// checks remain mandatory before any later fixture action.
+type ProductionRecoveryAdmission struct {
+	RecoveryAdmissionID string `json:"recovery_admission_id"`
+	PriorRuntimeDir     string `json:"prior_runtime_dir"`
+	PriorLeaseID        string `json:"prior_lease_id"`
+	PriorLeaseVersion   string `json:"prior_lease_version"`
+	PriorLeaseHash      string `json:"prior_lease_hash"`
+	PriorApprovalID     string `json:"prior_approval_id"`
+	ResolutionID        string `json:"resolution_id"`
+	NewRuntimeID        string `json:"new_runtime_id"`
+	NewRuntimeDir       string `json:"new_runtime_dir"`
+	NewLeaseID          string `json:"new_lease_id"`
+	NewLeaseVersion     string `json:"new_lease_version"`
+	NewLeaseHash        string `json:"new_lease_hash"`
+	NewApprovalID       string `json:"new_approval_id"`
+	ReviewedBy          string `json:"reviewed_by"`
+	ReviewerID          string `json:"reviewer_id"`
+	ReviewedAt          string `json:"reviewed_at"`
+	ExecutionPermitted  bool   `json:"execution_permitted"`
+}
 type ProductionOutcomeEvaluation struct {
 	EvaluationID  string   `json:"evaluation_id"`
 	LeaseID       string   `json:"lease_id"`
@@ -365,6 +389,8 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 		schema, value = "production-activation-record.schema.json", &ProductionActivationRecord{}
 	case "resolution":
 		schema, value = "production-reconciliation-resolution.schema.json", &ProductionReconciliationResolution{}
+	case "recovery_admission":
+		schema, value = "production-recovery-admission.schema.json", &ProductionRecoveryAdmission{}
 	case "evaluation":
 		schema, value = "production-outcome-evaluation.schema.json", &ProductionOutcomeEvaluation{}
 	case "cycle":
@@ -395,6 +421,13 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 			return nil, "INVALID_PROFILE"
 		}
 		if !before(x.AuthorizedAt, x.ExpiresAt) {
+			return nil, "INVALID_TIME_BINDING"
+		}
+	case *ProductionRecoveryAdmission:
+		if x.ReviewedBy != "human" || x.ExecutionPermitted || x.PriorRuntimeDir == x.NewRuntimeDir || x.PriorLeaseID == x.NewLeaseID || x.PriorLeaseHash == x.NewLeaseHash || x.PriorApprovalID == x.NewApprovalID {
+			return nil, "INVALID_RECOVERY_ADMISSION"
+		}
+		if _, err := time.Parse(time.RFC3339, x.ReviewedAt); err != nil {
 			return nil, "INVALID_TIME_BINDING"
 		}
 	case *ProductionCycleRecord:
@@ -457,6 +490,8 @@ func CanonicalArtifact(kind string, raw []byte) (string, []byte, string) {
 		id = x.LeaseID + "/" + x.LeaseVersion
 	case *ProductionReconciliationResolution:
 		id = x.ResolutionID
+	case *ProductionRecoveryAdmission:
+		id = x.RecoveryAdmissionID
 	case *ProductionOutcomeEvaluation:
 		id = x.EvaluationID
 	case *ProductionCycleRecord:

@@ -1181,12 +1181,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON | m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID | m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT | m11-close-cycle STATE_DIR CYCLE_ID EVALUATION_ID CLOSED_AT | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON | m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID | m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT | m11-recovery-admit NEW_STATE_DIR OLD_STATE_DIR HANDOFF_INPUT ADMISSION_INPUT | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT | m11-close-cycle STATE_DIR CYCLE_ID EVALUATION_ID CLOSED_AT | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
 	}
 	// Directory creation and an exclusive lock make the mutable mission state
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
-	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-record-unknown": true, "m11-reconcile": true, "m11-outcome": true, "m11-evaluate": true, "m11-close-cycle": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-record-unknown": true, "m11-reconcile": true, "m11-recovery-admit": true, "m11-outcome": true, "m11-evaluate": true, "m11-close-cycle": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
 		if err := os.MkdirAll(args[1], 0700); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -1796,10 +1796,18 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			corem11.ArtifactKindActivation: true, corem11.ArtifactKindLedger: true,
 			corem11.ArtifactKindGate: true, corem11.ArtifactKindAuthorization: true,
 			corem11.ArtifactKindExecution: true, corem11.ArtifactKindEvaluation: true,
-			corem11.ArtifactKindCycle: true,
+			corem11.ArtifactKindCycle: true, corem11.ArtifactKindRecoveryAdmission: true,
 		}
 		if managedKinds[args[2]] {
 			return emit("REJECTED", nil, fmt.Errorf("M11 lifecycle artifact must be created by its dedicated command"), 1)
+		}
+		// A stopped runtime accepts only the human reconciliation artifact needed
+		// to establish its read-only recovery handoff. No later lease/approval or
+		// lifecycle record can be appended to blur the old STOP boundary.
+		if state, err := loadMissionState(args[1]); err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		} else if state.Stop && args[2] != corem11.ArtifactKindReconciliation {
+			return emit("STOPPED", nil, fmt.Errorf("durable STOP: %s", state.StopReason), 1)
 		}
 		raw, err := os.ReadFile(args[3])
 		if err != nil {
@@ -1911,6 +1919,22 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("CONFLICT", nil, err, 1)
 		}
 		return emit(status, handoff, nil, 0)
+	case "m11-recovery-admit":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-recovery-admit NEW_STATE_DIR OLD_STATE_DIR HANDOFF_INPUT ADMISSION_INPUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[4])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		entry, status, err := admitM11Recovery(args[1], args[2], args[3], raw)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, entry, nil, 0)
 	case "m11-outcome":
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID"), 2)

@@ -13,18 +13,19 @@ import (
 )
 
 const (
-	ArtifactKindLease          = "PRODUCTION_LEASE"
-	ArtifactKindLeaseApproval  = "PRODUCTION_LEASE_APPROVAL"
-	ArtifactKindHealth         = "PRODUCTION_HEALTH_SNAPSHOT"
-	ArtifactKindCostBound      = "TRUSTED_COST_BOUND"
-	ArtifactKindLedger         = "PRODUCTION_LEDGER"
-	ArtifactKindGate           = "PRODUCTION_GATE"
-	ArtifactKindAuthorization  = "PRODUCTION_EXECUTION_AUTHORIZATION"
-	ArtifactKindExecution      = "PRODUCTION_EXECUTION_RECORD"
-	ArtifactKindActivation     = "PRODUCTION_ACTIVATION"
-	ArtifactKindReconciliation = "PRODUCTION_RECONCILIATION"
-	ArtifactKindEvaluation     = "PRODUCTION_OUTCOME_EVALUATION"
-	ArtifactKindCycle          = "PRODUCTION_CYCLE"
+	ArtifactKindLease             = "PRODUCTION_LEASE"
+	ArtifactKindLeaseApproval     = "PRODUCTION_LEASE_APPROVAL"
+	ArtifactKindHealth            = "PRODUCTION_HEALTH_SNAPSHOT"
+	ArtifactKindCostBound         = "TRUSTED_COST_BOUND"
+	ArtifactKindLedger            = "PRODUCTION_LEDGER"
+	ArtifactKindGate              = "PRODUCTION_GATE"
+	ArtifactKindAuthorization     = "PRODUCTION_EXECUTION_AUTHORIZATION"
+	ArtifactKindExecution         = "PRODUCTION_EXECUTION_RECORD"
+	ArtifactKindActivation        = "PRODUCTION_ACTIVATION"
+	ArtifactKindReconciliation    = "PRODUCTION_RECONCILIATION"
+	ArtifactKindRecoveryAdmission = "PRODUCTION_RECOVERY_ADMISSION"
+	ArtifactKindEvaluation        = "PRODUCTION_OUTCOME_EVALUATION"
+	ArtifactKindCycle             = "PRODUCTION_CYCLE"
 )
 
 // ArtifactEntry is an append-only, canonical M11 lifecycle artifact envelope.
@@ -58,6 +59,8 @@ func kindProfile(kind string) string {
 		return "activation"
 	case ArtifactKindReconciliation:
 		return "resolution"
+	case ArtifactKindRecoveryAdmission:
+		return "recovery_admission"
 	case ArtifactKindEvaluation:
 		return "evaluation"
 	case ArtifactKindCycle:
@@ -181,6 +184,11 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			execution, executionOK := executions[x.ExecutionID]
 			if !leaseOK || !executionOK || execution.ProductionLeaseID != x.LeaseID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
 				return fmt.Errorf("production reconciliation has an orphaned or mismatched link")
+			}
+		case *ProductionRecoveryAdmission:
+			lease, leaseOK := leases[x.NewLeaseID]
+			if !leaseOK || lease.LeaseVersion != x.NewLeaseVersion || lease.LeaseHash != x.NewLeaseHash || lease.ApprovalRef != x.NewApprovalID || x.ExecutionPermitted {
+				return fmt.Errorf("production recovery admission has an orphaned or mismatched link")
 			}
 		case *ProductionOutcomeEvaluation:
 			lease, leaseOK := leases[x.LeaseID]

@@ -416,6 +416,20 @@ mới và không gọi executor. Handoff đã có smoke; workflow tạo runtime 
 mới và approval mới vẫn phải được thiết kế như một canonical artifact boundary
 riêng, không thể suy ra chỉ từ export proof.
 
+**Cập nhật recovery admission (2026-09-09):** `m11-recovery-admit` đã persist
+`PRODUCTION_RECOVERY_ADMISSION` trong registry của **runtime mới**. Adapter
+đọc runtime cũ fail-closed, canonicalize handoff và yêu cầu STOP + reviewed
+resolution/ledger còn nguyên; runtime mới phải có state, lease/approval khác
+identity/hash, activation và NORMAL ledger riêng. New approval chỉ hợp lệ sau
+resolution cũ, admission review sau approval mới. Admission bind absolute
+runtime paths, không nhận parent/child hoặc path trùng, không ghi vào runtime
+cũ và luôn `execution_permitted=false`; health/cost/gate/authorization vẫn là
+đường duy nhất tới fixture operation. Smoke BR-16a cover valid admission,
+old-runtime lease append reject, prior lease/approval reuse reject, resolve và
+backup/restore admission. Đây không phải live recovery/executor proof; graph
+backup của runtime mới không thể tự chứng minh availability liên tục của
+runtime cũ ngoài artifact handoff đã bind.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

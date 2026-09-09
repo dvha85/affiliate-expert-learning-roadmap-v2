@@ -394,6 +394,45 @@ def main():
         handoff = invoke(bot, "mission", "m11-recovery-export", state, "br16-recovery-resolution", reviewed_ledger_id, recovery_handoff)
         assert handoff["status"] == "APPENDED" and handoff["artifact"]["requires_new_runtime"] is True and handoff["artifact"]["execution_permitted"] is False
 
+        # Recovery never reuses the stopped directory or its lease. A separate
+        # runtime must first establish its own state, separately reviewed lease,
+        # activation, and empty ledger before it can persist a non-authorizing
+        # admission that binds the old reviewed handoff.
+        admission_runtime = work / "recovery-admission-runtime"
+        assert invoke(bot, "mission", "init", admission_runtime)["status"] == "INITIALIZED"
+        shutil.copy2(state / "history.jsonl", admission_runtime / "history.jsonl")
+        shutil.copytree(state / "history.jsonl.m07", admission_runtime / "history.jsonl.m07")
+        assert invoke(bot, "mission", "bind", admission_runtime, intent, policy)["status"] == "BOUND"
+        admission_lease = dict(recovery_lease)
+        admission_lease.update({"lease_id": "br16-admission-lease", "lease_version": "v1", "approval_ref": "br16-admission-approval", "reviewed_at": "2026-09-08T00:00:06Z", "valid_from": "2026-09-08T00:00:06Z", "promotion_review_ref": "fixture:br16-admission-review"})
+        admission_lease.pop("lease_hash")
+        admission_lease["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(admission_lease, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        admission_lease_path = work / "admission-lease.json"; admission_lease_path.write_text(json.dumps(admission_lease), encoding="utf-8")
+        admission_approval_path = work / "admission-approval.json"; write_production_approval(admission_approval_path, admission_lease)
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_LEASE", admission_lease_path, expected=1)["status"] == "STOPPED"
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_LEASE", admission_lease_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_LEASE_APPROVAL", admission_approval_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", admission_runtime, admission_lease["lease_id"], "2026-09-08T00:00:07Z")["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", admission_runtime, admission_lease["lease_id"], "2026-09-08T00:00:07Z")["status"] == "APPENDED"
+        admission_input = work / "recovery-admission.json"
+        admission_input.write_text(json.dumps({"recovery_admission_id": "br16-recovery-admission", "prior_runtime_dir": str(state.resolve()), "prior_lease_id": handoff["artifact"]["prior_lease_id"], "prior_lease_version": handoff["artifact"]["prior_lease_version"], "prior_lease_hash": handoff["artifact"]["prior_lease_hash"], "prior_approval_id": handoff["artifact"]["prior_approval_id"], "resolution_id": handoff["artifact"]["resolution_id"], "new_runtime_id": "br16-recovery-runtime-v2", "new_runtime_dir": str(admission_runtime.resolve()), "new_lease_id": admission_lease["lease_id"], "new_lease_version": admission_lease["lease_version"], "new_lease_hash": admission_lease["lease_hash"], "new_approval_id": admission_lease["approval_ref"], "reviewed_by": "human", "reviewer_id": "pilot-human", "reviewed_at": "2026-09-08T00:00:07Z", "execution_permitted": False}), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_RECOVERY_ADMISSION", admission_input, expected=1)["status"] == "REJECTED"
+        admission = invoke(bot, "mission", "m11-recovery-admit", admission_runtime, state, recovery_handoff, admission_input)
+        assert admission["status"] == "APPENDED" and admission["execution_permitted"] is False and admission["artifact"]["artifact_kind"] == "PRODUCTION_RECOVERY_ADMISSION"
+        assert invoke(bot, "mission", "m11-recovery-admit", admission_runtime, state, recovery_handoff, admission_input)["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m11-recovery-admit", state, state, recovery_handoff, admission_input, expected=1)["status"] == "PATH_ERROR"
+        reused_lease = dict(json.loads(admission_input.read_text(encoding="utf-8")))
+        reused_lease.update({"recovery_admission_id": "br16-reused-lease", "new_lease_id": reused_lease["prior_lease_id"], "new_lease_version": reused_lease["prior_lease_version"], "new_lease_hash": reused_lease["prior_lease_hash"], "new_approval_id": reused_lease["prior_approval_id"]})
+        reused_lease_input = work / "reused-recovery-admission.json"; reused_lease_input.write_text(json.dumps(reused_lease), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-recovery-admit", admission_runtime, state, recovery_handoff, reused_lease_input, expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m11-resolve", admission_runtime, "PRODUCTION_RECOVERY_ADMISSION", "br16-recovery-admission")["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-authorize", admission_runtime, admission_lease["lease_id"], "missing-gate", "fixture_stub", "2026-09-08T00:00:08Z", expected=1)["status"] == "REJECTED"
+        admission_backup, admission_restored = work / "admission-backup", work / "admission-restored"
+        assert invoke(bot, "backup", "create", admission_runtime, admission_backup)["status"] == "BACKED_UP"
+        assert invoke(bot, "backup", "restore", admission_backup, admission_restored)["status"] == "RESTORED"
+        assert invoke(bot, "mission", "m11-resolve", admission_restored, "PRODUCTION_RECOVERY_ADMISSION", "br16-recovery-admission")["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "status", state)["artifact"]["stop"] is True
+
         # Snapshot the actual shared runtime, not an M08-M11-only directory.
         # Restore must resolve the persisted M07 proposal, human outcome, M10
         # record and M11 recovery graph before the old STOP can be trusted.

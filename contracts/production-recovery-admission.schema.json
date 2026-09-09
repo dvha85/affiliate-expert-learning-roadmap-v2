@@ -1,0 +1,27 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-recovery-admission.schema.json",
+  "title":"ProductionRecoveryAdmission",
+  "type":"object",
+  "required":["recovery_admission_id","prior_runtime_dir","prior_lease_id","prior_lease_version","prior_lease_hash","prior_approval_id","resolution_id","new_runtime_id","new_runtime_dir","new_lease_id","new_lease_version","new_lease_hash","new_approval_id","reviewed_by","reviewer_id","reviewed_at","execution_permitted"],
+  "properties":{
+    "recovery_admission_id":{"type":"string","minLength":1},
+    "prior_runtime_dir":{"type":"string","minLength":1},
+    "prior_lease_id":{"type":"string","minLength":1},
+    "prior_lease_version":{"type":"string","minLength":1},
+    "prior_lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "prior_approval_id":{"type":"string","minLength":1},
+    "resolution_id":{"type":"string","minLength":1},
+    "new_runtime_id":{"type":"string","minLength":1},
+    "new_runtime_dir":{"type":"string","minLength":1},
+    "new_lease_id":{"type":"string","minLength":1},
+    "new_lease_version":{"type":"string","minLength":1},
+    "new_lease_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "new_approval_id":{"type":"string","minLength":1},
+    "reviewed_by":{"const":"human"},
+    "reviewer_id":{"type":"string","minLength":1},
+    "reviewed_at":{"type":"string","format":"date-time"},
+    "execution_permitted":{"const":false}
+  },
+  "additionalProperties":false
+}
