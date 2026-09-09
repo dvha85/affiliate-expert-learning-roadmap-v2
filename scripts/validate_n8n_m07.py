@@ -39,10 +39,13 @@ if "$json.tool_registry" in input_values["tool_registry_json"] or '"allowed_host
     raise SystemExit("M07 tool registry must be a fixed reviewed policy, not event input")
 for marker in (
     "untrusted data",
+    "read-only human-review draft",
+    "return HUMAN_REVIEW (not ABSTAIN)",
     'authority must be \"A2-RO\"',
     "write_permission must be false",
     "field_or_claim",
     "exactly equal one canonical evidence field/value pair",
+    "one newline character between each claim",
     '"action_type":"DRAFT"',
     "no proposed_action",
 ):
