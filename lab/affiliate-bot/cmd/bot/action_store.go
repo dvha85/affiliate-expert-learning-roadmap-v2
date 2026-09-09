@@ -63,7 +63,9 @@ func loadActions(path string, records []HistoryRecord) ([]m03.HumanActionRecord,
 }
 
 // Compare lexical paths and existing inode aliases, including symlinks/hardlinks.
-func distinctActionPaths(paths ...string) error {
+// It is shared by append stores and immutable command artifacts so no command
+// can use a source path as its output destination.
+func distinctPaths(paths ...string) error {
 	for i, p := range paths {
 		for _, q := range paths[:i] {
 			a, err := filepath.Abs(p)
@@ -75,17 +77,19 @@ func distinctActionPaths(paths ...string) error {
 				return err
 			}
 			if a == b {
-				return fmt.Errorf("history, action store and input must be distinct")
+				return fmt.Errorf("input and output paths must be distinct")
 			}
 			pi, pe := os.Stat(p)
 			qi, qe := os.Stat(q)
 			if pe == nil && qe == nil && os.SameFile(pi, qi) {
-				return fmt.Errorf("aliased input/store paths")
+				return fmt.Errorf("aliased input/output paths")
 			}
 		}
 	}
 	return nil
 }
+
+func distinctActionPaths(paths ...string) error { return distinctPaths(paths...) }
 
 // Record/list orchestration remains next to M02 application ownership. The
 // JSONL adapter only writes validated bytes; no executor or network is involved.
@@ -113,6 +117,13 @@ func runActionStore(args []string, stdout, stderr io.Writer) int {
 	}
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
+	}
+	if args[0] == "record" {
+		release, err := acquireHistoryRuntimeGate(args[1])
+		if err != nil {
+			return emit("BUSY", nil, err, 1)
+		}
+		defer release()
 	}
 	records, err := LoadHistory(args[1])
 	if err != nil {

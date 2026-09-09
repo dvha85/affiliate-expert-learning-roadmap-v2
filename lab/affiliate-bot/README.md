@@ -125,10 +125,59 @@ go run ./cmd/bot m07 validate HISTORY.jsonl DECISION_ID MODEL-OUTPUT.json REGIST
 ```
 
 Các entrypoint learner proposal-only cho M08–M11 là `mission m08-intent`,
-`m08-policy`, `m09-approval`, `m10-canary`, `m10-reserve`, `m11-stop` và
+`m08-policy`, `m09-approval`, `m10-canary`, `m10-cost-register`, `m10-gate`,
+`m10-authorize`, `m10-reserve-authorization`, `m10-cancel`, `m10-reserve`,
+`m10-record-failed`, `m10-outcome`, `m11-register`, `m11-resolve`, `m11-activate`, `m11-stop` và
 `status`. Chúng ghi `mission-state.json`, kiểm hash/link trước khi ACK, giữ
 budget usage sau restart, từ chối risk cần review nếu chưa có approval hợp lệ,
-và STOP không bị `init` ghi đè; đây vẫn không phải live executor.
+và STOP không bị `init` ghi đè. `m10-cancel` chỉ phát hành execution record
+`CANCELLED`/`NOT_PERFORMED` được bind với authorization; nó không gọi executor,
+không reserve thêm budget và không tạo side effect. Đây vẫn không phải live
+executor.
+
+Đường governed mới là `m10-reserve-authorization`: chỉ nhận authorization đã
+được registry cấp, resolve lại trusted cost bound và charge đúng số đã được
+ủy quyền. Reservation lưu `authorization_id`; `m10-cancel` chỉ tạo record sau
+khi reservation đó tồn tại, rồi ghi ngược `execution_id` vào state. Điều này
+ngăn một authorization bị reserve/record nhiều lần. `m10-reserve` cũ vẫn có
+để tương thích các lab trước, nhưng không có authorization/execution binding
+và không dùng cho chuỗi governed mới.
+
+`m10-record-failed` là fixture stub local-only: nó chỉ có thể ghi
+`FAILED / NOT_PERFORMED` sau reservation governed, không gọi executor hay
+network. `m10-outcome` chỉ nhận outcome fixture `CANCELLED`, metrics rỗng, và
+`EffectRef` `MACHINE_EXECUTION` resolve đúng execution record no-side-effect;
+outcome được lưu trong `m10-outcomes.jsonl`. Nó không chứng minh outcome kinh
+doanh hay mở đường live executor.
+
+Các artifact M10 của learner được sao chép canonical vào registry bất biến
+`m10-artifacts.jsonl` trong state directory. Grant, trusted cost bound, gate,
+authorization và execution record chỉ được ACK sau khi registry nhận chúng;
+authorization/execution resolve lại input từ registry và từ chối artifact hợp
+schema nhưng không phải bản đã đăng ký. `m10-outcomes.jsonl` giữ fixture
+outcome riêng; khi restore, Bot resolve lại execution record, reservation và
+EffectRef trước khi chấp nhận graph. Registry/outcome fixture vẫn không phải
+executor hay bằng chứng outcome kinh doanh.
+
+Có thể chỉ đọc một artifact đã được registry sở hữu theo loại/ID (và tùy chọn
+content hash); lệnh không tạo quyền thực thi:
+
+```bash
+go run ./cmd/bot mission m10-resolve /tmp/affiliate-runtime EXECUTION_RECORD canary-exec-IDENTIFIER
+```
+
+Mỗi lần reserve mới phải có `RESERVATION_ID` ổn định. Retry cùng ID, cost và
+binding trả `EXACT_DUPLICATE` thay vì charge lần hai; tái dùng ID với cost hay
+binding khác bị từ chối. Dạng cũ không có ID chỉ còn tương thích tạm thời và
+không phù hợp cho attempt mới.
+
+```bash
+go run ./cmd/bot mission m10-reserve /tmp/affiliate-runtime 100 attempt-001
+go run ./cmd/bot mission m10-reserve-authorization /tmp/affiliate-runtime authorization.json governed-attempt-001
+go run ./cmd/bot mission m10-record-failed /tmp/affiliate-runtime authorization.json failed.json 2026-09-08T00:01:00Z fixture-dispatch-failed-before-executor
+go run ./cmd/bot mission m10-outcome /tmp/affiliate-runtime cancelled-outcome.json
+go run ./cmd/bot mission m10-cancel /tmp/affiliate-runtime authorization.json cancelled.json 2026-09-08T00:01:00Z learner-cancelled-before-executor
+```
 
 ```bash
 go run ./cmd/bot mission init /tmp/affiliate-runtime
@@ -137,7 +186,65 @@ go run ./cmd/bot backup create /tmp/affiliate-runtime /tmp/affiliate-backup
 go run ./cmd/bot backup restore /tmp/affiliate-backup /tmp/affiliate-restored
 ```
 
+Backup profile hiện là `affiliate-bot-backup/v3`. Manifest ghi mỗi path cùng
+`kind`, kích thước byte và SHA-256, cùng profile loại artifact bắt buộc/toàn bộ
+inventory. Backup chỉ nhận layout runtime đã biết; restore từ chối file thiếu,
+thừa hoặc sai loại, kể cả khi checksum từng file hợp lệ. Với runtime đã khởi tạo
+canary, manifest bắt buộc có `m10-artifacts.jsonl`; nếu có execution `FAILED`
+thì bắt buộc có thêm `m10-outcomes.jsonl`. Restore còn replay history, mission
+state và kiểm link reservation → execution, FAILED execution → fixture
+outcome/`MACHINE_EXECUTION` EffectRef. Một backup checksum hợp lệ nhưng orphan
+outcome, M11 evaluation/cycle link sai, hoặc cycle đóng trước evaluation vẫn bị
+từ chối với `GRAPH_FAILED`.
+
+Snapshot `v2` không được restore như `v3`: tạo lại backup mới từ runtime còn
+nguyên vẹn trước khi nâng cấp, để có inventory typed thay vì suy diễn từ map
+checksum cũ.
+
+`m11-register STATE_DIR KIND ARTIFACT.json` và `m11-resolve STATE_DIR KIND ID`
+là artifact spine cho M11: chúng dùng `core/m11` để strict-decode và lưu
+canonical record vào `m11-artifacts.jsonl`; registry chỉ nhận link lifecycle
+đã resolve (lease, approval, health, cost, ledger, gate, authorization,
+execution, activation, reconciliation, offline-fixture evaluation hoặc cycle).
+Backup v3 gồm registry này
+nếu runtime đã có nó và kiểm lại graph trước `RESTORED`. Đây chưa phải lệnh
+lease activation, production gate, executor, reconciliation/recovery hay M11
+lifecycle đầy đủ.
+
+`m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT` chỉ đọc một
+`CANCELLED`/`NOT_PERFORMED` fixture outcome đã được M11 ghi nhận và tạo
+`ProductionOutcomeEvaluation` với `source_profile=OFFLINE_FIXTURE` và
+`result=FIXTURE_NO_SIDE_EFFECT`. `m11-close-cycle STATE_DIR CYCLE_ID
+EVALUATION_ID CLOSED_AT` chỉ đóng audit cycle khi evaluation, outcome,
+execution, lease, gate, authorization, intent và canonical history cùng resolve
+exact. Hai lệnh không gọi executor, không clear STOP/không cấp quyền mới và
+không chứng minh business outcome. Backup v3 kiểm lại các link này, kể cả khi
+manifest checksum đã bị cập nhật theo một fixture bị sửa.
+
+`m11-activate STATE_DIR LEASE_ID ACTIVATED_AT` chỉ tạo `ProductionActivation`
+khi lease và lease approval khớp exact đã có trong registry, thời điểm còn nằm
+trong lease và runtime chưa STOP. Retry cùng activation trả `EXACT_DUPLICATE`.
+`m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT` chỉ tạo durable ledger
+rỗng sau activation đã resolve, trong thời hạn lease và khi chưa STOP; retry
+exact cũng không reset usage. Các lệnh này chưa thay thế health gate hay cấp
+phép/executor production.
+
+`m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT`
+resolve toàn bộ artifact trên từ registry, kiểm lease/activation/policy/scope,
+budget, freshness và health, rồi persist `ProductionGateDecision`. Nó trả
+`ALLOW_PRODUCTION`, `DEGRADE`, `STOP`, `REQUIRE_APPROVAL` hoặc `DENY`, nhưng
+luôn giữ `execution_authorized=false`. Bất kỳ ID/link không resolve được đều bị
+reject.
+
+`m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT` chỉ tạo
+`GOVERNED_PRODUCTION` authorization từ gate `ALLOW_PRODUCTION` đã persist,
+executor được lease allow và health/cost link còn exact. Hạn dùng là mốc sớm
+nhất của lease, intent, human approval và cost bound. Authorization không gọi
+executor; envelope command vẫn `execution_permitted=false`.
+
 [BR-10b: nhập và đọc OutcomeRecord](../../docs/architecture/BR-10B-OUTCOME-STORE.md): `bot outcome import HISTORY ACTIONS OUTCOMES INPUT`, `bot outcome list HISTORY ACTIONS OUTCOMES`; nối action đã lưu, store riêng, không execution.
+
+`bot outcome accesstrade-import HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json` là adapter read-only cho export CSV đã khử dữ liệu riêng tư của Publisher. Nó chỉ nhận mapping tường minh từ mã đơn đã ẩn danh sang ActionRecord, không suy attribution từ UTM. Mỗi snapshot được ghi thêm receipt hash-only vào cạnh outcome store; đọc/kiểm receipt bằng `bot outcome accesstrade-receipts HISTORY ACTIONS OUTCOMES`. Backup runtime chuẩn buộc phải mang theo receipt này; xem [fixture và giới hạn](../../examples/accesstrade-report/README.md).
 
 [BR-10a: ghi nhận ActionRecord thủ công](../../docs/architecture/BR-10A-ACTION-STORE.md): `bot action record HISTORY.jsonl ACTIONS.jsonl ACTION.json`, đọc lại bằng `bot action list HISTORY.jsonl ACTIONS.jsonl`. Store action riêng, không đăng bài/thực thi; decision phải tồn tại và replay MATCH. Lệnh validate dưới đây vẫn chỉ đọc.
 

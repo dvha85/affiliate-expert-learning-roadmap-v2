@@ -1,10 +1,10 @@
 # BR-15b — contract adversarial M07
 
 Bộ kiểm tra offline cố định các nhóm request nguy hiểm: prompt injection, ID
-bịa, thiếu context, host/redirect ngoài allowlist và write request. Nó kiểm tra
-instruction coi tool/webpage text là dữ liệu không tin cậy, registry chỉ
-read-only `GET` trên host được phép, và grounding boundary luôn trả
-`HUMAN_REVIEW` với `write_permission=false`.
+bịa, thiếu context, host/redirect ngoài allowlist và write request. Nó chạy
+learner Bot thật để kiểm registry chỉ read-only `GET` trên host được phép,
+tool-result phải được đăng ký trước khi cite, và output không hợp lệ trả
+`ABSTAIN`. Blueprint còn kiểm policy registry/adapter URL không đến từ event.
 
 Đây không phải model evaluation hay n8n execution evidence. Khi có instance,
 maintainer phải chạy cùng các case qua integration path, lưu execution IDs và

@@ -49,6 +49,20 @@ func TestFixtureNormalization(t *testing.T) {
 	}
 }
 
+func TestCanonicalContentHashIgnoresJSONKeyOrderOnly(t *testing.T) {
+	first := `{"product_id":"offer-1","price":100,"title":"A&B"}`
+	reordered := `{"title":"A&B","price":100,"product_id":"offer-1"}`
+	if m06.CanonicalContentHash(first) != m06.CanonicalContentHash(reordered) {
+		t.Fatal("JSON key order changed the M06 content fingerprint")
+	}
+	if m06.ContentHash(first) == m06.ContentHash(reordered) {
+		t.Fatal("test requires distinct transport bytes")
+	}
+	if m06.CanonicalContentHash("plain text") != m06.ContentHash("plain text") {
+		t.Fatal("non-JSON body was normalized without a parser profile")
+	}
+}
+
 func TestRawFixtureBoundary(t *testing.T) {
 	raw := `{"subject_id":"offer-1","status_code":200,"request":{"method":"GET","url":"https://example.com/offer","allow_hosts":["example.com"],"observed_at":"2026-09-03T01:00:00Z","correlation_id":"fixture-1","body":"abc"}}`
 	if _, status := m06.DecodeM06Input([]byte(raw)); status != "VALID" {
@@ -58,5 +72,54 @@ func TestRawFixtureBoundary(t *testing.T) {
 		if _, status := m06.DecodeM06Input([]byte(bad)); status != "INVALID_SCHEMA" {
 			t.Fatal(status, bad)
 		}
+	}
+}
+
+func TestOfferFixtureBuildUsesOneCanonicalPacket(t *testing.T) {
+	profile := m06.OfferFixtureProfile{
+		FixtureURL: "https://example.com/br13/offer",
+		SourceURL:  "https://example.com/br13/offer",
+		AllowHost:  "example.com",
+		Access:     "local_fixture",
+		Role:       "synthetic_fixture",
+		Limitation: "offline only",
+	}
+	raw := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"Fixture A\",\"currency\":\"USD\",\"price\":100,\"commission_rate\":0.08}"}`)
+	built, err := m06.BuildOfferFixture(raw, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(built.RecordID, "watch-") || built.ObservedAt != "2026-09-03T00:00:00Z" {
+		t.Fatal(built)
+	}
+	var packet struct {
+		Products []struct {
+			Fields []struct {
+				Field string `json:"field_or_claim"`
+				Value any    `json:"value"`
+			} `json:"fields"`
+		} `json:"products"`
+	}
+	if err := json.Unmarshal(built.Packet, &packet); err != nil || len(packet.Products) != 1 || len(packet.Products[0].Fields) != 2 || packet.Products[0].Fields[0].Field != "price" {
+		t.Fatal(err, string(built.Packet))
+	}
+	if _, err := m06.BuildOfferFixture([]byte(strings.Replace(string(raw), `"status_code":200`, `"status_code":201`, 1)), profile); err == nil {
+		t.Fatal("non-200 fixture accepted")
+	}
+	wrongProfile := profile
+	wrongProfile.SourceURL = "https://other.invalid/offer"
+	wrongProfile.AllowHost = "example.com"
+	if _, err := m06.BuildOfferFixture(raw, wrongProfile); err == nil {
+		t.Fatal("source/profile mismatch accepted")
+	}
+	reordered := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"commission_rate\":0.08,\"price\":100,\"currency\":\"USD\",\"product_name\":\"A&B Bé\",\"product_id\":\"a\"}"}`)
+	unicode := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-1","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"A&B Bé\",\"currency\":\"USD\",\"price\":100,\"commission_rate\":0.08}"}`)
+	first, err := m06.BuildOfferFixture(unicode, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m06.BuildOfferFixture(reordered, profile)
+	if err != nil || first.RecordID != second.RecordID || string(first.Packet) != string(second.Packet) {
+		t.Fatalf("equivalent Unicode fixture was not canonical: first=%+v second=%+v err=%v", first, second, err)
 	}
 }

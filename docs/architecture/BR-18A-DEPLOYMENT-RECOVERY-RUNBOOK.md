@@ -50,20 +50,37 @@ redirect policy theo blueprint, rồi lưu execution ID cùng ACK của adapter.
 ```
 
 Expected: `BACKED_UP`, `RESTORED`, `replay=MATCH`, rồi `stop: true`. Manifest
-SHA-256 phải được kiểm trước khi chép file; target restore phải trống. Chạy
+SHA-256 phải được kiểm trước khi chép file; target restore phải **chưa tồn tại**
+(không dùng lại cả thư mục rỗng). Restore chép vào staging cùng parent, chạy các
+loader/graph gate rồi mới publish atomically. Chạy
 `python3 scripts/smoke_br18b_backup_restore.py` để kiểm cả tamper, process mới,
 budget/canary link và STOP durable trong môi trường tạm.
+
+Target của `backup create` cũng phải trống và không được là runtime hoặc thư
+mục con của runtime; tạo backup mới vào một thư mục khác thay vì ghi đè snapshot
+cũ.
 
 ## Gates bắt buộc
 
 - health check fail hoặc lease hết hạn → không activate;
 - STOP durable được ghi trước, đọc lại sau restart và chặn mọi attempt;
-- backup append-only history + ledger, kiểm tra checksum và restore vào thư mục
-  cô lập;
+- `backup create` và mọi writer managed dùng cùng runtime gate. Nhận `BUSY`
+  nghĩa là giữ nguyên state, chờ writer/snapshot kết thúc hoặc thực hiện recovery
+  rõ ràng cho gate stale; không xóa lock tự động;
+- backup history + ledger và, nếu M07 adapter đã persist, toàn bộ sidecar
+  `history.jsonl.m07/`; manifest v3 chỉ nhận relative path chuẩn hóa trong
+  layout artifact đã biết, và ghi kind, kích thước cùng SHA-256. Restore đòi
+  inventory thực tế trùng manifest trước khi chép sang thư mục cô lập;
+- backup `v2` không tương thích với verifier `v3`; khi nâng cấp, tạo một
+  snapshot mới từ runtime gốc trước, không sửa tay manifest cũ;
+- gate M11 phải có `ledger_artifact_id` và `ledger_content_hash`. Gate đời cũ
+  thiếu hai binding này không được restore để cấp authorization; tạo gate mới
+  từ ledger hiện hành qua luồng review, không sửa lại artifact bất biến;
 - restore xong phải replay khớp, không reset reservation/STOP;
 - recovery cần human review, không tự mở lại executor.
 - restore không được tự tạo lại ledger, reservation, approval hoặc lease đã
-  hết hạn; các artifact phải replay/resolve được từ store.
+  hết hạn; artifact đã hết hạn vẫn phải replay/resolve được từ store để audit,
+  nhưng gate/authorization/reservation mới phải bị chặn theo thời gian hiện tại.
 
 ## Evidence record
 

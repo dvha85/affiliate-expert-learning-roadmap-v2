@@ -1,4 +1,4 @@
-"""Static safety contract for the M06 n8n blueprint; not engine execution evidence."""
+"""Static wiring check: M06 delegates construction and persistence to the shared adapter."""
 import json
 from pathlib import Path
 
@@ -8,42 +8,48 @@ blueprint = json.loads(path.read_text(encoding="utf-8"))
 nodes = {node["name"]: node for node in blueprint.get("nodes", [])}
 required = {
     "Schedule Trigger",
-    "Allowed Source + Canonical Store",
-    "Read-only HTTP GET",
-    "Parse Provenance + Change Detect",
-    "Build Canonical History Record",
-    "Canonical History Adapter",
+    "M06 Adapter Input",
+    "Build and Append Canonical M06 Adapter",
     "Require Canonical Store ACK",
-    "Report NEW UNCHANGED CHANGED",
+    "Report Canonical M06 Result",
 }
 missing = required - nodes.keys()
 if missing:
-    raise SystemExit(f"missing M06 nodes: {sorted(missing)}")
-http = nodes["Read-only HTTP GET"]
-if http["parameters"].get("method") != "GET":
-    raise SystemExit("M06 HTTP node must remain GET-only")
-source_url = nodes["Allowed Source + Canonical Store"]["parameters"]["assignments"]["assignments"][1]["value"]
-if not source_url.startswith("https://"):
-    raise SystemExit("M06 source placeholder must be HTTPS")
-normalize = nodes["Parse Provenance + Change Detect"]["parameters"]["jsCode"]
-for marker in [
-    "SOURCE_TOO_LARGE_FOR_SAFE_CHANGE_DETECTION",
-    "content_hash",
-    "change_state=previous===undefined?'NEW'",
-    "'UNCHANGED'",
-    "'CHANGED'",
-    "source_authority_or_role",
-    "claim_kind",
+    raise SystemExit(f"missing M06 adapter nodes: {sorted(missing)}")
+for retired in {"Allowed Source + Canonical Store", "Read-only HTTP GET", "Parse Provenance + Change Detect", "Build Canonical History Record", "Canonical History Adapter"}:
+    if retired in nodes:
+        raise SystemExit(f"retired local M06 builder node remains: {retired}")
+
+assignments = {
+    item["name"]: item["value"]
+    for item in nodes["M06 Adapter Input"]["parameters"]["assignments"]["assignments"]
+}
+for name in {"adapter_url", "fixture_json"}:
+    if name not in assignments:
+        raise SystemExit(f"M06 adapter input missing {name}")
+if "br13-offer-fixture/v1" not in assignments["fixture_json"]:
+    raise SystemExit("M06 adapter input must declare the synthetic fixture profile")
+
+handoff = nodes["Build and Append Canonical M06 Adapter"]["parameters"]
+if handoff.get("method") != "POST" or "/v1/m06/fixture-import" not in handoff.get("url", ""):
+    raise SystemExit("M06 must use the shared fixture-import adapter")
+if "fixture_json" not in handoff.get("jsonBody", "") or "JSON.parse" not in handoff.get("jsonBody", ""):
+    raise SystemExit("M06 adapter must receive the fixture as JSON data")
+
+ack = nodes["Require Canonical Store ACK"]["parameters"]["jsCode"]
+for marker in {"CANONICAL_HISTORY_NOT_ACKNOWLEDGED", "canonical_history_ack!==true", "canonical_history_persisted!==true", "canonical_history_handoff:'ACK'"}:
+    if marker not in ack:
+        raise SystemExit(f"M06 ACK boundary marker missing: {marker}")
+
+connections = blueprint.get("connections", {})
+for source, target in [
+    ("Schedule Trigger", "M06 Adapter Input"),
+    ("M06 Adapter Input", "Build and Append Canonical M06 Adapter"),
+    ("Build and Append Canonical M06 Adapter", "Require Canonical Store ACK"),
+    ("Require Canonical Store ACK", "Report Canonical M06 Result"),
 ]:
-    if marker not in normalize:
-        raise SystemExit(f"M06 normalize safety marker missing: {marker}")
-handoff = nodes["Require Canonical Store ACK"]
-code = handoff["parameters"]["jsCode"]
-for marker in ["CANONICAL_HISTORY_NOT_ACKNOWLEDGED", "canonical_history_handoff:'ACK'", "canonical_history_persisted:true"]:
-    if marker not in code:
-        raise SystemExit(f"M06 handoff boundary marker missing: {marker}")
-record = nodes["Build Canonical History Record"]["parameters"]["jsCode"]
-for marker in ["input_hash", "recorded_result", "decision_id", "evidence_ids", "formula_version"]:
-    if marker not in record:
-        raise SystemExit(f"M06 canonical record marker missing: {marker}")
-print("N8N M06 STATIC CONTRACT PASS: nodes, GET-only, provenance parser, canonical adapter and ACK gate")
+    destinations = {item["node"] for branch in connections.get(source, {}).get("main", []) for item in branch}
+    if target not in destinations:
+        raise SystemExit(f"missing M06 adapter flow {source} -> {target}")
+
+print("N8N M06 STATIC CONTRACT PASS: shared adapter builds, persists and resolves canonical history before ACK")

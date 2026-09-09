@@ -49,6 +49,9 @@ jobs:
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
+      - name: Learner Bot race regression
+        working-directory: lab/affiliate-bot
+        run: go test -race ./...
       - name: Embedded canonical schema tests
         working-directory: contracts
         run: |
@@ -67,6 +70,8 @@ jobs:
         run: python scripts/smoke_br10a.py
       - name: BR-10b outcome continuity smoke
         run: python scripts/smoke_br10b.py
+      - name: BR-10d ACCESSTRADE sanitized CSV adapter
+        run: python scripts/smoke_br10d_accesstrade.py
       - name: BR-10c full learner chain audit
         run: python scripts/smoke_br10c.py
       - name: BR-11a mock advisor smoke
@@ -87,6 +92,10 @@ jobs:
         run: python scripts/validate_n8n_m07_adversarial.py
       - name: BR-15c M07 output contract
         run: python scripts/validate_n8n_m07_output_cases.py
+      - name: BR-16a shared M00-M11 learner chain
+        run: python scripts/smoke_br16a_offline.py
+      - name: BR-18b M11 backup, reconciliation and restore
+        run: python scripts/smoke_br18b_backup_restore.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
       - name: Go vet

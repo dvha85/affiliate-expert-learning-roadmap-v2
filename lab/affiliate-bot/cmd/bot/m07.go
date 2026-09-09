@@ -48,6 +48,22 @@ func m07EvidenceContext(record HistoryRecord) (m07Context, error) {
 	return ctx, nil
 }
 
+func appendRegisteredToolEvidence(ctx m07Context, raw []byte, registry []corem07.ToolSpec) (m07Context, error) {
+	registered, err := corem07.ValidateRegisteredToolResult(raw, registry, ctx.RecordID)
+	if err != nil {
+		return m07Context{}, err
+	}
+	evidence := registered.Evidence()
+	for _, existing := range ctx.Evidence {
+		if existing.EvidenceID == evidence.EvidenceID {
+			return m07Context{}, fmt.Errorf("registered tool evidence id already exists in context")
+		}
+	}
+	ctx.EvidenceIDs = append(ctx.EvidenceIDs, evidence.EvidenceID)
+	ctx.Evidence = append(ctx.Evidence, evidence)
+	return ctx, nil
+}
+
 func loadM07Registry(path string) ([]corem07.ToolSpec, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -79,40 +95,85 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 register-proposal HISTORY RECORD_ID MODEL_OUTPUT REGISTRY OUTPUT [REGISTERED_TOOL_RESULT] | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
 	}
-	if (args[0] == "context" && len(args) != 3) || (args[0] == "validate" && len(args) != 5) || (args[0] != "context" && args[0] != "validate") {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY"), 2)
+	if (args[0] == "context" && len(args) != 3) || (args[0] == "register-tool-result" && len(args) != 6) || (args[0] == "register-proposal" && len(args) != 6 && len(args) != 7) || (args[0] == "validate" && len(args) != 5 && len(args) != 6) || (args[0] != "context" && args[0] != "register-tool-result" && args[0] != "register-proposal" && args[0] != "validate") {
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 register-proposal HISTORY RECORD_ID MODEL_OUTPUT REGISTRY OUTPUT [REGISTERED_TOOL_RESULT] | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
 	}
-	history, err := LoadHistory(args[1])
+	record, err := resolveCanonicalRecord(args[1], args[2])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)
 	}
-	var record *HistoryRecord
-	matching := 0
-	for i := range history {
-		if history[i].RecordID == args[2] {
-			copy := history[i]
-			record = &copy
-			matching++
-		}
-	}
-	if record == nil {
-		return emit("NOT_FOUND", nil, fmt.Errorf("decision %s not found in canonical history", args[2]), 1)
-	}
-	if matching != 1 {
-		return emit("HISTORY_ERROR", nil, fmt.Errorf("decision %s resolves to %d records", args[2], matching), 1)
-	}
-	if replay := Replay(*record); replay.State != replayMatch {
-		return emit("HISTORY_ERROR", nil, fmt.Errorf("decision %s is not replay-stable: %s", args[2], replay.State), 1)
-	}
-	ctx, err := m07EvidenceContext(*record)
+	ctx, err := m07EvidenceContext(record)
 	if err != nil {
 		return emit("CONTEXT_ERROR", nil, err, 1)
 	}
 	switch args[0] {
 	case "context":
 		return emit("VALID", ctx, nil, 0)
+	case "register-tool-result":
+		registry, err := loadM07Registry(args[3])
+		if err != nil {
+			return emit("REGISTRY_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[4])
+		if err != nil {
+			return emit("TOOL_RESULT_ERROR", nil, err, 1)
+		}
+		registered, err := corem07.RegisterToolResult(raw, registry)
+		if err != nil {
+			return emit("TOOL_RESULT_REJECTED", nil, err, 1)
+		}
+		if registered.RecordID != record.RecordID {
+			return emit("TOOL_RESULT_REJECTED", nil, fmt.Errorf("tool result record_id does not match canonical record"), 1)
+		}
+		if err := distinctPaths(args[1], args[3], args[4], args[5]); err != nil {
+			return emit("PATH_CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[5], registered)
+		if err != nil {
+			return emit("PERSISTENCE_ERROR", nil, err, 1)
+		}
+		return emit(status, map[string]any{"registered": registered, "evidence": registered.Evidence()}, nil, 0)
+	case "register-proposal":
+		raw, err := os.ReadFile(args[3])
+		if err != nil {
+			return emit("OUTPUT_ERROR", nil, err, 1)
+		}
+		text := strings.TrimSpace(string(raw))
+		if strings.HasPrefix(text, "```json") && strings.HasSuffix(text, "```") {
+			text = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(text, "```json"), "```"))
+		}
+		registry, err := loadM07Registry(args[4])
+		if err != nil {
+			return emit("REGISTRY_ERROR", nil, err, 1)
+		}
+		if len(args) == 7 {
+			toolRaw, err := os.ReadFile(args[6])
+			if err != nil {
+				return emit("TOOL_RESULT_ERROR", nil, err, 1)
+			}
+			ctx, err = appendRegisteredToolEvidence(ctx, toolRaw, registry)
+			if err != nil {
+				return emit("TOOL_RESULT_REJECTED", nil, err, 1)
+			}
+		}
+		proposal, err := corem07.RegisterAgentProposal([]byte(text), ctx.Evidence, registry, record.RecordID)
+		if err != nil {
+			return emit("PROPOSAL_REJECTED", nil, err, 1)
+		}
+		paths := []string{args[1], args[3], args[4], args[5]}
+		if len(args) == 7 {
+			paths = append(paths, args[6])
+		}
+		if err := distinctPaths(paths...); err != nil {
+			return emit("PATH_CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[5], proposal)
+		if err != nil {
+			return emit("PERSISTENCE_ERROR", nil, err, 1)
+		}
+		return emit(status, proposal, nil, 0)
 	case "validate":
 		raw, err := os.ReadFile(args[3])
 		if err != nil {
@@ -127,6 +188,16 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		registry, err := loadM07Registry(args[4])
 		if err != nil {
 			return emit("REGISTRY_ERROR", nil, err, 1)
+		}
+		if len(args) == 6 {
+			toolRaw, err := os.ReadFile(args[5])
+			if err != nil {
+				return emit("TOOL_RESULT_ERROR", nil, err, 1)
+			}
+			ctx, err = appendRegisteredToolEvidence(ctx, toolRaw, registry)
+			if err != nil {
+				return emit("TOOL_RESULT_REJECTED", nil, err, 1)
+			}
 		}
 		output, err := corem07.ValidateAgentOutput([]byte(text), ctx.Evidence, registry)
 		if err != nil {

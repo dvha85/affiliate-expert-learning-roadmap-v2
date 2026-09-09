@@ -21,15 +21,16 @@ result: PASS | FAIL | UNVERIFIED
 
 1. Dùng instance sạch, import blueprint và ghi lại engine/node versions cùng
    import result; không activate schedule mặc định.
-2. Thay placeholder bằng fixture/public source được phép, giới hạn GET và
-   credential read-only. Chạy hai lần cùng nội dung (`NEW`, rồi `UNCHANGED`),
-   đổi nội dung (`CHANGED`), rồi đổi thứ tự key JSON (vẫn `UNCHANGED`).
-3. Gửi output qua adapter BR-13; kiểm tra `observation_id`, correlation,
-   `canonical_history_handoff=ACK`, `canonical_history_persisted=true` và record ID trong canonical history.
-4. Chạy response quá 200000 ký tự và sink failure. Kỳ vọng fail closed, không
-   báo `persisted=true`; retry sau đó không tạo record mơ hồ.
-5. Restart workflow/mất watcher cache: lần sau có thể `NEW`, nhưng history
-   canonical phải còn nguyên và replay được.
+2. Giữ fixture synthetic mặc định và không thêm credential hay URL nguồn thật.
+   Chạy hai lần cùng fixture: lần đầu `APPENDED`, lần hai `EXACT_DUPLICATE`.
+3. Thử fixture sai URL/status/body. Adapter phải reject và workflow không được
+   báo persistence. Với hai run thành công, kiểm tra `record_id`, correlation,
+   `canonical_history_handoff=ACK`, `canonical_history_persisted=true` và replay
+   của record trong canonical history.
+4. Dừng adapter để thử sink failure. Kỳ vọng fail closed, không báo
+   `persisted=true`; sau khi adapter chạy lại, retry không tạo record mơ hồ.
+5. Restart workflow: history canonical phải còn nguyên và replay được. Profile
+   này không có watcher cache hoặc trạng thái `NEW/UNCHANGED/CHANGED` n8n.
 
 Kết quả chỉ được ghi PASS khi có execution IDs và history refs. Nếu chưa có
 instance hoặc nguồn được phép, ghi `UNVERIFIED` và giữ workflow inactive.

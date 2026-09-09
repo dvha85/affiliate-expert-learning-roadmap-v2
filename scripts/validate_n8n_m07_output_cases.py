@@ -11,6 +11,12 @@ BOT_DIR = ROOT / "lab/affiliate-bot"
 REGISTRY = ROOT / "lab/mission-runtime/testdata/m07-registry.json"
 
 
+def grounded_claim(field, value, evidence_id):
+    value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
+    rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
+    return rendered, {"text": rendered, "field_or_claim": field, "value": value, "evidence_ids": [evidence_id]}
+
+
 def main():
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
     with tempfile.TemporaryDirectory(prefix="m07-output-") as directory:
@@ -21,12 +27,13 @@ def main():
         context = json.loads(subprocess.run([str(bot), "m07", "context", history, "m07-d"], check=True, capture_output=True, text=True, env=env).stdout)["artifact"]
         evidence_id = context["evidence_ids"][0]
         evidence = next(item for item in context["evidence"] if item["evidence_id"] == evidence_id)
+        answer, claim = grounded_claim(evidence["field_or_claim"], evidence.get("value"), evidence_id)
         cases = {
-            "normal": ({"state": "HUMAN_REVIEW", "answer": "limited", "claims": [{"text": "supported", "field_or_claim": evidence["field_or_claim"], "value": evidence.get("value"), "evidence_ids": [evidence_id]}], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A2-RO", "write_permission": False}, 0, "VALID"),
+            "normal": ({"state": "HUMAN_REVIEW", "answer": answer, "claims": [claim], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A2-RO", "write_permission": False}, 0, "VALID"),
             "forged-id": ({"state": "HUMAN_REVIEW", "answer": "forged", "claims": [{"text": "forged", "evidence_ids": ["e999"]}], "evidence_ids": ["e999"], "tool_calls": [], "authority": "A2-RO", "write_permission": False}, 1, "ABSTAIN"),
             "missing-claims": ({"state": "HUMAN_REVIEW", "answer": "unsupported", "claims": [], "evidence_ids": [], "tool_calls": [], "authority": "A2-RO", "write_permission": False}, 1, "ABSTAIN"),
-            "write-request": ({"state": "HUMAN_REVIEW", "answer": "write", "claims": [{"text": "supported", "field_or_claim": evidence["field_or_claim"], "value": evidence.get("value"), "evidence_ids": [evidence_id]}], "evidence_ids": [evidence_id], "tool_calls": [{"tool_name": "public_http", "method": "POST", "target": "https://example.com/a"}], "authority": "A2-RO", "write_permission": False}, 1, "ABSTAIN"),
-            "authority-escalation": ({"state": "PROPOSE", "answer": "escalated", "claims": [{"text": "supported", "field_or_claim": evidence["field_or_claim"], "value": evidence.get("value"), "evidence_ids": [evidence_id]}], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A3", "write_permission": False}, 1, "ABSTAIN"),
+            "write-request": ({"state": "HUMAN_REVIEW", "answer": answer, "claims": [claim], "evidence_ids": [evidence_id], "tool_calls": [{"tool_name": "public_http", "method": "POST", "target": "https://example.com/a"}], "authority": "A2-RO", "write_permission": False}, 1, "ABSTAIN"),
+            "authority-escalation": ({"state": "PROPOSE", "answer": answer, "claims": [claim], "evidence_ids": [evidence_id], "tool_calls": [], "authority": "A3", "write_permission": False}, 1, "ABSTAIN"),
         }
         model = work / "model.json"
         for name, (value, expected_code, expected_status) in cases.items():

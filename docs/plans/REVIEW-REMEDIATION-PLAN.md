@@ -1,5 +1,11 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
+> Cập nhật 09/09/2026: xem [kế hoạch sửa trước merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md)
+> cho bảy phát hiện PMR-01…07, thứ tự triển khai, regression và merge gate mới.
+> Các mục triển khai bên dưới là lịch sử; không dùng kết quả PASS cũ để đóng
+> các phát hiện này. Các sửa PMR đang ở worktree và chờ review/CI; chưa được
+> commit, push hay đề xuất merge.
+
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
 - Baseline: `ece6a32619e5b9a05d0599b87f50023f38931cb9`.
@@ -70,19 +76,155 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 
 | Gói | Phạm vi | Phụ thuộc trước khi merge | Quy mô | Trạng thái |
 |---|---|---|---|---|
-| RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | PROPOSED |
-| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | TODO |
-| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | TODO |
-| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | TODO |
-| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | TODO |
-| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | TODO |
-| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | TODO |
+| RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
+| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
+| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
+| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
+| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — `core/m06`, CLI/HTTP/n8n fixture adapter và resolver M07/M08 đã dùng chung; regression key-order/field ID/DRIFT có trong learner. Generic source và n8n operated run vẫn mở |
+| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract, adapter-owned trace/proposal store và blueprint ACK chain đã có; n8n/model operated evidence, generic deployment policy còn mở |
+| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v3 typed inventory/profile, M07 replay và runtime gate cross-process; semantic coverage và fault/host proof còn mở |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
+
+### Cập nhật triển khai — 2026-09-08
+
+Các thay đổi dưới đây nằm trên branch `codex/rp-01-path-safety` (head
+`df16783` khi ghi mục này), chưa có PR/merge nên **không thay đổi trạng thái
+nghiệm thu trên `main`**.
+
+- **RP-01, phần M08:** commit `b48cea7` chặn cùng path, symlink/hardlink và
+  overwrite artifact khác; retry byte-identical trả `EXACT_DUPLICATE`. Test
+  trực tiếp learner command kiểm history/request/policy không bị mutate. Chưa
+  audit hết các writer khác (backup/restore) nên không đóng RP-01.
+- **RP-02, phần M08:** commit `573d4ed` thêm `core/m08`; learner và harness
+  dùng chung hash/policy/decoder cho ActionIntent/PolicyDecision. Có regression
+  số `9007199254740993`, `parameters:null`, duplicate key và agent proposal
+  chưa resolve. Proposal resolver/store thực vẫn thuộc RP-04/RP-05; chưa có
+  full conformance matrix nên không đóng RP-02.
+- **RP-03 foundation:** commit `1eb452c` thêm state atomic, lock fail-closed và
+  expiry/binding checks; `b68144c` thêm reservation ID/ledger retry;
+  `12d54cc` thêm race smoke; `149128e` thêm `core/m10` TrustedCostBound;
+  `df16783` thêm registry/resolution learner. Smoke `scripts/smoke_br16a_offline.py`
+  chạy register → reserve và các reject unregistered/tampered/expired, restart,
+  STOP và race cap. Grant/approval/ledger hiện chưa là graph canonical M09/M10,
+  chưa có execution stub/outcome linkage hay fault-injection đầy đủ; RP-03 vẫn
+  mở.
+- **RP-03 canonical grant/gate foundation:** `core/m10` nay decode/hash
+  `CanaryGrant` theo contract, recheck approval/policy/risk/host/correlation/
+  expiry khi learner nhận grant, và recheck hash khi reload mission state.
+  `m10-gate` resolve cost-bound đã register rồi emit immutable,
+  non-authorizing `CanaryGateDecision` từ snapshot budget với
+  `EVALUATED_AT` explicit để retry byte-identical. Smoke shared chain cover
+  grant sealed, gate ALLOW/retry và cost-bound tamper reject. Grant còn embedded
+  trong mutable state, gate chưa được registry/authorization/execution resolve
+  và không có side effect; RP-03 vẫn mở.
+- **RP-03 authorization foundation:** `m10-authorize` load gate artifact,
+  cost-bound registered và state hiện tại, buộc `AUTHORIZED_AT` khớp gate rồi
+  evaluate lại snapshot trước khi emit immutable `ExecutionAuthorization`.
+  Authorization bind grant/gate/cost/intent/executor và hạn dùng là minimum của
+  intent/grant/cost expiry; không reserve budget hay gọi executor. Smoke cover
+  authorization retry và reject gate stale sau reserve. Artifact chưa được
+  đăng ký trong graph state và execution record/effect link còn mở.
+- **RP-03 cancelled-execution foundation:** learner `m10-cancel` resolve và
+  kiểm `ExecutionAuthorization` với mission state hiện tại rồi ghi artifact
+  bất biến `ExecutionRecord` chỉ có `CANCELLED`/`NOT_PERFORMED`. Core validator
+  và BR-16a smoke kiểm retry byte-identical; đường này không gọi executor,
+  không reserve budget hay tạo EffectRef. Execution thành công/thất bại, ledger
+  link, outcome và graph persistence vẫn thuộc RP-03/RP-06/RP-07, do đó RP-03
+  vẫn mở.
+- **RP-03 authorization-reservation foundation:** `m10-reserve-authorization`
+  resolve authorization/cost bound đã registry cấp, kiểm expiry/binding rồi
+  charge đúng bound và persist reservation một-lần với `authorization_id`.
+  `m10-cancel` giờ cần reservation đó và ACK chỉ sau khi ghi `execution_id`
+  ngược vào state; retry chỉ cho cùng ID/artifact. `m10-reserve` cũ được giữ
+  compatibility-only, không thể tạo execution binding. Chưa có transaction
+  multi-artifact crash recovery, execution result/outcome/EffectRef hay ledger
+  canonical ngoài learner state, nên RP-03 vẫn mở.
+- **RP-03 no-side-effect execution/outcome foundation:** `m10-record-failed`
+  tạo đúng `ExecutionRecord` `FAILED`/`NOT_PERFORMED` cho reservation governed
+  và không có executor/network. `m10-outcome` chỉ append fixture outcome
+  `CANCELLED`, metrics rỗng, `fixture:m10-outcome/…`, sau khi `EffectRef`
+  `MACHINE_EXECUTION` resolve record đã registry cấp và state xác nhận bind
+  reservation. Smoke cover record retry và forged EffectRef reject. Đây không
+  phải execution success, business outcome, cross-store canonical outcome graph
+  hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
+- **RP-03 M10 registry foundation:** state directory nay có registry append-only
+  `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
+  `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation
+  record sau khi registry validate toàn bộ link grant → cost/gate → authorization
+  → record. `m10-resolve` chỉ đọc artifact canonical theo kind/ID/(tùy chọn)
+  content hash. Gate/authorization hợp schema nhưng không có entry chính xác bị
+  smoke BR-16a từ chối. Registry chưa có reservation-to-attempt link, execution
+  result/outcome/EffectRef, migration/restore graph hoặc fault injection đầy
+  đủ, vì vậy không đóng RP-03/RP-06/RP-07.
+- **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
+  read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
+  một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng
+  resolve lại record từ store sau append trước khi ACK/return artifact. Chưa
+  có core M06 builder chung, chưa đổi n8n blueprint/HTTP adapter, và chưa có
+  proposal resolver; RP-04 vẫn mở.
+- **RP-04 M06 shared fixture path:** `core/m06` nay owns strict
+  `br13-offer-fixture/v1` decoding, timestamp/identity/provenance normalization
+  và M00 packet construction. Learner CLI local/pinned fetch cùng n8n endpoint
+  `/v1/m06/fixture-import` dùng profile này; endpoint append rồi resolve/replay
+  canonical record trước ACK. Blueprint không còn GET/parse/hash/build history
+  bằng JavaScript. Unit test cover adapter APPENDED/EXACT_DUPLICATE/replay và
+  reject không mutate history. Đây chỉ là fixed synthetic profile; generic
+  source profile, n8n operated execution và full shared HistoryRecord type vẫn
+  còn mở, nên RP-04 chưa đóng.
+- **RP-04 canonical fingerprint + M08 field links:** M06 dùng canonical JSON
+  fingerprint cho body có cấu trúc (key order không tạo observation mới), còn
+  raw byte hash giữ riêng cho HTTPS fixture pinning. CLI/HTTP adapter retry
+  cùng body reordered là `EXACT_DUPLICATE`; price/commission thiếu tạo field
+  `missing` và HistoryRecord vẫn replay `MATCH`. M08 resolve cùng canonical
+  record rồi dùng đúng field IDs mà M07 context công bố; ID tự dựng và record
+  `DRIFT` đều bị reject. Regression chạy implementation learner thật, không
+  dùng parser Python thay thế. Chưa có generic source profile hoặc n8n engine
+  execution evidence, nên RP-04 vẫn `IN PROGRESS`.
+- **RP-05 foundation:** core/learner M07 nay kiểm output thực: chỉ
+  `HUMAN_REVIEW`/`ABSTAIN`, claim/evidence/value và `answer`/`claim.text` phải
+  là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`
+  tự khai bị reject. `m07 register-tool-result` preflight/validate response,
+  ghi artifact immutable có trace hash rồi `m07 validate` resolve lại hash và
+  record binding trước khi body `unknown` được cite. Test learner trực tiếp,
+  regression M07 và smoke shared workspace tạo/cite trace rồi reject trace giả.
+  `m07 register-proposal` persist raw validated output/proposed action với
+  canonical digest và record binding; M08 agent intent/policy resolve lại
+  artifact và reject target/parameters đổi ngoài proposal. Chưa có canonical
+  tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
+  vẫn mở, R01/R05 chưa đóng toàn phạm vi.
+- **RP-05 HTTP adapter foundation:** watcher có endpoint loopback
+  `/v1/m07/register-tool-result`, `/v1/m07/validate` và
+  `/v1/m07/register-proposal`. Chúng resolve history canonical, lưu artifact
+  trace/proposal bất biến dưới store dẫn xuất từ history và ACK sau validation;
+  validate chỉ resolve tool trace bằng ID đã persist. Test handler cover ACK,
+  validate, proposal persistence và trace ID giả. Blueprint n8n đã chuyển flow
+  sang preflight/full-response/no-redirect/register/context/validate/proposal
+  endpoints và static validator kiểm wiring, nhưng chưa có n8n instance chạy
+  workflow hay parity execution thật nên chưa là operated evidence.
+- **RP-05 adapter-owned transport:** watcher thêm `fetch-and-register`; n8n
+  không còn gọi remote HTTP trực tiếp. Adapter validate registry trước fetch,
+  resolve DNS trước request và mỗi dial, reject non-public/mixed IP, proxy,
+  redirect và response vượt 256 KiB; timeout đến từ registry. Unit test cover
+  private/CGNAT/mixed DNS và body quá cỡ; chưa có n8n import/run, controlled
+  public-source integration hoặc sink-failure parity nên không đóng RP-05.
+- **RP-05 blueprint persistence boundary:** blueprint M07 dùng adapter URL và
+  registry review cố định, không lấy hai policy boundary này từ event input.
+  Trace tool, context canonical, grounding `HUMAN_REVIEW` có draft và proposal
+  persistence đều phải nhận ACK ở node riêng trước khi node sau chạy. Learner
+  HTTP regression kiểm proposal ACK và xác nhận output không grounded không
+  thể sửa artifact proposal đã persist. Đây vẫn là fixture/offline evidence:
+  chưa có n8n engine, credential model hay provider integration được vận hành.
+- **BR-16a continuity:** smoke shared workspace nay dùng `M07
+  register-proposal → M08 agent intent → M08 policy`, có ca target bị thay đổi
+  bị reject. Số `9007199254740993` đi qua proposal/intent/bind/state; `bind`
+  và state loader dùng shared decoder/`UseNumber` để không làm tròn trước khi
+  kiểm intent hash. Chuỗi vẫn chưa có execution/EffectRef/M11 graph đầy đủ,
+  nên không đổi trạng thái RP-02/RP-07 hay BR-16a.
 
 ### RP-01 — Không làm mất input/store khi ghi artifact
 
@@ -175,6 +317,54 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 
 **Chạm tới:** `backup_command.go`, runtime store inventory, canonical loaders, manifest version và deployment runbook.
 
+**Cập nhật thực hiện (2026-09-09, phạm vi hẹp):** learner backup đã lên
+`affiliate-bot-backup/v3`: mỗi artifact ghi path, kind, kích thước, SHA-256 và
+profile inventory; restore đòi inventory trùng khớp tuyệt đối. Runtime có canary phải có
+M10 registry; runtime có `FAILED` execution phải có fixture outcome store.
+Restore gọi canonical loader để kiểm reservation → execution và FAILED
+execution → `MACHINE_EXECUTION` EffectRef trước khi trả `RESTORED`. Smoke tạo
+governed M10 chain bằng Bot, kiểm manifest thiếu artifact, checksum-hợp-lệ
+nhưng orphan outcome, replay/resolve sau process mới, budget và STOP. Đây chỉ
+là một lát cắt RP-06; các hạng mục còn lại bên dưới vẫn mở.
+
+**Cập nhật M07 snapshot (2026-09-09):** manifest v3 inventory đệ quy theo
+relative path chuẩn hóa và đưa `history.jsonl.m07/` vào backup khi adapter đã
+persist tool trace/proposal. Trace lưu registry đã được review; loader replay
+chính validator M07 cho method/host/redirect, trace digest, canonical history,
+grounding và link AgentProposal → M08 intent trước `RESTORED`. Test tạo trace
+và proposal bằng HTTP adapter của learner Bot, restore sang runtime trống rồi
+thử proposal checksum-hợp-lệ nhưng hỏng. Backup từ symlink, writer lock hoặc
+target nằm trong runtime bị từ chối. Đây chưa thay thế snapshot transaction,
+coverage full M00–M10 hoặc n8n/model operated evidence.
+
+**Cập nhật snapshot gate (2026-09-09):** writer của learner runtime và
+`backup create` cùng giữ một runtime gate cross-process. M06/M07 history and
+sidecar, M08–M11 mission state, action/outcome/evaluation/review và import
+ACCESSTRADE trả `BUSY` khi snapshot hoặc writer khác đang giữ gate; stale gate
+không tự bị xóa. Manifest chỉ publish sau toàn bộ copy thành công. Regression
+giữ gate rồi thử backup/history write, và inject lỗi copy để xác nhận target
+partial không có manifest/không restore được. Chưa có filesystem snapshot
+transaction đa-host, kill/power-loss proof hoặc coverage mọi external store.
+
+**Cập nhật graph M00–M05 và expiry (2026-09-09):** backup profile bây giờ
+derive inventory action → outcome → evaluation → proposal → review từ file có
+thực, dùng canonical loader/link validator ở source và restored target. Một
+outcome orphan dù manifest checksum đã cập nhật bị reject. Loader state chỉ
+kiểm toàn vẹn/binding lịch sử khi restore; intent/approval/grant hết hạn vẫn
+replay được để audit nhưng gate/reservation mới kiểm thời gian thực và bị chặn.
+Regression tạo M03–M05 qua CLI, backup/restore, resolve review, rồi cover
+orphan và expired authority. Manifest v3 từ chối layout lạ, file known nhưng
+không nằm trong inventory, và kind sai; mọi artifact runtime hiện hỗ trợ đều có
+kind/size/SHA-256/profile. Kill/power-loss đa file, source ngoài runtime và
+evidence operated vẫn mở.
+
+**Cập nhật consistency gate (2026-09-09):** trước khi copy, backup chụp typed
+inventory của source; sau canonical validation chụp lại để phát hiện thay đổi
+trong lúc chuẩn bị, rồi đối chiếu từng file đã copy với snapshot ban đầu. Lệch
+một file trả `SNAPSHOT_CONFLICT`, không publish manifest và không thể restore.
+Regression mô phỏng đồng thời thay đổi mission state cùng M07 proposal giữa
+copy; đây là fault seam nội bộ, không phải quyền cho writer vượt runtime gate.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.
@@ -185,6 +375,80 @@ Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song tr�
 **Nghiệm thu RP-06:** snapshot/restore M00–M10 PASS và giữ budget/STOP, proposal/authorization/execution/EffectRef resolve đúng. R12/R13 được ghi evidence cho phạm vi này nhưng **chưa đóng toàn phạm vi M00–M11**; chỉ đóng sau gate mở rộng restore RP-07a dưới đây. **Rollback:** giữ source/backup nguyên trạng; staging lỗi không trở thành active runtime; người vận hành quyết định cleanup/recovery, không tự ghi đè đích cũ.
 
 ### RP-07a/07b — M11 lifecycle và chain learner đầy đủ
+
+**Cập nhật thực hiện (2026-09-08, artifact spine):** `core/m11` nay sở hữu
+decoder/semantic checks cho M11 artifact; harness gọi decoder này thay vì parser
+semantic riêng. Learner có `m11-register`/`m11-resolve` và registry append-only
+`m11-artifacts.jsonl`, reject hash/schema/link hỏng, và backup v3 snapshot/verify
+registry nếu có. `m11-activate` chỉ tạo activation từ lease + approval đã
+register, trong thời hạn và khi chưa STOP; `m11-ledger-init` chỉ tạo ledger
+rỗng sau activation này và không reset được bằng retry. Smoke backup tạo
+lease/approval/activation/ledger qua learner, restore rồi resolve bằng process
+mới. `m11-gate` resolve exact lease/activation/health/cost/ledger, persist
+gate không-authorizing và fail closed với scope, time, budget hoặc health lỗi.
+`m11-authorize` tạo quyền governed có expiry bị chặn bởi lease/intent/approval/
+cost từ gate ALLOW đã persist, nhưng chưa gọi executor. `m11-reserve-authorization`
+chỉ tạo pre-ledger immutable một lần cho authorization đó, charge bound và giữ
+pending execution; `m11-record-failed` chỉ có đường fixture `FAILED`/
+`NOT_PERFORMED` và không gọi executor. Pending chỉ được giải phóng bởi
+`m11-outcome` khi fixture `CANCELLED` có đúng `MACHINE_EXECUTION` EffectRef
+được ghi; lệnh này tạo post-ledger và vẫn hoạt động để đóng observation sau STOP.
+Business outcome, reconciliation và reviewed recovery bên dưới vẫn còn bắt buộc
+trước khi đóng.
+
+**Cập nhật reconciliation (2026-09-08):** learner có `m11-record-unknown` cho
+fixture effect không xác định. Nó ghi `RECONCILIATION_REQUIRED`/`UNKNOWN`,
+ledger STOPPED và durable STOP trước khi trả kết quả. `m11-reconcile` chỉ nhận
+resolution đã nằm trong registry, do `human` xác nhận đúng unknown execution và
+chỉ chốt ledger ở `RECOVERY_REVIEW_REQUIRED`; lệnh không thể kích hoạt lại lease
+hoặc cấp authorization mới. `smoke_br18b_backup_restore.py` chạy runtime riêng
+qua UNKNOWN → STOP → resolution → backup/restore → restart và xác nhận lease
+cũ vẫn bị reject; smoke cũng sửa stopped ledger với checksum manifest hợp lệ và
+xác nhận restore trả `GRAPH_FAILED`. Cần thêm trace fault-injection/
+concurrent-writer và reviewed recovery bằng **lease mới** trước khi coi RP-07a
+hoàn tất.
+
+**Cập nhật recovery handoff (2026-09-08):** `m11-recovery-export` chỉ đọc
+stopped ledger + registered human resolution và xuất proof có
+`requires_new_runtime=true`, `requires_new_lease=true`,
+`execution_permitted=false`. Nó không reset STOP, không copy state sang runtime
+mới và không gọi executor. Handoff đã có smoke; workflow tạo runtime mới, lease
+mới và approval mới vẫn phải được thiết kế như một canonical artifact boundary
+riêng, không thể suy ra chỉ từ export proof.
+
+**Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
+quét canonical registry trước khi append. Exact retry của cùng artifact trả
+`EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
+khác bị reject, nên không thể charge budget hai lần chỉ bằng cách dùng lại
+pre-ledger. Smoke BR-18b chạy trực tiếp ca âm này. Fault injection giữa nhiều
+file append vẫn là việc riêng, chưa được coi là transaction đa-file. Smoke cũng
+giả lập partial reconciliation write (UNKNOWN execution + resolution còn nhưng
+reviewed stopped-ledger mất) với checksum manifest hợp lệ; restore fail-closed
+`GRAPH_FAILED`. Chưa có crash hook thực thi tại từng `write/sync/rename`.
+
+**Cập nhật multi-process reservation (2026-09-08):** BR-18b chạy hai process
+cùng `m11-reserve-authorization` với cùng authorization và timestamps khác.
+Chỉ một process được `APPENDED`; process còn lại `BUSY` hoặc `REJECTED`, và retry
+sau `BUSY` bị reject. Đây kiểm lock + canonical registry guard; không thay CAS
+hoặc transaction đa-file.
+
+**Cập nhật fault seam (2026-09-08):** registry M11 có hook nội bộ chỉ dùng trong
+test (không nhận từ CLI/env). Test inject lỗi sau `write` nhưng trước khi caller
+nhận success: loader vẫn đọc được artifact hoàn chỉnh và retry trả
+`EXACT_DUPLICATE`. Đây chứng minh recovery cho một append artifact; không suy
+ra transaction cho cặp registry/ledger/outcome/STOP hoặc lỗi trước/giữa partial
+filesystem write.
+
+**Cập nhật atomic state seam (2026-09-08):** `writeJSONAtomic` có hook test
+trước rename. Test chứng minh lỗi tại điểm đó giữ nguyên state cũ, không để
+temporary file và retry commit semantic state mới. Hook không có đường kích hoạt
+từ runtime; nó không chứng minh atomicity giữa mission-state và registry/STOP.
+
+**Cập nhật stopped-ledger crash seam (2026-09-08):** loader fail-closed nếu
+M11 registry có ledger `STOPPED` nhưng mutable state chưa STOP. BR-18b tạo
+snapshot UNKNOWN/STOP rồi sửa manifest hợp lệ để mất state/marker STOP, giữ
+stopped ledger; restore trả `VERIFY_FAILED`. Đây là recovery guard, không phải
+transaction đa-file hay power-loss proof.
 
 **07a:** tách/reuse M11 lease activation, health gate, ledger/reconciliation, STOP, reviewed recovery từ harness; thêm learner entrypoint và store links. Offline executor stub không được gọi là live execution. Persist lifecycle artifact và version, kiểm time/authority/unknown usage/cycle closure; không chỉ thêm STOP/status alias.
 
@@ -197,7 +461,33 @@ RP-07a sở hữu graph M11: source canary/promotion review → lease + lease ap
 - Negative cases: thiếu hoặc sai lease/activation/health/cost/gate/authorization/execution/EffectRef/cycle/resolution; dữ liệu bị sửa nhưng checksum backup hợp lệ; phiên bản manifest không hỗ trợ. Reject graph hỏng, không publish runtime sẵn dùng. Lịch sử đã hết hạn vẫn phục hồi được ở chế độ không cấp quyền; recovery chưa review phải bị chặn.
 - Chỉ ghi đóng R12/R13 toàn phạm vi khi cả evidence RP-06 và gate restore M11 này PASS trên head tương thích. RP-07b và RP-09 không được nghiệm thu full chain/readiness nếu gate này chưa đạt. Dependency là RP-06 → RP-07a → RP-07b, không có vòng lặp.
 
+**Cập nhật backup negative cases (2026-09-09):** `smoke_br18b_backup_restore.py`
+tạo evaluation/cycle bằng learner Bot rồi restore các bản sao có checksum hợp lệ
+nhưng outcome bị orphan khỏi evaluation, cycle trỏ evaluation không tồn tại, hoặc
+`closed_at` sớm hơn evaluation. Tất cả bị `GRAPH_FAILED`; bước inventory chỉ đọc
+envelope hợp lệ trước, còn graph chỉ quyết định sau staging restore.
+
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
+
+**Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00
+history, M07 registered proposal, M08 agent-bound intent/policy, M09 approval,
+M10 cost/gate/authorization/fixture outcome rồi dùng **chính các artifact đó**
+để tạo M11 lease, activation, health gate, authorization, reservation,
+`FAILED`/`NOT_PERFORMED` fixture và M11 `MACHINE_EXECUTION` outcome. Smoke
+resolve execution sau đó. Cùng workspace tiếp tục tạo recovery lease đã review
+riêng (vì authorization đầu là one-time) nhưng giữ proposal/intent/policy/grant/
+cost-bound gốc, rồi cover `UNKNOWN` → `RECONCILIATION_REQUIRED` durable STOP →
+human reconciliation idempotent → read-only recovery handoff; activation lại
+bị reject trước reconciliation. M07 tool/proposal đi qua loopback adapter và
+persist sidecar trong chính runtime. Smoke backup/restore runtime đó vào đích
+trống, replay history và resolve M07 context, M10 execution, M11 UNKNOWN,
+resolution và stopped ledger trước khi xác nhận STOP tiếp tục chặn activation.
+Mỗi lệnh là process mới nên STOP được đọc lại từ store. Nhánh
+`FAILED`/`NOT_PERFORMED` fixture nay tạo `ProductionOutcomeEvaluation`
+`OFFLINE_FIXTURE`/`FIXTURE_NO_SIDE_EFFECT`, rồi chỉ đóng audit cycle khi các
+link outcome → execution → lease/gate/authorization/history đều exact; restore
+còn từ chối outcome bị sửa dù manifest checksum đã được cập nhật. Đây không
+phải business outcome/evaluation thật và live proof vẫn chưa có.
 
 1. M00 packet → M01 evaluation → M02 history/decision.
 2. M03 human action → outcome snapshots → M04 advisor dùng đúng history/action/outcome.
@@ -217,6 +507,18 @@ Walkthrough phải có lệnh build, input paths/fixtures được version contr
 
 - Baseline tests phải tiếp tục chạy. Mỗi PR trên thêm regression vào cùng workflow trước khi merge; không để tests chỉ nằm trong thư mục tạm của reviewer.
 - Wire `smoke_br16a_offline.py` và `smoke_br18b_backup_restore.py` vào `.github/workflows/`; test blueprint đọc và thực thi chính `jsCode` hoặc gọi adapter shared, không tự viết lại canonical()/validator trong test.
+
+**Cập nhật CI (2026-09-08):** hai smoke trên đã được wired vào job
+`deterministic-runtime` của `curriculum-ci.yml`, chạy cho pull request và push
+vào `main`. Đây là regression CI cho shared M00–M11 fixture lineage và M11
+backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở head cho
+đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
+dưới.
+
+**Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
+`go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
+phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc
+thay thế barrier/fault hook quyết định.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.
@@ -225,6 +527,15 @@ Walkthrough phải có lệnh build, input paths/fixtures được version contr
 **Nghiệm thu:** R15 đóng; không tắt check để làm CI xanh. Thay branch protection/required-check setting cần phê duyệt quản trị riêng, không ngầm nằm trong sửa workflow.
 
 ### RP-09 — Audit readiness và nghiệm thu offline
+
+**Cập nhật audit (2026-09-08):** `audit_readiness.py` đọc matrix thay vì tìm từ
+khóa đơn lẻ: kiểm version/IDs/status, implementation/test refs tồn tại, remaining
+evidence bắt buộc cho non-final status, `IMPLEMENTED` không được còn gap, và hai
+smoke M00–M11/M11 restore đã wired trong CI. Nó cũng reject claim
+`ready for production` không có phủ định khi matrix giữ NOT_READY. Năm isolated
+negative fixtures chạy implementation thực cho ref hỏng, status final còn gap,
+CI regression mất, và prose overclaim. Audit vẫn chưa parse toàn bộ ngữ nghĩa
+mọi tài liệu/PR hoặc xác nhận remote CI run; các phần đó còn mở.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.

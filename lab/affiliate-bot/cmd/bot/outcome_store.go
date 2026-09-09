@@ -99,6 +99,12 @@ func loadOutcomes(path string, actions []m03.HumanActionRecord) ([]m03.OutcomeRe
 	return out, nil
 }
 
+func sameOutcome(a, b m03.OutcomeRecord) bool { return reflect.DeepEqual(a, b) }
+
+func appendOutcome(path string, encoded []byte) error {
+	return (store.JSONL{}).AppendLine(path, encoded)
+}
+
 func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	command := "outcome"
 	if len(args) > 0 {
@@ -118,11 +124,24 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 		}
 		return code
 	}
+	if len(args) > 0 && args[0] == "accesstrade-import" {
+		return runAccesstradeOutcomeImport(args, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "accesstrade-receipts" {
+		return runAccesstradeReceiptList(args, stdout, stderr)
+	}
 	if len(args) == 0 || (args[0] != "import" && args[0] != "list") || (args[0] == "import" && len(args) != 5) || (args[0] == "list" && len(args) != 4) {
 		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot outcome import HISTORY ACTIONS OUTCOMES INPUT | bot outcome list HISTORY ACTIONS OUTCOMES"), 2)
 	}
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
+	}
+	if args[0] == "import" {
+		release, lockErr := acquireHistoryRuntimeGate(args[1])
+		if lockErr != nil {
+			return emit("BUSY", nil, lockErr, 1)
+		}
+		defer release()
 	}
 	history, err := LoadHistory(args[1])
 	if err != nil {
@@ -149,7 +168,7 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	}
 	for _, old := range outcomes {
 		if old.OutcomeID == o.OutcomeID {
-			if reflect.DeepEqual(old, o) {
+			if sameOutcome(old, o) {
 				return emit("EXACT_DUPLICATE", o, nil, 0)
 			}
 			return emit("CONFLICT", nil, fmt.Errorf("outcome_id reused with different content"), 1)
@@ -159,7 +178,7 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("INVALID_SCHEMA", nil, err, 1)
 	}
-	if err := (store.JSONL{}).AppendLine(args[3], encoded); err != nil {
+	if err := appendOutcome(args[3], encoded); err != nil {
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	return emit("APPENDED", o, nil, 0)

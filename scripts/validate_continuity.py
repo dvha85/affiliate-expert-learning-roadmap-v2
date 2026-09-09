@@ -47,24 +47,18 @@ for marker in ["O00 và M03–M11", "go run ./cmd/demo M11", "không phải Affi
 try:
     blueprint = json.loads((ROOT / "lab/n8n/M06-readonly-watcher.blueprint.json").read_text(encoding="utf-8"))
     nodes = {node.get("name"): node for node in blueprint.get("nodes", [])}
-    normalize = nodes.get("Parse Provenance + Change Detect", {}).get("parameters", {}).get("jsCode", "")
-    handoff = nodes.get("Canonical History Adapter", {})
+    input_node = nodes.get("M06 Adapter Input", {})
+    handoff = nodes.get("Build and Append Canonical M06 Adapter", {})
     handoff_code = json.dumps(handoff.get("parameters", {}))
     ack_code = nodes.get("Require Canonical Store ACK", {}).get("parameters", {}).get("jsCode", "")
-    if "watcher_fingerprint" not in normalize:
-        errors.append("M06 n8n must name static state watcher_fingerprint")
-    if "observation_id" not in normalize:
-        errors.append("M06 n8n must emit canonical observation_id")
-    if "content_hash" not in normalize or "previous===content_hash" not in normalize:
-        errors.append("M06 change detection must compare content hashes")
-    if "200000" not in normalize:
-        errors.append("M06 watcher cache must fail closed on oversized snapshots")
-    if "store.history" in normalize or "store.history" in handoff_code:
-        errors.append("M06 n8n static data must never be canonical history")
-    for marker in ["canonical_store_url"]:
-        if marker not in handoff_code:
-            errors.append(f"M06 canonical-history handoff marker missing: {marker}")
-    for marker in ["canonical_history_handoff:'ACK'", "canonical_history_persisted:true", "CANONICAL_HISTORY_NOT_ACKNOWLEDGED"]:
+    if not input_node or "fixture_json" not in json.dumps(input_node.get("parameters", {})):
+        errors.append("M06 n8n must supply the fixed synthetic fixture to the adapter")
+    if "/v1/m06/fixture-import" not in handoff_code:
+        errors.append("M06 canonical-history handoff must use fixture-import adapter")
+    for retired in ["Parse Provenance + Change Detect", "Build Canonical History Record", "Canonical History Adapter"]:
+        if retired in nodes:
+            errors.append(f"M06 n8n must not retain local history builder node: {retired}")
+    for marker in ["canonical_history_handoff:'ACK'", "canonical_history_persisted!==true", "CANONICAL_HISTORY_NOT_ACKNOWLEDGED"]:
         if marker not in ack_code:
             errors.append(f"M06 ACK gate marker missing: {marker}")
     if "ACK" not in ack_code:
@@ -73,7 +67,7 @@ except Exception as exc:
     errors.append(f"invalid M06 n8n blueprint: {exc}")
 
 m06_lesson = (ROOT / "curriculum/M06/M06.3-n8n-readonly-workflow.md").read_text(encoding="utf-8")
-for marker in ["Watcher cache (bộ nhớ đệm) != canonical history", "canonical_history_handoff=ACK", "Canonical History Adapter", "Continuity Gate"]:
+for marker in ["fixture synthetic", "canonical_history_handoff=ACK", "Build and Append Canonical M06 Adapter", "Continuity Gate"]:
     if marker not in m06_lesson:
         errors.append(f"M06 lesson boundary marker missing: {marker}")
 

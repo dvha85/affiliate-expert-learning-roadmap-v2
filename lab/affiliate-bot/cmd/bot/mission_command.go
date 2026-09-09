@@ -1,17 +1,25 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 const missionStateVersion = "learner-m08-m11/v1"
@@ -59,15 +67,8 @@ type LearnerApproval struct {
 	OneTime       bool   `json:"one_time"`
 }
 type LearnerCanary struct {
-	GrantID        string `json:"grant_id"`
-	IntentID       string `json:"intent_id"`
-	IntentHash     string `json:"intent_hash"`
-	ApprovalID     string `json:"approval_id"`
-	MaxExecutions  int    `json:"max_executions"`
-	MaxCostMinor   int64  `json:"max_cost_minor"`
-	Currency       string `json:"currency"`
+	corem10.CanaryGrant
 	Status         string `json:"status"`
-	GrantedAt      string `json:"granted_at"`
 	ExecutionsUsed int    `json:"executions_used"`
 	CostUsedMinor  int64  `json:"cost_used_minor"`
 }
@@ -77,16 +78,279 @@ type LearnerLease struct {
 	Status        string `json:"status"`
 	CreatedAt     string `json:"created_at"`
 }
+type LearnerReservation struct {
+	ReservationID   string `json:"reservation_id"`
+	GrantID         string `json:"grant_id"`
+	IntentID        string `json:"intent_id"`
+	IntentHash      string `json:"intent_hash"`
+	CostMinor       int64  `json:"cost_minor"`
+	CostBoundID     string `json:"cost_bound_id,omitempty"`
+	CostBoundHash   string `json:"cost_bound_hash,omitempty"`
+	AuthorizationID string `json:"authorization_id,omitempty"`
+	ExecutionID     string `json:"execution_id,omitempty"`
+	ReservationMode string `json:"reservation_mode,omitempty"`
+	ReservedAt      string `json:"reserved_at"`
+}
+
+func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
+func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
+func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
+func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
+func m11OutcomeJournalPath(dir string) string   { return filepath.Join(dir, "m11-outcome-journal.json") }
+
+// m11OutcomeAppendFault is a test-only seam for the two-file M11 outcome
+// commit. It is never configurable through the CLI.
+var m11OutcomeAppendFault func(phase string) error
+
+func m11OutcomeWriteFault(phase string) error {
+	if m11OutcomeAppendFault == nil {
+		return nil
+	}
+	return m11OutcomeAppendFault(phase)
+}
+
+type m11OutcomeJournal struct {
+	Version                string                   `json:"version"`
+	PredecessorArtifactID  string                   `json:"predecessor_artifact_id"`
+	PredecessorContentHash string                   `json:"predecessor_content_hash"`
+	Outcome                m03.OutcomeRecord        `json:"outcome"`
+	Ledger                 corem11.ProductionLedger `json:"ledger"`
+}
+
+// The registry lives beside mission-state.json and is append-only. It owns the
+// canonical compact JSON used for later resolution; user-supplied output files
+// are only portable views of those registered artifacts.
+func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
+	raw, err := os.ReadFile(m10ArtifactRegistryPath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries := []corem10.ArtifactEntry{}
+	seen := map[string]string{}
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, err := corem10.ValidateArtifactEntry(line)
+		if err != nil {
+			return nil, fmt.Errorf("invalid M10 artifact registry entry: %w", err)
+		}
+		key := entry.ArtifactKind + "\x00" + entry.ArtifactID
+		if prior, exists := seen[key]; exists {
+			if prior == entry.ContentHash {
+				return nil, fmt.Errorf("duplicate M10 artifact registry entry")
+			}
+			return nil, fmt.Errorf("M10 artifact ID reused with different content")
+		}
+		seen[key] = entry.ContentHash
+		entries = append(entries, entry)
+	}
+	if err := validateM10ArtifactGraph(entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
+	grants := map[string]corem10.CanaryGrant{}
+	bounds := map[string]corem10.TrustedCostBound{}
+	gates := map[string]corem10.CanaryGateDecision{}
+	authorizations := map[string]corem10.ExecutionAuthorization{}
+	records := []corem10.ExecutionRecord{}
+	for _, entry := range entries {
+		switch entry.ArtifactKind {
+		case corem10.ArtifactKindCanaryGrant:
+			grant, status := corem10.DecodeCanaryGrant(entry.Artifact)
+			if status != "VALID" {
+				return fmt.Errorf("invalid registered canary grant")
+			}
+			grants[grant.GrantID] = grant
+		case corem10.ArtifactKindTrustedCostBound:
+			bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
+			if status != "VALID" {
+				return fmt.Errorf("invalid registered trusted cost bound")
+			}
+			bounds[bound.CostBoundID] = bound
+		case corem10.ArtifactKindCanaryGate:
+			gate, err := corem10.ValidateCanaryGateDecision(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered canary gate: %w", err)
+			}
+			gates[gate.GateID] = gate
+		case corem10.ArtifactKindExecutionAuthorization:
+			authorization, err := corem10.ValidateExecutionAuthorization(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered execution authorization: %w", err)
+			}
+			authorizations[authorization.AuthorizationID] = authorization
+		case corem10.ArtifactKindExecutionRecord:
+			record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("invalid registered execution record: %w", err)
+			}
+			records = append(records, record)
+		default:
+			return fmt.Errorf("unsupported registered M10 artifact kind")
+		}
+	}
+	for _, gate := range gates {
+		grant, grantOK := grants[gate.GrantID]
+		bound, boundOK := bounds[gate.CostBoundID]
+		if !grantOK || !boundOK || grant.GrantVersion != gate.GrantVersion || grant.GrantHash != gate.GrantHash || bound.CostBoundHash != gate.CostBoundHash || bound.MaxCostMinor != gate.CostBoundMinor || bound.IntentID != gate.IntentID || bound.IntentHash != gate.IntentHash || grant.PolicyVersion != gate.PolicyVersion {
+			return fmt.Errorf("canary gate has an orphaned or mismatched registry link")
+		}
+	}
+	for _, authorization := range authorizations {
+		grant, grantOK := grants[authorization.CanaryGrantID]
+		gate, gateOK := gates[authorization.CanaryGateID]
+		bound, boundOK := bounds[authorization.CanaryCostBoundID]
+		if !grantOK || !gateOK || !boundOK || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
+			return fmt.Errorf("execution authorization has an orphaned or mismatched registry link")
+		}
+	}
+	for _, record := range records {
+		authorization, exists := authorizations[record.AuthorizationID]
+		if !exists || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
+			return fmt.Errorf("execution record has an orphaned or mismatched registry link")
+		}
+	}
+	return nil
+}
+
+func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, string, error) {
+	entry, err := corem10.NewArtifactEntry(kind, raw)
+	if err != nil {
+		return entry, "", err
+	}
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return entry, "", err
+	}
+	for _, registered := range entries {
+		if registered.ArtifactKind != entry.ArtifactKind || registered.ArtifactID != entry.ArtifactID {
+			continue
+		}
+		if registered.ContentHash == entry.ContentHash {
+			return entry, appendDuplicate, nil
+		}
+		return entry, "", fmt.Errorf("M10 artifact ID reused with different content")
+	}
+	if err := validateM10ArtifactGraph(append(entries, entry)); err != nil {
+		return entry, "", err
+	}
+	line, err := json.Marshal(entry)
+	if err != nil {
+		return entry, "", err
+	}
+	f, err := os.OpenFile(m10ArtifactRegistryPath(dir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return entry, "", err
+	}
+	_, err = f.Write(append(line, '\n'))
+	if syncErr := f.Sync(); err == nil {
+		err = syncErr
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return entry, "", err
+	}
+	return entry, appendAdded, nil
+}
+
+func resolveM10Artifact(dir, kind string, raw []byte) bool {
+	expected, err := corem10.NewArtifactEntry(kind, raw)
+	if err != nil {
+		return false
+	}
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind == expected.ArtifactKind && entry.ArtifactID == expected.ArtifactID && entry.ContentHash == expected.ContentHash {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveM10ArtifactByID(dir, kind, artifactID, contentHash string) (corem10.ArtifactEntry, error) {
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return corem10.ArtifactEntry{}, err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != kind || entry.ArtifactID != artifactID {
+			continue
+		}
+		if contentHash != "" && entry.ContentHash != contentHash {
+			return corem10.ArtifactEntry{}, fmt.Errorf("M10 artifact content hash does not match")
+		}
+		return entry, nil
+	}
+	return corem10.ArtifactEntry{}, fmt.Errorf("M10 artifact is not registered")
+}
+
+func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
+	raw, err := os.ReadFile(trustedCostBoundsPath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var bounds []corem10.TrustedCostBound
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		bound, status := corem10.DecodeTrustedCostBound(line)
+		if status != "VALID" {
+			return nil, fmt.Errorf("invalid trusted cost-bound registry entry: %s", status)
+		}
+		bounds = append(bounds, bound)
+	}
+	return bounds, nil
+}
+
+func resolveTrustedCostBound(dir string, bound corem10.TrustedCostBound) bool {
+	if bound.CostBoundHash == "" || bound.CostBoundHash != corem10.ComputeTrustedCostBoundHash(bound) {
+		return false
+	}
+	raw, err := json.Marshal(bound)
+	if err != nil || !resolveM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, raw) {
+		return false
+	}
+	bounds, err := loadTrustedCostBounds(dir)
+	if err != nil {
+		return false
+	}
+	for _, registered := range bounds {
+		if registered.CostBoundID == bound.CostBoundID && registered.CostBoundHash == bound.CostBoundHash {
+			return true
+		}
+	}
+	return false
+}
+
 type LearnerMissionState struct {
-	Version    string           `json:"version"`
-	Intent     *LearnerIntent   `json:"intent,omitempty"`
-	Policy     *LearnerPolicy   `json:"policy,omitempty"`
-	Approval   *LearnerApproval `json:"approval,omitempty"`
-	Canary     *LearnerCanary   `json:"canary,omitempty"`
-	Lease      *LearnerLease    `json:"lease,omitempty"`
-	Stop       bool             `json:"stop"`
-	StopReason string           `json:"stop_reason,omitempty"`
-	UpdatedAt  string           `json:"updated_at"`
+	Version      string               `json:"version"`
+	Intent       *LearnerIntent       `json:"intent,omitempty"`
+	Policy       *LearnerPolicy       `json:"policy,omitempty"`
+	Approval     *LearnerApproval     `json:"approval,omitempty"`
+	Canary       *LearnerCanary       `json:"canary,omitempty"`
+	Reservations []LearnerReservation `json:"reservations,omitempty"`
+	Lease        *LearnerLease        `json:"lease,omitempty"`
+	Stop         bool                 `json:"stop"`
+	StopReason   string               `json:"stop_reason,omitempty"`
+	UpdatedAt    string               `json:"updated_at"`
 }
 
 type intentHashPayload struct {
@@ -107,30 +371,79 @@ type intentHashPayload struct {
 }
 
 func learnerIntentHash(i LearnerIntent) string {
-	ids := append([]string(nil), i.EvidenceIDs...)
-	// Evidence IDs are already canonical in HistoryRecord; preserve order to
-	// make tampering visible instead of silently normalizing a submitted intent.
-	b, _ := json.Marshal(intentHashPayload{i.IntentID, i.DecisionID, ids, i.ActionType, i.Target, i.Parameters, i.ProposedBy, i.ProposalRef, i.CreatedAt, i.ExpiresAt, i.CorrelationID, i.IdempotencyKey, i.IntentMode, i.ExecutionAuthorized})
-	s := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(s[:])
+	return corem08.ComputeIntentHash(corem08.Intent(i))
 }
 
 func writeJSON(path string, value any) error {
-	b, err := json.MarshalIndent(value, "", "  ")
+	b, err := marshalJSON(value)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(b, '\n'), 0600)
+	return os.WriteFile(path, b, 0600)
+}
+
+func marshalJSON(value any) ([]byte, error) {
+	b, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(b, '\n'), nil
+}
+
+// writeNewJSON creates an immutable command artifact. A retry is successful
+// only when it finds the byte-for-byte artifact it would have created; a
+// different existing file, symlink, or special file is never overwritten.
+func writeNewJSON(path string, value any) (string, error) {
+	b, err := marshalJSON(value)
+	if err != nil {
+		return "", err
+	}
+	if info, err := os.Lstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return "", fmt.Errorf("artifact output must be a new regular file")
+		}
+		existing, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		if bytes.Equal(existing, b) {
+			return appendDuplicate, nil
+		}
+		return "", fmt.Errorf("artifact output already exists with different content")
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return "", err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return appendAdded, nil
 }
 func readJSON(path string, value any) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, value)
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	return decoder.Decode(value)
 }
 func missionStatePath(dir string) string { return filepath.Join(dir, "mission-state.json") }
 func loadMissionState(dir string) (LearnerMissionState, error) {
@@ -168,6 +481,27 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 	if marker && !s.Stop {
 		return fmt.Errorf("STOP marker is active but mission state is not stopped")
 	}
+	// A crash can occur after M11 has durably written a stopped ledger but
+	// before mission-state/STOP is committed. Never let that inconsistent
+	// directory resume on the stale mutable state.
+	if !s.Stop {
+		entries, loadErr := loadM11ArtifactRegistry(dir)
+		if loadErr != nil {
+			return fmt.Errorf("M11 registry integrity check failed: %w", loadErr)
+		}
+		for _, entry := range entries {
+			if entry.ArtifactKind != corem11.ArtifactKindLedger {
+				continue
+			}
+			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 ledger integrity check failed")
+			}
+			if value.(*corem11.ProductionLedger).ControlMode == "STOPPED" {
+				return fmt.Errorf("stopped M11 ledger requires durable mission STOP")
+			}
+		}
+	}
 	if s.Intent != nil {
 		if s.Intent.IntentHash == "" || s.Intent.IntentHash != learnerIntentHash(*s.Intent) || s.Intent.ExecutionAuthorized || s.Intent.IntentMode != "PROPOSAL_ONLY" {
 			return fmt.Errorf("mission intent integrity/authority check failed")
@@ -182,16 +516,137 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 		}
 	}
 	if s.Canary != nil {
-		if s.Intent == nil || s.Approval == nil || s.Canary.GrantID == "" || s.Canary.IntentID != s.Intent.IntentID || s.Canary.IntentHash != s.Intent.IntentHash || s.Canary.ApprovalID != s.Approval.ApprovalID || s.Canary.MaxExecutions <= 0 || s.Canary.MaxCostMinor < 0 || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutions || s.Canary.CostUsedMinor > s.Canary.MaxCostMinor {
+		grantRaw, marshalErr := json.Marshal(s.Canary.CanaryGrant)
+		_, grantStatus := corem10.DecodeCanaryGrant(grantRaw)
+		validFrom, validFromErr := time.Parse(time.RFC3339, s.Canary.ValidFrom)
+		if marshalErr != nil || grantStatus != "VALID" || validFromErr != nil || s.Intent == nil || s.Approval == nil || s.Policy == nil || s.Canary.GrantID == "" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed > s.Canary.MaxExecutionsTotal || s.Canary.CostUsedMinor > s.Canary.MaxCostMinorTotal || corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, validFrom) != "VALID" {
 			return fmt.Errorf("mission canary integrity/binding/budget check failed")
 		}
+	}
+	seenReservations := map[string]bool{}
+	seenAuthorizations := map[string]bool{}
+	for _, r := range s.Reservations {
+		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || s.Intent == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Intent.IntentID || r.IntentHash != s.Intent.IntentHash || r.CostMinor < 0 {
+			return fmt.Errorf("mission reservation integrity/binding check failed")
+		}
+		if r.AuthorizationID != "" {
+			if r.ReservationMode != "GOVERNED_AUTHORIZATION" || r.CostBoundID == "" || r.CostBoundHash == "" || seenAuthorizations[r.AuthorizationID] {
+				return fmt.Errorf("mission governed reservation integrity/binding check failed")
+			}
+			seenAuthorizations[r.AuthorizationID] = true
+		} else if r.ExecutionID != "" || (r.ReservationMode != "" && r.ReservationMode != "LEGACY_COMPAT") {
+			return fmt.Errorf("mission legacy reservation cannot bind execution")
+		}
+		if _, err := time.Parse(time.RFC3339, r.ReservedAt); err != nil {
+			return fmt.Errorf("mission reservation timestamp is invalid")
+		}
+		seenReservations[r.ReservationID] = true
 	}
 	return nil
 }
 func saveMissionState(dir string, s LearnerMissionState) error {
 	s.Version = missionStateVersion
 	s.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	return writeJSON(missionStatePath(dir), s)
+	return writeJSONAtomic(missionStatePath(dir), s)
+}
+
+// missionStateWriteFault is a test-only fault seam. It is never set from CLI
+// input or environment and lets tests prove that the atomic rename boundary
+// preserves the prior state on a failed write.
+var missionStateWriteFault func(phase string) error
+
+func missionWriteFault(phase string) error {
+	if missionStateWriteFault == nil {
+		return nil
+	}
+	return missionStateWriteFault(phase)
+}
+
+// Mission state is mutable, unlike M08 artifacts. Commit it by atomic rename
+// while the mission directory lock is held; never truncate the prior state.
+func writeJSONAtomic(path string, value any) error {
+	b, err := marshalJSON(value)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".mission-state-")
+	if err != nil {
+		return err
+	}
+	temporary := f.Name()
+	defer os.Remove(temporary)
+	if err := f.Chmod(0600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := missionWriteFault("after_temp_sync"); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := missionWriteFault("before_rename"); err != nil {
+		return err
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	closeErr := d.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
+	if s.Intent == nil || s.Policy == nil || s.Approval == nil {
+		return fmt.Errorf("intent, policy and approval are required")
+	}
+	intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt)
+	approvalExpiry, approvalErr := time.Parse(time.RFC3339, s.Approval.ExpiresAt)
+	policyChecked, policyErr := time.Parse(time.RFC3339, s.Policy.PolicyCheckedAt)
+	if intentErr != nil || approvalErr != nil || policyErr != nil || !intentExpiry.After(now) || !approvalExpiry.After(now) || policyChecked.After(now) {
+		return fmt.Errorf("intent, approval or policy time binding is invalid or expired")
+	}
+	if s.Approval.Decision != "APPROVE" || !s.Approval.OneTime || s.Approval.IntentID != s.Intent.IntentID || s.Approval.IntentHash != s.Intent.IntentHash || s.Approval.PolicyVersion != s.Policy.PolicyVersion || s.Approval.CorrelationID != s.Intent.CorrelationID {
+		return fmt.Errorf("approval does not bind to current intent/policy")
+	}
+	return nil
+}
+
+// missionCanaryActive is deliberately separate from loadMissionState. A
+// restored historical grant may be expired yet still be a valid record to
+// replay and audit; only an operation that would create new authority or a
+// reservation must require it to be active now.
+func missionCanaryActive(s LearnerMissionState, now time.Time) error {
+	if err := missionAuthorityActive(s, now); err != nil {
+		return err
+	}
+	if s.Canary == nil {
+		return fmt.Errorf("canary grant is required")
+	}
+	if status := corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, now); status != "VALID" {
+		return fmt.Errorf("canary grant: %s", status)
+	}
+	return nil
 }
 
 type learnerIntentRequest struct {
@@ -209,27 +664,66 @@ type learnerIntentRequest struct {
 	IdempotencyKey string         `json:"idempotency_key"`
 }
 
-func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) {
-	var req learnerIntentRequest
-	if err := readJSON(requestPath, &req); err != nil {
-		return LearnerIntent{}, err
+func resolveM07Proposal(record HistoryRecord, proposalPath string) (corem07.RegisteredAgentProposal, corem07.AgentOutput, error) {
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
 	}
-	history, err := LoadHistory(historyPath)
+	ctx, err := m07EvidenceContext(record)
+	if err != nil {
+		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
+	}
+	return corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID)
+}
+
+func sameParameters(raw json.RawMessage, parameters map[string]any) bool {
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return false
+	}
+	canonicalProposal, err := json.Marshal(value)
+	if err != nil {
+		return false
+	}
+	canonicalIntent, err := json.Marshal(parameters)
+	return err == nil && bytes.Equal(canonicalProposal, canonicalIntent)
+}
+
+func buildLearnerIntent(historyPath, requestPath, proposalPath string) (LearnerIntent, error) {
+	var req learnerIntentRequest
+	raw, err := os.ReadFile(requestPath)
 	if err != nil {
 		return LearnerIntent{}, err
 	}
-	var record *HistoryRecord
-	for i := range history {
-		if history[i].RecordID == req.DecisionID {
-			copy := history[i]
-			record = &copy
-		}
+	if err := contracts.DecodeStrict(raw, &req); err != nil {
+		return LearnerIntent{}, err
 	}
-	if record == nil {
-		return LearnerIntent{}, fmt.Errorf("decision_id does not resolve in canonical history")
+	decoded, err := contracts.Decode(raw)
+	if err != nil {
+		return LearnerIntent{}, err
+	}
+	object, ok := decoded.(map[string]any)
+	if !ok {
+		return LearnerIntent{}, fmt.Errorf("intent request must be an object")
+	}
+	parameters, ok := object["parameters"].(map[string]any)
+	if !ok {
+		return LearnerIntent{}, fmt.Errorf("parameters must be a JSON object")
+	}
+	req.Parameters = parameters
+	record, err := resolveCanonicalRecord(historyPath, req.DecisionID)
+	if err != nil {
+		return LearnerIntent{}, fmt.Errorf("decision_id resolution: %w", err)
+	}
+	// M08 accepts the same canonical field IDs that M07 can ground, rather
+	// than inventing a parallel aggregate-only ID namespace. The resolver has
+	// already required exactly one replay-MATCH HistoryRecord.
+	context, err := m07EvidenceContext(record)
+	if err != nil {
+		return LearnerIntent{}, fmt.Errorf("decision evidence resolution: %w", err)
 	}
 	allowed := map[string]bool{}
-	for _, id := range record.RecordedResult.EvidenceIDs {
+	for _, id := range context.EvidenceIDs {
 		allowed[id] = true
 	}
 	if len(req.EvidenceIDs) == 0 {
@@ -243,6 +737,29 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 	if req.IntentID == "" || req.ActionType == "" || req.Target == "" || (req.ProposedBy != "human" && req.ProposedBy != "agent") || req.CorrelationID == "" || req.IdempotencyKey == "" || req.CreatedAt == "" || req.ExpiresAt == "" {
 		return LearnerIntent{}, fmt.Errorf("intent request missing required field")
 	}
+	if req.ProposedBy == "agent" {
+		if proposalPath == "" {
+			return LearnerIntent{}, fmt.Errorf("agent proposal_ref requires a persisted M07 proposal")
+		}
+		proposal, output, err := resolveM07Proposal(record, proposalPath)
+		if err != nil {
+			return LearnerIntent{}, fmt.Errorf("agent proposal resolution: %w", err)
+		}
+		if req.ProposalRef != proposal.ProposalID || output.ProposedAction == nil || req.ActionType != output.ProposedAction.ActionType || req.Target != output.ProposedAction.Target || !sameParameters(output.ProposedAction.Parameters, req.Parameters) {
+			return LearnerIntent{}, fmt.Errorf("agent intent must exactly bind the persisted M07 proposed_action")
+		}
+		proposalEvidence := map[string]bool{}
+		for _, id := range output.EvidenceIDs {
+			proposalEvidence[id] = true
+		}
+		for _, id := range req.EvidenceIDs {
+			if !proposalEvidence[id] {
+				return LearnerIntent{}, fmt.Errorf("agent intent evidence_id %s is absent from proposal", id)
+			}
+		}
+	} else if proposalPath != "" {
+		return LearnerIntent{}, fmt.Errorf("human intent must not supply an agent proposal")
+	}
 	created, err := time.Parse(time.RFC3339, req.CreatedAt)
 	if err != nil {
 		return LearnerIntent{}, err
@@ -251,9 +768,8 @@ func buildLearnerIntent(historyPath, requestPath string) (LearnerIntent, error) 
 	if err != nil || !expires.After(created) {
 		return LearnerIntent{}, fmt.Errorf("expires_at must be after created_at")
 	}
-	i := LearnerIntent{IntentID: req.IntentID, DecisionID: req.DecisionID, EvidenceIDs: req.EvidenceIDs, ActionType: strings.ToUpper(req.ActionType), Target: req.Target, Parameters: req.Parameters, ProposedBy: req.ProposedBy, ProposalRef: req.ProposalRef, CreatedAt: req.CreatedAt, ExpiresAt: req.ExpiresAt, CorrelationID: req.CorrelationID, IdempotencyKey: req.IdempotencyKey, IntentMode: "PROPOSAL_ONLY", ExecutionAuthorized: false}
-	i.IntentHash = learnerIntentHash(i)
-	return i, nil
+	sealed := corem08.SealIntent(corem08.Intent{IntentID: req.IntentID, DecisionID: req.DecisionID, EvidenceIDs: req.EvidenceIDs, ActionType: req.ActionType, Target: req.Target, Parameters: req.Parameters, ProposedBy: req.ProposedBy, ProposalRef: req.ProposalRef, CreatedAt: req.CreatedAt, ExpiresAt: req.ExpiresAt, CorrelationID: req.CorrelationID, IdempotencyKey: req.IdempotencyKey})
+	return LearnerIntent(sealed), nil
 }
 
 type learnerPolicyRequest struct {
@@ -264,63 +780,390 @@ type learnerPolicyRequest struct {
 	SeenIdempotency map[string]string `json:"seen_idempotency"`
 }
 
-func evaluateLearnerPolicy(i LearnerIntent, path string) (LearnerPolicy, error) {
+func evaluateLearnerPolicy(i LearnerIntent, path string, knownProposalIDs []string) (LearnerPolicy, error) {
 	var req learnerPolicyRequest
-	if err := readJSON(path, &req); err != nil {
-		return LearnerPolicy{}, err
-	}
-	if req.PolicyVersion == "" {
-		return LearnerPolicy{}, fmt.Errorf("policy_version required")
-	}
-	if i.IntentHash != learnerIntentHash(i) {
-		return LearnerPolicy{}, fmt.Errorf("intent hash mismatch")
-	}
-	now, err := time.Parse(time.RFC3339, req.Now)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return LearnerPolicy{}, err
 	}
-	expires, _ := time.Parse(time.RFC3339, i.ExpiresAt)
-	if expires.IsZero() {
-		return LearnerPolicy{}, fmt.Errorf("intent expires_at is invalid")
+	if err := contracts.DecodeStrict(raw, &req); err != nil {
+		return LearnerPolicy{}, err
 	}
-	decision := "DENY"
-	reason := "UNKNOWN_ACTION_POLICY"
-	risk := req.ActionRisk[i.ActionType]
-	if risk != "RISK0" && risk != "RISK1" && risk != "RISK2" {
-		return LearnerPolicy{}, fmt.Errorf("unknown action risk %q", risk)
+	ctx := corem08.PolicyContext{PolicyVersion: req.PolicyVersion, Now: req.Now, KnownDecisionIDs: []string{i.DecisionID}, KnownEvidenceIDs: append([]string(nil), i.EvidenceIDs...), KnownProposalIDs: knownProposalIDs, AllowedHosts: req.AllowedHosts, ActionRisk: req.ActionRisk, SeenIdempotency: req.SeenIdempotency}
+	return LearnerPolicy(corem08.EvaluatePolicy(corem08.Intent(i), ctx)), nil
+}
+
+func evaluateLearnerCanaryGate(s LearnerMissionState, bound corem10.TrustedCostBound, evaluatedAt string) (corem10.CanaryGateDecision, error) {
+	if s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+		return corem10.CanaryGateDecision{}, fmt.Errorf("active intent, policy, approval and canary grant required")
 	}
-	if risk == "RISK0" {
-		decision = "ALLOW"
-		reason = "SHADOW_POLICY_ALLOW"
-	} else {
-		decision = "HUMAN_REVIEW"
-		reason = risk + "_REQUIRES_REVIEW"
+	gate := corem10.EvaluateCanaryGate(corem10.CanaryGateInput{
+		Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash,
+		PolicyVersion: s.Policy.PolicyVersion, PolicyDecision: s.Policy.Decision, RiskClass: s.Policy.RiskClass,
+		ApprovalID: s.Approval.ApprovalID, ApproverID: s.Approval.ApproverID, CorrelationID: s.Intent.CorrelationID,
+		ActionType: s.Intent.ActionType, Target: s.Intent.Target, Now: evaluatedAt,
+		Ledger: corem10.CanaryLedgerSnapshot{ExecutionsTotal: s.Canary.ExecutionsUsed, ExecutionsInWindow: s.Canary.ExecutionsUsed, CostMinorTotal: s.Canary.CostUsedMinor},
+	})
+	raw, err := json.Marshal(gate)
+	if err != nil {
+		return corem10.CanaryGateDecision{}, err
 	}
-	target, parseErr := url.Parse(i.Target)
-	hostAllowed := parseErr == nil && target.Scheme == "https" && target.Hostname() != "" && target.Port() == "" && target.User == nil && target.RawQuery == "" && target.Fragment == ""
-	if hostAllowed {
-		hostAllowed = false
-		for _, host := range req.AllowedHosts {
-			if strings.EqualFold(strings.TrimSpace(host), target.Hostname()) {
-				hostAllowed = true
-				break
-			}
+	if _, err := corem10.ValidateCanaryGateDecision(raw); err != nil {
+		return corem10.CanaryGateDecision{}, err
+	}
+	return gate, nil
+}
+
+func authorizationBindsMissionState(authorization corem10.ExecutionAuthorization, s LearnerMissionState) bool {
+	if s.Intent == nil || s.Policy == nil || s.Canary == nil {
+		return false
+	}
+	return authorization.IntentID == s.Intent.IntentID && authorization.IntentHash == s.Intent.IntentHash &&
+		authorization.PolicyVersion == s.Policy.PolicyVersion && authorization.CanaryGrantID == s.Canary.GrantID &&
+		authorization.CanaryGrantVersion == s.Canary.GrantVersion && authorization.CanaryGrantHash == s.Canary.GrantHash &&
+		authorization.CorrelationID == s.Intent.CorrelationID && authorization.IdempotencyKey == s.Intent.IdempotencyKey
+}
+
+func resolveAuthorizationCostBound(dir string, authorization corem10.ExecutionAuthorization) (corem10.TrustedCostBound, error) {
+	entry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindTrustedCostBound, authorization.CanaryCostBoundID, "")
+	if err != nil {
+		return corem10.TrustedCostBound{}, err
+	}
+	bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
+	if status != "VALID" || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
+		return corem10.TrustedCostBound{}, fmt.Errorf("authorization cost bound does not resolve exactly")
+	}
+	return bound, nil
+}
+
+func reservationForExecution(s LearnerMissionState, executionID string) bool {
+	for _, reservation := range s.Reservations {
+		if reservation.ReservationMode == "GOVERNED_AUTHORIZATION" && reservation.ExecutionID == executionID {
+			return true
 		}
 	}
-	if !hostAllowed {
-		decision = "DENY"
-		reason = "TARGET_HOST_DENIED"
+	return false
+}
+
+func reservationIndexForAuthorization(s LearnerMissionState, authorizationID string) int {
+	for index, reservation := range s.Reservations {
+		if reservation.AuthorizationID == authorizationID && reservation.ReservationMode == "GOVERNED_AUTHORIZATION" {
+			return index
+		}
 	}
-	if _, seen := req.SeenIdempotency[i.IdempotencyKey]; seen {
-		decision = "DENY"
-		reason = "IDEMPOTENCY_REPLAY"
+	return -1
+}
+
+func validateExecutionReservation(s LearnerMissionState, authorization corem10.ExecutionAuthorization, record corem10.ExecutionRecord) (int, error) {
+	index := reservationIndexForAuthorization(s, authorization.AuthorizationID)
+	if index == -1 {
+		return -1, fmt.Errorf("governed authorization requires a bound reservation before execution record")
 	}
-	if !expires.After(now) {
-		decision = "DENY"
-		reason = "INTENT_EXPIRED"
+	if priorExecutionID := s.Reservations[index].ExecutionID; priorExecutionID != "" && priorExecutionID != record.ExecutionID {
+		return -1, fmt.Errorf("reservation already binds a different execution record")
 	}
-	p := LearnerPolicy{PolicyVersion: req.PolicyVersion, IntentID: i.IntentID, IntentHash: i.IntentHash, Decision: decision, RiskClass: risk, Reason: reason, PolicyReviewRequired: decision == "HUMAN_REVIEW", PolicyMode: "NON_AUTHORIZING", ExecutionAuthorized: false, PolicyCheckedAt: req.Now}
-	return p, nil
+	return index, nil
+}
+
+// validateM10FixtureOutcome deliberately permits only a terminal no-side-effect
+// record. It is a local fixture measurement, not evidence of business impact.
+func validateM10FixtureOutcome(dir string, s LearnerMissionState, raw []byte) (m03.OutcomeRecord, string) {
+	outcome, status := m03.DecodeM03Outcome(raw)
+	if status != "VALID" {
+		return outcome, status
+	}
+	if outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" {
+		return outcome, "REQUIRE_MACHINE_EXECUTION"
+	}
+	entry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindExecutionRecord, outcome.EffectRef.EffectID, "")
+	if err != nil {
+		return outcome, "ORPHAN_EXECUTION"
+	}
+	record, err := corem10.ValidateExecutionRecord(entry.Artifact)
+	if err != nil || !reservationForExecution(s, record.ExecutionID) {
+		return outcome, "ORPHAN_EXECUTION"
+	}
+	attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	observedAt, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	if attemptedErr != nil || observedErr != nil || observedAt.Before(attemptedAt) {
+		return outcome, "OUTCOME_BEFORE_EXECUTION"
+	}
+	if record.SideEffectState != "NOT_PERFORMED" || outcome.Status != "CANCELLED" || len(outcome.Metrics) != 0 || !strings.HasPrefix(outcome.SourceRef, "fixture:m10-outcome/") {
+		return outcome, "INVALID_NO_SIDE_EFFECT_OUTCOME"
+	}
+	return outcome, "VALID"
+}
+
+func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRecord, error) {
+	f, err := (store.JSONL{}).Open(m10OutcomeStorePath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
+	outcomes := []m03.OutcomeRecord{}
+	seen := map[string]bool{}
+	for scanner.Scan() {
+		outcome, status := validateM10FixtureOutcome(dir, s, scanner.Bytes())
+		if status != "VALID" || seen[outcome.OutcomeID] {
+			return nil, fmt.Errorf("invalid M10 fixture outcome store")
+		}
+		seen[outcome.OutcomeID] = true
+		outcomes = append(outcomes, outcome)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return outcomes, nil
+}
+
+// validateM11FixtureOutcome accepts only an observation that proves a local
+// fixture did not perform a side effect. It is deliberately not a production
+// business-outcome ingestion path.
+func validateM11FixtureOutcome(dir string, raw []byte) (m03.OutcomeRecord, corem11.ProductionExecutionRecord, string) {
+	outcome, status := m03.DecodeM03Outcome(raw)
+	if status != "VALID" {
+		return outcome, corem11.ProductionExecutionRecord{}, status
+	}
+	if outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" {
+		return outcome, corem11.ProductionExecutionRecord{}, "REQUIRE_MACHINE_EXECUTION"
+	}
+	value, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, outcome.EffectRef.EffectID)
+	if err != nil {
+		return outcome, corem11.ProductionExecutionRecord{}, "ORPHAN_EXECUTION"
+	}
+	record := *value.(*corem11.ProductionExecutionRecord)
+	attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	observedAt, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	if attemptedErr != nil || observedErr != nil || observedAt.Before(attemptedAt) {
+		return outcome, record, "OUTCOME_BEFORE_EXECUTION"
+	}
+	if record.Status != "FAILED" || record.SideEffectState != "NOT_PERFORMED" || outcome.Status != "CANCELLED" || len(outcome.Metrics) != 0 || !strings.HasPrefix(outcome.SourceRef, "fixture:m11-outcome/") {
+		return outcome, record, "INVALID_NO_SIDE_EFFECT_OUTCOME"
+	}
+	return outcome, record, "VALID"
+}
+
+func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
+	f, err := (store.JSONL{}).Open(m11OutcomeStorePath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
+	outcomes := []m03.OutcomeRecord{}
+	seen := map[string]bool{}
+	for scanner.Scan() {
+		outcome, _, status := validateM11FixtureOutcome(dir, scanner.Bytes())
+		if status != "VALID" || seen[outcome.OutcomeID] {
+			return nil, fmt.Errorf("invalid M11 fixture outcome store")
+		}
+		seen[outcome.OutcomeID] = true
+		outcomes = append(outcomes, outcome)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return outcomes, nil
+}
+
+func appendM11FixtureOutcome(dir string, outcome m03.OutcomeRecord) (string, error) {
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, prior := range outcomes {
+		if prior.OutcomeID == outcome.OutcomeID {
+			if reflect.DeepEqual(prior, outcome) {
+				return appendDuplicate, nil
+			}
+			return "", fmt.Errorf("outcome_id reused with different content")
+		}
+		if prior.EffectRef.EffectID == outcome.EffectRef.EffectID {
+			return "", fmt.Errorf("M11 execution already has an outcome")
+		}
+	}
+	encoded, err := json.Marshal(outcome)
+	if err != nil {
+		return "", err
+	}
+	if err := m11OutcomeWriteFault("before_append"); err != nil {
+		return "", err
+	}
+	if err := (store.JSONL{}).AppendLine(m11OutcomeStorePath(dir), encoded); err != nil {
+		return "", err
+	}
+	if err := m11OutcomeWriteFault("after_append"); err != nil {
+		return "", err
+	}
+	return appendAdded, nil
+}
+
+func nextM11FixtureOutcomeLedger(ledger corem11.ProductionLedger, outcome m03.OutcomeRecord, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {
+	if ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ReconciliationRequired {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 ledger cannot accept the outcome")
+	}
+	observed, observedErr := time.Parse(time.RFC3339, outcome.ObservedAt)
+	updated, updatedErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+	if observedErr != nil || updatedErr != nil || !observed.After(updated) {
+		return corem11.ProductionLedger{}, fmt.Errorf("outcome time must advance the ledger")
+	}
+	pendingIndex := -1
+	for index, id := range ledger.PendingExecutionIDs {
+		if id == record.ExecutionID {
+			pendingIndex = index
+		}
+	}
+	if pendingIndex < 0 || ledger.PendingOutcomes < 1 {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 outcome has no pending execution")
+	}
+	for _, link := range ledger.OutcomeLinks {
+		if link.OutcomeID == outcome.OutcomeID || link.ExecutionID == record.ExecutionID {
+			return corem11.ProductionLedger{}, fmt.Errorf("M11 execution already has an outcome")
+		}
+	}
+	next := ledger
+	next.PendingOutcomes--
+	// Keep the in-memory transition in the same canonical form as its JSON
+	// artifact. In particular, an empty list must be [] rather than nil, or a
+	// journal replay would correctly reject its own decoded snapshot.
+	next.PendingExecutionIDs = make([]string, 0, len(ledger.PendingExecutionIDs)-1)
+	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[:pendingIndex]...)
+	next.PendingExecutionIDs = append(next.PendingExecutionIDs, ledger.PendingExecutionIDs[pendingIndex+1:]...)
+	next.OutcomeLinks = append(append([]corem11.ProductionOutcomeLink(nil), ledger.OutcomeLinks...), corem11.ProductionOutcomeLink{OutcomeID: outcome.OutcomeID, ExecutionID: record.ExecutionID, ObservedAt: outcome.ObservedAt})
+	next.ConsecutiveFailures = 0
+	next.LastOutcomeAt = outcome.ObservedAt
+	next.UpdatedAt = outcome.ObservedAt
+	return next, nil
+}
+
+// recoverM11OutcomeJournal completes a durable two-file outcome transition.
+// The journal is written before either file is changed. Each replay step is
+// idempotent, so a crash after the ledger append or after the outcome append
+// cannot leave a caller with a false ACK or a permanently orphaned transition.
+func recoverM11OutcomeJournal(dir string) error {
+	raw, err := os.ReadFile(m11OutcomeJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m11OutcomeJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m11-outcome-journal/v1" {
+		return fmt.Errorf("M11 outcome journal is invalid")
+	}
+	ledgerRaw, err := json.Marshal(journal.Ledger)
+	if err != nil {
+		return err
+	}
+	if _, status := corem11.DecodeArtifact("ledger", ledgerRaw); status != corem11.Valid {
+		return fmt.Errorf("M11 outcome journal ledger is invalid")
+	}
+	outcomeRaw, err := json.Marshal(journal.Outcome)
+	if err != nil {
+		return err
+	}
+	_, record, status := validateM11FixtureOutcome(dir, outcomeRaw)
+	if status != "VALID" {
+		return fmt.Errorf("M11 outcome journal outcome is invalid")
+	}
+	predecessorEntry, err := resolveM11Artifact(dir, corem11.ArtifactKindLedger, journal.PredecessorArtifactID, journal.PredecessorContentHash)
+	if err != nil {
+		return fmt.Errorf("M11 outcome journal predecessor does not resolve: %w", err)
+	}
+	predecessorValue, predecessorStatus := corem11.DecodeArtifact("ledger", predecessorEntry.Artifact)
+	if predecessorStatus != corem11.Valid {
+		return fmt.Errorf("M11 outcome journal predecessor is invalid")
+	}
+	expectedLedger, err := nextM11FixtureOutcomeLedger(*predecessorValue.(*corem11.ProductionLedger), journal.Outcome, record)
+	if err != nil || !reflect.DeepEqual(expectedLedger, journal.Ledger) {
+		return fmt.Errorf("M11 outcome journal transition does not match its predecessor")
+	}
+	expectedEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		return err
+	}
+	currentEntry, _, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil {
+		return err
+	}
+	if currentEntry.ArtifactID == predecessorEntry.ArtifactID && currentEntry.ContentHash == predecessorEntry.ContentHash {
+		if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+			return fmt.Errorf("M11 outcome journal ledger recovery failed: %w", err)
+		}
+	} else if currentEntry.ArtifactID != expectedEntry.ArtifactID || currentEntry.ContentHash != expectedEntry.ContentHash {
+		return fmt.Errorf("M11 outcome journal is no longer the active ledger transition")
+	}
+	if _, err := appendM11FixtureOutcome(dir, journal.Outcome); err != nil {
+		return fmt.Errorf("M11 outcome journal outcome recovery failed: %w", err)
+	}
+	if err := os.Remove(m11OutcomeJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	parent, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = parent.Sync()
+	closeErr := parent.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecord, corem11.ProductionLedger, string, error) {
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		return m03.OutcomeRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	outcome, record, validation := validateM11FixtureOutcome(dir, raw)
+	if validation != "VALID" {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome rejected: %s", validation)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	for _, prior := range outcomes {
+		if prior.OutcomeID != outcome.OutcomeID {
+			if prior.EffectRef.EffectID == record.ExecutionID {
+				return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 execution already has an outcome")
+			}
+			continue
+		}
+		if reflect.DeepEqual(prior, outcome) {
+			return outcome, corem11.ProductionLedger{}, appendDuplicate, nil
+		}
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("outcome_id reused with different content")
+	}
+	ledgerEntry, ledger, err := m11LedgerHead(dir, record.ProductionLeaseID)
+	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	if ledgerEntry.ArtifactID != ledgerID {
+		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
+	}
+	next, err := nextM11FixtureOutcomeLedger(ledger, outcome, record)
+	if err != nil {
+		return outcome, corem11.ProductionLedger{}, "", err
+	}
+	journal := m11OutcomeJournal{Version: "m11-outcome-journal/v1", PredecessorArtifactID: ledgerEntry.ArtifactID, PredecessorContentHash: ledgerEntry.ContentHash, Outcome: outcome, Ledger: next}
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		return outcome, next, "", err
+	}
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		return outcome, next, "", err
+	}
+	return outcome, next, appendAdded, nil
 }
 
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
@@ -338,46 +1181,118 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if len(args) < 1 {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-reserve STATE_DIR COST_MINOR | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | m08-policy INTENT POLICY OUT | bind STATE_DIR INTENT POLICY | m09-approval STATE_DIR APPROVAL | m10-canary STATE_DIR GRANT | m10-cost-register STATE_DIR COST_BOUND | m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT | m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID | m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID | m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON | m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON | m10-outcome STATE_DIR OUTCOME_INPUT | m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m10-reserve STATE_DIR COST_MINOR|COST_BOUND [RESERVATION_ID] | m11-register STATE_DIR KIND ARTIFACT_INPUT | m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH] | m11-activate STATE_DIR LEASE_ID ACTIVATED_AT | m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT | m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT | m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT | m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT | m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON | m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON | m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID | m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT | m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID | m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT | m11-close-cycle STATE_DIR CYCLE_ID EVALUATION_ID CLOSED_AT | m11-stop STATE_DIR REASON | status STATE_DIR"), 2)
+	}
+	// Directory creation and an exclusive lock make the mutable mission state
+	// single-writer across processes. A stale lock fails closed and requires an
+	// explicit recovery procedure rather than silently risking double reserve.
+	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-record-unknown": true, "m11-reconcile": true, "m11-outcome": true, "m11-evaluate": true, "m11-close-cycle": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	if mutatesState && len(args) >= 2 {
+		if err := os.MkdirAll(args[1], 0700); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
+		lockPath := filepath.Join(args[1], ".mission.lock")
+		if err := os.Mkdir(lockPath, 0700); err != nil {
+			if os.IsExist(err) {
+				return emit("BUSY", nil, fmt.Errorf("mission state is locked; explicit recovery required after an interrupted writer"), 1)
+			}
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		defer os.Remove(lockPath)
+		if err := recoverM11OutcomeJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
+		if err := recoverM11DurableStop(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 	}
 	switch args[0] {
 	case "m08-intent", "intent":
-		if len(args) != 4 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT"), 2)
+		if len(args) != 4 && len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-intent HISTORY REQUEST OUT | bot mission m08-intent HISTORY REQUEST M07_PROPOSAL OUT"), 2)
 		}
-		i, err := buildLearnerIntent(args[1], args[2])
+		if err := distinctPaths(args[1:]...); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		proposalPath, outputPath := "", args[3]
+		if len(args) == 5 {
+			proposalPath, outputPath = args[3], args[4]
+		}
+		i, err := buildLearnerIntent(args[1], args[2], proposalPath)
 		if err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		if err = writeJSON(args[3], i); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		status, err := writeNewJSON(outputPath, i)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
 		}
-		return emit("APPENDED", i, nil, 0)
+		return emit(status, i, nil, 0)
 	case "m08-policy", "policy":
-		if len(args) != 4 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-policy INTENT POLICY OUT"), 2)
+		if len(args) != 4 && len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m08-policy INTENT POLICY OUT | bot mission m08-policy HISTORY INTENT POLICY M07_PROPOSAL OUT"), 2)
 		}
-		var i LearnerIntent
-		if err := readJSON(args[1], &i); err != nil {
+		if err := distinctPaths(args[1:]...); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		intentPath, policyPath, outputPath := args[1], args[2], args[3]
+		if len(args) == 6 {
+			intentPath, policyPath, outputPath = args[2], args[3], args[5]
+		}
+		raw, err := os.ReadFile(intentPath)
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
-		p, err := evaluateLearnerPolicy(i, args[2])
+		decoded, state := corem08.DecodeIntent(raw)
+		if state != "VALID" {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
+		}
+		i := LearnerIntent(decoded)
+		knownProposalIDs := []string{}
+		if i.ProposedBy == "agent" {
+			if len(args) != 6 {
+				return emit("INPUT_ERROR", nil, fmt.Errorf("agent intent policy requires HISTORY and persisted M07 proposal"), 1)
+			}
+			record, err := resolveCanonicalRecord(args[1], i.DecisionID)
+			if err != nil {
+				return emit("INPUT_ERROR", nil, err, 1)
+			}
+			proposal, output, err := resolveM07Proposal(record, args[4])
+			if err != nil || proposal.ProposalID != i.ProposalRef || output.ProposedAction == nil || i.ActionType != output.ProposedAction.ActionType || i.Target != output.ProposedAction.Target || !sameParameters(output.ProposedAction.Parameters, i.Parameters) {
+				return emit("INPUT_ERROR", nil, fmt.Errorf("agent intent does not resolve to its persisted M07 proposal"), 1)
+			}
+			knownProposalIDs = []string{proposal.ProposalID}
+		}
+		p, err := evaluateLearnerPolicy(i, policyPath, knownProposalIDs)
 		if err != nil {
 			return emit("DENY", nil, err, 1)
 		}
-		if err = writeJSON(args[3], p); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		status, err := writeNewJSON(outputPath, p)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, p, nil, 0)
 		}
 		return emit(p.Decision, p, nil, 0)
 	case "bind":
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission bind STATE_DIR INTENT POLICY"), 2)
 		}
-		var i LearnerIntent
 		var p LearnerPolicy
-		if err := readJSON(args[2], &i); err != nil {
+		intentRaw, err := os.ReadFile(args[2])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
+		decodedIntent, state := corem08.DecodeIntent(intentRaw)
+		if state != "VALID" {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
+		}
+		i := LearnerIntent(decodedIntent)
 		if err := readJSON(args[3], &p); err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -400,6 +1315,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			s.Approval = nil
 			s.Canary = nil
 			s.Lease = nil
+			s.Reservations = nil
 		}
 		s.Intent = &i
 		s.Policy = &p
@@ -427,6 +1343,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if approvedErr != nil || expiresErr != nil || !expiresAt.After(approvedAt) || !expiresAt.After(time.Now().UTC()) || approvedAt.After(time.Now().UTC()) {
 			return emit("REJECTED", nil, fmt.Errorf("approval timestamps are invalid or expired"), 1)
 		}
+		if intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt); intentErr != nil || !intentExpiry.After(time.Now().UTC()) {
+			return emit("REJECTED", nil, fmt.Errorf("intent is expired"), 1)
+		}
+		if s.Approval != nil {
+			if *s.Approval == a {
+				return emit("EXACT_DUPLICATE", a, nil, 0)
+			}
+			return emit("REJECTED", nil, fmt.Errorf("cannot replace an existing approval"), 1)
+		}
 		s.Approval = &a
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -443,42 +1368,212 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop {
 			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
 		}
-		if s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Approval.Decision != "APPROVE" {
-			return emit("REJECTED", nil, fmt.Errorf("approved human record required"), 1)
+		if err := missionAuthorityActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
 		}
-		var c LearnerCanary
-		if err = readJSON(args[2], &c); err != nil {
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
-		if c.GrantID == "" || c.MaxExecutions <= 0 || c.MaxCostMinor < 0 || c.Currency == "" || c.ExecutionsUsed < 0 || c.CostUsedMinor < 0 {
-			return emit("REJECTED", nil, fmt.Errorf("bounded canary fields required"), 1)
+		grant, status := corem10.DecodeCanaryGrant(raw)
+		if status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant: %s", status), 1)
 		}
-		if c.ExecutionsUsed > c.MaxExecutions || c.CostUsedMinor > c.MaxCostMinor {
-			return emit("REJECTED", nil, fmt.Errorf("canary usage exceeds grant"), 1)
+		if status := corem10.ValidCanaryGrantFor(grant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, time.Now().UTC()); status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant: %s", status), 1)
 		}
+		c := LearnerCanary{CanaryGrant: grant, Status: "ACTIVE"}
 		if s.Canary != nil {
-			if s.Canary.GrantID != c.GrantID || s.Canary.IntentID != s.Intent.IntentID || s.Canary.ApprovalID != s.Approval.ApprovalID {
+			if s.Canary.GrantID != c.GrantID || s.Canary.GrantHash != c.GrantHash {
 				return emit("REJECTED", nil, fmt.Errorf("cannot replace an existing canary binding"), 1)
 			}
 			c.ExecutionsUsed = s.Canary.ExecutionsUsed
 			c.CostUsedMinor = s.Canary.CostUsedMinor
-			c.GrantedAt = s.Canary.GrantedAt
 		}
-		c.IntentID = s.Intent.IntentID
-		c.IntentHash = s.Intent.IntentHash
-		c.ApprovalID = s.Approval.ApprovalID
-		c.Status = "ACTIVE"
-			if c.GrantedAt == "" {
-				c.GrantedAt = time.Now().UTC().Format(time.RFC3339Nano)
-			}
+		grantRaw, err := json.Marshal(c.CanaryGrant)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
 		s.Canary = &c
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("ACK", c, nil, 0)
-	case "m10-reserve", "reserve":
+	case "m10-cost-register":
 		if len(args) != 3 {
-			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR"), 2)
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cost-register STATE_DIR COST_BOUND"), 2)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent and canary grant required"), 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(raw)
+		if status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+		}
+		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()); status != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+		}
+		bounds, err := loadTrustedCostBounds(args[1])
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		boundAlreadyRegistered := false
+		for _, old := range bounds {
+			if old.CostBoundID == bound.CostBoundID {
+				if old.CostBoundHash == bound.CostBoundHash {
+					boundAlreadyRegistered = true
+					break
+				}
+				return emit("CONFLICT", nil, fmt.Errorf("cost_bound_id reused with different content"), 1)
+			}
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindTrustedCostBound, raw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if boundAlreadyRegistered {
+			return emit("EXACT_DUPLICATE", bound, nil, 0)
+		}
+		f, err := os.OpenFile(trustedCostBoundsPath(args[1]), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		_, err = f.Write(append(bytes.TrimSpace(raw), '\n'))
+		if syncErr := f.Sync(); err == nil {
+			err = syncErr
+		}
+		if closeErr := f.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("APPENDED", bound, nil, 0)
+	case "m10-gate":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-gate STATE_DIR COST_BOUND OUT EVALUATED_AT"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
+		}
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(raw)
+		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
+		}
+		gate, err := evaluateLearnerCanaryGate(s, bound, args[4])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		gateRaw, err := json.Marshal(gate)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		status, err = writeNewJSON(args[3], gate)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, gate, nil, 0)
+		}
+		return emit(gate.Decision, gate, nil, 0)
+	case "m10-authorize":
+		if len(args) != 7 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-authorize STATE_DIR COST_BOUND GATE OUT AUTHORIZED_AT EXECUTOR_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
+		}
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		boundRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		bound, status := corem10.DecodeTrustedCostBound(boundRaw)
+		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
+			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
+		}
+		gateRaw, err := os.ReadFile(args[3])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		storedGate, err := corem10.ValidateCanaryGateDecision(gateRaw)
+		if err != nil {
+			return emit("REJECTED", nil, fmt.Errorf("invalid persisted canary gate"), 1)
+		}
+		if !resolveM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw) {
+			return emit("REJECTED", nil, fmt.Errorf("canary gate is not a registered canonical artifact"), 1)
+		}
+		if storedGate.EvaluatedAt != args[5] {
+			return emit("REJECTED", nil, fmt.Errorf("authorization time must exactly match persisted gate evaluation"), 1)
+		}
+		currentGate, err := evaluateLearnerCanaryGate(s, bound, args[5])
+		if err != nil || storedGate != currentGate {
+			return emit("REJECTED", nil, fmt.Errorf("persisted canary gate is stale or does not match current state"), 1)
+		}
+		authorization, err := corem10.AuthorizeCanary(corem10.CanaryAuthorizationInput{Gate: storedGate, Grant: s.Canary.CanaryGrant, CostBound: bound, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, PolicyVersion: s.Policy.PolicyVersion, IdempotencyKey: s.Intent.IdempotencyKey, CorrelationID: s.Intent.CorrelationID, IntentExpiresAt: s.Intent.ExpiresAt, ExecutorID: args[6], AuthorizedAt: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		authorizationRaw, err := json.Marshal(authorization)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionAuthorization(authorizationRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		status, err = writeNewJSON(args[4], authorization)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if status == appendDuplicate {
+			return emit(status, authorization, nil, 0)
+		}
+		return emit("AUTHORIZED", authorization, nil, 0)
+	case "m10-reserve-authorization":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve-authorization STATE_DIR AUTHORIZATION RESERVATION_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
 		}
 		s, err := loadMissionState(args[1])
 		if err != nil {
@@ -490,15 +1585,426 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil || !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) || !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is invalid, unregistered or mismatched"), 1)
+		}
+		expiresAt, err := time.Parse(time.RFC3339, authorization.ExpiresAt)
+		if err != nil || !expiresAt.After(time.Now().UTC()) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization has expired"), 1)
+		}
+		bound, err := resolveAuthorizationCostBound(args[1], authorization)
+		if err != nil || corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()) != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("authorization cost bound is invalid or expired"), 1)
+		}
+		reservationID := args[3]
+		if reservationID == "" {
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id is required"), 1)
+		}
+		for _, prior := range s.Reservations {
+			if prior.ReservationID == reservationID {
+				if prior.AuthorizationID == authorization.AuthorizationID && prior.GrantID == authorization.CanaryGrantID && prior.IntentID == authorization.IntentID && prior.IntentHash == authorization.IntentHash && prior.CostMinor == authorization.CanaryCostBoundMinor && prior.CostBoundID == authorization.CanaryCostBoundID && prior.CostBoundHash == authorization.CanaryCostBoundHash && prior.ReservationMode == "GOVERNED_AUTHORIZATION" {
+					return emit("EXACT_DUPLICATE", prior, nil, 0)
+				}
+				return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different authorization binding"), 1)
+			}
+			if prior.AuthorizationID == authorization.AuthorizationID {
+				return emit("REJECTED", nil, fmt.Errorf("execution authorization already has a reservation"), 1)
+			}
+		}
+		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutionsTotal || authorization.CanaryCostBoundMinor > s.Canary.MaxCostMinorTotal-s.Canary.CostUsedMinor {
+			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
+		}
+		reservation := LearnerReservation{ReservationID: reservationID, GrantID: authorization.CanaryGrantID, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, CostMinor: authorization.CanaryCostBoundMinor, CostBoundID: authorization.CanaryCostBoundID, CostBoundHash: authorization.CanaryCostBoundHash, AuthorizationID: authorization.AuthorizationID, ReservationMode: "GOVERNED_AUTHORIZATION", ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+		s.Canary.ExecutionsUsed++
+		s.Canary.CostUsedMinor += authorization.CanaryCostBoundMinor
+		s.Reservations = append(s.Reservations, reservation)
+		if err := saveMissionState(args[1], s); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("RESERVED", reservation, nil, 0)
+	case "m10-record-failed":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-record-failed STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT FIXTURE_REASON"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil || !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) || !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is invalid, unregistered or mismatched"), 1)
+		}
+		record, err := corem10.FailCanaryExecutionFixture(corem10.FailedExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		reservationIndex, err := validateExecutionReservation(s, authorization, record)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		recordRaw, err := json.Marshal(record)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if s.Reservations[reservationIndex].ExecutionID == "" {
+			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
+			if err := saveMissionState(args[1], s); err != nil {
+				return emit("STORE_ERROR", nil, err, 1)
+			}
+		}
+		return emit(status, record, nil, 0)
+	case "m10-cancel":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-cancel STATE_DIR AUTHORIZATION OUT ATTEMPTED_AT REASON"), 2)
+		}
+		if err := distinctPaths(args[1], args[2], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		authorizationRaw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+		if err != nil {
+			return emit("REJECTED", nil, fmt.Errorf("invalid execution authorization: %w", err), 1)
+		}
+		if !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization is not a registered canonical artifact"), 1)
+		}
+		if !authorizationBindsMissionState(authorization, s) {
+			return emit("REJECTED", nil, fmt.Errorf("execution authorization does not bind to current mission state"), 1)
+		}
+		record, err := corem10.CancelCanaryExecution(corem10.CancelledExecutionInput{Authorization: authorization, AttemptedAt: args[4], Reason: args[5]})
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		reservationIndex, err := validateExecutionReservation(s, authorization, record)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		recordRaw, err := json.Marshal(record)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		if s.Reservations[reservationIndex].ExecutionID == "" {
+			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
+			if err := saveMissionState(args[1], s); err != nil {
+				return emit("STORE_ERROR", nil, err, 1)
+			}
+		}
+		return emit(status, record, nil, 0)
+	case "m10-outcome":
+		if len(args) != 3 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-outcome STATE_DIR OUTCOME_INPUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		outcome, outcomeStatus := validateM10FixtureOutcome(args[1], s, raw)
+		if outcomeStatus != "VALID" {
+			return emit(outcomeStatus, nil, fmt.Errorf("M10 outcome rejected: %s", outcomeStatus), 1)
+		}
+		outcomes, err := loadM10FixtureOutcomes(args[1], s)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		for _, prior := range outcomes {
+			if prior.OutcomeID != outcome.OutcomeID {
+				continue
+			}
+			if reflect.DeepEqual(prior, outcome) {
+				return emit("EXACT_DUPLICATE", outcome, nil, 0)
+			}
+			return emit("CONFLICT", nil, fmt.Errorf("outcome_id reused with different content"), 1)
+		}
+		encoded, err := json.Marshal(outcome)
+		if err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		if err := (store.JSONL{}).AppendLine(m10OutcomeStorePath(args[1]), encoded); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+		return emit("APPENDED", outcome, nil, 0)
+	case "m10-resolve":
+		if len(args) != 4 && len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
+		}
+		contentHash := ""
+		if len(args) == 5 {
+			contentHash = args[4]
+		}
+		entry, err := resolveM10ArtifactByID(args[1], args[2], args[3], contentHash)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit("RESOLVED", entry.Artifact, nil, 0)
+	case "m11-register":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-register STATE_DIR KIND ARTIFACT_INPUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[3]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		managedKinds := map[string]bool{
+			corem11.ArtifactKindActivation: true, corem11.ArtifactKindLedger: true,
+			corem11.ArtifactKindGate: true, corem11.ArtifactKindAuthorization: true,
+			corem11.ArtifactKindExecution: true, corem11.ArtifactKindEvaluation: true,
+			corem11.ArtifactKindCycle: true,
+		}
+		if managedKinds[args[2]] {
+			return emit("REJECTED", nil, fmt.Errorf("M11 lifecycle artifact must be created by its dedicated command"), 1)
+		}
+		raw, err := os.ReadFile(args[3])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		entry, status, err := registerM11Artifact(args[1], args[2], raw)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, entry, nil, 0)
+	case "m11-resolve":
+		if len(args) != 4 && len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
+		}
+		hash := ""
+		if len(args) == 5 {
+			hash = args[4]
+		}
+		entry, err := resolveM11Artifact(args[1], args[2], args[3], hash)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit("RESOLVED", entry.Artifact, nil, 0)
+	case "m11-activate":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-activate STATE_DIR LEASE_ID ACTIVATED_AT"), 2)
+		}
+		record, status, err := activateM11Lease(args[1], args[2], args[3])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, record, nil, 0)
+	case "m11-ledger-init":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-ledger-init STATE_DIR LEASE_ID INITIALIZED_AT"), 2)
+		}
+		ledger, status, err := initializeM11Ledger(args[1], args[2], args[3])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, ledger, nil, 0)
+	case "m11-gate":
+		if len(args) != 7 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-gate STATE_DIR LEASE_ID HEALTH_ID COST_BOUND_ID LEDGER_ID EVALUATED_AT"), 2)
+		}
+		gate, _, err := evaluateM11Gate(args[1], args[2], args[3], args[4], args[5], args[6])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(gate.Decision, gate, nil, 0)
+	case "m11-authorize":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-authorize STATE_DIR LEASE_ID GATE_ID EXECUTOR_ID AUTHORIZED_AT"), 2)
+		}
+		authorization, status, err := authorizeM11Production(args[1], args[2], args[3], args[4], args[5])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, authorization, nil, 0)
+	case "m11-reserve-authorization":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-reserve-authorization STATE_DIR AUTHORIZATION_ID LEDGER_ID RESERVED_AT"), 2)
+		}
+		ledger, status, err := reserveM11Authorization(args[1], args[2], args[3], args[4])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, ledger, nil, 0)
+	case "m11-record-failed":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-record-failed STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT FIXTURE_REASON"), 2)
+		}
+		record, executionLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, map[string]any{"execution": record, "execution_ledger": executionLedger}, nil, 0)
+	case "m11-record-unknown":
+		if len(args) != 6 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-record-unknown STATE_DIR AUTHORIZATION_ID RESERVATION_LEDGER_ID ATTEMPTED_AT REASON"), 2)
+		}
+		record, stoppedLedger, status, err := recordUnknownM11Execution(args[1], args[2], args[3], args[4], args[5])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, nil, 0)
+	case "m11-reconcile":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-reconcile STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID"), 2)
+		}
+		resolution, ledger, status, err := reconcileM11Execution(args[1], args[2], args[3])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, map[string]any{"resolution": resolution, "stopped_ledger": ledger}, nil, 0)
+	case "m11-recovery-export":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT"), 2)
+		}
+		if err := distinctPaths(args[1], args[4]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		handoff, err := m11RecoveryHandoff(args[1], args[2], args[3])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		status, err := writeNewJSON(args[4], handoff)
+		if err != nil {
+			return emit("CONFLICT", nil, err, 1)
+		}
+		return emit(status, handoff, nil, 0)
+	case "m11-outcome":
+		if len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-outcome STATE_DIR OUTCOME_INPUT LEDGER_ID"), 2)
+		}
+		if err := distinctPaths(args[1], args[2]); err != nil {
+			return emit("PATH_ERROR", nil, err, 1)
+		}
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
+			return emit("INPUT_ERROR", nil, err, 1)
+		}
+		outcome, ledger, status, err := recordM11FixtureOutcome(args[1], args[3], raw)
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, map[string]any{"outcome": outcome, "post_ledger": ledger}, nil, 0)
+	case "m11-evaluate":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT"), 2)
+		}
+		evaluation, status, err := evaluateM11FixtureOutcome(args[1], args[2], args[3], args[4])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, evaluation, nil, 0)
+	case "m11-close-cycle":
+		if len(args) != 5 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-close-cycle STATE_DIR CYCLE_ID EVALUATION_ID CLOSED_AT"), 2)
+		}
+		cycle, status, err := closeM11FixtureCycle(args[1], args[2], args[3], args[4])
+		if err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
+		return emit(status, cycle, nil, 0)
+	case "m10-reserve", "reserve":
+		if len(args) != 3 && len(args) != 4 {
+			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-reserve STATE_DIR COST_MINOR [RESERVATION_ID]"), 2)
+		}
+		s, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if s.Stop {
+			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
+		}
+		if s.Canary == nil {
+			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
+		}
+		if err := missionCanaryActive(s, time.Now().UTC()); err != nil {
+			return emit("REJECTED", nil, err, 1)
+		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)
-		if parseErr != nil || cost < 0 {
+		boundID, boundHash := "", ""
+		if parseErr != nil {
+			raw, err := os.ReadFile(args[2])
+			if err != nil {
+				return emit("INPUT_ERROR", nil, err, 1)
+			}
+			bound, status := corem10.DecodeTrustedCostBound(raw)
+			if status != "VALID" {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+			}
+			if !resolveTrustedCostBound(args[1], bound) {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound is not registered"), 1)
+			}
+			if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, time.Now().UTC()); status != "VALID" {
+				return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
+			}
+			cost, boundID, boundHash = bound.MaxCostMinor, bound.CostBoundID, bound.CostBoundHash
+		} else if cost < 0 {
 			return emit("REJECTED", nil, fmt.Errorf("cost must be a non-negative integer"), 1)
 		}
-		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutions || cost > s.Canary.MaxCostMinor-s.Canary.CostUsedMinor {
+		reservationID := "legacy:" + args[2]
+		if len(args) == 4 {
+			reservationID = args[3]
+		}
+		if reservationID == "" {
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id is required"), 1)
+		}
+		for _, prior := range s.Reservations {
+			if prior.ReservationID != reservationID {
+				continue
+			}
+			if prior.AuthorizationID == "" && prior.GrantID == s.Canary.GrantID && prior.IntentID == s.Intent.IntentID && prior.IntentHash == s.Intent.IntentHash && prior.CostMinor == cost {
+				return emit("EXACT_DUPLICATE", s.Canary, nil, 0)
+			}
+			return emit("REJECTED", nil, fmt.Errorf("reservation_id reused with different binding or cost"), 1)
+		}
+		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutionsTotal || cost > s.Canary.MaxCostMinorTotal-s.Canary.CostUsedMinor {
 			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
 		}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += cost
+		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservationMode: "LEGACY_COMPAT", ReservedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		if err := saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
@@ -516,13 +2022,18 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err = saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		if err = writeJSON(filepath.Join(args[1], "STOP"), map[string]any{"active": true, "reason": args[2]}); err != nil {
+		if err = writeJSONAtomic(filepath.Join(args[1], "STOP"), map[string]any{"active": true, "reason": args[2]}); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("STOPPED", s, nil, 0)
 	case "status", "m11-status":
 		if len(args) != 2 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission status STATE_DIR"), 2)
+		}
+		if _, err := os.Stat(m11OutcomeJournalPath(args[1])); err == nil {
+			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 outcome journal requires a locked writer recovery"), 1)
+		} else if !os.IsNotExist(err) {
+			return emit("STATE_ERROR", nil, err, 1)
 		}
 		s, err := loadMissionState(args[1])
 		if err != nil {

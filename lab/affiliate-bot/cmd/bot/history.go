@@ -331,6 +331,11 @@ func loadHistoryWith(storage store.History, path string) ([]HistoryRecord, error
 }
 
 func AppendHistory(path string, record HistoryRecord) (string, error) {
+	release, err := acquireHistoryRuntimeGate(path)
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	return appendHistoryWith(store.JSONL{}, path, record)
 }
 

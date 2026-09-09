@@ -1,0 +1,18 @@
+{
+  "snapshot_id": "at-sanitized-2026-09-08",
+  "observed_at": "2026-09-08T12:00:00+07:00",
+  "source_ref": "accesstrade:sanitized-report:at-sanitized-2026-09-08",
+  "currency": "VND",
+  "mappings": [
+    {
+      "order_id": "redacted-order-001",
+      "outcome_id": "at-outcome-001",
+      "action_id": "manual-action-001"
+    },
+    {
+      "order_id": "redacted-order-002",
+      "outcome_id": "at-outcome-002",
+      "action_id": "manual-action-001"
+    }
+  ]
+}

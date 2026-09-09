@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
 
 const missionValid = "VALID"
@@ -26,6 +28,30 @@ func ContentHash(body string) string {
 	s := sha256.Sum256([]byte(body))
 	return hex.EncodeToString(s[:])
 }
+
+// CanonicalContentHash is the semantic change fingerprint for structured M06
+// response bodies. JSON object key order is transport noise, not a new source
+// observation. Non-JSON bodies deliberately retain their exact bytes: M06 has
+// no content-type/parser profile that could safely normalize arbitrary text.
+// ContentHash remains available for byte-exact pinning of an HTTPS fixture.
+func CanonicalContentHash(body string) string {
+	trimmed := strings.TrimSpace(body)
+	if !json.Valid([]byte(trimmed)) {
+		return ContentHash(body)
+	}
+	value, err := contracts.Decode([]byte(trimmed))
+	if err != nil {
+		// Duplicate-key or otherwise ambiguous JSON is not canonicalized here.
+		// A profile that accepts it must reject it explicitly before persistence.
+		return ContentHash(body)
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return ContentHash(body)
+	}
+	return ContentHash(string(canonical))
+}
+
 func EvaluateWatchRequest(r WatchRequest) string {
 	m := strings.ToUpper(strings.TrimSpace(r.Method))
 	if m != "GET" && m != "HEAD" {
@@ -47,7 +73,7 @@ func EvaluateWatchRequest(r WatchRequest) string {
 	if _, e := time.Parse(time.RFC3339, r.ObservedAt); e != nil || strings.TrimSpace(r.CorrelationID) == "" {
 		return missionInvalid
 	}
-	current := ContentHash(r.Body)
+	current := CanonicalContentHash(r.Body)
 	if r.PreviousHash == "" {
 		return "NEW"
 	}
@@ -80,7 +106,7 @@ func NormalizeWatchObservation(r WatchRequest, subjectID string) (CanonicalObser
 	if strings.TrimSpace(subjectID) == "" {
 		return CanonicalObservation{}, missionInvalid
 	}
-	hash := ContentHash(r.Body)
+	hash := CanonicalContentHash(r.Body)
 	method := strings.ToUpper(strings.TrimSpace(r.Method))
 	at, _ := time.Parse(time.RFC3339, r.ObservedAt)
 	identity, _ := json.Marshal([]string{subjectID, r.URL, at.UTC().Format(time.RFC3339Nano), method, r.CorrelationID, hash})

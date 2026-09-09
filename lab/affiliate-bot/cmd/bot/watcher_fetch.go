@@ -118,9 +118,9 @@ func runWatcherFetch(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("FIXTURE_ERROR", nil, err, 1)
 	}
-	status, err := AppendHistory(args[1], record)
+	status, resolved, err := appendResolvedHistory(args[1], record)
 	if err != nil {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": record.RecordID, "state": record.RecordedResult.State, "source_url": watcherPinnedURL, "response_sha256": watcherPinnedHash, "fetch_started_at": started, "fetch_completed_at": time.Now().UTC().Format(time.RFC3339Nano), "evidence_kind": "synthetic", "scenario_observed_at": record.AsOf}, nil, 0)
+	return emit(status, map[string]any{"record_id": resolved.RecordID, "state": resolved.RecordedResult.State, "source_url": watcherPinnedURL, "response_sha256": watcherPinnedHash, "fetch_started_at": started, "fetch_completed_at": time.Now().UTC().Format(time.RFC3339Nano), "evidence_kind": "synthetic", "scenario_observed_at": resolved.AsOf}, nil, 0)
 }
