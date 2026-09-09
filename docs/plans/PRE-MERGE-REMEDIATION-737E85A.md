@@ -42,7 +42,7 @@ PMR-07 đã tồn tại ở base; không mô tả đây là regression mới do 
 
 ### Cập nhật triển khai — 09/09/2026
 
-Các thay đổi dưới đây đang ở worktree của nhánh review; chưa commit/push/merge và không thay đổi `NOT_READY_FOR_PRODUCTION`.
+Các thay đổi dưới đây đã được commit/push trên nhánh review nhưng chưa merge; chúng không thay đổi `NOT_READY_FOR_PRODUCTION`.
 
 - **PMR-01:** M11 chỉ cho transition mới dùng ledger head có `updated_at` lớn nhất, duy nhất theo lease. `m11-ledger-init` chỉ idempotent cho genesis chính xác và từ chối reset; generic `m11-register` không thể chèn lifecycle ledger/gate/authorization/execution/evaluation/cycle. Core registry từ chối lịch sử ledger giảm total executions/cost. Khi stopped ledger đã commit nhưng state/STOP chưa ghi xong, preflight dưới runtime lock tái lập durable STOP trước mọi mutation khác. BR-18b tạo intent/approval/cost-bound thứ hai trong runtime đã dùng hết lease: genesis bị từ chối và head trả `BUDGET_EXCEEDED`.
 - **PMR-02:** authorize kiểm health/gate không ở tương lai, health chưa đến biên max-age, và bind exact `ledger_artifact_id`/`ledger_content_hash` đã được gate dùng. FAILED/STOP làm gate cũ stale kể cả khi bốn counter budget không đổi. Reserve chặn thời gian trước authorization và không cho timestamp đứng/lùi sau ledger. BR-18b kiểm authorize ở +120 giây và sau FAILED đều bị reject. Vẫn phải kiểm lại toàn bộ policy về clock vận hành nếu có live adapter; fixture clock không là production authority.
