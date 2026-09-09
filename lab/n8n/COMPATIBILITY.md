@@ -25,13 +25,33 @@ Node migration, credential behavior và tool wrapping phải được kiểm b�
 
 ## Bản ghi admission cho release
 
-`tested_n8n_version` cố ý để **UNVERIFIED** cho tới khi maintainer chạy smoke test dưới đây trên đúng engine version và ghi version, ngày, kết quả import cùng execution IDs vào PR/release evidence. Không được biến “JSON parse được” thành “n8n hỗ trợ workflow này”.
+`tested_n8n_version` là **release admission**, nên vẫn để UNVERIFIED cho tới khi
+có đủ smoke của cả hai blueprint theo ma trận dưới đây trên topology được chọn.
+Không được biến “JSON parse được” hay một local run thành “n8n hỗ trợ workflow
+này” một cách tổng quát.
 
 ```text
 tested_n8n_version: UNVERIFIED
 tested_node_versions: declared above; engine support unverified
 upgrade_review_cadence: trước mỗi lần nâng n8n engine và ít nhất mỗi quý
 ```
+
+### Evidence local có phạm vi hẹp — 2026-09-09
+
+Đây **không** thay đổi release admission ở trên. M07 blueprint hiện hành (SHA-256
+`80f9247c586eab1075aa347c57b7ca151eb45a4c5f110320ab461b54de62a97d`) đã chạy
+qua Manual Trigger trên n8n `2.38.1` local với credential Cockpit chỉ đọc. Lần
+chạy `execution_id=12` hoàn tất toàn bộ chuỗi node: nhận/đăng ký tool, dựng
+context canonical, Agent chỉ đọc, kiểm grounding, lưu proposal và báo ACK.
+Grounding là `VALID/HUMAN_REVIEW`, proposal canonical
+`sha256:afdfbb9116ea609f8032443021956d03a27c8ae8da40199e3a1ea22191c9b7de`
+ACK với `execution_permitted=false`. Sau restart n8n, health, canonical history
+replay và cùng proposal ID vẫn resolve được.
+
+Scope là fixture synthetic/read-only; không có campaign, provider diversity,
+received-redirect transport, production deployment, business outcome hoặc
+MACHINE_EXECUTION. PR #96/#97 bổ sung CI n8n `2.38.1` cho M06 và M07 negative
+paths, nhưng không đưa credential/model-success vào CI.
 
 ## Smoke test bắt buộc
 
