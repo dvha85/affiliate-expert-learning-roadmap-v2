@@ -466,8 +466,11 @@ resolve execution sau đó. Cùng workspace tiếp tục tạo recovery lease đ
 riêng (vì authorization đầu là one-time) nhưng giữ proposal/intent/policy/grant/
 cost-bound gốc, rồi cover `UNKNOWN` → `RECONCILIATION_REQUIRED` durable STOP →
 human reconciliation idempotent → read-only recovery handoff; activation lại
-bị reject trước reconciliation. Mỗi lệnh là process mới nên STOP được đọc lại
-từ store. Backup/restore recovery graph vẫn ở BR-18b; business
+bị reject trước reconciliation. M07 tool/proposal đi qua loopback adapter và
+persist sidecar trong chính runtime. Smoke backup/restore runtime đó vào đích
+trống, replay history và resolve M07 context, M10 execution, M11 UNKNOWN,
+resolution và stopped ledger trước khi xác nhận STOP tiếp tục chặn activation.
+Mỗi lệnh là process mới nên STOP được đọc lại từ store. Business
 outcome/evaluation/cycle M11 và live proof vẫn chưa có.
 
 1. M00 packet → M01 evaluation → M02 history/decision.
