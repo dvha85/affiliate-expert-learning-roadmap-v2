@@ -24,8 +24,8 @@ func registerM11TestArtifact(t *testing.T, dir, kind string, value any) {
 	}
 }
 
-func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
-	dir := t.TempDir()
+func setupM11OutcomeJournalFixture(t *testing.T, dir string) (m11OutcomeJournal, corem11.ArtifactEntry) {
+	t.Helper()
 	lease := corem11.ProductionLease{LeaseID: "journal-lease", LeaseVersion: "v1", PolicyVersion: "policy-1", ApprovalRef: "journal-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 10, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "journal-correlation", HashVersion: "go-json-v1"}
 	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
 	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
@@ -76,6 +76,12 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 		Outcome:                outcome,
 		Ledger:                 next,
 	}
+	return journal, ledgerEntry
+}
+
+func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
+	dir := t.TempDir()
+	journal, ledgerEntry := setupM11OutcomeJournalFixture(t, dir)
 	tamperedJournal := journal
 	tamperedJournal.Ledger.PendingOutcomes = 1
 	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), tamperedJournal); err != nil {
@@ -87,7 +93,7 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
 		t.Fatalf("tampered journal was unexpectedly removed: %v", err)
 	}
-	headEntry, _, err := m11LedgerHead(dir, lease.LeaseID)
+	headEntry, _, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
 	if err != nil || headEntry.ArtifactID != ledgerEntry.ArtifactID || headEntry.ContentHash != ledgerEntry.ContentHash {
 		t.Fatalf("tampered journal changed the active ledger: entry=%+v err=%v", headEntry, err)
 	}
@@ -117,10 +123,10 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 		t.Fatalf("journal still exists after recovery: %v", err)
 	}
 	outcomes, err := loadM11FixtureOutcomes(dir)
-	if err != nil || len(outcomes) != 1 || outcomes[0].OutcomeID != outcome.OutcomeID {
+	if err != nil || len(outcomes) != 1 || outcomes[0].OutcomeID != journal.Outcome.OutcomeID {
 		t.Fatalf("outcome was not recovered exactly: outcomes=%+v err=%v", outcomes, err)
 	}
-	_, head, err := m11LedgerHead(dir, lease.LeaseID)
+	_, head, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
 	if err != nil || head.PendingOutcomes != 0 || len(head.OutcomeLinks) != 1 {
 		t.Fatalf("ledger recovery mismatch: ledger=%+v err=%v", head, err)
 	}
@@ -137,5 +143,51 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 	state, err := loadMissionState(dir)
 	if err != nil || !state.Stop || state.StopReason != "RECOVERY_REQUIRED" {
 		t.Fatalf("mission STOP was not recovered: state=%+v err=%v", state, err)
+	}
+}
+
+func TestM11OutcomeJournalRecoversAfterOutcomeAppendAckFailure(t *testing.T) {
+	dir := t.TempDir()
+	journal, _ := setupM11OutcomeJournalFixture(t, dir)
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	m11OutcomeAppendFault = func(phase string) error {
+		if phase == "after_append" {
+			return errors.New("injected outcome append acknowledgement failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { m11OutcomeAppendFault = nil })
+	if err := recoverM11OutcomeJournal(dir); err == nil {
+		t.Fatal("outcome append acknowledgement failure was not surfaced")
+	} else if !strings.Contains(err.Error(), "injected outcome append acknowledgement failure") {
+		t.Fatalf("journal did not reach the post-append fault: %v", err)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("journal was removed after the outcome append ACK failure: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("outcome append was not persisted exactly once before replay: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("ledger transition was not persisted before replay: ledger=%+v err=%v", head, err)
+	}
+	m11OutcomeAppendFault = nil
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		t.Fatalf("post-append journal replay failed: %v", err)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("journal still exists after post-append replay: %v", err)
+	}
+	outcomes, err = loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("replay duplicated or changed the outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err = m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("replay duplicated or changed the ledger transition: ledger=%+v err=%v", head, err)
 	}
 }
