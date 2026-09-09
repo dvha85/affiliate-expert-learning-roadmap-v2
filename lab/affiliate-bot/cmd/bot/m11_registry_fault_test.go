@@ -38,7 +38,15 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	}
 }
 
-func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.T) {
+type m11UnknownStopFixture struct {
+	dir           string
+	lease         corem11.ProductionLease
+	authorization corem11.ProductionExecutionAuthorization
+	ledgerEntry   corem11.ArtifactEntry
+}
+
+func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
+	t.Helper()
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
 		t.Fatalf("init failed: code=%d response=%+v", code, response)
@@ -69,43 +77,56 @@ func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.
 	}{{corem11.ArtifactKindLease, lease}, {corem11.ArtifactKindLeaseApproval, approval}, {corem11.ArtifactKindHealth, health}, {corem11.ArtifactKindCostBound, cost}, {corem11.ArtifactKindLedger, ledger}, {corem11.ArtifactKindActivation, activation}, {corem11.ArtifactKindGate, gate}, {corem11.ArtifactKindAuthorization, authorization}} {
 		registerM11TestArtifact(t, dir, item.kind, item.value)
 	}
-	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
-	m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
-		if entry.ArtifactKind == corem11.ArtifactKindLedger && phase == "before_write" {
-			return errors.New("injected stopped-ledger write failure")
-		}
-		return nil
-	}
-	t.Cleanup(func() { m11RegistryAppendFault = nil })
-	if _, _, _, err := recordUnknownM11Execution(dir, authorization.AuthorizationID, ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
-		t.Fatal("stopped-ledger fault was not surfaced")
-	}
-	if _, err := os.Stat(m11UnknownStopJournalPath(dir)); err != nil {
-		t.Fatalf("unknown STOP journal was removed before recovery: %v", err)
-	}
-	if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
-		t.Fatalf("status did not fail closed on unknown STOP journal: code=%d response=%+v", code, response)
-	}
-	state, err := loadMissionState(dir)
-	if err != nil || state.Stop {
-		t.Fatalf("partial UNKNOWN transition marked mission stopped: state=%+v err=%v", state, err)
-	}
-	m11RegistryAppendFault = nil
-	if err := recoverM11UnknownStopJournal(dir); err != nil {
-		t.Fatalf("unknown STOP journal recovery failed: %v", err)
-	}
-	if _, err := os.Stat(m11UnknownStopJournalPath(dir)); !os.IsNotExist(err) {
-		t.Fatalf("unknown STOP journal remains after recovery: %v", err)
-	}
-	state, err = loadMissionState(dir)
-	if err != nil || !state.Stop || state.StopReason != "RECONCILIATION_REQUIRED" {
-		t.Fatalf("recovered mission is not durably stopped: state=%+v err=%v", state, err)
-	}
-	_, head, err := m11LedgerHead(dir, lease.LeaseID)
-	if err != nil || head.ControlMode != "STOPPED" || !head.ReconciliationRequired {
-		t.Fatalf("recovered stopped ledger is invalid: ledger=%+v err=%v", head, err)
-	}
-	if _, _, status, err := recordUnknownM11Execution(dir, authorization.AuthorizationID, ledgerEntry.ArtifactID, attemptedAt, reason); err != nil || status != appendDuplicate {
-		t.Fatalf("unknown retry was not exact duplicate: status=%s err=%v", status, err)
+	return m11UnknownStopFixture{dir: dir, lease: lease, authorization: authorization, ledgerEntry: ledgerEntry}
+}
+
+func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.T) {
+	for _, phase := range []string{"before_write", "after_write"} {
+		faultPhase := phase
+		t.Run(phase, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
+			m11RegistryAppendFault = func(registryPhase string, entry corem11.ArtifactEntry) error {
+				if entry.ArtifactKind == corem11.ArtifactKindLedger && registryPhase == faultPhase {
+					return errors.New("injected stopped-ledger write failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m11RegistryAppendFault = nil })
+			if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+				t.Fatal("stopped-ledger fault was not surfaced")
+			}
+			if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); err != nil {
+				t.Fatalf("unknown STOP journal was removed before recovery: %v", err)
+			}
+			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("status did not fail closed on unknown STOP journal: code=%d response=%+v", code, response)
+			}
+			state, err := loadMissionState(fixture.dir)
+			if faultPhase == "before_write" && (err != nil || state.Stop) {
+				t.Fatalf("pre-write fault marked mission stopped: state=%+v err=%v", state, err)
+			}
+			if faultPhase == "after_write" && (err == nil || state.Stop) {
+				t.Fatalf("post-write fault did not fail closed at the stopped-ledger recovery boundary: state=%+v err=%v", state, err)
+			}
+			m11RegistryAppendFault = nil
+			if err := recoverM11UnknownStopJournal(fixture.dir); err != nil {
+				t.Fatalf("unknown STOP journal recovery failed: %v", err)
+			}
+			if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("unknown STOP journal remains after recovery: %v", err)
+			}
+			state, err = loadMissionState(fixture.dir)
+			if err != nil || !state.Stop || state.StopReason != "RECONCILIATION_REQUIRED" {
+				t.Fatalf("recovered mission is not durably stopped: state=%+v err=%v", state, err)
+			}
+			_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+			if err != nil || head.ControlMode != "STOPPED" || !head.ReconciliationRequired {
+				t.Fatalf("recovered stopped ledger is invalid: ledger=%+v err=%v", head, err)
+			}
+			if _, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err != nil || status != appendDuplicate {
+				t.Fatalf("unknown retry was not exact duplicate: status=%s err=%v", status, err)
+			}
+		})
 	}
 }
