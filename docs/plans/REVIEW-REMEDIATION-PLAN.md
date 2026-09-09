@@ -455,6 +455,14 @@ và kiểm STOP vẫn bền. Journal là kế hoạch replay có fsync cho một
 transition, **không
 phải** transaction đa-file/power-loss proof.
 
+**Cập nhật M11 outcome-journal ACK fault (2026-09-10):** regression gọi trực
+tiếp `recoverM11OutcomeJournal` với fault sau khi JSONL outcome đã append nhưng
+trước khi caller nhận ACK. Journal phải còn lại, outcome và ledger transition
+đã ghi phải resolve đúng một lần; replay sau restart-style retry chỉ nhận
+`EXACT_DUPLICATE`, xóa journal và không thêm outcome/ledger mới. Đây là bằng
+chứng deterministic cho đúng recovery seam đó, không chứng minh atomicity
+đa-file khi mất điện hoặc external business outcome.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
