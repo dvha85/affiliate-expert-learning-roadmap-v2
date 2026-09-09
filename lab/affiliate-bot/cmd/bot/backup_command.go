@@ -131,6 +131,35 @@ func backupFileMetadata(path, name string) (backupFile, error) {
 	}
 	return backupFile{Kind: kind, SizeBytes: info.Size(), SHA256: digest}, nil
 }
+
+func backupSourceInventory(source string, files []string) (map[string]backupFile, error) {
+	inventory := make(map[string]backupFile, len(files))
+	for _, name := range files {
+		clean, err := backupRelativePath(name)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err := backupFileMetadata(filepath.Join(source, clean), name)
+		if err != nil {
+			return nil, err
+		}
+		inventory[name] = metadata
+	}
+	return inventory, nil
+}
+
+func sameBackupInventory(left, right map[string]backupFile) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for name, metadata := range left {
+		if right[name] != metadata {
+			return false
+		}
+	}
+	return true
+}
+
 func regularFile(path string) error {
 	i, e := os.Lstat(path)
 	if e != nil {
@@ -813,6 +842,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
 		}
+		sourceInventory, e := backupSourceInventory(args[1], files)
+		if e != nil {
+			return emit("INPUT_ERROR", nil, e, 1)
+		}
 		if e = os.MkdirAll(args[2], 0700); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
@@ -831,6 +864,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		if e = validateM11BackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
+		}
+		verifiedSourceInventory, inventoryErr := backupSourceInventory(args[1], files)
+		if inventoryErr != nil || !sameBackupInventory(sourceInventory, verifiedSourceInventory) {
+			return emit("SNAPSHOT_CONFLICT", nil, fmt.Errorf("runtime changed while backup snapshot was prepared"), 1)
 		}
 		profile, e := backupProfileFor(required, files)
 		if e != nil {
@@ -861,6 +898,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			metadata, metadataErr := backupFileMetadata(target, name)
 			if metadataErr != nil {
 				return emit("STORE_ERROR", nil, metadataErr, 1)
+			}
+			if metadata != sourceInventory[name] {
+				return emit("SNAPSHOT_CONFLICT", nil, fmt.Errorf("runtime changed while copying %s", name), 1)
 			}
 			m.Files[name] = metadata
 		}

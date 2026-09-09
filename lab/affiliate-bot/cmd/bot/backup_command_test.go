@@ -390,6 +390,43 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 		t.Fatalf("interrupted snapshot was restorable: code=%d response=%+v", code, response)
 	}
 
+	missionBytes, err := os.ReadFile(filepath.Join(runtime, "mission-state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposalBytes, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	multiFileConflict := filepath.Join(root, "multi-file-conflict")
+	changed := false
+	backupCopyFault = func(name string) error {
+		if name != "mission-state.json" || changed {
+			return nil
+		}
+		changed = true
+		if err := os.WriteFile(filepath.Join(runtime, "mission-state.json"), append(missionBytes, '\n'), 0600); err != nil {
+			return err
+		}
+		return os.WriteFile(proposalPath, append(proposalBytes, '\n'), 0600)
+	}
+	if code, response := backupCall(t, "create", runtime, multiFileConflict); code == 0 || response["status"] != "SNAPSHOT_CONFLICT" {
+		t.Fatalf("backup accepted a mixed multi-file snapshot: code=%d response=%+v", code, response)
+	}
+	backupCopyFault = nil
+	if err := os.WriteFile(filepath.Join(runtime, "mission-state.json"), missionBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(proposalPath, proposalBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(multiFileConflict, "manifest.json")); !os.IsNotExist(err) {
+		t.Fatalf("multi-file conflict published a manifest: %v", err)
+	}
+	if code, response := backupCall(t, "restore", multiFileConflict, filepath.Join(root, "multi-file-conflict-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("mixed multi-file snapshot was restorable: code=%d response=%+v", code, response)
+	}
+
 	badBackup := filepath.Join(root, "bad-backup")
 	if err := os.MkdirAll(filepath.Join(badBackup, "history.jsonl.m07", "proposals"), 0700); err != nil {
 		t.Fatal(err)
