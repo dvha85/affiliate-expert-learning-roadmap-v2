@@ -51,6 +51,7 @@ Các thay đổi dưới đây đang ở worktree của nhánh review; chưa com
 - **PMR-05:** restore copy vào staging sibling, chạy replay/load/graph gates tại đó rồi mới rename publish. Đích phải chưa tồn tại để tránh ghi đè directory rỗng của người dùng; per-target gate serialize các publisher managed trước final rename. Mọi lỗi dọn staging do operation tạo. BR-18b xác nhận `GRAPH_FAILED` không tạo target. Kill/power-loss và writer không tôn trọng managed target gate vẫn cần drill host thật.
 - **PMR-06:** Gate ID là digest của lease/intent/health/cost/immutable ledger entry/evaluation time; retry cùng input idempotent, evaluation khác tạo artifact khác. Gate persist exact `ledger_artifact_id` và `ledger_content_hash`; core graph resolve hai refs này. BR-18b kiểm re-evaluate sau một giây không còn collision.
 - **PMR-07:** Core M07 dùng decoder exact-number, tool result/evidence/claim/render không đi qua float64. Adapter trả JSON text nguyên vẹn cho workflow; blueprint chuyển context/evidence/model output bằng text thay vì `JSON.stringify`/`JSON.parse` số. Unit/adapter test kiểm `9007199254740993` không match `9007199254740992`. Chưa có n8n engine operated run, nên compatibility thực tế của node/model vẫn PARTIAL.
+- **PMR-07 — operated-run update (09/09):** Đã chạy n8n `2.38.1` local, import workflow M07 inactive, tạo canonical history từ synthetic fixture và gọi canonical adapter thật tại loopback. Context `VALID` có ba evidence; request `POST` bị adapter reject trước fetch; execution n8n đi đúng vào `Fetch and Register Tool Adapter` và dừng trước model/persistence khi input không hợp lệ. Lần chạy valid-input tiếp theo phát hiện blueprint có newline thật bên trong JavaScript string của `Read-only Evidence Agent`, khiến engine báo `invalid syntax` trước model call. Blueprint đã đổi sang `\\n` và validator M07 từ chối regression này. Sau fix, run đi tới Agent; mock OpenAI-compatible cục bộ không đáp ứng đầy đủ contract tool-calling/streaming của Agent v3 nên execution bị treo, được recovery sau restart (`database integrity_check=ok`, execution `crashed`). Vì vậy **chưa có full successful M07 engine run, grounding validation hoặc proposal persistence evidence**; cần model/provider tương thích hoặc mock đúng contract trước khi nâng trạng thái.
 
 Kết quả kiểm local sau triển khai, không phải nghiệm thu/merge approval:
 
@@ -225,7 +226,7 @@ python3 scripts/audit_readiness.py
 git diff --check
 ```
 
-Các script n8n ở trên không tự chứng minh đã chạy workflow trong engine thật. Nếu sandbox không cho mở loopback, ghi test bị chặn, chạy phần không cần port và nghiệm thu phần còn lại trên môi trường được cấp quyền; không sửa test để bỏ qua guard.
+Các script n8n ở trên không tự chứng minh đã chạy workflow trong engine thật. Operated run local ngày 09/09 đã chứng minh import/wiring tới Agent và phát hiện newline-expression regression, nhưng chưa hoàn thành success path qua model/grounding/persistence; không suy diễn thành full M07 acceptance. Nếu sandbox không cho mở loopback, ghi test bị chặn, chạy phần không cần port và nghiệm thu phần còn lại trên môi trường được cấp quyền; không sửa test để bỏ qua guard.
 
 ## 6. Compatibility, bàn giao và merge gate
 

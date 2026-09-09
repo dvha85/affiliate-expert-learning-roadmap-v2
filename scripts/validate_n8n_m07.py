@@ -88,6 +88,10 @@ for source, target in expected:
 agent_text = nodes["Read-only Evidence Agent"]["parameters"].get("text", "")
 if "artifact_raw_json" not in agent_text or "evidence_raw_json" not in agent_text or "JSON.stringify" in agent_text:
     raise SystemExit("M07 agent must receive adapter-preserved JSON text, not reserialized numeric values")
+if "\ncanonical_context=" in agent_text or "\nregistered_tool_evidence=" in agent_text:
+    raise SystemExit("M07 agent expression must not contain literal newlines inside JavaScript string literals")
+if "\\ncanonical_context=" not in agent_text or "\\nregistered_tool_evidence=" not in agent_text:
+    raise SystemExit("M07 agent expression must encode line breaks as JavaScript \\n escapes")
 for name in ("Validate Grounding Adapter", "Persist Agent Proposal Adapter"):
     body = nodes[name]["parameters"].get("jsonBody", "")
     if "model_output_text" not in body or "model_output:JSON.parse" in body:

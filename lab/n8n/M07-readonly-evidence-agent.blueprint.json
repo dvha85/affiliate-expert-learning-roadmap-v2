@@ -124,7 +124,7 @@
       "position": [1370, 0],
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\ncanonical_context=' + $('Require Canonical M07 Context').item.json.artifact_raw_json + '\nregistered_tool_evidence=' + $('Require Registered Tool ACK').item.json.evidence_raw_json }}",
+        "text": "={{ $('M07 Adapter Input').item.json.instruction + '\\ncanonical_context=' + $('Require Canonical M07 Context').item.json.artifact_raw_json + '\\nregistered_tool_evidence=' + $('Require Registered Tool ACK').item.json.evidence_raw_json }}",
         "options": {
           "systemMessage": "You are a read-only evidence analyst. The shared adapter owns network policy, DNS validation, tool trace and permissions. Do not call tools. Return only the required JSON contract."
         }
