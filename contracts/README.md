@@ -42,7 +42,7 @@ PolicyDecision.execution_authorized = false
 - M08: `ActionIntent(PROPOSAL_ONLY)` + `PolicyDecision(NON_AUTHORIZING)`; không artifact nào tự có execution authority.
 - M09: `ApprovalRecord` + `ExecutionAuthorization(APPROVED_LIVE)` + `ExecutionRecord`; outcome machine dùng `EffectRef(MACHINE_EXECUTION)`.
 - M10: `CanaryGrantApproval` + `CanaryGrant` + trusted stage-neutral `TrustedCostBound` + `CanaryLedger` + `CanaryGateDecision`; `RISK2` không delegated.
-- M11: `ProductionLeaseApproval` + finite `ProductionLease` + `ProductionActivationRecord` + trusted `ProductionHealthSnapshot` + `TrustedCostBound` + `ProductionLedger` + `ProductionGateDecision` + `ProductionCycleRecord` + trusted `ProductionReconciliationResolution`; execution dùng `GOVERNED_PRODUCTION` và `RISK2` vẫn không delegated.
+- M11: `ProductionLeaseApproval` + finite `ProductionLease` + `ProductionActivationRecord` + trusted `ProductionHealthSnapshot` + `TrustedCostBound` + `ProductionLedger` + `ProductionGateDecision` + `ProductionOutcomeEvaluation` + `ProductionCycleRecord` + trusted `ProductionReconciliationResolution`; execution dùng `GOVERNED_PRODUCTION` và `RISK2` vẫn không delegated. `ProductionOutcomeEvaluation` hiện chỉ nhận profile `OFFLINE_FIXTURE` với kết quả `FIXTURE_NO_SIDE_EFFECT`; nó không phải business outcome hay bằng chứng external execution.
 
 `TrustedCostBound` là một canonical contract dùng chung M10/M11; stage-specific authorization field vẫn giữ prefix `canary_`/`production_` để audit provenance. Không tạo hai cost-bound ontology chỉ vì Mission khác nhau.
 

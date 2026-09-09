@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
@@ -639,11 +640,16 @@ func validateM11BackupGraph(dir string) error {
 		return fmt.Errorf("M11 outcome store is invalid: %w", err)
 	}
 	linked := map[string]bool{}
+	outcomesByID := map[string]m03.OutcomeRecord{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	executions := []corem11.ProductionExecutionRecord{}
+	executionsByID := map[string]corem11.ProductionExecutionRecord{}
+	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
+	cycles := []corem11.ProductionCycleRecord{}
 	for _, outcome := range outcomes {
 		linked[outcome.EffectRef.EffectID] = true
+		outcomesByID[outcome.OutcomeID] = outcome
 	}
 	for _, entry := range entries {
 		switch entry.ArtifactKind {
@@ -665,7 +671,22 @@ func validateM11BackupGraph(dir string) error {
 			if status != corem11.Valid {
 				return fmt.Errorf("M11 execution artifact is invalid")
 			}
-			executions = append(executions, *value.(*corem11.ProductionExecutionRecord))
+			record := *value.(*corem11.ProductionExecutionRecord)
+			executions = append(executions, record)
+			executionsByID[record.ExecutionID] = record
+		case corem11.ArtifactKindEvaluation:
+			value, status := corem11.DecodeArtifact("evaluation", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 outcome evaluation artifact is invalid")
+			}
+			evaluation := *value.(*corem11.ProductionOutcomeEvaluation)
+			evaluations[evaluation.EvaluationID] = evaluation
+		case corem11.ArtifactKindCycle:
+			value, status := corem11.DecodeArtifact("cycle", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 cycle artifact is invalid")
+			}
+			cycles = append(cycles, *value.(*corem11.ProductionCycleRecord))
 		}
 	}
 	for _, record := range executions {
@@ -692,6 +713,19 @@ func validateM11BackupGraph(dir string) error {
 		}
 		if !matched {
 			return fmt.Errorf("unknown M11 execution lacks matching stopped reconciliation ledger")
+		}
+	}
+	for _, evaluation := range evaluations {
+		outcome, outcomeOK := outcomesByID[evaluation.OutcomeID]
+		execution, executionOK := executionsByID[evaluation.ExecutionID]
+		if !outcomeOK || !executionOK || outcome.EffectRef.EffectID != execution.ExecutionID || execution.ProductionLeaseID != evaluation.LeaseID || execution.ProductionLeaseVersion != evaluation.LeaseVersion || execution.ProductionLeaseHash != evaluation.LeaseHash {
+			return fmt.Errorf("M11 outcome evaluation does not resolve its fixture outcome and execution")
+		}
+	}
+	for _, cycle := range cycles {
+		evaluation, evaluationOK := evaluations[cycle.EvaluationID]
+		if !evaluationOK || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID {
+			return fmt.Errorf("M11 cycle does not resolve its outcome evaluation")
 		}
 	}
 	return nil

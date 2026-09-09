@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
@@ -244,7 +246,7 @@ func m11ArtifactValue(dir, kind, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation", corem11.ArtifactKindReconciliation: "resolution"}
+	profiles := map[string]string{corem11.ArtifactKindLease: "lease", corem11.ArtifactKindLeaseApproval: "approval", corem11.ArtifactKindHealth: "health", corem11.ArtifactKindCostBound: "cost", corem11.ArtifactKindLedger: "ledger", corem11.ArtifactKindGate: "gate", corem11.ArtifactKindAuthorization: "authorization", corem11.ArtifactKindExecution: "execution", corem11.ArtifactKindActivation: "activation", corem11.ArtifactKindReconciliation: "resolution", corem11.ArtifactKindEvaluation: "evaluation", corem11.ArtifactKindCycle: "cycle"}
 	profile := profiles[kind]
 	if profile == "" {
 		return nil, fmt.Errorf("unsupported M11 gate artifact")
@@ -724,4 +726,164 @@ func m11RecoveryHandoff(dir, resolutionID, ledgerID string) (map[string]any, err
 		return nil, fmt.Errorf("recovery resolution is not linked from stopped ledger")
 	}
 	return map[string]any{"profile": "M11_RECOVERY_HANDOFF/v1", "prior_lease_id": ledger.LeaseID, "prior_lease_version": ledger.LeaseVersion, "prior_lease_hash": ledger.LeaseHash, "resolution_id": resolution.ResolutionID, "execution_id": resolution.ExecutionID, "resolved_by": resolution.ResolvedBy, "resolver_id": resolution.ResolverID, "resolved_at": resolution.ResolvedAt, "effect_state": resolution.EffectState, "prior_stop_reason": ledger.StopReason, "requires_new_runtime": true, "requires_new_lease": true, "execution_permitted": false}, nil
+}
+
+// evaluateM11FixtureOutcome is deliberately narrow: it only evaluates the
+// learner's CANCELLED/NOT_PERFORMED fixture outcome. It records an audit link,
+// never a business result, performance claim, authority grant, or lease change.
+func evaluateM11FixtureOutcome(dir, outcomeID, evaluationID, evaluatedAt string) (corem11.ProductionOutcomeEvaluation, string, error) {
+	if strings.TrimSpace(outcomeID) == "" || strings.TrimSpace(evaluationID) == "" {
+		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("outcome_id and evaluation_id are required")
+	}
+	evaluated, err := time.Parse(time.RFC3339, evaluatedAt)
+	if err != nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("invalid evaluated_at")
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", err
+	}
+	var outcome *m03.OutcomeRecord
+	for index := range outcomes {
+		if outcomes[index].OutcomeID == outcomeID {
+			copied := outcomes[index]
+			outcome = &copied
+		}
+	}
+	if outcome == nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("M11 fixture outcome does not resolve")
+	}
+	observed, err := time.Parse(time.RFC3339, outcome.ObservedAt)
+	if err != nil || evaluated.Before(observed) {
+		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("evaluation precedes fixture outcome")
+	}
+	executionValue, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, outcome.EffectRef.EffectID)
+	if err != nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", err
+	}
+	execution := executionValue.(*corem11.ProductionExecutionRecord)
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem11.ArtifactKindEvaluation {
+			continue
+		}
+		value, status := corem11.DecodeArtifact("evaluation", entry.Artifact)
+		if status != corem11.Valid {
+			return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("invalid M11 outcome evaluation")
+		}
+		prior := value.(*corem11.ProductionOutcomeEvaluation)
+		if prior.EvaluationID == evaluationID {
+			candidate := corem11.ProductionOutcomeEvaluation{EvaluationID: evaluationID, LeaseID: execution.ProductionLeaseID, LeaseVersion: execution.ProductionLeaseVersion, LeaseHash: execution.ProductionLeaseHash, ExecutionID: execution.ExecutionID, OutcomeID: outcome.OutcomeID, EvaluatedAt: evaluatedAt, Result: "FIXTURE_NO_SIDE_EFFECT", EvidenceIDs: []string{outcome.OutcomeID}, Limitations: []string{"offline fixture: proves only a recorded NOT_PERFORMED outcome; it is not a business outcome"}, SourceProfile: "OFFLINE_FIXTURE"}
+			if reflect.DeepEqual(*prior, candidate) {
+				return candidate, appendDuplicate, nil
+			}
+			return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("evaluation_id reused with different content")
+		}
+		if prior.OutcomeID == outcome.OutcomeID || prior.ExecutionID == execution.ExecutionID {
+			return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("M11 fixture outcome already evaluated")
+		}
+	}
+	evaluation := corem11.ProductionOutcomeEvaluation{EvaluationID: evaluationID, LeaseID: execution.ProductionLeaseID, LeaseVersion: execution.ProductionLeaseVersion, LeaseHash: execution.ProductionLeaseHash, ExecutionID: execution.ExecutionID, OutcomeID: outcome.OutcomeID, EvaluatedAt: evaluatedAt, Result: "FIXTURE_NO_SIDE_EFFECT", EvidenceIDs: []string{outcome.OutcomeID}, Limitations: []string{"offline fixture: proves only a recorded NOT_PERFORMED outcome; it is not a business outcome"}, SourceProfile: "OFFLINE_FIXTURE"}
+	raw, err := json.Marshal(evaluation)
+	if err != nil {
+		return evaluation, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindEvaluation, raw)
+	return evaluation, status, err
+}
+
+// closeM11FixtureCycle ties the fixture evaluation back to the original
+// canonical history and M11 authority lineage. It is audit-only and cannot
+// reactivate a lease, clear STOP, or authorize another execution.
+func closeM11FixtureCycle(dir, cycleID, evaluationID, closedAt string) (corem11.ProductionCycleRecord, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil || state.Intent == nil || state.Policy == nil {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("cycle requires persisted intent and policy")
+	}
+	closed, err := time.Parse(time.RFC3339, closedAt)
+	if err != nil || strings.TrimSpace(cycleID) == "" {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("invalid cycle close input")
+	}
+	evaluationValue, err := m11ArtifactValue(dir, corem11.ArtifactKindEvaluation, evaluationID)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	evaluation := evaluationValue.(*corem11.ProductionOutcomeEvaluation)
+	evaluated, err := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
+	if err != nil || closed.Before(evaluated) {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("cycle closes before evaluation")
+	}
+	executionValue, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, evaluation.ExecutionID)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	execution := executionValue.(*corem11.ProductionExecutionRecord)
+	authorizedValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, execution.AuthorizationID)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	authorization := authorizedValue.(*corem11.ProductionExecutionAuthorization)
+	gateValue, err := m11ArtifactValue(dir, corem11.ArtifactKindGate, execution.ProductionGateID)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	gate := gateValue.(*corem11.ProductionGateDecision)
+	if evaluation.LeaseID != execution.ProductionLeaseID || evaluation.LeaseVersion != execution.ProductionLeaseVersion || evaluation.LeaseHash != execution.ProductionLeaseHash || authorization.IntentID != state.Intent.IntentID || authorization.IntentHash != state.Intent.IntentHash || gate.IntentID != state.Intent.IntentID || gate.IntentHash != state.Intent.IntentHash {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("cycle has mismatched lineage")
+	}
+	if _, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, evaluation.LeaseID); err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	matchedOutcome := false
+	for _, outcome := range outcomes {
+		matchedOutcome = matchedOutcome || outcome.OutcomeID == evaluation.OutcomeID && outcome.EffectRef.EffectID == execution.ExecutionID
+	}
+	if !matchedOutcome {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("cycle evaluation outcome does not resolve")
+	}
+	record, err := resolveCanonicalRecord(filepath.Join(dir, "history.jsonl"), state.Intent.DecisionID)
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	observationIDs := make([]string, 0, len(record.Observations))
+	for _, observation := range record.Observations {
+		observationIDs = append(observationIDs, observation.ObservationID)
+	}
+	cycle := corem11.ProductionCycleRecord{CycleID: cycleID, LeaseID: evaluation.LeaseID, LeaseVersion: evaluation.LeaseVersion, LeaseHash: evaluation.LeaseHash, ObservationIDs: observationIDs, DecisionID: record.RecordID, IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, GateID: gate.GateID, AuthorizationID: authorization.AuthorizationID, ExecutionID: execution.ExecutionID, OutcomeID: evaluation.OutcomeID, EvaluationID: evaluation.EvaluationID, Status: "CLOSED", OpenedAt: execution.AttemptedAt, ClosedAt: closedAt, CorrelationID: execution.CorrelationID}
+	entries, err := loadM11ArtifactRegistry(dir)
+	if err != nil {
+		return cycle, "", err
+	}
+	for _, entry := range entries {
+		if entry.ArtifactKind != corem11.ArtifactKindCycle {
+			continue
+		}
+		value, status := corem11.DecodeArtifact("cycle", entry.Artifact)
+		if status != corem11.Valid {
+			return cycle, "", fmt.Errorf("invalid production cycle")
+		}
+		prior := value.(*corem11.ProductionCycleRecord)
+		if prior.CycleID == cycleID {
+			if reflect.DeepEqual(*prior, cycle) {
+				return cycle, appendDuplicate, nil
+			}
+			return cycle, "", fmt.Errorf("cycle_id reused with different content")
+		}
+		if prior.EvaluationID == cycle.EvaluationID || prior.ExecutionID == cycle.ExecutionID {
+			return cycle, "", fmt.Errorf("M11 execution already has a closed cycle")
+		}
+	}
+	raw, err := json.Marshal(cycle)
+	if err != nil {
+		return cycle, "", err
+	}
+	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindCycle, raw)
+	return cycle, status, err
 }

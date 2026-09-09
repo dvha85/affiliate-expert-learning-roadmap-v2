@@ -219,6 +219,19 @@ type ProductionReconciliationResolution struct {
 	EffectState  string `json:"effect_state"`
 	Reason       string `json:"reason"`
 }
+type ProductionOutcomeEvaluation struct {
+	EvaluationID  string   `json:"evaluation_id"`
+	LeaseID       string   `json:"lease_id"`
+	LeaseVersion  string   `json:"lease_version"`
+	LeaseHash     string   `json:"lease_hash"`
+	ExecutionID   string   `json:"execution_id"`
+	OutcomeID     string   `json:"outcome_id"`
+	EvaluatedAt   string   `json:"evaluated_at"`
+	Result        string   `json:"result"`
+	EvidenceIDs   []string `json:"evidence_ids"`
+	Limitations   []string `json:"limitations"`
+	SourceProfile string   `json:"source_profile"`
+}
 type ProductionCycleRecord struct {
 	CycleID               string   `json:"cycle_id"`
 	LeaseID               string   `json:"lease_id"`
@@ -350,6 +363,8 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 		schema, value = "production-activation-record.schema.json", &ProductionActivationRecord{}
 	case "resolution":
 		schema, value = "production-reconciliation-resolution.schema.json", &ProductionReconciliationResolution{}
+	case "evaluation":
+		schema, value = "production-outcome-evaluation.schema.json", &ProductionOutcomeEvaluation{}
 	case "cycle":
 		schema, value = "production-cycle-record.schema.json", &ProductionCycleRecord{}
 	default:
@@ -383,6 +398,10 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 	case *ProductionCycleRecord:
 		if before(x.ClosedAt, x.OpenedAt) {
 			return nil, "INVALID_TIME_BINDING"
+		}
+	case *ProductionOutcomeEvaluation:
+		if x.SourceProfile != "OFFLINE_FIXTURE" || x.Result != "FIXTURE_NO_SIDE_EFFECT" || len(x.EvidenceIDs) == 0 || len(x.Limitations) == 0 {
+			return nil, "INVALID_EVALUATION"
 		}
 	case *ProductionLedger:
 		if x.ExecutionsInWindow > x.ExecutionsTotal || x.PendingOutcomes != len(x.PendingExecutionIDs) || x.PendingOutcomes > x.ExecutionsTotal || len(x.SuccessfulIdempotencyKeys) > x.ExecutionsTotal {
@@ -436,6 +455,8 @@ func CanonicalArtifact(kind string, raw []byte) (string, []byte, string) {
 		id = x.LeaseID + "/" + x.LeaseVersion
 	case *ProductionReconciliationResolution:
 		id = x.ResolutionID
+	case *ProductionOutcomeEvaluation:
+		id = x.EvaluationID
 	case *ProductionCycleRecord:
 		id = x.CycleID
 	case corem10.TrustedCostBound:

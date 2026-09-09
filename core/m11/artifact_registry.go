@@ -22,6 +22,7 @@ const (
 	ArtifactKindExecution      = "PRODUCTION_EXECUTION_RECORD"
 	ArtifactKindActivation     = "PRODUCTION_ACTIVATION"
 	ArtifactKindReconciliation = "PRODUCTION_RECONCILIATION"
+	ArtifactKindEvaluation     = "PRODUCTION_OUTCOME_EVALUATION"
 	ArtifactKindCycle          = "PRODUCTION_CYCLE"
 )
 
@@ -56,6 +57,8 @@ func kindProfile(kind string) string {
 		return "activation"
 	case ArtifactKindReconciliation:
 		return "resolution"
+	case ArtifactKindEvaluation:
+		return "evaluation"
 	case ArtifactKindCycle:
 		return "cycle"
 	default:
@@ -104,6 +107,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]ProductionGateDecision{}
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
+	evaluations := map[string]ProductionOutcomeEvaluation{}
 	for _, entry := range entries {
 		profile := kindProfile(entry.ArtifactKind)
 		value, status := DecodeArtifact(profile, entry.Artifact)
@@ -165,12 +169,20 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !executionOK || execution.ProductionLeaseID != x.LeaseID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
 				return fmt.Errorf("production reconciliation has an orphaned or mismatched link")
 			}
+		case *ProductionOutcomeEvaluation:
+			lease, leaseOK := leases[x.LeaseID]
+			execution, executionOK := executions[x.ExecutionID]
+			if !leaseOK || !executionOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash {
+				return fmt.Errorf("production outcome evaluation has an orphaned or mismatched link")
+			}
+			evaluations[x.EvaluationID] = *x
 		case *ProductionCycleRecord:
 			lease, leaseOK := leases[x.LeaseID]
 			gate, gateOK := gates[x.GateID]
 			auth, authOK := authorizations[x.AuthorizationID]
 			execution, executionOK := executions[x.ExecutionID]
-			if !leaseOK || !gateOK || !authOK || !executionOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || execution.ExecutionID != x.ExecutionID || execution.CorrelationID != x.CorrelationID {
+			evaluation, evaluationOK := evaluations[x.EvaluationID]
+			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || execution.ExecutionID != x.ExecutionID || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID {
 				return fmt.Errorf("production cycle has an orphaned or mismatched link")
 			}
 		}

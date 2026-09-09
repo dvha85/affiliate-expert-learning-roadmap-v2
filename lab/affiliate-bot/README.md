@@ -204,10 +204,21 @@ checksum cũ.
 là artifact spine cho M11: chúng dùng `core/m11` để strict-decode và lưu
 canonical record vào `m11-artifacts.jsonl`; registry chỉ nhận link lifecycle
 đã resolve (lease, approval, health, cost, ledger, gate, authorization,
-execution, activation, reconciliation hoặc cycle). Backup v3 gồm registry này
+execution, activation, reconciliation, offline-fixture evaluation hoặc cycle).
+Backup v3 gồm registry này
 nếu runtime đã có nó và kiểm lại graph trước `RESTORED`. Đây chưa phải lệnh
 lease activation, production gate, executor, reconciliation/recovery hay M11
 lifecycle đầy đủ.
+
+`m11-evaluate STATE_DIR OUTCOME_ID EVALUATION_ID EVALUATED_AT` chỉ đọc một
+`CANCELLED`/`NOT_PERFORMED` fixture outcome đã được M11 ghi nhận và tạo
+`ProductionOutcomeEvaluation` với `source_profile=OFFLINE_FIXTURE` và
+`result=FIXTURE_NO_SIDE_EFFECT`. `m11-close-cycle STATE_DIR CYCLE_ID
+EVALUATION_ID CLOSED_AT` chỉ đóng audit cycle khi evaluation, outcome,
+execution, lease, gate, authorization, intent và canonical history cùng resolve
+exact. Hai lệnh không gọi executor, không clear STOP/không cấp quyền mới và
+không chứng minh business outcome. Backup v3 kiểm lại các link này, kể cả khi
+manifest checksum đã bị cập nhật theo một fixture bị sửa.
 
 `m11-activate STATE_DIR LEASE_ID ACTIVATED_AT` chỉ tạo `ProductionActivation`
 khi lease và lease approval khớp exact đã có trong registry, thời điểm còn nằm

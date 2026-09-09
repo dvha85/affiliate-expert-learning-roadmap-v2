@@ -305,6 +305,13 @@ def main():
         execution_ledger_id = execution_ledger["lease_id"] + "/" + execution_ledger["updated_at"]
         production_outcome_result = invoke(bot, "mission", "m11-outcome", state, production_outcome, execution_ledger_id)
         assert production_outcome_result["status"] == "APPENDED"
+        production_evaluation = invoke(bot, "mission", "m11-evaluate", state, "br16-production-o", "br16-production-e", "2026-09-08T00:00:04Z")
+        assert production_evaluation["status"] == "APPENDED" and production_evaluation["artifact"]["result"] == "FIXTURE_NO_SIDE_EFFECT"
+        assert invoke(bot, "mission", "m11-evaluate", state, "br16-production-o", "br16-production-e", "2026-09-08T00:00:04Z")["status"] == "EXACT_DUPLICATE"
+        production_cycle = invoke(bot, "mission", "m11-close-cycle", state, "br16-production-cycle", "br16-production-e", "2026-09-08T00:00:05Z")
+        assert production_cycle["status"] == "APPENDED" and production_cycle["artifact"]["status"] == "CLOSED"
+        assert invoke(bot, "mission", "m11-close-cycle", state, "br16-production-cycle", "br16-production-e", "2026-09-08T00:00:05Z")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m11-close-cycle", state, "br16-invalid-cycle", "missing-evaluation", "2026-09-08T00:00:05Z", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-resolve", state, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"])["status"] == "RESOLVED"
 
         resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
@@ -392,6 +399,22 @@ def main():
         # record and M11 recovery graph before the old STOP can be trusted.
         backup, restored = work / "backup", work / "restored"
         assert invoke(bot, "backup", "create", state, backup)["status"] == "BACKED_UP"
+        # A checksum-valid edit to the fixture outcome must still fail the
+        # canonical evaluation/cycle graph check; manifest integrity alone is
+        # deliberately insufficient evidence for a safe restore.
+        broken_backup = work / "backup-broken-evaluation-link"
+        shutil.copytree(backup, broken_backup)
+        outcomes_path = broken_backup / "m11-outcomes.jsonl"
+        broken_outcome = json.loads(outcomes_path.read_text(encoding="utf-8"))
+        broken_outcome["outcome_id"] = "br16-production-o-missing"
+        broken_bytes = (json.dumps(broken_outcome) + "\n").encode()
+        outcomes_path.write_bytes(broken_bytes)
+        manifest_path = broken_backup / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["files"]["m11-outcomes.jsonl"]["size_bytes"] = len(broken_bytes)
+        manifest["files"]["m11-outcomes.jsonl"]["sha256"] = hashlib.sha256(broken_bytes).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert invoke(bot, "backup", "restore", broken_backup, work / "broken-restored", expected=1)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", backup, restored)["status"] == "RESTORED"
         restored_history = restored / "history.jsonl"
         assert "replay=MATCH" in run([bot, "history", "replay", restored_history]).stdout
@@ -400,6 +423,8 @@ def main():
         restored_status = invoke(bot, "mission", "status", restored)["artifact"]
         assert restored_status["stop"] is True and restored_status["stop_reason"] == "RECONCILIATION_REQUIRED"
         assert invoke(bot, "mission", "m10-resolve", restored, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_OUTCOME_EVALUATION", "br16-production-e")["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_CYCLE", "br16-production-cycle")["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_RECORD", recovery_unknown["artifact"]["execution"]["execution_id"])["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_RECONCILIATION", "br16-recovery-resolution")["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", reviewed_ledger_id)["status"] == "RESOLVED"
