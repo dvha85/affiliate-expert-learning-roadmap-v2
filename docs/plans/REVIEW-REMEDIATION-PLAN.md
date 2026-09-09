@@ -76,7 +76,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — `core/m06`, CLI/HTTP/n8n fixture adapter và resolver M07/M08 đã dùng chung; regression key-order/field ID/DRIFT có trong learner. Generic source và n8n operated run vẫn mở |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract, adapter-owned trace/proposal store và blueprint ACK chain đã có; n8n/model operated evidence, generic deployment policy còn mở |
-| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v2 snapshot recursive, M07 replay và runtime gate cross-process; coverage inventory M00–M10 đầy đủ, fault/host proof còn mở |
+| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v3 typed inventory/profile, M07 replay và runtime gate cross-process; semantic coverage và fault/host proof còn mở |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
@@ -311,8 +311,9 @@ nghiệm thu trên `main`**.
 
 **Chạm tới:** `backup_command.go`, runtime store inventory, canonical loaders, manifest version và deployment runbook.
 
-**Cập nhật thực hiện (2026-09-08, phạm vi hẹp):** learner backup đã lên
-`affiliate-bot-backup/v2` và ghi inventory bắt buộc. Runtime có canary phải có
+**Cập nhật thực hiện (2026-09-09, phạm vi hẹp):** learner backup đã lên
+`affiliate-bot-backup/v3`: mỗi artifact ghi path, kind, kích thước, SHA-256 và
+profile inventory; restore đòi inventory trùng khớp tuyệt đối. Runtime có canary phải có
 M10 registry; runtime có `FAILED` execution phải có fixture outcome store.
 Restore gọi canonical loader để kiểm reservation → execution và FAILED
 execution → `MACHINE_EXECUTION` EffectRef trước khi trả `RESTORED`. Smoke tạo
@@ -320,7 +321,7 @@ governed M10 chain bằng Bot, kiểm manifest thiếu artifact, checksum-hợp-
 nhưng orphan outcome, replay/resolve sau process mới, budget và STOP. Đây chỉ
 là một lát cắt RP-06; các hạng mục còn lại bên dưới vẫn mở.
 
-**Cập nhật M07 snapshot (2026-09-08):** manifest v2 giờ inventory đệ quy theo
+**Cập nhật M07 snapshot (2026-09-09):** manifest v3 inventory đệ quy theo
 relative path chuẩn hóa và đưa `history.jsonl.m07/` vào backup khi adapter đã
 persist tool trace/proposal. Trace lưu registry đã được review; loader replay
 chính validator M07 cho method/host/redirect, trace digest, canonical history,
@@ -346,8 +347,10 @@ outcome orphan dù manifest checksum đã cập nhật bị reject. Loader state
 kiểm toàn vẹn/binding lịch sử khi restore; intent/approval/grant hết hạn vẫn
 replay được để audit nhưng gate/reservation mới kiểm thời gian thực và bị chặn.
 Regression tạo M03–M05 qua CLI, backup/restore, resolve review, rồi cover
-orphan và expired authority. Chưa có inventory profile typed cho mọi artifact
-M00–M10, fault injection đa-file hoặc evidence operated.
+orphan và expired authority. Manifest v3 từ chối layout lạ, file known nhưng
+không nằm trong inventory, và kind sai; mọi artifact runtime hiện hỗ trợ đều có
+kind/size/SHA-256/profile. Fault injection đa-file, source ngoài runtime và
+evidence operated vẫn mở.
 
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
@@ -363,7 +366,7 @@ M00–M10, fault injection đa-file hoặc evidence operated.
 **Cập nhật thực hiện (2026-09-08, artifact spine):** `core/m11` nay sở hữu
 decoder/semantic checks cho M11 artifact; harness gọi decoder này thay vì parser
 semantic riêng. Learner có `m11-register`/`m11-resolve` và registry append-only
-`m11-artifacts.jsonl`, reject hash/schema/link hỏng, và backup v2 snapshot/verify
+`m11-artifacts.jsonl`, reject hash/schema/link hỏng, và backup v3 snapshot/verify
 registry nếu có. `m11-activate` chỉ tạo activation từ lease + approval đã
 register, trong thời hạn và khi chưa STOP; `m11-ledger-init` chỉ tạo ledger
 rỗng sau activation này và không reset được bằng retry. Smoke backup tạo

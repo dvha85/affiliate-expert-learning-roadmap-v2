@@ -176,7 +176,7 @@ def main():
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
-        assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v2"
+        assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v3"
         assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl", "m11-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
         invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
         (invalid_source / "m10-outcomes.jsonl").unlink()
@@ -201,7 +201,8 @@ def main():
         invalid_outcome_bytes = (json.dumps(invalid_outcome) + "\n").encode()
         (invalid_graph_backup / "m10-outcomes.jsonl").write_bytes(invalid_outcome_bytes)
         invalid_manifest = json.loads((invalid_graph_backup / "manifest.json").read_text(encoding="utf-8"))
-        invalid_manifest["files"]["m10-outcomes.jsonl"] = hashlib.sha256(invalid_outcome_bytes).hexdigest()
+        invalid_manifest["files"]["m10-outcomes.jsonl"]["sha256"] = hashlib.sha256(invalid_outcome_bytes).hexdigest()
+        invalid_manifest["files"]["m10-outcomes.jsonl"]["size_bytes"] = len(invalid_outcome_bytes)
         (invalid_graph_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_graph_backup, root / "invalid-graph-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", backup, restored, env=env)["status"] == "RESTORED"
@@ -262,7 +263,8 @@ def main():
         (stopped_state_partial / "mission-state.json").write_bytes(partial_state_bytes)
         (stopped_state_partial / "STOP").unlink()
         partial_state_manifest = json.loads((stopped_state_partial / "manifest.json").read_text(encoding="utf-8"))
-        partial_state_manifest["files"]["mission-state.json"] = hashlib.sha256(partial_state_bytes).hexdigest()
+        partial_state_manifest["files"]["mission-state.json"]["sha256"] = hashlib.sha256(partial_state_bytes).hexdigest()
+        partial_state_manifest["files"]["mission-state.json"]["size_bytes"] = len(partial_state_bytes)
         del partial_state_manifest["files"]["STOP"]
         (stopped_state_partial / "manifest.json").write_text(json.dumps(partial_state_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", stopped_state_partial, root / "stopped-state-partial-restored", expected=1, env=env)["status"] == "VERIFY_FAILED"
@@ -290,7 +292,8 @@ def main():
         changed_bytes = ("\n".join(changed_lines) + "\n").encode()
         (invalid_reconciliation_backup / "m11-artifacts.jsonl").write_bytes(changed_bytes)
         invalid_reconciliation_manifest = json.loads((invalid_reconciliation_backup / "manifest.json").read_text(encoding="utf-8"))
-        invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"] = hashlib.sha256(changed_bytes).hexdigest()
+        invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"]["sha256"] = hashlib.sha256(changed_bytes).hexdigest()
+        invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"]["size_bytes"] = len(changed_bytes)
         (invalid_reconciliation_backup / "manifest.json").write_text(json.dumps(invalid_reconciliation_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_reconciliation_backup, root / "invalid-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         partial_reconciliation_backup = root / "partial-reconciliation-backup"; shutil.copytree(recovery_backup, partial_reconciliation_backup)
@@ -303,7 +306,8 @@ def main():
         partial_bytes = ("\n".join(partial_lines) + "\n").encode()
         (partial_reconciliation_backup / "m11-artifacts.jsonl").write_bytes(partial_bytes)
         partial_manifest = json.loads((partial_reconciliation_backup / "manifest.json").read_text(encoding="utf-8"))
-        partial_manifest["files"]["m11-artifacts.jsonl"] = hashlib.sha256(partial_bytes).hexdigest()
+        partial_manifest["files"]["m11-artifacts.jsonl"]["sha256"] = hashlib.sha256(partial_bytes).hexdigest()
+        partial_manifest["files"]["m11-artifacts.jsonl"]["size_bytes"] = len(partial_bytes)
         (partial_reconciliation_backup / "manifest.json").write_text(json.dumps(partial_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", partial_reconciliation_backup, root / "partial-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         assert invoke(bot, "backup", "restore", recovery_backup, recovery_restored, env=env)["status"] == "RESTORED"
@@ -315,10 +319,11 @@ def main():
         invalid_state_bytes = json.dumps(invalid_state).encode()
         (invalid_backup / "mission-state.json").write_bytes(invalid_state_bytes)
         invalid_manifest = json.loads((invalid_backup / "manifest.json").read_text(encoding="utf-8"))
-        invalid_manifest["files"]["mission-state.json"] = hashlib.sha256(invalid_state_bytes).hexdigest()
+        invalid_manifest["files"]["mission-state.json"]["sha256"] = hashlib.sha256(invalid_state_bytes).hexdigest()
+        invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, governed M11 failed-fixture outcome, and UNKNOWN-to-human-reconciliation chain use a v2 manifest; checksum, required inventory, orphaned outcome, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M10 graph, governed M11 failed-fixture outcome, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, orphaned outcome, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -18,10 +19,25 @@ import (
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
+const backupManifestVersion = "affiliate-bot-backup/v3"
+
+type backupFile struct {
+	Kind      string `json:"kind"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256"`
+}
+
+type backupProfile struct {
+	Name           string   `json:"name"`
+	RequiredKinds  []string `json:"required_kinds"`
+	InventoryKinds []string `json:"inventory_kinds"`
+}
+
 type backupManifest struct {
-	Version  string            `json:"version"`
-	Files    map[string]string `json:"files"`
-	Required []string          `json:"required"`
+	Version  string                `json:"version"`
+	Profile  backupProfile         `json:"profile"`
+	Files    map[string]backupFile `json:"files"`
+	Required []string              `json:"required"`
 }
 
 // backupCopyFault is a test-only seam for an interrupted snapshot. Manifest
@@ -36,6 +52,84 @@ func fileDigest(path string) (string, error) {
 	}
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:]), nil
+}
+
+func backupArtifactKind(name string) (string, error) {
+	if strings.HasPrefix(name, "history.jsonl.m07/tool-results/") && strings.HasSuffix(name, ".json") {
+		return "M07_TOOL_RESULT", nil
+	}
+	if strings.HasPrefix(name, "history.jsonl.m07/proposals/") && strings.HasSuffix(name, ".json") {
+		return "M07_AGENT_PROPOSAL", nil
+	}
+	kinds := map[string]string{
+		"history.jsonl":              "M02_HISTORY",
+		"mission-state.json":         "MISSION_STATE",
+		"actions.jsonl":              "M03_ACTION_STORE",
+		"outcomes.jsonl":             "M03_OUTCOME_STORE",
+		"evaluations.jsonl":          "M05_EVALUATION_STORE",
+		"proposals.jsonl":            "M05_PROPOSAL_STORE",
+		"reviews.jsonl":              "M05_REVIEW_STORE",
+		"accesstrade-receipts.jsonl": "ACCESSTRADE_RECEIPT_STORE",
+		"trusted-cost-bounds.jsonl":  "M10_COST_BOUND_STORE",
+		"m10-artifacts.jsonl":        "M10_ARTIFACT_REGISTRY",
+		"m10-outcomes.jsonl":         "M10_OUTCOME_STORE",
+		"m11-artifacts.jsonl":        "M11_ARTIFACT_REGISTRY",
+		"m11-outcomes.jsonl":         "M11_OUTCOME_STORE",
+		"STOP":                       "DURABLE_STOP",
+	}
+	kind, ok := kinds[name]
+	if !ok {
+		return "", fmt.Errorf("unsupported backup artifact layout %s", name)
+	}
+	return kind, nil
+}
+
+func sortedKinds(files []string) ([]string, error) {
+	seen := map[string]bool{}
+	for _, name := range files {
+		kind, err := backupArtifactKind(name)
+		if err != nil {
+			return nil, err
+		}
+		seen[kind] = true
+	}
+	kinds := make([]string, 0, len(seen))
+	for kind := range seen {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	return kinds, nil
+}
+
+func backupProfileFor(required, files []string) (backupProfile, error) {
+	requiredKinds, err := sortedKinds(required)
+	if err != nil {
+		return backupProfile{}, err
+	}
+	inventoryKinds, err := sortedKinds(files)
+	if err != nil {
+		return backupProfile{}, err
+	}
+	return backupProfile{Name: "learner-runtime/offline-v3", RequiredKinds: requiredKinds, InventoryKinds: inventoryKinds}, nil
+}
+
+func backupFileMetadata(path, name string) (backupFile, error) {
+	kind, err := backupArtifactKind(name)
+	if err != nil {
+		return backupFile{}, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return backupFile{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return backupFile{}, fmt.Errorf("%s must be a regular file", path)
+	}
+	digest, err := fileDigest(path)
+	if err != nil {
+		return backupFile{}, err
+	}
+	return backupFile{Kind: kind, SizeBytes: info.Size(), SHA256: digest}, nil
 }
 func regularFile(path string) error {
 	i, e := os.Lstat(path)
@@ -101,6 +195,9 @@ func backupFiles(source string) ([]string, error) {
 			return nil
 		}
 		if _, err := backupRelativePath(name); err != nil {
+			return err
+		}
+		if _, err := backupArtifactKind(name); err != nil {
 			return err
 		}
 		out = append(out, name)
@@ -601,20 +698,43 @@ func verifyBackup(dir string) (backupManifest, error) {
 	if err := readJSON(filepath.Join(dir, "manifest.json"), &m); err != nil {
 		return m, err
 	}
-	if m.Version != "affiliate-bot-backup/v2" || len(m.Files) == 0 {
+	if m.Version != backupManifestVersion || len(m.Files) == 0 {
 		return m, fmt.Errorf("invalid backup manifest")
+	}
+	actualFiles, err := backupFiles(dir)
+	if err != nil {
+		return m, fmt.Errorf("backup inventory is invalid: %w", err)
+	}
+	manifestFiles := make([]string, 0, len(m.Files))
+	for name := range m.Files {
+		manifestFiles = append(manifestFiles, name)
+	}
+	sort.Strings(manifestFiles)
+	if !sameFileSet(manifestFiles, actualFiles) {
+		return m, fmt.Errorf("backup artifact inventory does not exactly match manifest")
 	}
 	for name, want := range m.Files {
 		clean, err := backupRelativePath(name)
 		if err != nil {
 			return m, err
 		}
+		kind, err := backupArtifactKind(name)
+		if err != nil {
+			return m, err
+		}
+		if want.Kind != kind || want.SizeBytes < 0 || want.SHA256 == "" {
+			return m, fmt.Errorf("backup artifact metadata is invalid for %s", name)
+		}
 		p := filepath.Join(dir, clean)
 		if err := regularFile(p); err != nil {
 			return m, err
 		}
+		info, err := os.Stat(p)
+		if err != nil || info.Size() != want.SizeBytes {
+			return m, fmt.Errorf("backup size mismatch for %s", name)
+		}
 		got, e := fileDigest(p)
-		if e != nil || got != want {
+		if e != nil || got != want.SHA256 {
 			return m, fmt.Errorf("backup checksum mismatch for %s", name)
 		}
 	}
@@ -630,6 +750,13 @@ func verifyBackup(dir string) (backupManifest, error) {
 		if _, ok := m.Files[required]; !ok {
 			return m, fmt.Errorf("backup is missing required %s", required)
 		}
+	}
+	expectedProfile, err := backupProfileFor(expectedRequired, actualFiles)
+	if err != nil {
+		return m, err
+	}
+	if !reflect.DeepEqual(m.Profile, expectedProfile) {
+		return m, fmt.Errorf("backup profile does not match artifact inventory")
 	}
 	if err := validateM07BackupGraph(dir); err != nil {
 		return m, fmt.Errorf("backup M07 graph is invalid: %w", err)
@@ -705,7 +832,11 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e = validateM11BackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
 		}
-		m := backupManifest{Version: "affiliate-bot-backup/v2", Files: map[string]string{}, Required: required}
+		profile, e := backupProfileFor(required, files)
+		if e != nil {
+			return emit("INPUT_ERROR", nil, e, 1)
+		}
+		m := backupManifest{Version: backupManifestVersion, Profile: profile, Files: map[string]backupFile{}, Required: required}
 		for _, name := range files {
 			if backupCopyFault != nil {
 				if e = backupCopyFault(name); e != nil {
@@ -727,7 +858,11 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			if e = os.WriteFile(target, b, 0600); e != nil {
 				return emit("STORE_ERROR", nil, e, 1)
 			}
-			m.Files[name], _ = fileDigest(target)
+			metadata, metadataErr := backupFileMetadata(target, name)
+			if metadataErr != nil {
+				return emit("STORE_ERROR", nil, metadataErr, 1)
+			}
+			m.Files[name] = metadata
 		}
 		if e = writeJSON(filepath.Join(args[2], "manifest.json"), m); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
@@ -753,7 +888,12 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	} else {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
+	fileNames := make([]string, 0, len(m.Files))
 	for name := range m.Files {
+		fileNames = append(fileNames, name)
+	}
+	sort.Strings(fileNames)
+	for _, name := range fileNames {
 		clean, pathErr := backupRelativePath(name)
 		if pathErr != nil {
 			return emit("VERIFY_FAILED", nil, pathErr, 1)

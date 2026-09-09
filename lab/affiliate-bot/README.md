@@ -186,20 +186,25 @@ go run ./cmd/bot backup create /tmp/affiliate-runtime /tmp/affiliate-backup
 go run ./cmd/bot backup restore /tmp/affiliate-backup /tmp/affiliate-restored
 ```
 
-Backup profile hiện là `affiliate-bot-backup/v2`. Với runtime đã khởi tạo
+Backup profile hiện là `affiliate-bot-backup/v3`. Manifest ghi mỗi path cùng
+`kind`, kích thước byte và SHA-256, cùng profile loại artifact bắt buộc/toàn bộ
+inventory. Backup chỉ nhận layout runtime đã biết; restore từ chối file thiếu,
+thừa hoặc sai loại, kể cả khi checksum từng file hợp lệ. Với runtime đã khởi tạo
 canary, manifest bắt buộc có `m10-artifacts.jsonl`; nếu có execution `FAILED`
-thì bắt buộc có thêm `m10-outcomes.jsonl`. Restore kiểm checksum, inventory bắt
-buộc, replay history, mission state, rồi kiểm link reservation → execution và
-FAILED execution → fixture outcome/`MACHINE_EXECUTION` EffectRef. Một backup
-checksum hợp lệ nhưng orphan outcome vẫn bị từ chối với `GRAPH_FAILED`. Phạm vi
-này chỉ là flat M10 learner graph: chưa là snapshot transaction, inventory
-recursive M00–M10 hay lifecycle M11.
+thì bắt buộc có thêm `m10-outcomes.jsonl`. Restore còn replay history, mission
+state và kiểm link reservation → execution, FAILED execution → fixture
+outcome/`MACHINE_EXECUTION` EffectRef. Một backup checksum hợp lệ nhưng orphan
+outcome vẫn bị từ chối với `GRAPH_FAILED`.
+
+Snapshot `v2` không được restore như `v3`: tạo lại backup mới từ runtime còn
+nguyên vẹn trước khi nâng cấp, để có inventory typed thay vì suy diễn từ map
+checksum cũ.
 
 `m11-register STATE_DIR KIND ARTIFACT.json` và `m11-resolve STATE_DIR KIND ID`
 là artifact spine cho M11: chúng dùng `core/m11` để strict-decode và lưu
 canonical record vào `m11-artifacts.jsonl`; registry chỉ nhận link lifecycle
 đã resolve (lease, approval, health, cost, ledger, gate, authorization,
-execution, activation, reconciliation hoặc cycle). Backup v2 gồm registry này
+execution, activation, reconciliation hoặc cycle). Backup v3 gồm registry này
 nếu runtime đã có nó và kiểm lại graph trước `RESTORED`. Đây chưa phải lệnh
 lease activation, production gate, executor, reconciliation/recovery hay M11
 lifecycle đầy đủ.

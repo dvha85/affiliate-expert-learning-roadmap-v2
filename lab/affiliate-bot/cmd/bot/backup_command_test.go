@@ -103,6 +103,11 @@ func TestBackupRestoreReplaysM00ToM05Graph(t *testing.T) {
 	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
 		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
 	}
+	for _, name := range []string{"action-input.json", "outcome-input.json", "evaluation-config.json", "proposal.json", "review.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
 	backup, restored := filepath.Join(filepath.Dir(runtime), "m00-m05-backup"), filepath.Join(filepath.Dir(runtime), "m00-m05-restored")
 	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
 		t.Fatalf("M00-M05 backup failed: code=%d response=%+v", code, response)
@@ -151,7 +156,7 @@ func TestBackupRestoreReplaysM00ToM05Graph(t *testing.T) {
 	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
 		t.Fatal(err)
 	}
-	manifest.Files["outcomes.jsonl"], err = fileDigest(outcomesPath)
+	manifest.Files["outcomes.jsonl"], err = backupFileMetadata(outcomesPath, "outcomes.jsonl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,6 +172,11 @@ func TestBackupRestoreReplaysExpiredAuthorityButBlocksNewReservation(t *testing.
 	dir := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(dir); err != nil {
 		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
 	}
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
 		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
@@ -203,6 +213,57 @@ func TestBackupRestoreReplaysExpiredAuthorityButBlocksNewReservation(t *testing.
 	}
 	if code, response := missionCall(t, "m10-reserve", restored, "1", "must-remain-blocked"); code == 0 || response["status"] != "REJECTED" {
 		t.Fatalf("expired restored authority accepted a new reservation: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
+	runtime := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(filepath.Join(runtime, "operator-notes.txt"), []byte("not a canonical artifact\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", runtime, filepath.Join(filepath.Dir(runtime), "unknown-artifact-backup")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted unsupported runtime file: code=%d response=%+v", code, response)
+	}
+	if err := os.Remove(filepath.Join(runtime, "operator-notes.txt")); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(filepath.Dir(runtime), "typed-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("typed backup failed: code=%d response=%+v", code, response)
+	}
+	knownExtra := filepath.Join(filepath.Dir(runtime), "known-extra-backup")
+	copyFlatBackup(t, backup, knownExtra)
+	if err := os.WriteFile(filepath.Join(knownExtra, "reviews.jsonl"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", knownExtra, filepath.Join(filepath.Dir(runtime), "known-extra-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("restore accepted uninventoried known artifact: code=%d response=%+v", code, response)
+	}
+	wrongKind := filepath.Join(filepath.Dir(runtime), "wrong-kind-backup")
+	copyFlatBackup(t, backup, wrongKind)
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(wrongKind, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	metadata := manifest.Files["history.jsonl"]
+	metadata.Kind = "M03_ACTION_STORE"
+	manifest.Files["history.jsonl"] = metadata
+	if err := writeJSON(filepath.Join(wrongKind, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", wrongKind, filepath.Join(filepath.Dir(runtime), "wrong-kind-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("restore accepted a wrong artifact kind: code=%d response=%+v", code, response)
 	}
 }
 
@@ -361,13 +422,17 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := backupManifest{Version: "affiliate-bot-backup/v2", Files: map[string]string{}, Required: []string{"history.jsonl", "mission-state.json", "history.jsonl.m07/proposals/" + proposal.ProposalID[len("sha256:"):] + ".json", "history.jsonl.m07/tool-results/" + tool.TraceID[len("sha256:"):] + ".json"}}
+	manifest := backupManifest{Version: backupManifestVersion, Files: map[string]backupFile{}, Required: []string{"history.jsonl", "mission-state.json", "history.jsonl.m07/proposals/" + proposal.ProposalID[len("sha256:"):] + ".json", "history.jsonl.m07/tool-results/" + tool.TraceID[len("sha256:"):] + ".json"}}
+	manifest.Profile, err = backupProfileFor(manifest.Required, files)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range files {
-		digest, err := fileDigest(filepath.Join(badBackup, filepath.FromSlash(name)))
+		metadata, err := backupFileMetadata(filepath.Join(badBackup, filepath.FromSlash(name)), name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		manifest.Files[name] = digest
+		manifest.Files[name] = metadata
 	}
 	if err := writeJSON(filepath.Join(badBackup, "manifest.json"), manifest); err != nil {
 		t.Fatal(err)

@@ -66,8 +66,11 @@ cũ.
   nghĩa là giữ nguyên state, chờ writer/snapshot kết thúc hoặc thực hiện recovery
   rõ ràng cho gate stale; không xóa lock tự động;
 - backup history + ledger và, nếu M07 adapter đã persist, toàn bộ sidecar
-  `history.jsonl.m07/`; manifest chỉ nhận relative path chuẩn hóa, checksum và
-  restore vào thư mục cô lập;
+  `history.jsonl.m07/`; manifest v3 chỉ nhận relative path chuẩn hóa trong
+  layout artifact đã biết, và ghi kind, kích thước cùng SHA-256. Restore đòi
+  inventory thực tế trùng manifest trước khi chép sang thư mục cô lập;
+- backup `v2` không tương thích với verifier `v3`; khi nâng cấp, tạo một
+  snapshot mới từ runtime gốc trước, không sửa tay manifest cũ;
 - restore xong phải replay khớp, không reset reservation/STOP;
 - recovery cần human review, không tự mở lại executor.
 - restore không được tự tạo lại ledger, reservation, approval hoặc lease đã
