@@ -84,7 +84,7 @@ RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR G
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract, adapter-owned trace/proposal store và blueprint ACK chain đã có; n8n/model operated evidence, generic deployment policy còn mở |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v3 typed inventory/profile, M07 replay và runtime gate cross-process; semantic coverage và fault/host proof còn mở |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
-| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | TODO |
+| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | IN PROGRESS — CI engine regression M06 + M07 policy-reject đã có; mutation, model-success và full scope còn mở |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | TODO |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
 
@@ -519,6 +519,16 @@ dưới.
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc
 thay thế barrier/fault hook quyết định.
+
+**Cập nhật engine CI (2026-09-09):** job `n8n-engine-regression` trong
+`mission-agent-path-ci.yml` cài n8n `2.38.1` vào runtime disposable, build
+canonical adapter thật và import một bản copy có ID/loopback URL. Vì `n8n
+execute` chỉ chấp nhận `Execute Workflow Trigger`, bản copy thay trigger
+Schedule/Manual bằng entrypoint này; blueprint review gốc không đổi. Job kiểm
+M06 `APPENDED → EXACT_DUPLICATE → replay=MATCH`, sink failure không đến report,
+và M07 `POST` dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal
+persistence. Không cài credential, không gọi affiliate/provider và không coi
+đó là M07 model-success/redirect coverage hoặc evidence business.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.
