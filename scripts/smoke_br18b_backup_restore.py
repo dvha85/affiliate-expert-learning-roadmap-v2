@@ -109,6 +109,21 @@ def write_production_lease_approval(path, lease_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_recovery_admission_lease(path, prior_lease_path):
+    payload = json.loads(prior_lease_path.read_text(encoding="utf-8"))
+    payload.update({
+        "lease_id": "br18-recovery-admission-lease",
+        "lease_version": "v1",
+        "approval_ref": "br18-recovery-admission-approval",
+        "reviewed_at": "2026-09-08T00:00:06Z",
+        "valid_from": "2026-09-08T00:00:06Z",
+        "promotion_review_ref": "fixture:br18-recovery-admission-review",
+    })
+    del payload["lease_hash"]
+    payload["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def write_production_health(path, lease_path):
     lease = json.loads(lease_path.read_text(encoding="utf-8"))
     payload = {
@@ -403,6 +418,40 @@ def main():
         assert invoke(bot, "mission", "status", recovery_restored, env=env)["artifact"]["stop"] is True
         assert invoke(bot, "mission", "m11-resolve", recovery_restored, "PRODUCTION_RECONCILIATION", "br18-production-resolution", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-activate", recovery_restored, "br18-production-lease", "2026-09-08T00:00:04Z", expected=1, env=env)["status"] == "REJECTED"
+
+        # Re-admission starts only from the restored, durably stopped runtime.
+        # The new runtime has a separately reviewed lease/approval and fresh
+        # ledger; it inherits neither old budget nor old approval state.
+        admission_runtime = root / "recovery-admission-runtime"
+        assert invoke(bot, "mission", "init", admission_runtime, env=env)["status"] == "INITIALIZED"
+        shutil.copy2(recovery_restored / "history.jsonl", admission_runtime / "history.jsonl")
+        assert invoke(bot, "mission", "bind", admission_runtime, intent, policy, env=env)["status"] == "BOUND"
+        admission_lease = root / "recovery-admission-lease.json"; write_recovery_admission_lease(admission_lease, production_lease)
+        admission_approval = root / "recovery-admission-approval.json"; write_production_lease_approval(admission_approval, admission_lease)
+        admission_lease_value = json.loads(admission_lease.read_text(encoding="utf-8"))
+        assert invoke(bot, "mission", "m11-register", recovery_restored, "PRODUCTION_LEASE", admission_lease, expected=1, env=env)["status"] == "STOPPED"
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_LEASE", admission_lease, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_LEASE_APPROVAL", admission_approval, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", admission_runtime, admission_lease_value["lease_id"], "2026-09-08T00:00:07Z", env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", admission_runtime, admission_lease_value["lease_id"], "2026-09-08T00:00:07Z", env=env)["status"] == "APPENDED"
+        restored_handoff = root / "restored-recovery-handoff.json"
+        assert invoke(bot, "mission", "m11-recovery-export", recovery_restored, "br18-production-resolution", reviewed_ledger_id, restored_handoff, env=env)["status"] == "APPENDED"
+        admission_input = root / "recovery-admission.json"
+        admission_input.write_text(json.dumps({"recovery_admission_id": "br18-recovery-admission", "prior_runtime_dir": str(recovery_restored.resolve()), "prior_lease_id": handoff["artifact"]["prior_lease_id"], "prior_lease_version": handoff["artifact"]["prior_lease_version"], "prior_lease_hash": handoff["artifact"]["prior_lease_hash"], "prior_approval_id": handoff["artifact"]["prior_approval_id"], "resolution_id": handoff["artifact"]["resolution_id"], "new_runtime_id": "br18-recovery-runtime-v2", "new_runtime_dir": str(admission_runtime.resolve()), "new_lease_id": admission_lease_value["lease_id"], "new_lease_version": admission_lease_value["lease_version"], "new_lease_hash": admission_lease_value["lease_hash"], "new_approval_id": admission_lease_value["approval_ref"], "reviewed_by": "human", "reviewer_id": "pilot-human", "reviewed_at": "2026-09-08T00:00:07Z", "execution_permitted": False}), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_RECOVERY_ADMISSION", admission_input, expected=1, env=env)["status"] == "REJECTED"
+        admission = invoke(bot, "mission", "m11-recovery-admit", admission_runtime, recovery_restored, restored_handoff, admission_input, env=env)
+        assert admission["status"] == "APPENDED" and admission["execution_permitted"] is False
+        assert invoke(bot, "mission", "m11-recovery-admit", admission_runtime, recovery_restored, restored_handoff, admission_input, env=env)["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m11-recovery-admit", recovery_restored, recovery_restored, restored_handoff, admission_input, expected=1, env=env)["status"] == "PATH_ERROR"
+        admission_backup, admission_restored = root / "recovery-admission-backup", root / "recovery-admission-restored"
+        assert invoke(bot, "backup", "create", admission_runtime, admission_backup, env=env)["status"] == "BACKED_UP"
+        broken_admission_backup = root / "broken-recovery-admission-backup"; shutil.copytree(admission_backup, broken_admission_backup)
+        rewrite_m11_registry(broken_admission_backup, replace_m11_field("PRODUCTION_RECOVERY_ADMISSION", "new_lease_hash", "sha256:" + "f" * 64))
+        broken_admission_result = invoke(bot, "backup", "restore", broken_admission_backup, root / "broken-recovery-admission-restored", expected=1, env=env)
+        assert broken_admission_result["status"] == "VERIFY_FAILED", broken_admission_result
+        assert invoke(bot, "backup", "restore", admission_backup, admission_restored, env=env)["status"] == "RESTORED"
+        assert invoke(bot, "mission", "m11-resolve", admission_restored, "PRODUCTION_RECOVERY_ADMISSION", "br18-recovery-admission", env=env)["status"] == "RESOLVED"
+        assert invoke(bot, "mission", "m11-authorize", admission_restored, admission_lease_value["lease_id"], "missing-gate", "fixture_stub", "2026-09-08T00:00:08Z", expected=1, env=env)["status"] == "REJECTED"
         invalid_backup = root / "invalid-backup"; invalid_restored = root / "invalid-restored"; shutil.copytree(backup, invalid_backup)
         invalid_state = json.loads((invalid_backup / "mission-state.json").read_text(encoding="utf-8")); invalid_state["canary"]["executions_used"] = -1
         invalid_state_bytes = json.dumps(invalid_state).encode()
