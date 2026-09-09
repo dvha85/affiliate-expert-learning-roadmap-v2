@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
@@ -167,6 +168,41 @@ func TestM11UnknownStopJournalRecoversAfterDurableStopWriteFailure(t *testing.T)
 			}
 			assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
 		})
+	}
+}
+
+func TestBackupCreateRecoversPendingM11UnknownStopJournal(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
+	m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+		if entry.ArtifactKind == corem11.ArtifactKindLedger && phase == "before_write" {
+			return errors.New("injected stopped-ledger write failure")
+		}
+		return nil
+	}
+	if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+		t.Fatal("stopped-ledger fault was not surfaced")
+	}
+	m11RegistryAppendFault = nil
+	t.Cleanup(func() { m11RegistryAppendFault = nil })
+	if _, err := buildBR10AdvisorFixture(fixture.dir); err != nil {
+		t.Fatalf("build backup history fixture: %v", err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(fixture.dir, name)); err != nil {
+			t.Fatalf("remove fixture-only backup input %s: %v", name, err)
+		}
+	}
+	backup, restored := filepath.Join(t.TempDir(), "backup"), filepath.Join(t.TempDir(), "restored")
+	if code, response := backupCall(t, "create", fixture.dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup create did not recover pending UNKNOWN STOP journal: code=%d response=%+v", code, response)
+	}
+	assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("recovered UNKNOWN STOP backup did not restore: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "status", restored); code != 0 || response["artifact"].(map[string]any)["stop"] != true {
+		t.Fatalf("restored UNKNOWN STOP runtime was not durably stopped: code=%d response=%+v", code, response)
 	}
 }
 

@@ -450,7 +450,8 @@ malformed, stale hoặc competing thì mutation và `status` fail closed
 và ngay sau stopped-ledger write sau execution append, cùng lỗi atomic rename
 của mission state hoặc STOP marker; restart replay append ledger/STOP
 exactly-once và retry trả duplicate. Backup create cũng chạy recovery dưới lock
-trước inventory. Journal là kế hoạch replay có fsync cho một
+trước inventory; regression tạo journal pending thật rồi backup/restore runtime
+và kiểm STOP vẫn bền. Journal là kế hoạch replay có fsync cho một
 transition, **không
 phải** transaction đa-file/power-loss proof.
 
