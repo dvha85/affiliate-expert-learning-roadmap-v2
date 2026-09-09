@@ -238,9 +238,11 @@ Các script n8n ở trên không tự khởi tạo credential/provider và vì v
 `n8n-engine-regression` trên GitHub Actions. Nó import copy workflow với
 ID/loopback URL và Execute Workflow Trigger chỉ cho CLI, giữ nguyên blueprint
 gốc. Regression kiểm M06 append/duplicate/replay và sink failure; M07 dùng
-record M06 thật, ép `POST`, yêu cầu lỗi `TOOL_TRANSPORT_REJECTED` tại fetch và
-không cho Agent/proposal persistence chạy. Không có credential hoặc provider
-trong job này, nên M07 success qua model/redirect/sink parity vẫn là gap mở.
+record M06 thật, ép `POST`, registry bật redirect, hoặc adapter không khả dụng;
+tất cả phải dừng tại fetch trước Agent/proposal persistence. Ca POST còn yêu
+cầu lỗi `TOOL_TRANSPORT_REJECTED`; registry redirect bị strict decoder reject.
+Không có credential hoặc provider trong job này, nên M07 success qua model và
+received-redirect transport parity vẫn là gap mở.
 
 ## 6. Compatibility, bàn giao và merge gate
 

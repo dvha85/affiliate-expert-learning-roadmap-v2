@@ -526,9 +526,10 @@ canonical adapter thật và import một bản copy có ID/loopback URL. Vì `n
 execute` chỉ chấp nhận `Execute Workflow Trigger`, bản copy thay trigger
 Schedule/Manual bằng entrypoint này; blueprint review gốc không đổi. Job kiểm
 M06 `APPENDED → EXACT_DUPLICATE → replay=MATCH`, sink failure không đến report,
-và M07 `POST` dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal
-persistence. Không cài credential, không gọi affiliate/provider và không coi
-đó là M07 model-success/redirect coverage hoặc evidence business.
+và M07 `POST`, registry bật `follow_redirects`, hoặc adapter không khả dụng đều
+dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal persistence.
+Không cài credential, không gọi affiliate/provider và không coi đó là M07
+model-success hoặc received-redirect transport coverage/evidence business.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.

@@ -113,7 +113,7 @@ def node_json(execution: dict, node: str) -> dict:
         raise AssertionError(f"n8n node has no JSON output: {node}") from error
 
 
-def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m07_post: bool = False, m07_record_id: Optional[str] = None) -> None:
+def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m07_case: Optional[str] = None, m07_record_id: Optional[str] = None) -> None:
     data = json.loads(blueprint.read_text(encoding="utf-8"))
     data["id"] = workflow_id
     for node in data["nodes"]:
@@ -130,8 +130,12 @@ def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, wor
                     assignment["value"] = f"http://127.0.0.1:{adapter_port}"
                 if m07_record_id is not None and assignment["name"] == "record_id":
                     assignment["value"] = m07_record_id
-                if m07_post and assignment["name"] == "tool_request_json":
+                if m07_case == "post" and assignment["name"] == "tool_request_json":
                     assignment["value"] = '{"tool_name":"public_http","method":"POST","target":"https://example.com/br13/offer"}'
+                if m07_case in {"get", "redirect-registry"} and assignment["name"] == "tool_request_json":
+                    assignment["value"] = '{"tool_name":"public_http","method":"GET","target":"https://example.com/br13/offer"}'
+                if m07_case == "redirect-registry" and assignment["name"] == "tool_registry_json":
+                    assignment["value"] = '[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":10000,"follow_redirects":true}]'
     imported = work / f"{workflow_id}.json"
     imported.write_text(json.dumps(data), encoding="utf-8")
     run(prefix + ["import:workflow", f"--input={imported}"], env=env)
@@ -169,12 +173,12 @@ def require_m06_sink_failure(execution: dict) -> None:
         raise AssertionError("M06 sink failure reached a persistence report")
 
 
-def require_m07_policy_rejection(execution: dict, proposal_store: Path) -> None:
+def require_m07_rejection(execution: dict, proposal_store: Path, marker: Optional[str] = None) -> None:
     result = execution.get("data", {}).get("resultData", {})
     if execution.get("status") != "error" or result.get("lastNodeExecuted") != "Fetch and Register Tool Adapter":
         raise AssertionError("M07 POST request was not rejected at the policy adapter")
-    if "TOOL_TRANSPORT_REJECTED" not in json.dumps(result, separators=(",", ":")):
-        raise AssertionError("M07 fetch failed for a reason other than the adapter transport policy")
+    if marker is not None and marker not in json.dumps(result, separators=(",", ":")):
+        raise AssertionError(f"M07 fetch rejection did not contain expected marker {marker}")
     for forbidden in ("Read-only Evidence Agent", "Persist Agent Proposal Adapter", "Report Persisted M07 Proposal"):
         if forbidden in result.get("runData", {}):
             raise AssertionError(f"policy-rejected M07 request reached {forbidden}")
@@ -233,8 +237,15 @@ def main() -> None:
             require_m06_sink_failure(execute(prefix, env, "rp08-m06", expected=1))
             adapter = start_adapter(bot, history, port, env)
             run([str(bot), "history", "replay", str(history)], env=env)
-            import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-reject", port, m07_post=True, m07_record_id=record_id)
-            require_m07_policy_rejection(execute(prefix, env, "rp08-m07-reject", expected=1), history.with_name(history.name + ".m07") / "proposals")
+            proposal_store = history.with_name(history.name + ".m07") / "proposals"
+            import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-post", port, m07_case="post", m07_record_id=record_id)
+            require_m07_rejection(execute(prefix, env, "rp08-m07-post", expected=1), proposal_store, "TOOL_TRANSPORT_REJECTED")
+            import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-redirect", port, m07_case="redirect-registry", m07_record_id=record_id)
+            require_m07_rejection(execute(prefix, env, "rp08-m07-redirect", expected=1), proposal_store, "INVALID_REQUEST")
+            stop_adapter(adapter)
+            adapter = None
+            import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-sink", port, m07_case="get", m07_record_id=record_id)
+            require_m07_rejection(execute(prefix, env, "rp08-m07-sink", expected=1), proposal_store)
         finally:
             if adapter is not None:
                 stop_adapter(adapter)
@@ -246,7 +257,7 @@ def main() -> None:
             print(f"N8N engine regression runtime retained at {runtime}", file=sys.stderr)
         else:
             shutil.rmtree(runtime)
-    print("N8N ENGINE REGRESSION PASS: M06 persisted/replayed via n8n; M06 sink failure and M07 POST policy rejection failed closed")
+    print("N8N ENGINE REGRESSION PASS: M06 persisted/replayed via n8n; M06 sink failure plus M07 POST, redirect-registry, and unavailable-adapter paths failed closed")
 
 
 if __name__ == "__main__":
