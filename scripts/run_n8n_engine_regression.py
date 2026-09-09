@@ -113,7 +113,7 @@ def node_json(execution: dict, node: str) -> dict:
         raise AssertionError(f"n8n node has no JSON output: {node}") from error
 
 
-def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m07_case: Optional[str] = None, m07_record_id: Optional[str] = None) -> None:
+def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m06_fixture: Optional[dict] = None, m07_case: Optional[str] = None, m07_record_id: Optional[str] = None) -> None:
     data = json.loads(blueprint.read_text(encoding="utf-8"))
     data["id"] = workflow_id
     for node in data["nodes"]:
@@ -128,6 +128,8 @@ def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, wor
             for assignment in node["parameters"]["assignments"]["assignments"]:
                 if assignment["name"] == "adapter_url":
                     assignment["value"] = f"http://127.0.0.1:{adapter_port}"
+                if m06_fixture is not None and assignment["name"] == "fixture_json":
+                    assignment["value"] = json.dumps(m06_fixture, separators=(",", ":"), ensure_ascii=False)
                 if m07_record_id is not None and assignment["name"] == "record_id":
                     assignment["value"] = m07_record_id
                 if m07_case == "post" and assignment["name"] == "tool_request_json":
@@ -171,6 +173,26 @@ def require_m06_sink_failure(execution: dict) -> None:
         raise AssertionError("M06 sink failure did not stop at the adapter request")
     if "Report Canonical M06 Result" in result.get("runData", {}):
         raise AssertionError("M06 sink failure reached a persistence report")
+
+
+def require_m06_rejection(execution: dict) -> None:
+    result = execution.get("data", {}).get("resultData", {})
+    if execution.get("status") != "error" or result.get("lastNodeExecuted") != "Build and Append Canonical M06 Adapter":
+        raise AssertionError("M06 fixture rejection did not stop at the canonical adapter")
+    if "Require Canonical Store ACK" in result.get("runData", {}) or "Report Canonical M06 Result" in result.get("runData", {}):
+        raise AssertionError("M06 fixture rejection reached an ACK or persistence report")
+
+
+def m06_fixture(*, correlation_id: str = "event-1", body: str = '{"product_id":"a","product_name":"Fixture A","currency":"USD","price":100,"commission_rate":0.08}', url: str = "https://example.com/br13/offer") -> dict:
+    return {
+        "version": "br13-offer-fixture/v1",
+        "method": "GET",
+        "url": url,
+        "observed_at": "2026-09-03T00:00:00Z",
+        "correlation_id": correlation_id,
+        "status_code": 200,
+        "body": body,
+    }
 
 
 def require_m07_rejection(execution: dict, proposal_store: Path, marker: Optional[str] = None) -> None:
@@ -229,6 +251,26 @@ def main() -> None:
             second = execute(prefix, env, "rp08-m06")
             if require_m06_success(second, "EXACT_DUPLICATE") != record_id:
                 raise AssertionError("M06 duplicate did not resolve the original canonical record")
+            reordered = m06_fixture(body='{"commission_rate":0.08,"price":100,"currency":"USD","product_name":"Fixture A","product_id":"a"}')
+            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-reordered", port, m06_fixture=reordered)
+            if require_m06_success(execute(prefix, env, "rp08-m06-reordered"), "EXACT_DUPLICATE") != record_id:
+                raise AssertionError("M06 JSON key reordering did not resolve the original canonical record")
+            history_before_rejections = history.read_bytes()
+            changed_same_event = m06_fixture(body='{"product_id":"a","product_name":"Fixture A","currency":"USD","price":120,"commission_rate":0.08}')
+            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-conflict", port, m06_fixture=changed_same_event)
+            require_m06_rejection(execute(prefix, env, "rp08-m06-conflict", expected=1))
+            if history.read_bytes() != history_before_rejections:
+                raise AssertionError("M06 conflicting content changed canonical history")
+            bad_source = m06_fixture(url="https://other.invalid/br13/offer")
+            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-source-reject", port, m06_fixture=bad_source)
+            require_m06_rejection(execute(prefix, env, "rp08-m06-source-reject", expected=1))
+            if history.read_bytes() != history_before_rejections:
+                raise AssertionError("M06 rejected source changed canonical history")
+            changed_new_event = m06_fixture(correlation_id="event-2", body=changed_same_event["body"])
+            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-changed", port, m06_fixture=changed_new_event)
+            changed_record_id = require_m06_success(execute(prefix, env, "rp08-m06-changed"), "APPENDED")
+            if changed_record_id == record_id:
+                raise AssertionError("M06 changed event reused the original canonical record")
             replay = run([str(bot), "history", "replay", str(history)], env=env)
             if "replay=MATCH" not in replay.stdout:
                 raise AssertionError("canonical history did not replay after n8n M06 execution")
@@ -257,7 +299,7 @@ def main() -> None:
             print(f"N8N engine regression runtime retained at {runtime}", file=sys.stderr)
         else:
             shutil.rmtree(runtime)
-    print("N8N ENGINE REGRESSION PASS: M06 persisted/replayed via n8n; M06 sink failure plus M07 POST, redirect-registry, and unavailable-adapter paths failed closed")
+    print("N8N ENGINE REGRESSION PASS: M06 persisted/replayed via n8n with key-order retry, changed-event append, conflict/source rejection and sink failure; M07 POST, redirect-registry, and unavailable-adapter paths failed closed")
 
 
 if __name__ == "__main__":

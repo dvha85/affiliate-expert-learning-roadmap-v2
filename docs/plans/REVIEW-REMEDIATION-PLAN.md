@@ -530,6 +530,13 @@ và M07 `POST`, registry bật `follow_redirects`, hoặc adapter không khả d
 dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal persistence.
 Không cài credential, không gọi affiliate/provider và không coi đó là M07
 model-success hoặc received-redirect transport coverage/evidence business.
+
+**Mở rộng M06 engine CI (2026-09-09):** runner còn chạy key-order retry,
+same-correlation content conflict, unsupported source và changed event. Hai ca
+reject phải dừng ở adapter trước ACK/report và không được thay đổi bytes history;
+changed event mới phải persist record riêng và replay `MATCH`. Phạm vi vẫn là
+fixture synthetic; schedule admission và selected-source profile không được suy
+ra là đã nghiệm thu.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.
