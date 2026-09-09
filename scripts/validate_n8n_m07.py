@@ -37,7 +37,15 @@ if input_values["adapter_url"] != "http://127.0.0.1:8787":
     raise SystemExit("M07 adapter_url must be a fixed loopback boundary, not event input")
 if "$json.tool_registry" in input_values["tool_registry_json"] or '"allowed_hosts":["example.com"]' not in input_values["tool_registry_json"]:
     raise SystemExit("M07 tool registry must be a fixed reviewed policy, not event input")
-for marker in ("untrusted data", "Never request or claim write authority", "proposed_action"):
+for marker in (
+    "untrusted data",
+    'authority must be \"A2-RO\"',
+    "write_permission must be false",
+    "field_or_claim",
+    "exactly equal one canonical evidence field/value pair",
+    '"action_type":"DRAFT"',
+    "no proposed_action",
+):
     if marker not in input_values["instruction"]:
         raise SystemExit(f"M07 instruction safety marker missing: {marker}")
 
