@@ -35,6 +35,11 @@ Smoke BR-16a tạo admission, thử reuse lease và ghi lease vào runtime STOP 
 reject), rồi backup/restore runtime mới và resolve lại admission. Đây chỉ là
 evidence offline với fixture; chưa chứng minh recovery hay executor thật.
 
+UNKNOWN→STOP dùng journal bounded được ghi trước execution/stopped ledger. Khi
+restart, writer replay exact predecessor → execution UNKNOWN → ledger STOPPED
+→ durable STOP; status và mutation fail closed khi journal còn lại. Đây chỉ che
+transition đó, không phải transaction đa-file hay bằng chứng power-loss.
+
 ```text
 python scripts/validate_m11.py
 ```

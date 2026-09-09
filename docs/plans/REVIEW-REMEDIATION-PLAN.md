@@ -439,6 +439,17 @@ vì loader runtime mới phát hiện admission không còn link exact tới lea
 chỉ là validation deterministic của snapshot; không suy diễn atomic multi-file
 crash recovery hoặc availability của old runtime ngoài handoff persisted.
 
+**Cập nhật UNKNOWN→STOP journal (2026-09-09):** `m11-record-unknown` tạo
+`m11-unknown-stop-journal/v1` trước khi append execution và stopped ledger.
+Replay kiểm exact predecessor ledger, UNKNOWN execution và stopped transition;
+chỉ sau đó mới repair durable mission STOP/marker rồi xóa journal. Nếu journal
+malformed, stale hoặc competing thì mutation và `status` fail closed
+`RECOVERY_REQUIRED`, không tự đoán side effect. Fault test tiêm lỗi đúng trước
+stopped-ledger write sau execution append; restart replay append ledger/STOP
+exactly-once và retry trả duplicate. Backup create cũng chạy recovery dưới lock
+trước inventory. Journal là kế hoạch replay có fsync cho một transition, **không
+phải** transaction đa-file/power-loss proof.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

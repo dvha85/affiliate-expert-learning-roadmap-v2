@@ -792,6 +792,9 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 // immutable stopped ledger are written before returning the record. A later
 // reconciliation can establish facts, but never reactivates this lease.
 func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemptedAt, reason string) (corem11.ProductionExecutionRecord, corem11.ProductionLedger, string, error) {
+	if err := recoverM11UnknownStopJournal(dir); err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
 	state, err := loadMissionState(dir)
 	if err != nil {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
@@ -821,22 +824,18 @@ func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemp
 			return record, corem11.ProductionLedger{}, "", headErr
 		}
 		if head.LeaseID == auth.ProductionLeaseID && head.ControlMode == "STOPPED" && head.ReconciliationRequired && head.StopReason == "RECONCILIATION_REQUIRED" && head.LastExecutionAt == attemptedAt {
-			state.Stop, state.StopReason = true, "RECONCILIATION_REQUIRED"
-			if err := saveMissionState(dir, state); err != nil {
-				return record, head, "", err
-			}
-			if err := writeJSONAtomic(filepath.Join(dir, "STOP"), map[string]any{"active": true, "reason": state.StopReason}); err != nil {
-				return record, head, "", err
-			}
 			return record, head, appendDuplicate, nil
 		}
 	}
 	if state.Stop {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
 	}
-	ledger, err := requireM11LedgerHead(dir, auth.ProductionLeaseID, reservationLedgerID)
+	ledgerEntry, ledger, err := m11LedgerHead(dir, auth.ProductionLeaseID)
 	if err != nil {
 		return record, corem11.ProductionLedger{}, "", err
+	}
+	if ledgerEntry.ArtifactID != reservationLedgerID {
+		return record, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
 	}
 	if now.Before(mustM11Time(auth.AuthorizedAt)) || !now.After(mustM11Time(ledger.UpdatedAt)) {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("execution time must advance an active authorization and ledger")
@@ -848,40 +847,18 @@ func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemp
 	if !pending || ledger.PendingOutcomes < 1 || ledger.LeaseID != auth.ProductionLeaseID || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("execution has no governed reservation")
 	}
-	raw, err := json.Marshal(record)
+	next, err := nextM11UnknownStopLedger(ledger, record)
 	if err != nil {
 		return record, corem11.ProductionLedger{}, "", err
 	}
-	status := appendDuplicate
-	if !retry {
-		_, status, err = registerM11Artifact(dir, corem11.ArtifactKindExecution, raw)
-		if err != nil {
-			return record, corem11.ProductionLedger{}, status, err
-		}
+	journal := m11UnknownStopJournal{Version: "m11-unknown-stop-journal/v1", PredecessorArtifactID: ledgerEntry.ArtifactID, PredecessorContentHash: ledgerEntry.ContentHash, Execution: record, StoppedLedger: next}
+	if err := writeJSONAtomic(m11UnknownStopJournalPath(dir), journal); err != nil {
+		return record, next, "", err
 	}
-	next := ledger
-	next.ControlMode = "STOPPED"
-	next.StopReason = "RECONCILIATION_REQUIRED"
-	next.ReconciliationRequired = true
-	next.LastExecutionAt = attemptedAt
-	next.UpdatedAt = attemptedAt
-	ledgerRaw, err := json.Marshal(next)
-	if err != nil {
-		return record, next, status, err
+	if err := recoverM11UnknownStopJournal(dir); err != nil {
+		return record, next, "", err
 	}
-	if _, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
-		return record, next, ledgerStatus, err
-	} else if ledgerStatus == appendAdded {
-		status = appendAdded
-	}
-	state.Stop, state.StopReason = true, "RECONCILIATION_REQUIRED"
-	if err := saveMissionState(dir, state); err != nil {
-		return record, next, status, err
-	}
-	if err := writeJSONAtomic(filepath.Join(dir, "STOP"), map[string]any{"active": true, "reason": state.StopReason}); err != nil {
-		return record, next, status, err
-	}
-	return record, next, status, nil
+	return record, next, appendAdded, nil
 }
 
 // reconcileM11Execution requires an already registered, human-authored
