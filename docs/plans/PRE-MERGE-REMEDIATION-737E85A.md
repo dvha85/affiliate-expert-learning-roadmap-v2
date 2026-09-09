@@ -2,7 +2,7 @@
 
 - Mã kế hoạch: PMR-2026-09-09; phiên bản: 1.
 - Ngày lập: 09/09/2026.
-- Trạng thái: **IN_REVIEW — đã triển khai và kiểm tại worktree; chưa commit/push, chưa có CI đúng head và chưa đủ điều kiện đề xuất merge**.
+- Trạng thái: **IN_REVIEW — đã có implementation commits và local evidence; chưa có CI đúng head hoặc review độc lập, chưa đủ điều kiện đề xuất merge**.
 - Head được review: `737e85ae008088be6dcb9eb19a269e01c4a4005f`, nhánh `codex/rp-01-path-safety`.
 - Base đối chiếu local: `origin/main` tại `12a088aab619106d1206d87dfccc25843d3bcba7`.
 - Phạm vi diff đã đối chiếu: 62 commit, 77 file; không chỉ phần M11 của các commit cuối.
@@ -13,7 +13,7 @@
 
 Khắc phục các lỗi runtime đã tái hiện trước khi đề xuất merge nhánh hiện tại. Tài liệu này là phần bổ sung cho RP-01…RP-09, không thay thế lịch sử triển khai hoặc tự đóng các RP/BR còn mở.
 
-Đợt thực hiện sau kế hoạch chỉ thay đổi Go/Python/schema và fixture cô lập. Không tự commit/push/merge, không chạy live executor, không dùng tài khoản ACCESSTRADE, provider trả phí hoặc dữ liệu khách hàng. Các ca kiểm không tạo giao dịch affiliate thật.
+Đợt thực hiện sau kế hoạch chỉ thay đổi Go/Python/schema và fixture cô lập. Không chạy live executor, không dùng tài khoản ACCESSTRADE hoặc dữ liệu khách hàng. Operated M07 local dùng Cockpit loopback với fixture synthetic, không tạo giao dịch affiliate thật. Commit/push chỉ theo yêu cầu chủ repo.
 
 Nguyên tắc bắt buộc:
 
@@ -50,7 +50,7 @@ Các thay đổi dưới đây đang ở worktree của nhánh review; chưa com
 - **PMR-04:** restore resolve/replay canonical history cho every cycle, yêu cầu tập observation chính xác, đồng thời kiểm intent/hash/gate/authorization gắn với execution/evaluation. BR-18b thay decision/observation bằng ID không tồn tại nhưng recompute checksum/hash và nhận `GRAPH_FAILED`. Liên kết M07 proposal được validator M07 riêng kiểm; một cross-store evidence graph tổng quát vẫn là việc mở.
 - **PMR-05:** restore copy vào staging sibling, chạy replay/load/graph gates tại đó rồi mới rename publish. Đích phải chưa tồn tại để tránh ghi đè directory rỗng của người dùng; per-target gate serialize các publisher managed trước final rename. Mọi lỗi dọn staging do operation tạo. BR-18b xác nhận `GRAPH_FAILED` không tạo target. Kill/power-loss và writer không tôn trọng managed target gate vẫn cần drill host thật.
 - **PMR-06:** Gate ID là digest của lease/intent/health/cost/immutable ledger entry/evaluation time; retry cùng input idempotent, evaluation khác tạo artifact khác. Gate persist exact `ledger_artifact_id` và `ledger_content_hash`; core graph resolve hai refs này. BR-18b kiểm re-evaluate sau một giây không còn collision.
-- **PMR-07:** Core M07 dùng decoder exact-number, tool result/evidence/claim/render không đi qua float64. Adapter trả JSON text nguyên vẹn cho workflow; blueprint chuyển context/evidence/model output bằng text thay vì `JSON.stringify`/`JSON.parse` số. Unit/adapter test kiểm `9007199254740993` không match `9007199254740992`. Chưa có n8n engine operated run, nên compatibility thực tế của node/model vẫn PARTIAL.
+- **PMR-07:** Core M07 dùng decoder exact-number, tool result/evidence/claim/render không đi qua float64. Adapter trả JSON text nguyên vẹn cho workflow; blueprint chuyển context/evidence/model output bằng text thay vì `JSON.stringify`/`JSON.parse` số. Unit/adapter test kiểm `9007199254740993` không match `9007199254740992`. N8n engine operated run với synthetic fixture đã PASS; CI/containerized repeat và provider diversity vẫn PARTIAL.
 - **PMR-07 — operated-run update (09/09):** Đã chạy n8n `2.38.1` local, import workflow M07 inactive, tạo canonical history từ synthetic fixture và gọi canonical adapter thật tại loopback. Context `VALID` có ba evidence; request `POST` bị adapter reject trước fetch; execution n8n đi đúng vào `Fetch and Register Tool Adapter` và dừng trước model/persistence khi input không hợp lệ. Lần chạy valid-input tiếp theo phát hiện blueprint có newline thật bên trong JavaScript string của `Read-only Evidence Agent`, khiến engine báo `invalid syntax` trước model call. Blueprint đã đổi sang `\\n` và validator M07 từ chối regression này. Sau fix, run đi tới Agent; mock OpenAI-compatible cục bộ không đáp ứng đầy đủ contract tool-calling/streaming của Agent v3 nên execution bị treo, được recovery sau restart (`database integrity_check=ok`, execution `crashed`). Tại thời điểm cập nhật này chưa có full successful M07 engine run; kết quả Cockpit bên dưới thay thế giới hạn đó.
 - **PMR-07 — Cockpit operated-run update (09/09):** Cockpit local gateway tại loopback đã nhận request từ n8n; `gpt-5-mini`, `gpt-5.4-mini` và `gpt-5.3-codex` bị upstream từ chối theo quyền tài khoản, còn `gpt-5.6-luna` trả model output. Tool adapter, registered evidence và canonical context đều pass trước Agent. Grounding adapter từ chối output với `ABSTAIN`/HTTP 400 vì model bỏ `field_or_claim`/`value`, dùng authority sai và trả `proposed_action` là string. Không có proposal nào được persist. Prompt blueprint nay ghi rõ JSON contract này và static validator kiểm các marker; cần import/cập nhật workflow local rồi chạy lại để có bằng chứng successful grounding/persistence.
 - **PMR-07 — Cockpit rerun:** Sau khi siết schema, `gpt-5.6-luna` tạo `ABSTAIN` hợp lệ (`A2-RO`, read-only, không claim), grounding adapter trả `VALID` và gate persistence từ chối đúng vì không có `HUMAN_REVIEW` proposal. Prompt trước đó chưa nêu task cụ thể; nay nêu rõ draft chỉ đọc phải tạo `HUMAN_REVIEW` từ scalar canonical evidence nếu có, và chỉ ABSTAIN khi không thể restate evidence. Chưa có ACK persistence; cần rerun sau cập nhật này.
@@ -61,7 +61,7 @@ Kết quả kiểm local sau triển khai, không phải nghiệm thu/merge appr
 
 - PASS trước lần thêm ledger ref: `go test`/`go vet` toàn learner Bot và learner race suite, BR-16a. Đây không phải kết quả CI của worktree cuối cùng.
 - PASS tại worktree hiện tại: `go test`/`go vet` cho `contracts`, `core`, `lab/mission-runtime`; full learner Bot và full learner `-race`; BR-16a; learner tests M11/journal/backup được chọn, kể cả `-race`; smoke BR-18b; 15 Python unit tests và các validator M06/M07/adversarial/output; readiness audit; `git diff --check`.
-- Lần thử sandbox trước đó không thể bind `::1`/`127.0.0.1`, nhưng đã chạy lại thành công full learner, full learner race và BR-16a ở worktree hiện tại khi môi trường cho phép loopback. Mutation suite, n8n engine operated run và CI remote tại head mới vẫn chưa có evidence. Các hạng mục này vẫn là merge gate mở.
+- Lần thử sandbox trước đó không thể bind `::1`/`127.0.0.1`, nhưng đã chạy lại thành công full learner, full learner race và BR-16a ở worktree hiện tại khi môi trường cho phép loopback. N8n M07 engine operated run nay có evidence local; mutation suite và CI remote tại head mới vẫn là merge gate mở.
 - Đã rà soát wiring CI: `curriculum-ci.yml` chạy full learner Bot, learner race, BR-16a, BR-18b, M06/M07 validators và readiness audit trên mọi pull request; `mission-agent-path-ci.yml` chạy core/harness test+vet. Đây chỉ là bằng chứng workflow đã khai báo, không thay thế một CI run PASS ở exact head sắp merge.
 - PR #95 đã chạy CI cho `a5d3ad0`: ba job PASS, nhưng `Curriculum CI / deterministic-runtime` fail tại BR-12d vì smoke so sánh SHA toàn file baseline đã stale sau thay đổi hợp lệ. Follow-up thay SHA bằng kiểm chứng before/after/rollback theo targeted behavior; BR-12d PASS local. Chưa coi CI là PASS cho đến khi commit follow-up có run hoàn tất.
 - Các kết quả local chỉ cho thấy bảy regression hiện có bị chặn trên các đường đã kiểm; không là chứng cứ production readiness hoặc business outcome.
@@ -230,7 +230,7 @@ python3 scripts/audit_readiness.py
 git diff --check
 ```
 
-Các script n8n ở trên không tự chứng minh đã chạy workflow trong engine thật. Operated run local ngày 09/09 đã chứng minh import/wiring tới Agent và phát hiện newline-expression regression, nhưng chưa hoàn thành success path qua model/grounding/persistence; không suy diễn thành full M07 acceptance. Nếu sandbox không cho mở loopback, ghi test bị chặn, chạy phần không cần port và nghiệm thu phần còn lại trên môi trường được cấp quyền; không sửa test để bỏ qua guard.
+Các script n8n ở trên không tự khởi tạo credential/provider và vì vậy không thay thế engine run. Operated M07 local ngày 09/09 đã PASS synthetic success path qua model, grounding và persistence; `validate_n8n_m07_operated_execution.py` kiểm capture/ACK/proposal store mà không đọc secret. Đây chưa là CI/containerized provider coverage hay full M07 acceptance ngoài fixture. Nếu sandbox không cho mở loopback, ghi test bị chặn, chạy phần không cần port và nghiệm thu phần còn lại trên môi trường được cấp quyền; không sửa test để bỏ qua guard.
 
 ## 6. Compatibility, bàn giao và merge gate
 
