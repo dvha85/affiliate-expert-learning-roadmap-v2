@@ -302,6 +302,13 @@ func m07ToolResponseBody(reader io.Reader) (json.RawMessage, error) {
 // must be public. It disables redirects, proxies and connection reuse so an
 // n8n workflow cannot turn an allowlisted hostname into an SSRF hop.
 func fetchM07ToolResult(ctx context.Context, recordID string, request corem07.ToolRequest, registry []corem07.ToolSpec, lookup m07LookupIPAddr) (corem07.ToolResult, error) {
+	return fetchM07ToolResultWithTransport(ctx, recordID, request, registry, lookup, nil)
+}
+
+// fetchM07ToolResultWithTransport keeps redirect behavior testable without a
+// real network endpoint. Production only calls it through fetchM07ToolResult,
+// which passes nil and therefore constructs the guarded transport below.
+func fetchM07ToolResultWithTransport(ctx context.Context, recordID string, request corem07.ToolRequest, registry []corem07.ToolSpec, lookup m07LookupIPAddr, roundTripper http.RoundTripper) (corem07.ToolResult, error) {
 	if err := corem07.ValidateToolRequest(request, registry); err != nil {
 		return corem07.ToolResult{}, err
 	}
@@ -323,33 +330,35 @@ func fetchM07ToolResult(ctx context.Context, recordID string, request corem07.To
 		return corem07.ToolResult{}, err
 	}
 	dialer := &net.Dialer{Timeout: timeout}
-	transport := &http.Transport{
-		Proxy:                 nil,
-		DisableKeepAlives:     true,
-		ForceAttemptHTTP2:     false,
-		TLSHandshakeTimeout:   timeout,
-		ResponseHeaderTimeout: timeout,
-		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(address)
-			if err != nil || !strings.EqualFold(host, parsed.Hostname()) || port != "443" {
-				return nil, fmt.Errorf("M07 dial target changed")
-			}
-			addresses, err := m07ResolvePublicHost(dialCtx, host, lookup)
-			if err != nil {
-				return nil, err
-			}
-			var lastErr error
-			for _, candidate := range addresses {
-				connection, err := dialer.DialContext(dialCtx, network, net.JoinHostPort(candidate.IP.String(), port))
-				if err == nil {
-					return connection, nil
+	if roundTripper == nil {
+		roundTripper = &http.Transport{
+			Proxy:                 nil,
+			DisableKeepAlives:     true,
+			ForceAttemptHTTP2:     false,
+			TLSHandshakeTimeout:   timeout,
+			ResponseHeaderTimeout: timeout,
+			DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(address)
+				if err != nil || !strings.EqualFold(host, parsed.Hostname()) || port != "443" {
+					return nil, fmt.Errorf("M07 dial target changed")
 				}
-				lastErr = err
-			}
-			return nil, lastErr
-		},
+				addresses, err := m07ResolvePublicHost(dialCtx, host, lookup)
+				if err != nil {
+					return nil, err
+				}
+				var lastErr error
+				for _, candidate := range addresses {
+					connection, err := dialer.DialContext(dialCtx, network, net.JoinHostPort(candidate.IP.String(), port))
+					if err == nil {
+						return connection, nil
+					}
+					lastErr = err
+				}
+				return nil, lastErr
+			},
+		}
 	}
-	client := &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{Transport: roundTripper, Timeout: timeout, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	httpRequest, err := http.NewRequestWithContext(ctx, strings.ToUpper(request.Method), request.Target, nil)
 	if err != nil {
 		return corem07.ToolResult{}, err
@@ -369,7 +378,13 @@ func fetchM07ToolResult(ctx context.Context, recordID string, request corem07.To
 	return corem07.ToolResult{RecordID: recordID, ToolCall: request, StatusCode: response.StatusCode, ReceivedAt: time.Now().UTC().Format(time.RFC3339), Redirected: false, Body: body}, nil
 }
 
+type m07ToolFetcher func(context.Context, string, corem07.ToolRequest, []corem07.ToolSpec, m07LookupIPAddr) (corem07.ToolResult, error)
+
 func m07AdapterHandler(historyPath string) http.HandlerFunc {
+	return m07AdapterHandlerWithFetcher(historyPath, fetchM07ToolResult)
+}
+
+func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -426,7 +441,7 @@ func m07AdapterHandler(historyPath string) http.HandlerFunc {
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_REQUEST_REQUIRED", "execution_permitted": false})
 				return
 			}
-			result, err := fetchM07ToolResult(r.Context(), ctx.RecordID, *request.ToolRequest, request.Registry, net.DefaultResolver.LookupIPAddr)
+			result, err := fetcher(r.Context(), ctx.RecordID, *request.ToolRequest, request.Registry, net.DefaultResolver.LookupIPAddr)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_TRANSPORT_REJECTED", "execution_permitted": false})

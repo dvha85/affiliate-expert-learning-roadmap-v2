@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,12 @@ import (
 
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
 
 func watchFixture() watcherFixture {
 	return watcherFixture{Version: "br13-offer-fixture/v1", Method: "GET", URL: watcherFixtureURL, ObservedAt: "2026-09-03T00:00:00Z", CorrelationID: "event-1", StatusCode: 200, Body: `{"product_id":"a","product_name":"Fixture A","currency":"USD","price":100,"commission_rate":0.08}`}
@@ -296,6 +303,49 @@ func TestM07TransportRejectsPrivateDNSAndOversizedResponse(t *testing.T) {
 	body, err := m07ToolResponseBody(bytes.NewBufferString("untrusted html"))
 	if err != nil || string(body) != `"untrusted html"` {
 		t.Fatalf("untrusted text was not retained as JSON data: %s %v", body, err)
+	}
+}
+
+func TestM07AdapterRejectsReceivedRedirectWithoutFollowingOrPersisting(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
+	watchRun(t, history, input, watchFixture(), "APPENDED")
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal(err, records)
+	}
+	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	request := corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/redirect"}
+	var calls []string
+	redirectTransport := roundTripperFunc(func(httpRequest *http.Request) (*http.Response, error) {
+		calls = append(calls, httpRequest.URL.String())
+		return &http.Response{StatusCode: http.StatusFound, Header: http.Header{"Location": []string{"https://evil.invalid/redirected"}}, Body: io.NopCloser(strings.NewReader("redirect")), Request: httpRequest}, nil
+	})
+	publicLookup := func(_ context.Context, _ string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	fetcher := func(ctx context.Context, recordID string, toolRequest corem07.ToolRequest, tools []corem07.ToolSpec, _ m07LookupIPAddr) (corem07.ToolResult, error) {
+		return fetchM07ToolResultWithTransport(ctx, recordID, toolRequest, tools, publicLookup, redirectTransport)
+	}
+	raw, err := json.Marshal(m07AdapterRequest{RecordID: records[0].RecordID, Registry: registry, ToolRequest: &request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	m07AdapterHandlerWithFetcher(history, fetcher).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m07/fetch-and-register", bytes.NewReader(raw)))
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "TOOL_TRANSPORT_REJECTED") {
+		t.Fatalf("received redirect was not rejected by the M07 adapter: %d %s", response.Code, response.Body.String())
+	}
+	if len(calls) != 1 || calls[0] != request.Target {
+		t.Fatalf("M07 followed a redirect or changed target: %v", calls)
+	}
+	toolStore := history + ".m07/tool-results"
+	entries, err := os.ReadDir(toolStore)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("received redirect persisted tool artifacts: %v", entries)
 	}
 }
 

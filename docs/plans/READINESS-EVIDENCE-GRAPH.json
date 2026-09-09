@@ -22,7 +22,7 @@
       "criterion_id": "BR-15",
       "claims": [
         {"id": "BR-15-implementation", "kind": "implementation", "status": "IMPLEMENTED_OFFLINE", "matrix_field": "implementation_refs", "scope": "Read-only registry, tool trace, grounding validation and proposal persistence are deterministic offline boundaries.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-05 foundation"}]},
-        {"id": "BR-15-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Disposable n8n executes policy rejects and Agent success via a loopback OpenAI-compatible stub; received redirect is excluded.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}], "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "Mở rộng M07 model-stub CI"}]},
+        {"id": "BR-15-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Disposable n8n executes policy rejects and Agent success via a loopback OpenAI-compatible stub; adapter test receives a controlled 302 without following or persisting it, while a live redirect source is excluded.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}], "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M07 received-redirect transport regression"}]},
         {"id": "BR-15-external", "kind": "external", "status": "MISSING", "scope": "Provider diversity, received-redirect transport and a governed selected-source run are not evidenced.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
