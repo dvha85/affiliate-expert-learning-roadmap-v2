@@ -49,12 +49,28 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("execution_json", type=Path)
     parser.add_argument("--proposal-store", type=Path, required=True)
+    parser.add_argument("--expect-reject-at", metavar="NODE")
+    parser.add_argument("--expected-proposal-count", type=int)
     args = parser.parse_args()
 
     execution = load_execution(args.execution_json)
+    run_data = execution.get("data", {}).get("resultData", {}).get("runData", {})
+    proposal_files = sorted(args.proposal_store.glob("*.json"))
+    if args.expect_reject_at:
+        if args.expected_proposal_count is None:
+            raise AssertionError("negative operated validation requires --expected-proposal-count")
+        result_data = execution.get("data", {}).get("resultData", {})
+        if execution.get("status") != "error" or result_data.get("lastNodeExecuted") != args.expect_reject_at:
+            raise AssertionError(f"execution was not rejected at {args.expect_reject_at}")
+        for forbidden in ("Read-only Evidence Agent", "Persist Agent Proposal Adapter", "Report Persisted M07 Proposal"):
+            if forbidden in run_data:
+                raise AssertionError(f"rejected execution reached forbidden node: {forbidden}")
+        if len(proposal_files) != args.expected_proposal_count:
+            raise AssertionError("rejected execution changed canonical proposal inventory")
+        print(f"N8N M07 OPERATED REJECT PASS: stopped at {args.expect_reject_at} without persistence")
+        return
     if execution.get("status") != "success" or execution.get("finished") is not True:
         raise AssertionError("n8n execution did not finish successfully")
-    run_data = execution.get("data", {}).get("resultData", {}).get("runData", {})
     for name in REQUIRED_NODES:
         first_json(run_data, name)
 

@@ -31,7 +31,16 @@ python3 scripts/validate_n8n_m07_operated_execution.py \
 4. Restart n8n, không thay history/proposal store, rồi chạy lại parser. Proposal ID và
    record ID phải vẫn resolve được từ proposal store.
 5. Chạy riêng một negative case qua workflow/adapter (forged evidence ID hoặc write
-   request). Case phải dừng trước persistence và không tạo proposal file mới.
+   request). Ghi số proposal files trước khi chạy; case phải dừng trước persistence
+   và không tạo proposal file mới. Ví dụ một policy-rejected `POST`:
+
+```bash
+python3 scripts/validate_n8n_m07_operated_execution.py \
+  /path/to/m07-rejected-execution.json \
+  --proposal-store /path/to/history.jsonl.m07/proposals \
+  --expect-reject-at "Fetch and Register Tool Adapter" \
+  --expected-proposal-count 1
+```
 
 `PASS` chỉ chứng minh một M07 synthetic, read-only path đã chạy trong engine. Nó không
 chứng minh business outcome, business truth, approval hoặc quyền MACHINE_EXECUTION.
