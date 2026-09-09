@@ -118,38 +118,56 @@ func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.
 	}
 }
 
-func TestM11UnknownStopJournalRecoversAfterMissionStateWriteFailure(t *testing.T) {
-	fixture := newM11UnknownStopFixture(t)
-	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
-	atomicWrites := 0
-	missionStateWriteFault = func(phase string) error {
-		if phase != "before_rename" {
-			return nil
-		}
-		atomicWrites++ // journal first, then mission-state after stopped ledger
-		if atomicWrites == 2 {
-			return errors.New("injected mission-state write failure")
-		}
-		return nil
+func TestM11UnknownStopJournalRecoversAfterDurableStopWriteFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		failureAt      int
+		stateCommitted bool
+	}{
+		{name: "mission_state", failureAt: 2},
+		{name: "stop_marker", failureAt: 3, stateCommitted: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
+			atomicWrites := 0
+			missionStateWriteFault = func(phase string) error {
+				if phase != "before_rename" {
+					return nil
+				}
+				atomicWrites++ // journal, mission-state after stopped ledger, then STOP marker
+				if atomicWrites == tc.failureAt {
+					return errors.New("injected durable STOP write failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { missionStateWriteFault = nil })
+			if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+				t.Fatal("durable STOP write fault was not surfaced")
+			}
+			if atomicWrites != tc.failureAt {
+				t.Fatalf("fault did not reach expected durable STOP write: atomic writes=%d", atomicWrites)
+			}
+			if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); err != nil {
+				t.Fatalf("unknown STOP journal was removed before recovery: %v", err)
+			}
+			state, err := loadMissionState(fixture.dir)
+			if tc.stateCommitted && (err != nil || !state.Stop) {
+				t.Fatalf("STOP marker fault did not retain stopped mission state: state=%+v err=%v", state, err)
+			}
+			if !tc.stateCommitted && err == nil {
+				t.Fatalf("mission-state fault did not fail closed before STOP: state=%+v", state)
+			}
+			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("status did not fail closed on durable STOP write fault: code=%d response=%+v", code, response)
+			}
+			missionStateWriteFault = nil
+			if err := recoverM11UnknownStopJournal(fixture.dir); err != nil {
+				t.Fatalf("unknown STOP journal did not recover durable STOP write failure: %v", err)
+			}
+			assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
+		})
 	}
-	t.Cleanup(func() { missionStateWriteFault = nil })
-	if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
-		t.Fatal("mission-state write fault was not surfaced")
-	}
-	if atomicWrites != 2 {
-		t.Fatalf("fault did not reach mission-state write: atomic writes=%d", atomicWrites)
-	}
-	if _, err := os.Stat(m11UnknownStopJournalPath(fixture.dir)); err != nil {
-		t.Fatalf("unknown STOP journal was removed before recovery: %v", err)
-	}
-	if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
-		t.Fatalf("status did not fail closed on mission-state write fault: code=%d response=%+v", code, response)
-	}
-	missionStateWriteFault = nil
-	if err := recoverM11UnknownStopJournal(fixture.dir); err != nil {
-		t.Fatalf("unknown STOP journal did not recover mission-state write failure: %v", err)
-	}
-	assertM11UnknownStopRecovered(t, fixture, attemptedAt, reason)
 }
 
 func assertM11UnknownStopRecovered(t *testing.T, fixture m11UnknownStopFixture, attemptedAt, reason string) {
