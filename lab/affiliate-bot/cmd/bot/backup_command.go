@@ -921,6 +921,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, lockErr, 1)
 		}
 		defer release()
+		if e := recoverM11UnknownStopJournal(args[1]); e != nil {
+			return emit("RECOVERY_REQUIRED", nil, e, 1)
+		}
 		if e := recoverM11OutcomeJournal(args[1]); e != nil {
 			return emit("RECOVERY_REQUIRED", nil, e, 1)
 		}
