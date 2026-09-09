@@ -94,6 +94,35 @@ def write_production_health(path, lease):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_recovery_lease(path, grant, policy, intent):
+    payload = {
+        "lease_id": "br16-recovery-lease", "lease_version": "v1", "policy_version": policy["policy_version"],
+        "approval_ref": "br16-recovery-approval", "reviewed_by": "human", "reviewer_id": "pilot-human",
+        "reviewed_at": "2026-09-07T01:05:00Z", "promotion_review_ref": "fixture:br16-recovery-review",
+        "source_canary_grant_id": grant["grant_id"], "source_canary_grant_version": grant["grant_version"],
+        "source_canary_grant_hash": grant["grant_hash"], "valid_from": "2026-09-07T01:05:00Z",
+        "expires_at": "2099-09-03T02:50:00Z", "allowed_risk_classes": [policy["risk_class"]],
+        "allowed_action_types": [intent["action_type"]], "allowed_hosts": ["example.com"], "executor_ids": ["fixture_stub"],
+        "max_executions_total": 1, "max_executions_per_window": 1, "window_seconds": 60,
+        "max_cost_minor_total": 100, "currency": "USD", "max_pending_outcomes": 1,
+        "max_consecutive_failures": 1, "max_outcome_age_seconds": 60, "max_health_snapshot_age_seconds": 60,
+        "kill_switch_required": True, "correlation_id": intent["correlation_id"], "hash_version": "go-json-v1",
+    }
+    payload["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_production_resolution(path, lease, execution_id):
+    payload = {
+        "resolution_id": "br16-recovery-resolution", "lease_id": lease["lease_id"],
+        "lease_version": lease["lease_version"], "lease_hash": lease["lease_hash"],
+        "execution_id": execution_id, "resolved_by": "human", "resolver_id": "pilot-human",
+        "resolved_at": "2026-09-08T00:00:05Z", "effect_state": "NOT_PERFORMED",
+        "reason": "fixture provider audit confirmed no side effect",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def grounded_claim(field, value, evidence_id):
     value = json.loads(json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True))
     rendered = f"{field}={json.dumps(value, separators=(',', ':'), ensure_ascii=False, sort_keys=True)} [evidence:{evidence_id}]"
@@ -229,8 +258,10 @@ def main():
         production_outcome.write_text(json.dumps({"outcome_id":"br16-production-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br16-failed"}), encoding="utf-8")
         execution_ledger = production_failed["artifact"]["execution_ledger"]
         execution_ledger_id = execution_ledger["lease_id"] + "/" + execution_ledger["updated_at"]
-        assert invoke(bot, "mission", "m11-outcome", state, production_outcome, execution_ledger_id)["status"] == "APPENDED"
+        production_outcome_result = invoke(bot, "mission", "m11-outcome", state, production_outcome, execution_ledger_id)
+        assert production_outcome_result["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-resolve", state, "PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"])["status"] == "RESOLVED"
+
         resolved = invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", cancellation["artifact"]["execution_id"])
         assert resolved["status"] == "RESOLVED" and resolved["artifact"] == cancellation["artifact"]
         assert invoke(bot, "mission", "m10-resolve", state, "EXECUTION_RECORD", "canary-exec-not-registered", expected=1)["status"] == "REJECTED"
@@ -267,6 +298,49 @@ def main():
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 3
         assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, work / "stale-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
+
+        # The UNKNOWN path keeps the same workspace, M07 proposal, M08 intent,
+        # policy, canary grant and cost bound. It uses a separately reviewed
+        # recovery lease because the first production authorization is one-time.
+        recovery_lease_path = work / "recovery-lease.json"
+        write_recovery_lease(recovery_lease_path, grant_value, p, i)
+        recovery_lease = json.loads(recovery_lease_path.read_text(encoding="utf-8"))
+        recovery_approval_path = work / "recovery-approval.json"; write_production_approval(recovery_approval_path, recovery_lease)
+        recovery_health_path = work / "recovery-health.json"
+        recovery_health = json.loads(production_health_path.read_text(encoding="utf-8"))
+        recovery_health.update({"snapshot_id": "br16-recovery-health", "lease_id": recovery_lease["lease_id"], "lease_version": recovery_lease["lease_version"], "lease_hash": recovery_lease["lease_hash"]})
+        recovery_health.pop("snapshot_hash")
+        recovery_health["snapshot_hash"] = "sha256:" + hashlib.sha256(json.dumps(recovery_health, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        recovery_health_path.write_text(json.dumps(recovery_health), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_LEASE", recovery_lease_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_LEASE_APPROVAL", recovery_approval_path)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", state, recovery_lease["lease_id"], gate_time)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", state, recovery_lease["lease_id"], gate_time)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_HEALTH_SNAPSHOT", recovery_health_path)["status"] == "APPENDED"
+        recovery_ledger_id = recovery_lease["lease_id"] + "/" + gate_time
+        recovery_gate = invoke(bot, "mission", "m11-gate", state, recovery_lease["lease_id"], "br16-recovery-health", "br16-cost", recovery_ledger_id, gate_time)
+        assert recovery_gate["status"] == "ALLOW_PRODUCTION"
+        recovery_authorization = invoke(bot, "mission", "m11-authorize", state, recovery_lease["lease_id"], recovery_gate["artifact"]["gate_id"], "fixture_stub", gate_time)
+        assert recovery_authorization["status"] == "APPENDED"
+        recovery_reservation = invoke(bot, "mission", "m11-reserve-authorization", state, recovery_authorization["artifact"]["authorization_id"], recovery_ledger_id, "2026-09-08T00:00:01Z")
+        assert recovery_reservation["status"] == "APPENDED"
+        recovery_reservation_id = recovery_reservation["artifact"]["lease_id"] + "/" + recovery_reservation["artifact"]["updated_at"]
+        recovery_unknown = invoke(bot, "mission", "m11-record-unknown", state, recovery_authorization["artifact"]["authorization_id"], recovery_reservation_id, "2026-09-08T00:00:03Z", "fixture provider timeout after dispatch")
+        assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
+        unknown_status = invoke(bot, "mission", "status", state)["artifact"]
+        assert unknown_status["stop"] is True and unknown_status["stop_reason"] == "RECONCILIATION_REQUIRED"
+        assert invoke(bot, "mission", "m11-activate", state, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "REJECTED"
+        recovery_resolution_path = work / "recovery-resolution.json"
+        write_production_resolution(recovery_resolution_path, recovery_lease, recovery_unknown["artifact"]["execution"]["execution_id"])
+        assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_RECONCILIATION", recovery_resolution_path)["status"] == "APPENDED"
+        stopped_ledger_id = recovery_unknown["artifact"]["stopped_ledger"]["lease_id"] + "/" + recovery_unknown["artifact"]["stopped_ledger"]["updated_at"]
+        recovery_resolution = invoke(bot, "mission", "m11-reconcile", state, "br16-recovery-resolution", stopped_ledger_id)
+        assert recovery_resolution["status"] == "APPENDED" and recovery_resolution["artifact"]["stopped_ledger"]["control_mode"] == "STOPPED"
+        assert invoke(bot, "mission", "m11-reconcile", state, "br16-recovery-resolution", stopped_ledger_id)["status"] == "EXACT_DUPLICATE"
+        recovery_handoff = work / "recovery-handoff.json"
+        reviewed_ledger_id = recovery_resolution["artifact"]["stopped_ledger"]["lease_id"] + "/" + recovery_resolution["artifact"]["stopped_ledger"]["updated_at"]
+        handoff = invoke(bot, "mission", "m11-recovery-export", state, "br16-recovery-resolution", reviewed_ledger_id, recovery_handoff)
+        assert handoff["status"] == "APPENDED" and handoff["artifact"]["requires_new_runtime"] is True and handoff["artifact"]["execution_permitted"] is False
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout
@@ -274,7 +348,7 @@ def main():
         assert status["artifact"]["stop"] is True
         assert invoke(bot, "mission", "m10-canary", state, grant, expected=1)["status"] == "STOPPED"
         assert invoke(bot, "mission", "init", state, expected=1)["status"] == "ALREADY_INITIALIZED"
-    print("BR-16a PASS: one shared workspace, M00→M11 artifacts, real M07 validation, restart/replay and durable STOP")
+    print("BR-16a PASS: one shared workspace, M00→M11 artifacts, UNKNOWN reconciliation handoff, restart/replay and durable STOP")
 
 
 if __name__ == "__main__":

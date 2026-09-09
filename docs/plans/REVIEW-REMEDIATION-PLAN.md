@@ -457,13 +457,17 @@ RP-07a sở hữu graph M11: source canary/promotion review → lease + lease ap
 
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
-**Cập nhật shared chain (2026-09-08):** `smoke_br16a_offline.py` hiện tạo M00
+**Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00
 history, M07 registered proposal, M08 agent-bound intent/policy, M09 approval,
 M10 cost/gate/authorization/fixture outcome rồi dùng **chính các artifact đó**
 để tạo M11 lease, activation, health gate, authorization, reservation,
 `FAILED`/`NOT_PERFORMED` fixture và M11 `MACHINE_EXECUTION` outcome. Smoke
-resolve execution sau đó và restart/replay/STOP trong cùng workspace. Nhánh
-UNKNOWN/reconciliation/restore vẫn được kiểm bởi BR-18b runtime riêng; business
+resolve execution sau đó. Cùng workspace tiếp tục tạo recovery lease đã review
+riêng (vì authorization đầu là one-time) nhưng giữ proposal/intent/policy/grant/
+cost-bound gốc, rồi cover `UNKNOWN` → `RECONCILIATION_REQUIRED` durable STOP →
+human reconciliation idempotent → read-only recovery handoff; activation lại
+bị reject trước reconciliation. Mỗi lệnh là process mới nên STOP được đọc lại
+từ store. Backup/restore recovery graph vẫn ở BR-18b; business
 outcome/evaluation/cycle M11 và live proof vẫn chưa có.
 
 1. M00 packet → M01 evaluation → M02 history/decision.
