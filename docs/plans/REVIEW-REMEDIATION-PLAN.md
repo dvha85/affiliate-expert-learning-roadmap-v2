@@ -537,6 +537,14 @@ reject phải dừng ở adapter trước ACK/report và không được thay đ
 changed event mới phải persist record riêng và replay `MATCH`. Phạm vi vẫn là
 fixture synthetic; schedule admission và selected-source profile không được suy
 ra là đã nghiệm thu.
+
+**Mở rộng M07 model-stub CI (2026-09-09):** cùng job import credential disposable
+chỉ trỏ endpoint OpenAI-compatible loopback, thay network fetch ở bản copy test
+bằng fixture `register-tool-result`, rồi giữ Agent/context/grounding/proposal
+nodes của blueprint. Stub phải nhận canonical context và tool evidence; output
+được validate, persist, rồi revalidate sau restart adapter. Điều này không đưa
+secret/provider vào CI và không là bằng chứng received-redirect hoặc provider
+diversity.
 - Test vận hành HTTP bằng loopback; policy transport test không gọi internet/provider. Pinned HTTPS smoke hiện có giữ profile nguồn đã ghim, phân biệt lỗi network với guard reject.
 - Cross-process tests có barrier/fault hook và timeout hữu hạn; không trông chờ xác suất race hoặc sleep dài. `go test -race` bổ sung, không thay test nhiều process.
 - Mutation proof trong checkout tạm: bỏ expiry gate, bỏ lock, cho overwrite input, tự thêm ID hoặc skip nested bundle phải làm đúng test/job fail; restore checkout tạm sau test, không sửa worktree người dùng.
