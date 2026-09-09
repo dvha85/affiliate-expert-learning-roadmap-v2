@@ -449,6 +449,10 @@ def main():
         rewrite_m11_registry(broken_admission_backup, replace_m11_field("PRODUCTION_RECOVERY_ADMISSION", "new_lease_hash", "sha256:" + "f" * 64))
         broken_admission_result = invoke(bot, "backup", "restore", broken_admission_backup, root / "broken-recovery-admission-restored", expected=1, env=env)
         assert broken_admission_result["status"] == "VERIFY_FAILED", broken_admission_result
+        broken_approval_backup = root / "broken-recovery-approval-backup"; shutil.copytree(admission_backup, broken_approval_backup)
+        rewrite_m11_registry(broken_approval_backup, replace_m11_field("PRODUCTION_LEASE_APPROVAL", "lease_hash", "sha256:" + "e" * 64))
+        broken_approval_result = invoke(bot, "backup", "restore", broken_approval_backup, root / "broken-recovery-approval-restored", expected=1, env=env)
+        assert broken_approval_result["status"] == "VERIFY_FAILED", broken_approval_result
         assert invoke(bot, "backup", "restore", admission_backup, admission_restored, env=env)["status"] == "RESTORED"
         assert invoke(bot, "mission", "m11-resolve", admission_restored, "PRODUCTION_RECOVERY_ADMISSION", "br18-recovery-admission", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-authorize", admission_restored, admission_lease_value["lease_id"], "missing-gate", "fixture_stub", "2026-09-08T00:00:08Z", expected=1, env=env)["status"] == "REJECTED"

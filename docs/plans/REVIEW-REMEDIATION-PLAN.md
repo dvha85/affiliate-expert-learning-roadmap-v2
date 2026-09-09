@@ -434,10 +434,12 @@ runtime cũ ngoài artifact handoff đã bind.
 admission từ **old runtime đã restore** và vẫn STOPPED sang runtime mới với
 lease/approval/activation/NORMAL-ledger riêng. Smoke backup/restore runtime
 mới, resolve `PRODUCTION_RECOVERY_ADMISSION`, rồi sửa `new_lease_hash` trong
-backup và đồng bộ checksum manifest. Restore trả `VERIFY_FAILED` trước publish
-vì loader runtime mới phát hiện admission không còn link exact tới lease. Đây
-chỉ là validation deterministic của snapshot; không suy diễn atomic multi-file
-crash recovery hoặc availability của old runtime ngoài handoff persisted.
+backup và đồng bộ checksum manifest. Smoke cũng sửa `lease_hash` trong new
+`PRODUCTION_LEASE_APPROVAL` với checksum registry/manifest hợp lệ. Cả hai
+restore trả `VERIFY_FAILED` trước publish vì loader runtime mới phát hiện
+admission hoặc approval không còn link exact tới new lease. Đây chỉ là
+validation deterministic của snapshot; không suy diễn atomic multi-file crash
+recovery hoặc availability của old runtime ngoài handoff persisted.
 
 **Cập nhật UNKNOWN→STOP journal (2026-09-09):** `m11-record-unknown` tạo
 `m11-unknown-stop-journal/v1` trước khi append execution và stopped ledger.
