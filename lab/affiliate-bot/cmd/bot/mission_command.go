@@ -122,6 +122,24 @@ func m11UnknownStopJournalPath(dir string) string {
 	return filepath.Join(dir, "m11-unknown-stop-journal.json")
 }
 
+func m11JournalRecoveryRequired(dir string) error {
+	for _, item := range []struct {
+		name string
+		path string
+	}{
+		{name: "failed execution", path: m11FailedExecutionJournalPath(dir)},
+		{name: "unknown STOP", path: m11UnknownStopJournalPath(dir)},
+		{name: "outcome", path: m11OutcomeJournalPath(dir)},
+	} {
+		if _, err := os.Stat(item.path); err == nil {
+			return fmt.Errorf("M11 %s journal requires a locked writer recovery", item.name)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 // m11OutcomeAppendFault is a test-only seam for the two-file M11 outcome
 // commit. It is never configurable through the CLI.
 var m11OutcomeAppendFault func(phase string) error
@@ -2221,6 +2239,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 && len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
 		}
+		if err := m11JournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		hash := ""
 		if len(args) == 5 {
 			hash = args[4]
@@ -2305,6 +2326,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	case "m11-recovery-export":
 		if len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT"), 2)
+		}
+		if err := m11JournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		if err := distinctPaths(args[1], args[4]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
@@ -2465,20 +2489,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		} else if !os.IsNotExist(err) {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		if _, err := os.Stat(m11FailedExecutionJournalPath(args[1])); err == nil {
-			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 failed execution journal requires a locked writer recovery"), 1)
-		} else if !os.IsNotExist(err) {
-			return emit("STATE_ERROR", nil, err, 1)
-		}
-		if _, err := os.Stat(m11UnknownStopJournalPath(args[1])); err == nil {
-			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 unknown STOP journal requires a locked writer recovery"), 1)
-		} else if !os.IsNotExist(err) {
-			return emit("STATE_ERROR", nil, err, 1)
-		}
-		if _, err := os.Stat(m11OutcomeJournalPath(args[1])); err == nil {
-			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 outcome journal requires a locked writer recovery"), 1)
-		} else if !os.IsNotExist(err) {
-			return emit("STATE_ERROR", nil, err, 1)
+		if err := m11JournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		s, err := loadMissionState(args[1])
 		if err != nil {

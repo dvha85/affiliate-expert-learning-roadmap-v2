@@ -104,6 +104,16 @@ func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.
 			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
 				t.Fatalf("status did not fail closed on unknown STOP journal: code=%d response=%+v", code, response)
 			}
+			if code, response := missionCall(t, "m11-resolve", fixture.dir, corem11.ArtifactKindLedger, fixture.ledgerEntry.ArtifactID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("M11 resolver exposed an UNKNOWN-to-STOP partial transition: code=%d response=%+v", code, response)
+			}
+			exportPath := filepath.Join(fixture.dir, "partial-recovery-handoff.json")
+			if code, response := missionCall(t, "m11-recovery-export", fixture.dir, "missing-resolution", fixture.ledgerEntry.ArtifactID, exportPath); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("M11 recovery export exposed a partial transition: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(exportPath); !os.IsNotExist(err) {
+				t.Fatalf("M11 recovery export wrote during pending journal recovery: %v", err)
+			}
 			state, err := loadMissionState(fixture.dir)
 			if faultPhase == "before_write" && (err != nil || state.Stop) {
 				t.Fatalf("pre-write fault marked mission stopped: state=%+v err=%v", state, err)
