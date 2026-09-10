@@ -566,6 +566,16 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	if bytes.Equal(beforeState["m10-artifacts.jsonl"], afterFaultState["m10-artifacts.jsonl"]) {
 		t.Fatal("fixture did not reach the registry-before-state failure seam")
 	}
+	if code, response := backupCall(t, "create", runtimeDir, filepath.Join(root, "record-fault-backup-recovery")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup did not recover the M10 journal before fixture-graph validation: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); !os.IsNotExist(err) {
+		t.Fatalf("backup did not complete the valid M10 journal recovery: %v", err)
+	}
+	recoveredState, err := loadMissionState(runtimeDir)
+	if err != nil || len(recoveredState.Reservations) != 1 || recoveredState.Reservations[0].ExecutionID == "" {
+		t.Fatalf("backup journal recovery did not bind the execution: state=%+v err=%v", recoveredState, err)
+	}
 	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "fixture state commit fault"); code != 0 || response["status"] != "APPENDED" {
 		t.Fatalf("locked writer did not recover registry/state link before exact retry: code=%d response=%+v", code, response)
 	} else {
