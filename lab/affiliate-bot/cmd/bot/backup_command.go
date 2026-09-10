@@ -954,7 +954,10 @@ func validateM11BackupGraph(dir string) error {
 		execution, executionOK := executionsByID[evaluation.ExecutionID]
 		outcomeAt, outcomeTimeErr := time.Parse(time.RFC3339, outcome.ObservedAt)
 		evaluatedAt, evaluatedTimeErr := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
-		if !outcomeOK || !executionOK || outcomeTimeErr != nil || evaluatedTimeErr != nil || evaluatedAt.Before(outcomeAt) || outcome.EffectRef.EffectID != execution.ExecutionID || execution.ProductionLeaseID != evaluation.LeaseID || execution.ProductionLeaseVersion != evaluation.LeaseVersion || execution.ProductionLeaseHash != evaluation.LeaseHash {
+		// The only offline evaluation evidence is the fixture outcome that it
+		// evaluates. Do not accept a checksum-valid evaluation which keeps the
+		// outcome ID field but silently swaps its cited evidence.
+		if !outcomeOK || !executionOK || outcomeTimeErr != nil || evaluatedTimeErr != nil || evaluatedAt.Before(outcomeAt) || outcome.EffectRef.EffectID != execution.ExecutionID || execution.ProductionLeaseID != evaluation.LeaseID || execution.ProductionLeaseVersion != evaluation.LeaseVersion || execution.ProductionLeaseHash != evaluation.LeaseHash || len(evaluation.EvidenceIDs) != 1 || evaluation.EvidenceIDs[0] != outcome.OutcomeID {
 			return fmt.Errorf("M11 outcome evaluation does not resolve its fixture outcome and execution")
 		}
 	}
