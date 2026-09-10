@@ -47,6 +47,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenGateEntries); err == nil {
 		t.Fatal("gate with mismatched ledger head was accepted")
 	}
+	brokenGateWindow := gate
+	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
+	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
+	brokenGateWindowEntries[6] = m11Entry(t, ArtifactKindGate, brokenGateWindow)
+	if err := ValidateArtifactGraph(brokenGateWindowEntries); err == nil {
+		t.Fatal("gate at lease expiry was accepted")
+	}
 	brokenActivation := activation
 	brokenActivation.ActivatedAt = "2026-09-07T23:59:59Z"
 	brokenActivationEntries := append([]ArtifactEntry(nil), entries...)

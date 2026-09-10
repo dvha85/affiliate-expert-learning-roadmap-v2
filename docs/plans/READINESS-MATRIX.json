@@ -10,6 +10,7 @@
     {"id":"RP-07-lease-expiry-rebind","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/m11_registry.go"],"test_refs":["lab/affiliate-bot/cmd/bot/mission_command_test.go"],"scope":"activation at expiry and canonical same-ID lease rebind reject without registry mutation"},
     {"id":"RP-07-health-lease-window","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"health observation must fall within its exact lease window"}
     ,{"id":"RP-07-health-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"once activation exists, health observation cannot predate it; unactivated drafts remain non-authorizing history"}
+    ,{"id":"RP-07-gate-lease-window","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"gate evaluation must fall within its exact lease window"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},
