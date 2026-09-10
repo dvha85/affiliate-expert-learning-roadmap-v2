@@ -415,6 +415,67 @@ func TestBackupRestoreRejectsReservationMissingRegistryAuthorization(t *testing.
 	}
 }
 
+func TestBackupRestoreRejectsReservationMissingRegistryExecution(t *testing.T) {
+	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtime)
+	authorizationPath := filepath.Join(root, "execution-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtime, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtime, authorizationPath, "orphaned-execution-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	backup := filepath.Join(root, "execution-link-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	statePath := missionStatePath(runtime)
+	stateRaw, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadMissionState(runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Reservations[0].ExecutionID = "missing-registry-execution"
+	if err := saveMissionState(runtime, state); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "execution-link-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted a reservation missing its registry execution: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(statePath, stateRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "execution-link-broken")
+	copyFlatBackup(t, backup, broken)
+	state, err = loadMissionState(broken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Reservations[0].ExecutionID = "missing-registry-execution"
+	if err := saveMissionState(broken, state); err != nil {
+		t.Fatal(err)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["mission-state.json"], err = backupFileMetadata(missionStatePath(broken), "mission-state.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "execution-link-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted a reservation missing its registry execution: code=%d response=%+v", code, response)
+	}
+}
+
 func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
 	runtime := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtime); err != nil {

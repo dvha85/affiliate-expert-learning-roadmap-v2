@@ -437,6 +437,12 @@ binding. Backup create và restore staging cùng từ chối authorization bị 
 regression sửa manifest checksum sau khi tamper để kiểm graph gate, không chỉ
 checksum. Các orphan state-to-registry còn lại vẫn mở.
 
+**Cập nhật M10 reservation-execution link (2026-09-10):** khi reservation đã
+ghi `ExecutionID`, ID đó phải resolve execution record registry cùng
+`AuthorizationID`; một ID tùy ý trong mutable state không đủ để giữ budget đã
+tiêu. Cả source và restore staging từ chối backup tamper có checksum/manifest
+hợp lệ. Các match semantic sâu hơn và crash/host proof vẫn mở.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.
