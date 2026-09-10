@@ -256,6 +256,82 @@ func TestBackupRestoreReplaysExpiredAuthorityButBlocksNewReservation(t *testing.
 	}
 }
 
+func TestBackupRestoreRejectsStateCanaryMissingRegistryGrant(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("mission init failed: code=%d response=%+v", code, response)
+	}
+	intent := LearnerIntent{IntentID: "registry-link-intent", DecisionID: "br11-decision", EvidenceIDs: []string{"br11-observation"}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-01T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "registry-link-correlation", IdempotencyKey: "registry-link-key", IntentMode: "PROPOSAL_ONLY"}
+	intent.IntentHash = learnerIntentHash(intent)
+	approval := LearnerApproval{ApprovalID: "registry-link-approval", IntentID: intent.IntentID, IntentHash: intent.IntentHash, PolicyVersion: "registry-link-policy", Decision: "APPROVE", ApprovedBy: "human", ApproverID: "registry-link-reviewer", ApprovedAt: "2026-09-01T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: intent.CorrelationID, OneTime: true}
+	grant := corem10.CanaryGrant{GrantID: "registry-link-grant", GrantVersion: "v1", PolicyVersion: approval.PolicyVersion, ApprovalRef: approval.ApprovalID, ApprovedBy: "human", ApproverID: approval.ApproverID, ApprovedAt: approval.ApprovedAt, ValidFrom: approval.ApprovedAt, ExpiresAt: approval.ExpiresAt, AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
+	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
+	state, err := loadMissionState(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Intent = &intent
+	state.Policy = &LearnerPolicy{PolicyVersion: approval.PolicyVersion, IntentID: intent.IntentID, IntentHash: intent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: approval.ApprovedAt}
+	state.Approval = &approval
+	state.Canary = &LearnerCanary{CanaryGrant: grant, Status: "ACTIVE"}
+	if err := saveMissionState(dir, state); err != nil {
+		t.Fatal(err)
+	}
+	grantRaw, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(filepath.Dir(dir), "registry-link-backup")
+	if code, response := backupCall(t, "create", dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+	registryPath := m10ArtifactRegistryPath(dir)
+	registryRaw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(registryPath, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", dir, filepath.Join(filepath.Dir(dir), "registry-link-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted a state canary missing its registry grant: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	broken := filepath.Join(filepath.Dir(dir), "registry-link-broken")
+	copyFlatBackup(t, backup, broken)
+	registryPath = filepath.Join(broken, "m10-artifacts.jsonl")
+	if err := os.WriteFile(registryPath, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(filepath.Dir(dir), "registry-link-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted a state canary missing its registry grant: code=%d response=%+v", code, response)
+	}
+}
+
 func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
 	runtime := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtime); err != nil {

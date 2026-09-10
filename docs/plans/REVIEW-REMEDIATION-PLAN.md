@@ -422,6 +422,14 @@ một file trả `SNAPSHOT_CONFLICT`, không publish manifest và không thể r
 Regression mô phỏng đồng thời thay đổi mission state cùng M07 proposal giữa
 copy; đây là fault seam nội bộ, không phải quyền cho writer vượt runtime gate.
 
+**Cập nhật M10 active-canary registry link (2026-09-10):** backup create và
+restore staging đều canonicalize `state.Canary.CanaryGrant`, rồi yêu cầu đúng
+entry bất biến `CANARY_GRANT` (cùng ID, hash và bytes) trong M10 registry.
+Regression từ chối source thiếu link, và từ chối backup đã cập nhật
+checksum/manifest nhưng xóa entry trước khi staging có thể trở thành runtime.
+RP-06 vẫn `PARTIAL`: các loại semantic orphan M10 khác cùng crash/host proof
+vẫn chưa được chứng minh.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.
