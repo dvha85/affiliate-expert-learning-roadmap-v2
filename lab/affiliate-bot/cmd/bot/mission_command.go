@@ -2349,6 +2349,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
+		// Do not even read the supplied handoff/admission input while the old
+		// lifecycle is mid-recovery. The new runtime must receive no admission
+		// derived from a partial old-runtime transition.
+		if err := m11JournalRecoveryRequired(args[2]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		state, err := loadMissionState(args[1])
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
