@@ -648,6 +648,13 @@ nhưng outcome bị orphan khỏi evaluation, cycle trỏ evaluation không tồ
 `closed_at` sớm hơn evaluation. Tất cả bị `GRAPH_FAILED`; bước inventory chỉ đọc
 envelope hợp lệ trước, còn graph chỉ quyết định sau staging restore.
 
+**Cập nhật M10 temporal restore (2026-09-10):** regression learner tạo một
+backup M10 hợp lệ, sau đó sửa `m10-outcomes.jsonl` để `observed_at` sớm hơn
+`ExecutionRecord.attempted_at` và cập nhật lại checksum/size trong manifest.
+Restore trả `GRAPH_FAILED`; checksum hợp lệ không thay cho kiểm tra quan hệ
+outcome → execution. Đây chỉ bổ sung một negative temporal seam, không đóng
+những malformed-graph hoặc crash seam còn lại của RP-06.
+
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
 **Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00
