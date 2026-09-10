@@ -443,6 +443,12 @@ ghi `ExecutionID`, ID đó phải resolve execution record registry cùng
 tiêu. Cả source và restore staging từ chối backup tamper có checksum/manifest
 hợp lệ. Các match semantic sâu hơn và crash/host proof vẫn mở.
 
+**Cập nhật M10 canary usage ledger (2026-09-10):** `ExecutionsUsed` và
+`CostUsedMinor` trong mutable canary state phải đúng bằng số/tổng cost của mọi
+reservation đã persist; một state hạ counter sau reservation không thể mở lại
+budget. Backup create và restore manifest-checksum-hợp-lệ đều reject mismatch.
+Đây chưa là chứng minh crash/power-loss hoặc đầy đủ ledger external.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.

@@ -569,6 +569,7 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 	}
 	seenReservations := map[string]bool{}
 	seenAuthorizations := map[string]bool{}
+	reservedCostMinor := int64(0)
 	for _, r := range s.Reservations {
 		if r.ReservationID == "" || seenReservations[r.ReservationID] || s.Canary == nil || s.Intent == nil || r.GrantID != s.Canary.GrantID || r.IntentID != s.Intent.IntentID || r.IntentHash != s.Intent.IntentHash || r.CostMinor < 0 {
 			return fmt.Errorf("mission reservation integrity/binding check failed")
@@ -584,7 +585,14 @@ func validateMissionState(dir string, s LearnerMissionState) error {
 		if _, err := time.Parse(time.RFC3339, r.ReservedAt); err != nil {
 			return fmt.Errorf("mission reservation timestamp is invalid")
 		}
+		if r.CostMinor > 0 && reservedCostMinor > (int64(^uint64(0)>>1))-r.CostMinor {
+			return fmt.Errorf("mission reservation cost ledger overflows")
+		}
+		reservedCostMinor += r.CostMinor
 		seenReservations[r.ReservationID] = true
+	}
+	if s.Canary != nil && (s.Canary.ExecutionsUsed != len(s.Reservations) || s.Canary.CostUsedMinor != reservedCostMinor) {
+		return fmt.Errorf("mission canary usage does not match reservations")
 	}
 	return nil
 }
