@@ -604,6 +604,14 @@ recovery vẫn là đường duy nhất để khôi phục. Guard này chỉ ng�
 sát trạng thái dở dang, **không** chứng minh atomicity đa-file, power-loss
 recovery hay external execution/outcome.
 
+**Cập nhật coverage ba journal read boundary (2026-09-10):** fault regressions
+giờ giữ pending journal trên từng transition `FAILED`, `UNKNOWN→STOP` và
+outcome, rồi gọi CLI `m11-resolve` vào artifact đã tồn tại. Cả ba phải trả
+`RECOVERY_REQUIRED`; test không dùng parser mô phỏng. UNKNOWN vẫn kiểm thêm
+recovery export/admission không tạo handoff/admission dở dang. Đây chỉ mở rộng
+bằng chứng cho guard đọc chung, không là bằng chứng replay atomic hay crash
+coverage ngoài các fault seam cụ thể.
+
 **Cập nhật recovery-admission source boundary (2026-09-10):**
 `m11-recovery-admit` và helper handoff giờ kiểm journal M11 của **runtime cũ**
 trước khi đọc lifecycle/handoff hoặc ghi admission vào runtime mới. Regression
