@@ -54,6 +54,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenGateWindowEntries); err == nil {
 		t.Fatal("gate at lease expiry was accepted")
 	}
+	brokenGateCostWindow := gate
+	brokenGateCostWindow.EvaluatedAt = cost.ExpiresAt
+	brokenGateCostWindowEntries := append([]ArtifactEntry(nil), entries...)
+	brokenGateCostWindowEntries[6] = m11Entry(t, ArtifactKindGate, brokenGateCostWindow)
+	if err := ValidateArtifactGraph(brokenGateCostWindowEntries); err == nil {
+		t.Fatal("gate at cost-bound expiry was accepted")
+	}
 	brokenAuthorizationWindow := authorization
 	brokenAuthorizationWindow.AuthorizedAt = lease.ExpiresAt
 	brokenAuthorizationWindow.ExpiresAt = "2099-09-08T00:01:00Z"

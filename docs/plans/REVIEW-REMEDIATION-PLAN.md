@@ -722,6 +722,11 @@ graph reject authorization trước `ValidFrom`, tại/sau `ExpiresAt` của lea
 hoặc mang expiry vượt lease. Core regression và BR-18b checksum-valid mutation
 fail closed. Đây không là proof authority/executor production.
 
+**Cập nhật M11 gate cost-bound window graph (2026-09-11):** canonical graph
+đòi gate evaluation từ `TrustedCostBound.observed_at` đến trước bound expiry,
+và currency bound khớp lease. Core regression và BR-18b checksum-valid mutation
+tại cost expiry fail closed; không là provider-cost hay production proof.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

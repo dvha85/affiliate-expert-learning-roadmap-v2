@@ -173,7 +173,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
 			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
 			expiresAt, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
-			if !leaseOK || !healthOK || !costOK || !ledgerOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || !evaluatedAt.Before(expiresAt) {
+			costObservedAt, costObservedErr := time.Parse(time.RFC3339, bound.ObservedAt)
+			costExpiresAt, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
+			if !leaseOK || !healthOK || !costOK || !ledgerOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || costObservedErr != nil || costExpiryErr != nil || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			gates[x.GateID] = *x

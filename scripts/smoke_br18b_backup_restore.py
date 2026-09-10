@@ -414,6 +414,9 @@ def main():
         gate_outside_lease_backup = root / "gate-outside-lease-backup"; shutil.copytree(backup, gate_outside_lease_backup)
         rewrite_m11_registry(gate_outside_lease_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2099-09-03T02:50:00Z"))
         assert invoke(bot, "backup", "restore", gate_outside_lease_backup, root / "gate-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        gate_outside_cost_backup = root / "gate-outside-cost-backup"; shutil.copytree(backup, gate_outside_cost_backup)
+        rewrite_m11_registry(gate_outside_cost_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2099-09-03T02:45:00Z"))
+        assert invoke(bot, "backup", "restore", gate_outside_cost_backup, root / "gate-outside-cost-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         authorization_outside_lease_backup = root / "authorization-outside-lease-backup"; shutil.copytree(backup, authorization_outside_lease_backup)
         def authorization_outside_lease_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_EXECUTION_AUTHORIZATION":
