@@ -463,6 +463,17 @@ trước khi caller nhận ACK. Journal phải còn lại, outcome và ledger tr
 chứng deterministic cho đúng recovery seam đó, không chứng minh atomicity
 đa-file khi mất điện hoặc external business outcome.
 
+**Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
+ghi `m11-failed-execution-journal/v1` trước cặp immutable
+`FAILED/NOT_PERFORMED` execution và post-execution ledger. Recovery chỉ replay
+khi execution và ledger đúng transition của predecessor; journal malformed hoặc
+head cạnh tranh vẫn chặn mutation. Fault test cover trước/sau append ledger,
+`status=RECOVERY_REQUIRED`, recovery exact-once và retry `EXACT_DUPLICATE`.
+`backup create` cũng replay journal trước inventory; regression yêu cầu outcome
+fixture sau recovery rồi backup/restore runtime thật.
+Đây không biến hai file thành transaction power-loss hoặc chứng minh external
+execution/business outcome.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

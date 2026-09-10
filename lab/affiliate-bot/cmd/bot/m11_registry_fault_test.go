@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
@@ -171,6 +172,47 @@ func TestM11UnknownStopJournalRecoversAfterDurableStopWriteFailure(t *testing.T)
 	}
 }
 
+func TestM11FailedExecutionJournalRecoversAfterLedgerWriteFailure(t *testing.T) {
+	for _, phase := range []string{"before_write", "after_write"} {
+		faultPhase := phase
+		t.Run(phase, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture execution failure"
+			m11RegistryAppendFault = func(registryPhase string, entry corem11.ArtifactEntry) error {
+				if entry.ArtifactKind == corem11.ArtifactKindLedger && registryPhase == faultPhase {
+					return errors.New("injected failed-execution ledger write failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m11RegistryAppendFault = nil })
+			if _, _, _, err := recordFailedM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+				t.Fatal("failed-execution ledger fault was not surfaced")
+			}
+			if _, err := os.Stat(m11FailedExecutionJournalPath(fixture.dir)); err != nil {
+				t.Fatalf("failed execution journal was removed before recovery: %v", err)
+			}
+			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("status did not fail closed on failed-execution journal: code=%d response=%+v", code, response)
+			}
+			m11RegistryAppendFault = nil
+			if err := recoverM11FailedExecutionJournal(fixture.dir); err != nil {
+				t.Fatalf("failed-execution journal recovery failed: %v", err)
+			}
+			if _, err := os.Stat(m11FailedExecutionJournalPath(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("failed execution journal remains after recovery: %v", err)
+			}
+			_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+			if err != nil || head.ConsecutiveFailures != 1 || head.LastExecutionAt != attemptedAt || head.UpdatedAt != attemptedAt {
+				t.Fatalf("failed-execution ledger transition was not recovered: ledger=%+v err=%v", head, err)
+			}
+			record, ledger, status, err := recordFailedM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason)
+			if err != nil || status != appendDuplicate || record.Status != "FAILED" || ledger.UpdatedAt != attemptedAt || ledger.ConsecutiveFailures != 1 {
+				t.Fatalf("failed-execution retry was not exact after recovery: record=%+v ledger=%+v status=%s err=%v", record, ledger, status, err)
+			}
+		})
+	}
+}
+
 func TestBackupCreateRecoversPendingM11UnknownStopJournal(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
@@ -203,6 +245,55 @@ func TestBackupCreateRecoversPendingM11UnknownStopJournal(t *testing.T) {
 	}
 	if code, response := missionCall(t, "status", restored); code != 0 || response["artifact"].(map[string]any)["stop"] != true {
 		t.Fatalf("restored UNKNOWN STOP runtime was not durably stopped: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupCreateRecoversPendingM11FailedExecutionJournal(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	if _, err := buildBR10AdvisorFixture(fixture.dir); err != nil {
+		t.Fatalf("build backup history fixture: %v", err)
+	}
+	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture execution failure"
+	m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+		if entry.ArtifactKind == corem11.ArtifactKindLedger && phase == "before_write" {
+			return errors.New("injected failed-execution ledger write failure")
+		}
+		return nil
+	}
+	if _, _, _, err := recordFailedM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, reason); err == nil {
+		t.Fatal("failed-execution ledger fault was not surfaced")
+	}
+	m11RegistryAppendFault = nil
+	t.Cleanup(func() { m11RegistryAppendFault = nil })
+	backup, restored := filepath.Join(t.TempDir(), "backup"), filepath.Join(t.TempDir(), "restored")
+	if code, response := backupCall(t, "create", fixture.dir, backup); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted a recovered FAILED execution without an outcome: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11FailedExecutionJournalPath(fixture.dir)); !os.IsNotExist(err) {
+		t.Fatalf("backup did not recover failed-execution journal: %v", err)
+	}
+	postEntry, _, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve recovered post-execution ledger: %v", err)
+	}
+	outcome := m03.OutcomeRecord{OutcomeID: "backup-recovered-failed-outcome", EffectRef: m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: "prod-exec-" + fixture.authorization.AuthorizationID}, ObservedAt: "2026-09-08T00:00:03Z", Status: "CANCELLED", Metrics: map[string]float64{}, SourceRef: "fixture:m11-outcome/backup-recovery"}
+	outcomeInput := filepath.Join(fixture.dir, "m11-outcome-input.json")
+	if err := writeFixtureJSON(outcomeInput, outcome); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-outcome", fixture.dir, outcomeInput, postEntry.ArtifactID); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("record recovered FAILED outcome: code=%d response=%+v", code, response)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json", "m11-outcome-input.json"} {
+		if err := os.Remove(filepath.Join(fixture.dir, name)); err != nil {
+			t.Fatalf("remove fixture-only backup input %s: %v", name, err)
+		}
+	}
+	if code, response := backupCall(t, "create", fixture.dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup did not persist recovered FAILED execution: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("recovered FAILED execution backup did not restore: code=%d response=%+v", code, response)
 	}
 }
 

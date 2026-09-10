@@ -722,6 +722,9 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 }
 
 func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attemptedAt, reason string) (corem11.ProductionExecutionRecord, corem11.ProductionLedger, string, error) {
+	if err := recoverM11FailedExecutionJournal(dir); err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
 	state, err := loadMissionState(dir)
 	if err != nil {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
@@ -750,9 +753,12 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 		_, head, headErr := m11LedgerHead(dir, auth.ProductionLeaseID)
 		return record, head, appendDuplicate, headErr
 	}
-	ledger, err := requireM11LedgerHead(dir, auth.ProductionLeaseID, reservationLedgerID)
+	ledgerEntry, ledger, err := m11LedgerHead(dir, auth.ProductionLeaseID)
 	if err != nil {
 		return record, corem11.ProductionLedger{}, "", err
+	}
+	if ledgerEntry.ArtifactID != reservationLedgerID {
+		return record, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
 	}
 	if now.Before(mustM11Time(auth.AuthorizedAt)) || !now.After(mustM11Time(ledger.UpdatedAt)) {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("execution time must advance an active authorization and ledger")
@@ -764,27 +770,18 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 	if !pending || ledger.PendingOutcomes < 1 || ledger.LeaseID != auth.ProductionLeaseID {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("execution has no governed reservation")
 	}
-	raw, err := json.Marshal(record)
+	next, err := nextM11FailedExecutionLedger(ledger, record)
 	if err != nil {
 		return record, corem11.ProductionLedger{}, "", err
 	}
-	_, status, err := registerM11Artifact(dir, corem11.ArtifactKindExecution, raw)
-	if err != nil {
-		return record, corem11.ProductionLedger{}, status, err
+	journal := m11FailedExecutionJournal{Version: "m11-failed-execution-journal/v1", PredecessorArtifactID: ledgerEntry.ArtifactID, PredecessorContentHash: ledgerEntry.ContentHash, Execution: record, Ledger: next}
+	if err := writeJSONAtomic(m11FailedExecutionJournalPath(dir), journal); err != nil {
+		return record, next, "", err
 	}
-	next := ledger
-	next.ConsecutiveFailures++
-	next.LastExecutionAt = attemptedAt
-	next.UpdatedAt = attemptedAt
-	ledgerRaw, err := json.Marshal(next)
-	if err != nil {
-		return record, next, status, err
+	if err := recoverM11FailedExecutionJournal(dir); err != nil {
+		return record, next, "", err
 	}
-	_, ledgerStatus, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw)
-	if err != nil {
-		return record, next, ledgerStatus, err
-	}
-	return record, next, status, nil
+	return record, next, appendAdded, nil
 }
 
 // recordUnknownM11Execution is the only learner fixture that can model an
