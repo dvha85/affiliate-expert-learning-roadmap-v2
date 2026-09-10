@@ -700,6 +700,12 @@ reject activation tại exact `ExpiresAt` mà không mutation registry; same
 lease ID với payload/hash canonical khác cũng bị reject. Chưa là coverage
 expiry/rebind đầy đủ cho mọi M11 artifact hay production authority.
 
+**Cập nhật M11 health lease-window graph (2026-09-11):** canonical graph
+reject health snapshot trước `ValidFrom` hoặc tại/sau `ExpiresAt` của exact
+lease. Core regression dùng health tại expiry; BR-18b mutate backup checksum
+hợp lệ và restore `GRAPH_FAILED`. Đây chỉ là time-lineage offline, không là
+telemetry đáng tin cậy hay production health operation.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

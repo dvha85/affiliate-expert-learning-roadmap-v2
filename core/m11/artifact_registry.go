@@ -132,7 +132,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			}
 		case *ProductionHealthSnapshot:
 			lease, ok := leases[x.LeaseID]
-			if !ok || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
+			observedAt, observedErr := time.Parse(time.RFC3339, x.ObservedAt)
+			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
+			expiresAt, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+			if !ok || observedErr != nil || validFromErr != nil || expiresErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || observedAt.Before(validFrom) || !observedAt.Before(expiresAt) {
 				return fmt.Errorf("production health has an orphaned lease link")
 			}
 			health[x.SnapshotID] = *x
