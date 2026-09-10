@@ -130,8 +130,10 @@ grant/cost/gate thật, rồi chứng minh `m10-authorize` reject tại và sau 
 của từng authority mà không tạo portable output hay thay đổi
 `mission-state`/M10 registry. Cùng regression chặn rebind ID khi đổi expiry,
 cap hoặc currency; backup/restore đã kiểm một cost-bound hết hạn. Còn thiếu
-shared smoke subprocess, restore cho từng authority và coverage execution/
-ledger/cost state rộng hơn; không suy slice này thành complete acceptance.
+shared smoke độc lập, restore cho từng authority và coverage execution/ledger/
+cost state rộng hơn; regression hiện có đã chạy binary Bot ở process mới nhưng
+chưa thay thế full acceptance smoke. Không suy slice này thành complete
+acceptance.
 
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn

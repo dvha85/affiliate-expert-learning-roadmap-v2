@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
@@ -87,7 +86,7 @@ func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 }
 
 func TestBackupRestoreRejectsExpiredM10CostBoundWithoutMutation(t *testing.T) {
-	runtimeDir, boundPath, gatePath, boundary := authorityExpiryFixture(t, "cost")
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
 	root := filepath.Dir(runtimeDir)
 	backupDir := filepath.Join(root, "backup")
 	restoredDir := filepath.Join(root, "restored")
@@ -97,13 +96,10 @@ func TestBackupRestoreRejectsExpiredM10CostBoundWithoutMutation(t *testing.T) {
 	if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
 		t.Fatalf("restore failed: code=%d response=%+v", code, response)
 	}
-	clock := boundary
-	previousClock := missionClock
-	missionClock = func() time.Time { return clock }
-	t.Cleanup(func() { missionClock = previousClock })
 	before := missionRuntimeSnapshot(t, restoredDir)
 	authorizationPath := filepath.Join(root, "restored-expired-authorization.json")
-	if code, response := missionCall(t, "m10-authorize", restoredDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-authorize", restoredDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
 		t.Fatalf("restored expired cost bound was accepted: code=%d response=%+v", code, response)
 	}
 	if _, err := os.Stat(authorizationPath); !os.IsNotExist(err) {
