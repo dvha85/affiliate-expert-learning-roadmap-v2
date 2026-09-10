@@ -85,27 +85,31 @@ func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	}
 }
 
-func TestBackupRestoreRejectsExpiredM10CostBoundWithoutMutation(t *testing.T) {
-	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
-	root := filepath.Dir(runtimeDir)
-	backupDir := filepath.Join(root, "backup")
-	restoredDir := filepath.Join(root, "restored")
-	if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
-		t.Fatalf("backup failed: code=%d response=%+v", code, response)
-	}
-	if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
-		t.Fatalf("restore failed: code=%d response=%+v", code, response)
-	}
-	before := missionRuntimeSnapshot(t, restoredDir)
-	authorizationPath := filepath.Join(root, "restored-expired-authorization.json")
+func TestBackupRestoreRejectsExpiredM10AuthorityWithoutMutation(t *testing.T) {
 	binary := buildMissionBinary(t)
-	if code, response := missionBinaryCall(t, binary, "mission", "m10-authorize", restoredDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
-		t.Fatalf("restored expired cost bound was accepted: code=%d response=%+v", code, response)
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		t.Run(expiring, func(t *testing.T) {
+			runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, expiring)
+			root := filepath.Dir(runtimeDir)
+			backupDir := filepath.Join(root, "backup")
+			restoredDir := filepath.Join(root, "restored")
+			if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+				t.Fatalf("backup failed: code=%d response=%+v", code, response)
+			}
+			if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+				t.Fatalf("restore failed: code=%d response=%+v", code, response)
+			}
+			before := missionRuntimeSnapshot(t, restoredDir)
+			authorizationPath := filepath.Join(root, "restored-expired-authorization.json")
+			if code, response := missionBinaryCall(t, binary, "mission", "m10-authorize", restoredDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
+				t.Fatalf("restored expired %s authority was accepted: code=%d response=%+v", expiring, code, response)
+			}
+			if _, err := os.Stat(authorizationPath); !os.IsNotExist(err) {
+				t.Fatalf("restored expired %s authority created portable output: %v", expiring, err)
+			}
+			assertMissionRuntimeUnchanged(t, before, restoredDir)
+		})
 	}
-	if _, err := os.Stat(authorizationPath); !os.IsNotExist(err) {
-		t.Fatalf("restored expired cost bound created portable output: %v", err)
-	}
-	assertMissionRuntimeUnchanged(t, before, restoredDir)
 }
 
 func copyFlatBackup(t *testing.T, source, target string) {
