@@ -114,6 +114,16 @@ func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.
 			if _, err := os.Stat(exportPath); !os.IsNotExist(err) {
 				t.Fatalf("M11 recovery export wrote during pending journal recovery: %v", err)
 			}
+			admissionRuntime := t.TempDir()
+			if code, response := missionCall(t, "init", admissionRuntime); code != 0 || response["status"] != "INITIALIZED" {
+				t.Fatalf("init admission runtime: code=%d response=%+v", code, response)
+			}
+			if code, response := missionCall(t, "m11-recovery-admit", admissionRuntime, fixture.dir, filepath.Join(t.TempDir(), "missing-handoff.json"), filepath.Join(t.TempDir(), "missing-admission.json")); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("M11 recovery admission read an interrupted old runtime: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(m11ArtifactRegistryPath(admissionRuntime)); !os.IsNotExist(err) {
+				t.Fatalf("M11 recovery admission wrote during pending old journal recovery: %v", err)
+			}
 			state, err := loadMissionState(fixture.dir)
 			if faultPhase == "before_write" && (err != nil || state.Stop) {
 				t.Fatalf("pre-write fault marked mission stopped: state=%+v err=%v", state, err)

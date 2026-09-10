@@ -604,6 +604,15 @@ recovery vẫn là đường duy nhất để khôi phục. Guard này chỉ ng�
 sát trạng thái dở dang, **không** chứng minh atomicity đa-file, power-loss
 recovery hay external execution/outcome.
 
+**Cập nhật recovery-admission source boundary (2026-09-10):**
+`m11-recovery-admit` và helper handoff giờ kiểm journal M11 của **runtime cũ**
+trước khi đọc lifecycle/handoff hoặc ghi admission vào runtime mới. Regression
+giữ UNKNOWN→STOP journal pending thật rồi gọi admission với input còn thiếu:
+nó phải trả `RECOVERY_REQUIRED` thay vì đọc source/inputs khác, và registry mới
+không được có partial admission. Đây chỉ ràng buộc source đọc của handoff; nó
+không khóa snapshot đa-runtime, không là transaction giữa hai runtime và không
+chứng minh power-loss/external recovery.
+
 **Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
 ghi `m11-failed-execution-journal/v1` trước cặp immutable
 `FAILED/NOT_PERFORMED` execution và post-execution ledger. Recovery chỉ replay

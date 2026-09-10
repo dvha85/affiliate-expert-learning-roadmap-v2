@@ -935,6 +935,9 @@ func mustM11Time(raw string) time.Time {
 // was reconciled by a human, but it carries no authority to resume it. A new
 // runtime must still bind a separately reviewed lease through normal commands.
 func m11RecoveryHandoff(dir, resolutionID, ledgerID string) (map[string]any, error) {
+	if err := m11JournalRecoveryRequired(dir); err != nil {
+		return nil, err
+	}
 	state, err := loadMissionState(dir)
 	if err != nil || !state.Stop {
 		return nil, fmt.Errorf("recovery handoff requires durable STOP")
@@ -1000,6 +1003,13 @@ func m11DistinctRuntimeDirs(oldDir, newDir string) (string, string, error) {
 func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (corem11.ArtifactEntry, string, error) {
 	oldAbs, newAbs, err := m11DistinctRuntimeDirs(oldDir, newDir)
 	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	// An admission is an immutable audit link from the old stopped runtime. It
+	// must not inspect, validate, or carry forward an old lifecycle while that
+	// runtime still has an interrupted journal transition awaiting its locked
+	// writer recovery.
+	if err := m11JournalRecoveryRequired(oldAbs); err != nil {
 		return corem11.ArtifactEntry{}, "", err
 	}
 	state, err := loadMissionState(newDir)
