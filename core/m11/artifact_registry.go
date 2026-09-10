@@ -238,5 +238,19 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			return fmt.Errorf("production ledger predates its activation")
 		}
 	}
+	for _, snapshot := range health {
+		activation, ok := activations[snapshot.LeaseID]
+		// Draft registry history can predate an eventual activation entry. Once
+		// activation exists, however, health is evidence for the active runtime
+		// and cannot have been observed before that admission boundary.
+		if !ok {
+			continue
+		}
+		observedAt, observedErr := time.Parse(time.RFC3339, snapshot.ObservedAt)
+		activatedAt, activatedErr := time.Parse(time.RFC3339, activation.ActivatedAt)
+		if observedErr != nil || activatedErr != nil || activation.LeaseVersion != snapshot.LeaseVersion || activation.LeaseHash != snapshot.LeaseHash || observedAt.Before(activatedAt) {
+			return fmt.Errorf("production health predates its activation")
+		}
+	}
 	return nil
 }

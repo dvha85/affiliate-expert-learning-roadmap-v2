@@ -178,11 +178,11 @@ def write_recovery_admission_lease(path, prior_lease_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def write_production_health(path, lease_path):
+def write_production_health(path, lease_path, observed_at="2026-09-08T00:00:00Z"):
     lease = json.loads(lease_path.read_text(encoding="utf-8"))
     payload = {
         "snapshot_id": "br18-production-health", "lease_id": lease["lease_id"], "lease_version": lease["lease_version"],
-        "lease_hash": lease["lease_hash"], "observed_at": "2026-09-08T00:00:00Z", "source_refs": ["fixture:br18-health"],
+        "lease_hash": lease["lease_hash"], "observed_at": observed_at, "source_refs": ["fixture:br18-health"],
         "dependency_state": "HEALTHY", "telemetry_complete": True, "consecutive_failures": 0,
         "reconciliation_required": False, "compliance_alert_count": 0, "oldest_pending_outcome_age_seconds": 0,
         "hash_version": "go-json-v1",
@@ -251,12 +251,12 @@ def main():
         assert invoke(bot, "mission", "m11-activate", early_gate_runtime, "br18-production-lease", "2026-09-08T00:00:10Z", env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-ledger-init", early_gate_runtime, "br18-production-lease", "2026-09-08T00:00:10Z", env=env)["status"] == "APPENDED"
         production_health = root / "production-health.json"; write_production_health(production_health, production_lease)
-        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, env=env)["status"] == "APPENDED"
+        early_health = root / "early-production-health.json"; write_production_health(early_health, production_lease, "2026-09-08T00:00:10Z")
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, expected=1, env=env)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", early_health, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
         early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", env=env)
         assert early_gate["status"] == "DENY" and early_gate["artifact"]["reason"] == "LEASE_INACTIVE"
-        pre_activation_health_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:10Z", env=env)
-        assert pre_activation_health_gate["status"] == "DENY" and pre_activation_health_gate["artifact"]["reason"] == "HEALTH_MISMATCH"
         # Two valid authorizations can coexist before the first reservation.
         # The second must not consume budget after the first advances the
         # ledger that its gate snapshot authorized.
