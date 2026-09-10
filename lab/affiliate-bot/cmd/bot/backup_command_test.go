@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
@@ -649,6 +650,87 @@ func TestBackupRestoreRejectsReservationMissingRegistryCostBound(t *testing.T) {
 	}
 	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "cost-bound-link-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
 		t.Fatalf("restore accepted a reservation missing its registry cost bound: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupRestoreRejectsDuplicateM10FixtureOutcomeForExecution(t *testing.T) {
+	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtime)
+	authorizationPath := filepath.Join(root, "outcome-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtime, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtime, authorizationPath, "outcome-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "failed-record.json")
+	if code, response := missionCall(t, "m10-record-failed", runtime, authorizationPath, recordPath, "2026-09-08T00:00:01Z", "fixture failure"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("failed record setup failed: code=%d response=%+v", code, response)
+	}
+	var record corem10.ExecutionRecord
+	if err := readJSON(recordPath, &record); err != nil {
+		t.Fatal(err)
+	}
+	first := m03.OutcomeRecord{OutcomeID: "m10-fixture-outcome", EffectRef: m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID}, ObservedAt: "2026-09-08T00:00:02Z", Status: "CANCELLED", Metrics: map[string]float64{}, SourceRef: "fixture:m10-outcome/duplicate-link"}
+	firstPath := filepath.Join(root, "first-outcome.json")
+	if err := writeJSON(firstPath, first); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-outcome", runtime, firstPath); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("first outcome setup failed: code=%d response=%+v", code, response)
+	}
+	second := first
+	second.OutcomeID = "m10-fixture-outcome-duplicate"
+	secondPath := filepath.Join(root, "second-outcome.json")
+	if err := writeJSON(secondPath, second); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-outcome", runtime, secondPath); code == 0 || response["status"] != "CONFLICT" {
+		t.Fatalf("runtime accepted a second outcome for one execution: code=%d response=%+v", code, response)
+	}
+	backup := filepath.Join(root, "duplicate-outcome-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	outcomeStorePath := m10OutcomeStorePath(runtime)
+	storeRaw, err := os.ReadFile(outcomeStorePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRaw, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outcomeStorePath, append(storeRaw, append(secondRaw, '\n')...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "duplicate-outcome-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted duplicate M10 fixture outcomes: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(outcomeStorePath, storeRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "duplicate-outcome-broken")
+	copyFlatBackup(t, backup, broken)
+	outcomeStorePath = m10OutcomeStorePath(broken)
+	if err := os.WriteFile(outcomeStorePath, append(storeRaw, append(secondRaw, '\n')...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-outcomes.jsonl"], err = backupFileMetadata(outcomeStorePath, "m10-outcomes.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "duplicate-outcome-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted duplicate M10 fixture outcomes: code=%d response=%+v", code, response)
 	}
 }
 
