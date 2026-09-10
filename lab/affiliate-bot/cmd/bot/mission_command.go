@@ -2189,13 +2189,20 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
+		state, err := loadMissionState(args[1])
+		if err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if state.Stop {
+			return emit("STOPPED", nil, fmt.Errorf("durable STOP: %s", state.StopReason), 1)
+		}
 		raw, err := os.ReadFile(args[4])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
 		entry, status, err := admitM11Recovery(args[1], args[2], args[3], raw)
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, entry, nil, 0)
 	case "m11-outcome":
