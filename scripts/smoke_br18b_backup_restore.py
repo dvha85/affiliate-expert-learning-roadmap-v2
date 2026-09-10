@@ -311,6 +311,14 @@ def main():
         orphan_effect["effect_ref"]["effect_id"] = "missing-m11-execution"
         replace_backup_file(orphan_effect_backup, "m11-outcomes.jsonl", (json.dumps(orphan_effect) + "\n").encode())
         assert invoke(bot, "backup", "restore", orphan_effect_backup, root / "orphan-effect-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_ledger_outcome_backup = root / "orphan-ledger-outcome-backup"; shutil.copytree(backup, orphan_ledger_outcome_backup)
+        def orphan_ledger_outcome_change(entry):
+            if entry["artifact_kind"] != "PRODUCTION_LEDGER":
+                return False
+            entry["artifact"]["outcome_links"] = []
+            return True
+        rewrite_m11_registry(orphan_ledger_outcome_backup, orphan_ledger_outcome_change)
+        assert invoke(bot, "backup", "restore", orphan_ledger_outcome_backup, root / "orphan-ledger-outcome-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
