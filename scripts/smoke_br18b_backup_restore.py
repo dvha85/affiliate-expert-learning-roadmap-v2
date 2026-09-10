@@ -414,6 +414,15 @@ def main():
         gate_outside_lease_backup = root / "gate-outside-lease-backup"; shutil.copytree(backup, gate_outside_lease_backup)
         rewrite_m11_registry(gate_outside_lease_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2099-09-03T02:50:00Z"))
         assert invoke(bot, "backup", "restore", gate_outside_lease_backup, root / "gate-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        authorization_outside_lease_backup = root / "authorization-outside-lease-backup"; shutil.copytree(backup, authorization_outside_lease_backup)
+        def authorization_outside_lease_change(entry):
+            if entry["artifact_kind"] != "PRODUCTION_EXECUTION_AUTHORIZATION":
+                return False
+            entry["artifact"]["authorized_at"] = "2099-09-03T02:50:00Z"
+            entry["artifact"]["expires_at"] = "2099-09-03T02:51:00Z"
+            return True
+        rewrite_m11_registry(authorization_outside_lease_backup, authorization_outside_lease_change)
+        assert invoke(bot, "backup", "restore", authorization_outside_lease_backup, root / "authorization-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         ledger_before_activation_backup = root / "ledger-before-activation-backup"; shutil.copytree(backup, ledger_before_activation_backup)
         def ledger_before_activation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or not entry["artifact"].get("outcome_links"):

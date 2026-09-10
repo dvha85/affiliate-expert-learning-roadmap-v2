@@ -717,6 +717,11 @@ gate trước `ValidFrom` hoặc tại/sau `ExpiresAt` của exact lease. Core r
 và BR-18b mutation backup checksum-hợp-lệ tại expiry đều fail closed. Đây không
 xác nhận provider clock hay production gate operation.
 
+**Cập nhật M11 authorization lease-window graph (2026-09-11):** canonical
+graph reject authorization trước `ValidFrom`, tại/sau `ExpiresAt` của lease,
+hoặc mang expiry vượt lease. Core regression và BR-18b checksum-valid mutation
+fail closed. Đây không là proof authority/executor production.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

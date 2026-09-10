@@ -54,6 +54,14 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenGateWindowEntries); err == nil {
 		t.Fatal("gate at lease expiry was accepted")
 	}
+	brokenAuthorizationWindow := authorization
+	brokenAuthorizationWindow.AuthorizedAt = lease.ExpiresAt
+	brokenAuthorizationWindow.ExpiresAt = "2099-09-08T00:01:00Z"
+	brokenAuthorizationWindowEntries := append([]ArtifactEntry(nil), entries...)
+	brokenAuthorizationWindowEntries[7] = m11Entry(t, ArtifactKindAuthorization, brokenAuthorizationWindow)
+	if err := ValidateArtifactGraph(brokenAuthorizationWindowEntries); err == nil {
+		t.Fatal("authorization at lease expiry was accepted")
+	}
 	brokenActivation := activation
 	brokenActivation.ActivatedAt = "2026-09-07T23:59:59Z"
 	brokenActivationEntries := append([]ArtifactEntry(nil), entries...)
