@@ -471,6 +471,10 @@ def main():
         remove_m11_entry(missing_approval_backup, "PRODUCTION_LEASE_APPROVAL", admission_lease_value["approval_ref"])
         missing_approval_result = invoke(bot, "backup", "restore", missing_approval_backup, root / "missing-recovery-approval-restored", expected=1, env=env)
         assert missing_approval_result["status"] == "GRAPH_FAILED", missing_approval_result
+        missing_activation_backup = root / "missing-recovery-activation-backup"; shutil.copytree(admission_backup, missing_activation_backup)
+        remove_m11_entry(missing_activation_backup, "PRODUCTION_ACTIVATION", admission_lease_value["lease_id"] + "/" + admission_lease_value["lease_version"])
+        missing_activation_result = invoke(bot, "backup", "restore", missing_activation_backup, root / "missing-recovery-activation-restored", expected=1, env=env)
+        assert missing_activation_result["status"] == "GRAPH_FAILED", missing_activation_result
         assert invoke(bot, "backup", "restore", admission_backup, admission_restored, env=env)["status"] == "RESTORED"
         assert invoke(bot, "mission", "m11-resolve", admission_restored, "PRODUCTION_RECOVERY_ADMISSION", "br18-recovery-admission", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-authorize", admission_restored, admission_lease_value["lease_id"], "missing-gate", "fixture_stub", "2026-09-08T00:00:08Z", expected=1, env=env)["status"] == "REJECTED"

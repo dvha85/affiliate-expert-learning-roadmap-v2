@@ -745,6 +745,7 @@ func validateM11BackupGraph(dir string) error {
 	outcomeExecutionIDs := map[string]string{}
 	leases := map[string]corem11.ProductionLease{}
 	leaseApprovals := map[string]corem11.ProductionLeaseApproval{}
+	activations := map[string]corem11.ProductionActivationRecord{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	executions := []corem11.ProductionExecutionRecord{}
@@ -775,6 +776,13 @@ func validateM11BackupGraph(dir string) error {
 			}
 			approval := *value.(*corem11.ProductionLeaseApproval)
 			leaseApprovals[approval.ApprovalID] = approval
+		case corem11.ArtifactKindActivation:
+			value, status := corem11.DecodeArtifact("activation", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 activation artifact is invalid")
+			}
+			activation := *value.(*corem11.ProductionActivationRecord)
+			activations[activation.LeaseID] = activation
 		case corem11.ArtifactKindLedger:
 			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
 			if status != corem11.Valid {
@@ -820,6 +828,18 @@ func validateM11BackupGraph(dir string) error {
 		approval, found := leaseApprovals[lease.ApprovalRef]
 		if !found || approval.LeaseID != lease.LeaseID || approval.LeaseVersion != lease.LeaseVersion || approval.LeaseHash != lease.LeaseHash || approval.PromotionReviewRef != lease.PromotionReviewRef || approval.SourceCanaryGrantID != lease.SourceCanaryGrantID || approval.SourceCanaryGrantVersion != lease.SourceCanaryGrantVersion || approval.SourceCanaryGrantHash != lease.SourceCanaryGrantHash || approval.ReviewerID != lease.ReviewerID || approval.ReviewedAt != lease.ReviewedAt {
 			return fmt.Errorf("M11 lease is orphaned from its restored approval")
+		}
+	}
+	// A lease may remain registered but inactive. Once a ledger exists, however,
+	// it is a lifecycle state created after activation; restore must retain that
+	// exact activation rather than accepting a checksum-valid ledger detached
+	// from its admission boundary.
+	for _, ledger := range ledgers {
+		activation, found := activations[ledger.LeaseID]
+		activatedAt, activatedAtErr := time.Parse(time.RFC3339, activation.ActivatedAt)
+		ledgerAt, ledgerAtErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+		if !found || activatedAtErr != nil || ledgerAtErr != nil || activation.LeaseVersion != ledger.LeaseVersion || activation.LeaseHash != ledger.LeaseHash || activatedAt.After(ledgerAt) {
+			return fmt.Errorf("M11 ledger is orphaned from its restored activation")
 		}
 	}
 	for _, record := range executions {

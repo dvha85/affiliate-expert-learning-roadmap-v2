@@ -602,6 +602,13 @@ mới thật, xóa approval M11 rồi cập nhật checksum/manifest; restore tr
 `GRAPH_FAILED` trước publish. Đây chỉ chứng minh semantic snapshot validation
 cho link đó, không là external review evidence hoặc atomic multi-file proof.
 
+**Cập nhật ledger-activation snapshot link (2026-09-10):** lease có thể chưa
+active trong registry, nhưng ledger đã persist phải resolve activation cùng
+lease/version/hash với thời điểm activation không muộn hơn ledger. Smoke xóa
+activation của runtime có ledger, cập nhật checksum/manifest và restore trả
+`GRAPH_FAILED` trước publish. Đây chỉ là kiểm graph deterministic, không suy
+ra live activation, external execution hay crash atomicity.
+
 **Cập nhật read/export boundary của M11 journal (2026-09-10):** trong khi bất
 kỳ journal `FAILED`, `UNKNOWN→STOP` hoặc outcome nào còn pending,
 `m11-resolve` và `m11-recovery-export` trả `RECOVERY_REQUIRED` trước khi đọc
