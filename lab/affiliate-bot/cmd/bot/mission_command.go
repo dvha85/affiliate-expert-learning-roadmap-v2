@@ -1912,15 +1912,19 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}
-		status, err := writeNewJSON(args[3], record)
-		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
-		}
 		if s.Reservations[reservationIndex].ExecutionID == "" {
 			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
 			if err := saveMissionState(args[1], s); err != nil {
 				return emit("STORE_ERROR", nil, err, 1)
 			}
+		}
+		// The registry record and mission reservation are canonical runtime state;
+		// the requested output is only a portable view. Bind the reservation
+		// before attempting that view so an output collision cannot leave the
+		// canonical execution orphaned from its budget reservation.
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", record, err, 1)
 		}
 		return emit(status, record, nil, 0)
 	case "m10-cancel":
@@ -1966,15 +1970,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}
-		status, err := writeNewJSON(args[3], record)
-		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
-		}
 		if s.Reservations[reservationIndex].ExecutionID == "" {
 			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
 			if err := saveMissionState(args[1], s); err != nil {
 				return emit("STORE_ERROR", nil, err, 1)
 			}
+		}
+		status, err := writeNewJSON(args[3], record)
+		if err != nil {
+			return emit("CONFLICT", record, err, 1)
 		}
 		return emit(status, record, nil, 0)
 	case "m10-outcome":

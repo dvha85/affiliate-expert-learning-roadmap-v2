@@ -30,7 +30,7 @@
       "criterion_id": "BR-16a",
       "claims": [
         {"id": "BR-16a-implementation", "kind": "implementation", "status": "PARTIAL", "matrix_field": "implementation_refs", "scope": "M00-M11 fixture lineage is present, without a business outcome graph.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-07b"}]},
-        {"id": "BR-16a-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Shared fixture smoke and restore smoke are wired to deterministic CI.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "python scripts/smoke_br16a_offline.py"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật CI"}]},
+        {"id": "BR-16a-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Shared fixture smoke and restore smoke are wired to deterministic CI; the shared smoke verifies an M10 portable-output conflict cannot orphan the canonical execution reservation binding.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "python scripts/smoke_br16a_offline.py"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật CI"}, {"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-03 canonical binding before portable output"}]},
         {"id": "BR-16a-external", "kind": "external", "status": "MISSING", "scope": "No beginner pilot on a clean machine is recorded.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
