@@ -415,6 +415,9 @@ def main(argv=None):
         assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
         unknown_status = invoke(bot, "mission", "status", state)["artifact"]
         assert unknown_status["stop"] is True and unknown_status["stop_reason"] == "RECONCILIATION_REQUIRED"
+        registry_before_stopped_gate = (state / "m11-artifacts.jsonl").read_bytes()
+        assert invoke(bot, "mission", "m11-gate", state, "missing-lease", "missing-health", "missing-cost", "missing-ledger", "2026-09-08T00:00:04Z", expected=1)["status"] == "STOPPED"
+        assert (state / "m11-artifacts.jsonl").read_bytes() == registry_before_stopped_gate
         assert invoke(bot, "mission", "m11-activate", state, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "STOPPED"
         recovery_resolution_path = work / "recovery-resolution.json"
         write_production_resolution(recovery_resolution_path, recovery_lease, recovery_unknown["artifact"]["execution"]["execution_id"])

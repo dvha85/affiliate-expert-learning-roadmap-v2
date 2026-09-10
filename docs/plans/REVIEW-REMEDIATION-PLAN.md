@@ -603,6 +603,12 @@ mới tự hoàn thành không trợ giúp.
 Runbook kiểm chính lệnh này sau restore. Đây chỉ là contract fail-closed của
 CLI, không làm lease fixture hợp lệ hay cấp authority.
 
+**Cập nhật STOP gate boundary (2026-09-10):** `m11-gate` giờ dừng trước resolve
+bất cứ supplied ID nào và trước registry append khi runtime đã STOP; nó trả
+`STOPPED`, không ghi gate `STOP` mới. Go regression và BR-16a shared smoke giữ
+snapshot registry để kiểm no-write. Chỉ reconciliation được phép append vào
+runtime STOPPED; thay đổi không mở lại lease hay execution authority.
+
 **Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc

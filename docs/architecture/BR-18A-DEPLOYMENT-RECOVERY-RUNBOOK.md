@@ -54,6 +54,15 @@ if /tmp/affiliate-bot mission m11-activate /tmp/affiliate-restored fixture-lease
   echo "unexpected activation after durable STOP" >&2
   exit 1
 fi
+
+# Gate cũng bị chặn trước khi resolve input hoặc ghi registry artifact.
+test ! -e /tmp/affiliate-restored/m11-artifacts.jsonl
+if /tmp/affiliate-bot mission m11-gate /tmp/affiliate-restored missing-lease \
+  missing-health missing-cost missing-ledger 2026-09-03T00:00:00Z; then
+  echo "unexpected gate after durable STOP" >&2
+  exit 1
+fi
+test ! -e /tmp/affiliate-restored/m11-artifacts.jsonl
 ```
 
 Expected: `BACKED_UP`, `RESTORED`, `replay=MATCH`, rồi `stop: true`. Manifest
@@ -66,6 +75,9 @@ budget/canary link và STOP durable trong môi trường tạm.
 Lệnh `m11-activate` cuối phải in JSON `status: "STOPPED"` và exit non-zero.
 `fixture-lease` không được resolve/activate; nó chỉ chứng minh STOP được đọc
 trước mọi điều kiện lease, nên không thể biến drill này thành activation thật.
+`m11-gate` cũng phải in `STOPPED`, không resolve các ID `missing-*` và không
+tạo `m11-artifacts.jsonl`; sau STOP, reconciliation là post-STOP mutation duy
+nhất được phép.
 
 Target của `backup create` cũng phải trống và không được là runtime hoặc thư
 mục con của runtime; tạo backup mới vào một thư mục khác thay vì ghi đè snapshot

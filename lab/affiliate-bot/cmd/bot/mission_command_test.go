@@ -325,6 +325,22 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	}
 }
 
+func TestMissionM11GateDurableStopPreventsRegistryWrite(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-stop", dir, "gate-stop-drill"); code != 0 || response["status"] != "STOPPED" {
+		t.Fatalf("stop failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-gate", dir, "missing-lease", "missing-health", "missing-cost", "missing-ledger", "2026-09-08T00:00:00Z"); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("stopped gate did not fail closed: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11ArtifactRegistryPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("stopped gate wrote an M11 registry artifact: %v", err)
+	}
+}
+
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
 	i.IntentHash = learnerIntentHash(i)

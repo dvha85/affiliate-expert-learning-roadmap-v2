@@ -2111,7 +2111,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		gate, _, err := evaluateM11Gate(args[1], args[2], args[3], args[4], args[5], args[6])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(gate.Decision, gate, nil, 0)
 	case "m11-authorize":
