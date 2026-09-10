@@ -667,9 +667,20 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 			}
 		}
 	}
-	ledger, err := requireM11LedgerHead(dir, auth.ProductionLeaseID, ledgerID)
+	ledgerEntry, ledger, err := m11LedgerHead(dir, auth.ProductionLeaseID)
 	if err != nil {
 		return corem11.ProductionLedger{}, "", err
+	}
+	if ledgerEntry.ArtifactID != ledgerID {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
+	}
+	gateValue, err := m11ArtifactValue(dir, corem11.ArtifactKindGate, auth.ProductionGateID)
+	if err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
+	gate := gateValue.(*corem11.ProductionGateDecision)
+	if gate.Decision != "ALLOW_PRODUCTION" || gate.LeaseID != auth.ProductionLeaseID || gate.LeaseVersion != auth.ProductionLeaseVersion || gate.LeaseHash != auth.ProductionLeaseHash || gate.LedgerArtifactID != ledgerEntry.ArtifactID || gate.LedgerContentHash != ledgerEntry.ContentHash || gate.ExecutionsTotalBefore != ledger.ExecutionsTotal || gate.ExecutionsInWindowBefore != ledger.ExecutionsInWindow || gate.CostMinorTotalBefore != ledger.CostMinorTotal || gate.PendingOutcomesBefore != ledger.PendingOutcomes {
+		return corem11.ProductionLedger{}, "", fmt.Errorf("production authorization gate is stale against the current ledger")
 	}
 	if ledger.LeaseID != auth.ProductionLeaseID || ledger.LeaseVersion != auth.ProductionLeaseVersion || ledger.LeaseHash != auth.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired || ledger.ExecutionsTotal < 0 || ledger.CostMinorTotal < 0 {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not reservable")
