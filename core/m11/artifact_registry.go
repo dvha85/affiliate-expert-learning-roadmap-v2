@@ -182,7 +182,11 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			gate, gateOK := gates[x.ProductionGateID]
 			snapshot, healthOK := health[x.ProductionHealthSnapshotID]
 			bound, costOK := costs[x.ProductionCostBoundID]
-			if !leaseOK || !gateOK || !healthOK || !costOK || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
+			authorizedAt, authorizedErr := time.Parse(time.RFC3339, x.AuthorizedAt)
+			authorizationExpiresAt, authorizationExpiryErr := time.Parse(time.RFC3339, x.ExpiresAt)
+			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
+			leaseExpiresAt, leaseExpiryErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+			if !leaseOK || !gateOK || !healthOK || !costOK || authorizedErr != nil || authorizationExpiryErr != nil || validFromErr != nil || leaseExpiryErr != nil || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || authorizedAt.Before(validFrom) || !authorizedAt.Before(leaseExpiresAt) || authorizationExpiresAt.After(leaseExpiresAt) || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
 				return fmt.Errorf("production authorization has an orphaned or mismatched link")
 			}
 			authorizations[x.AuthorizationID] = *x
