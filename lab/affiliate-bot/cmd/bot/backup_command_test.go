@@ -364,6 +364,47 @@ func removeM10ArtifactEntry(t *testing.T, path, kind, artifactID string) {
 	}
 }
 
+func replaceM10ArtifactEntry(t *testing.T, path, kind, artifactID string, artifact []byte) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := corem10.NewArtifactEntry(kind, artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.ArtifactID != artifactID {
+		t.Fatalf("replacement M10 artifact ID mismatch: got %s want %s", replacement.ArtifactID, artifactID)
+	}
+	lines := make([][]byte, 0)
+	replaced := false
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, err := corem10.ValidateArtifactEntry(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if entry.ArtifactKind == kind && entry.ArtifactID == artifactID {
+			line, err = json.Marshal(replacement)
+			if err != nil {
+				t.Fatal(err)
+			}
+			replaced = true
+		}
+		lines = append(lines, line)
+	}
+	if !replaced {
+		t.Fatalf("missing M10 artifact to replace: %s/%s", kind, artifactID)
+	}
+	if err := os.WriteFile(path, append(bytes.Join(lines, []byte{'\n'}), '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBackupRestoreRejectsReservationMissingRegistryAuthorization(t *testing.T) {
 	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
 	root := filepath.Dir(runtime)
@@ -731,6 +772,76 @@ func TestBackupRestoreRejectsDuplicateM10FixtureOutcomeForExecution(t *testing.T
 	}
 	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "duplicate-outcome-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
 		t.Fatalf("restore accepted duplicate M10 fixture outcomes: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupRestoreRejectsExecutionOutsideAuthorizationLifetime(t *testing.T) {
+	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtime)
+	authorizationPath := filepath.Join(root, "execution-lifetime-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtime, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtime, authorizationPath, "execution-lifetime-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "execution-lifetime-record.json")
+	if code, response := missionCall(t, "m10-record-failed", runtime, authorizationPath, recordPath, "2026-09-08T00:00:01Z", "fixture failure"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("record setup failed: code=%d response=%+v", code, response)
+	}
+	var record corem10.ExecutionRecord
+	if err := readJSON(recordPath, &record); err != nil {
+		t.Fatal(err)
+	}
+	outcome := m03.OutcomeRecord{OutcomeID: "execution-lifetime-outcome", EffectRef: m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID}, ObservedAt: "2026-09-08T00:00:02Z", Status: "CANCELLED", Metrics: map[string]float64{}, SourceRef: "fixture:m10-outcome/execution-lifetime"}
+	outcomePath := filepath.Join(root, "execution-lifetime-outcome.json")
+	if err := writeJSON(outcomePath, outcome); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-outcome", runtime, outcomePath); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("outcome setup failed: code=%d response=%+v", code, response)
+	}
+	backup := filepath.Join(root, "execution-lifetime-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	altered := record
+	altered.AttemptedAt = "2026-09-08T02:00:00Z"
+	alteredRaw, err := json.Marshal(altered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := m10ArtifactRegistryPath(runtime)
+	registryRaw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "execution-lifetime-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted an execution at authorization expiry: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "execution-lifetime-broken")
+	copyFlatBackup(t, backup, broken)
+	registryPath = m10ArtifactRegistryPath(broken)
+	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "execution-lifetime-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("restore accepted an execution at authorization expiry: code=%d response=%+v", code, response)
 	}
 }
 
