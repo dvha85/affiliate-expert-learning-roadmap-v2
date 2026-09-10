@@ -236,7 +236,7 @@ func TestM11FailedExecutionJournalRecoversAfterLedgerWriteFailure(t *testing.T) 
 	}
 }
 
-func TestM11ReconcileRejectsStaleStoppedLedgerAfterPriorResolution(t *testing.T) {
+func TestM11ReconcileRejectsSecondResolutionForSameUnknownExecution(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	const attemptedAt = "2026-09-08T00:00:02Z"
 	execution, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fixture timeout")
@@ -256,13 +256,16 @@ func TestM11ReconcileRejectsStaleStoppedLedgerAfterPriorResolution(t *testing.T)
 		t.Fatalf("exact reconciliation retry did not resolve from the new head: ledger=%+v status=%s err=%v", ledger, status, err)
 	}
 	second := corem11.ProductionReconciliationResolution{ResolutionID: "resolution-stale", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-2", ResolvedAt: "2026-09-08T00:00:04Z", EffectState: "NOT_PERFORMED", Reason: "attempt stale fork"}
-	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindReconciliation, second)
-	if _, _, _, err := reconcileM11Execution(fixture.dir, second.ResolutionID, stoppedEntry.ArtifactID); err == nil {
-		t.Fatal("stale stopped ledger created a forked reconciliation transition")
+	secondRaw, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(fixture.dir, corem11.ArtifactKindReconciliation, secondRaw); err == nil {
+		t.Fatal("second reconciliation resolution for one UNKNOWN execution was registered")
 	}
 	_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
 	if err != nil || len(head.ReconciliationResolutionIDs) != 1 || head.ReconciliationResolutionIDs[0] != first.ResolutionID || head.UpdatedAt != first.ResolvedAt {
-		t.Fatalf("stale reconciliation changed the current ledger head: ledger=%+v err=%v", head, err)
+		t.Fatalf("rejected reconciliation changed the current ledger head: ledger=%+v err=%v", head, err)
 	}
 }
 
