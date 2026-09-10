@@ -152,7 +152,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			ledgerEntries[entry.ArtifactID] = entry
 		case *ProductionActivationRecord:
 			lease, ok := leases[x.LeaseID]
-			if !ok || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
+			activatedAt, activatedErr := time.Parse(time.RFC3339, x.ActivatedAt)
+			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
+			expiresAt, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+			if !ok || activatedErr != nil || validFromErr != nil || expiresErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || activatedAt.Before(validFrom) || !activatedAt.Before(expiresAt) {
 				return fmt.Errorf("production activation has an orphaned lease link")
 			}
 		case *ProductionGateDecision:
