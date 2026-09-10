@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: db297acfc26533f839a03a8b60c398ce555880f6 -->
+<!-- readiness-main-baseline: 3900d5733c709b26f6cec0e689eaa18f17ea3693 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -759,6 +759,12 @@ registry yêu cầu offline evaluation không trước execution attempt và cyc
 evaluation trước attempt và cycle đóng trước evaluation. Đây chỉ đồng bộ temporal
 lineage core với restore checker; không chứng minh outcome business hay lifecycle
 ngoài fixture.
+
+**Cập nhật M11 cycle closure-status graph (2026-09-11):** canonical registry
+chỉ coi `ProductionCycleRecord` là lifecycle closure khi `status=CLOSED`, đồng
+bộ với restore graph. Core regression reject record `REVIEW_PENDING` dù các
+reference/time khác hợp lệ. Đây không thêm workflow pending/review hay chứng
+minh operation/outcome bên ngoài fixture.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

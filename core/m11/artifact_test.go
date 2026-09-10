@@ -187,6 +187,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(preEvaluationCycleEntries); err == nil {
 		t.Fatal("cycle closed before its evaluation was accepted")
 	}
+	pendingCycle := cycle
+	pendingCycle.Status = "REVIEW_PENDING"
+	pendingCycleEntries := append([]ArtifactEntry(nil), entries...)
+	pendingCycleEntries[len(pendingCycleEntries)-1] = m11Entry(t, ArtifactKindCycle, pendingCycle)
+	if err := ValidateArtifactGraph(pendingCycleEntries); err == nil {
+		t.Fatal("non-closed production cycle was accepted")
+	}
 	entries[len(entries)-1].Artifact = json.RawMessage(`{"execution_id":"orphan"}`)
 	if err := ValidateArtifactGraph(entries); err == nil {
 		t.Fatal("invalid cycle entry accepted")
