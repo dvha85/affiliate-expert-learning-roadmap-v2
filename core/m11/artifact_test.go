@@ -54,6 +54,14 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenActivationEntries); err == nil {
 		t.Fatal("activation outside its lease lifetime was accepted")
 	}
+	brokenHealth := health
+	brokenHealth.ObservedAt = lease.ExpiresAt
+	brokenHealth.SnapshotHash = ComputeProductionHealthHash(brokenHealth)
+	brokenHealthEntries := append([]ArtifactEntry(nil), entries...)
+	brokenHealthEntries[2] = m11Entry(t, ArtifactKindHealth, brokenHealth)
+	if err := ValidateArtifactGraph(brokenHealthEntries); err == nil {
+		t.Fatal("health at lease expiry was accepted")
+	}
 	brokenLedger := ledger
 	brokenLedger.WindowStartedAt = "2026-09-07T23:59:59Z"
 	brokenLedgerEntries := append([]ArtifactEntry(nil), entries[:6]...)
