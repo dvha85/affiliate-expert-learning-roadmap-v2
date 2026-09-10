@@ -408,6 +408,14 @@ def main():
         activation_outside_lease_backup = root / "activation-outside-lease-backup"; shutil.copytree(backup, activation_outside_lease_backup)
         rewrite_m11_registry(activation_outside_lease_backup, replace_m11_field("PRODUCTION_ACTIVATION", "activated_at", "2026-09-07T01:00:00Z"))
         assert invoke(bot, "backup", "restore", activation_outside_lease_backup, root / "activation-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        ledger_before_activation_backup = root / "ledger-before-activation-backup"; shutil.copytree(backup, ledger_before_activation_backup)
+        def ledger_before_activation_change(entry):
+            if entry["artifact_kind"] != "PRODUCTION_LEDGER" or not entry["artifact"].get("outcome_links"):
+                return False
+            entry["artifact"]["window_started_at"] = "2026-09-07T23:59:59Z"
+            return True
+        rewrite_m11_registry(ledger_before_activation_backup, ledger_before_activation_change)
+        assert invoke(bot, "backup", "restore", ledger_before_activation_backup, root / "ledger-before-activation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_m11_reservation_backup = root / "orphan-m11-reservation-backup"; shutil.copytree(backup, orphan_m11_reservation_backup)
         def orphan_m11_reservation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or production_failed["artifact"]["execution"]["execution_id"] not in entry["artifact"].get("pending_execution_ids", []):
