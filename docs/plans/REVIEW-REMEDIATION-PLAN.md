@@ -727,6 +727,12 @@ fail closed. Đây không là proof authority/executor production.
 và currency bound khớp lease. Core regression và BR-18b checksum-valid mutation
 tại cost expiry fail closed; không là provider-cost hay production proof.
 
+**Cập nhật M11 authorization gate/health freshness graph (2026-09-11):**
+canonical authorization phải bind gate `ALLOW_PRODUCTION`, không trước gate/
+health, và health age nhỏ hơn lease limit tại thời điểm authorize. Core regression
+chặn non-ALLOW gate và stale health; BR-18b checksum-valid mutation chặn stale
+health. Đây không chứng minh health provider hay authority production.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

@@ -13,6 +13,7 @@
     ,{"id":"RP-07-gate-lease-window","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"gate evaluation must fall within its exact lease window"}
     ,{"id":"RP-07-authorization-lease-window","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"authorization issue and expiry must remain within its exact lease window"}
     ,{"id":"RP-07-gate-cost-bound-window","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"gate evaluation must fall within trusted-cost-bound validity and use lease currency"}
+    ,{"id":"RP-07-authorization-gate-health-freshness","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"authorization requires a prior ALLOW gate and fresh health at issuance"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},

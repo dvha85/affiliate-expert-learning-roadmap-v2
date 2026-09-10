@@ -426,6 +426,15 @@ def main():
             return True
         rewrite_m11_registry(authorization_outside_lease_backup, authorization_outside_lease_change)
         assert invoke(bot, "backup", "restore", authorization_outside_lease_backup, root / "authorization-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        authorization_stale_health_backup = root / "authorization-stale-health-backup"; shutil.copytree(backup, authorization_stale_health_backup)
+        def authorization_stale_health_change(entry):
+            if entry["artifact_kind"] != "PRODUCTION_EXECUTION_AUTHORIZATION":
+                return False
+            entry["artifact"]["authorized_at"] = "2026-09-08T00:01:00Z"
+            entry["artifact"]["expires_at"] = "2026-09-08T00:02:00Z"
+            return True
+        rewrite_m11_registry(authorization_stale_health_backup, authorization_stale_health_change)
+        assert invoke(bot, "backup", "restore", authorization_stale_health_backup, root / "authorization-stale-health-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         ledger_before_activation_backup = root / "ledger-before-activation-backup"; shutil.copytree(backup, ledger_before_activation_backup)
         def ledger_before_activation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or not entry["artifact"].get("outcome_links"):
