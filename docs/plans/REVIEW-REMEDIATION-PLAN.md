@@ -484,9 +484,9 @@ lệ. Không suy điều này thành proof cho multi-file crash hoặc executor 
 **Cập nhật M10 registry/state retry seam (2026-09-10):** fault test dừng
 `m10-record-failed` sau khi registry append nhưng trước atomic commit
 `mission-state`. Lúc dở dang, portable output không xuất hiện; journal M10
-bền yêu cầu `status` fail-closed. Lệnh writer có lock kế tiếp canonical-validate
-journal, append/replay record nếu cần, bind đúng reservation rồi mới xử lý retry
-exact và cho backup hợp lệ. Regression journal có record hợp lệ nhưng
+bền yêu cầu `status` và `m10-resolve` fail-closed. Lệnh writer có lock kế tiếp
+canonical-validate journal, append/replay record nếu cần, bind đúng reservation
+rồi mới xử lý retry exact và cho backup hợp lệ. Regression journal có record hợp lệ nhưng
 `reservation_id` không resolve chứng minh writer và backup trả
 `RECOVERY_REQUIRED`, giữ nguyên journal/state/registry; tamper không được đoán
 hoặc bỏ qua. Đây là recovery cục bộ có giới hạn, **không** là transaction đa-file hay
