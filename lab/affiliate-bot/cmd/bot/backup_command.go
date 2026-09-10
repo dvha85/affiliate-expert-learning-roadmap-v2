@@ -978,7 +978,7 @@ func validateM11BackupGraph(dir string) error {
 			}
 			cycleObservations[id] = true
 		}
-		if !evaluationOK || !executionOK || !recordOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID || cycle.IntentID != execution.IntentID || cycle.IntentHash != execution.IntentHash || cycle.GateID != execution.ProductionGateID || cycle.AuthorizationID != execution.AuthorizationID || !reflect.DeepEqual(observations, cycleObservations) {
+		if !evaluationOK || !executionOK || !recordOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.Status != "CLOSED" || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID || evaluation.LeaseVersion != cycle.LeaseVersion || evaluation.LeaseHash != cycle.LeaseHash || cycle.LeaseID != execution.ProductionLeaseID || cycle.LeaseVersion != execution.ProductionLeaseVersion || cycle.LeaseHash != execution.ProductionLeaseHash || cycle.IntentID != execution.IntentID || cycle.IntentHash != execution.IntentHash || cycle.GateID != execution.ProductionGateID || cycle.AuthorizationID != execution.AuthorizationID || cycle.CorrelationID != execution.CorrelationID || !reflect.DeepEqual(observations, cycleObservations) {
 			return fmt.Errorf("M11 cycle does not resolve its outcome evaluation")
 		}
 	}
