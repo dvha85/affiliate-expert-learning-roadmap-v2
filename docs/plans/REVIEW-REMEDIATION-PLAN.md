@@ -609,6 +609,13 @@ bất cứ supplied ID nào và trước registry append khi runtime đã STOP; 
 snapshot registry để kiểm no-write. Chỉ reconciliation được phép append vào
 runtime STOPPED; thay đổi không mở lại lease hay execution authority.
 
+**Cập nhật STOP lifecycle boundary (2026-09-10):** cùng guard nay áp dụng cho
+ledger initialization, authorization/reservation, failed/unknown fixture record,
+fixture outcome, evaluation và cycle closure. Mọi lệnh này trả `STOPPED` sau
+STOP và regression table kiểm cả registry lẫn outcome store không thay đổi;
+reconciliation/handoff vẫn là đường recovery được giới hạn. Đây không chứng
+minh recovery tự động hay business outcome.
+
 **Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc

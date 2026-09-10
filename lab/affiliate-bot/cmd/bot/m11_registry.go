@@ -536,11 +536,14 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 
 func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt string) (corem11.ProductionExecutionAuthorization, string, error) {
 	state, err := loadMissionState(dir)
-	if err != nil || state.Intent == nil || state.Policy == nil {
-		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("M11 authorization requires persisted intent and policy")
+	if err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
 	}
 	if state.Stop {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	if state.Intent == nil || state.Policy == nil {
+		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("M11 authorization requires persisted intent and policy")
 	}
 	now, err := time.Parse(time.RFC3339, authorizedAt)
 	if err != nil {
@@ -1086,6 +1089,13 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 // learner's CANCELLED/NOT_PERFORMED fixture outcome. It records an audit link,
 // never a business result, performance claim, authority grant, or lease change.
 func evaluateM11FixtureOutcome(dir, outcomeID, evaluationID, evaluatedAt string) (corem11.ProductionOutcomeEvaluation, string, error) {
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return corem11.ProductionOutcomeEvaluation{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
 	if strings.TrimSpace(outcomeID) == "" || strings.TrimSpace(evaluationID) == "" {
 		return corem11.ProductionOutcomeEvaluation{}, "", fmt.Errorf("outcome_id and evaluation_id are required")
 	}
@@ -1154,7 +1164,13 @@ func evaluateM11FixtureOutcome(dir, outcomeID, evaluationID, evaluatedAt string)
 // reactivate a lease, clear STOP, or authorize another execution.
 func closeM11FixtureCycle(dir, cycleID, evaluationID, closedAt string) (corem11.ProductionCycleRecord, string, error) {
 	state, err := loadMissionState(dir)
-	if err != nil || state.Intent == nil || state.Policy == nil {
+	if err != nil {
+		return corem11.ProductionCycleRecord{}, "", err
+	}
+	if state.Stop {
+		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	if state.Intent == nil || state.Policy == nil {
 		return corem11.ProductionCycleRecord{}, "", fmt.Errorf("cycle requires persisted intent and policy")
 	}
 	closed, err := time.Parse(time.RFC3339, closedAt)
