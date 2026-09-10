@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
@@ -427,6 +429,63 @@ func TestMissionM10RecordRejectsAuthorizationExpiryWithoutMutation(t *testing.T)
 		t.Fatalf("expired authorization record created output: %v", err)
 	}
 	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "record-fault-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "record-fault-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	beforeState := missionRuntimeSnapshot(t, runtimeDir)
+	recordPath := filepath.Join(root, "record-fault.json")
+	missionStateWriteFault = func(phase string) error {
+		if phase == "before_rename" {
+			return errors.New("injected state commit fault after M10 registry append")
+		}
+		return nil
+	}
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "fixture state commit fault"); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("state commit fault was not surfaced: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = nil
+	if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
+		t.Fatalf("state commit fault created portable output: %v", err)
+	}
+	afterFaultState := missionRuntimeSnapshot(t, runtimeDir)
+	if !bytes.Equal(beforeState["mission-state.json"], afterFaultState["mission-state.json"]) {
+		t.Fatal("registry/state fault changed mutable mission state")
+	}
+	if bytes.Equal(beforeState["m10-artifacts.jsonl"], afterFaultState["m10-artifacts.jsonl"]) {
+		t.Fatal("fixture did not reach the registry-before-state failure seam")
+	}
+	if code, response := backupCall(t, "create", runtimeDir, filepath.Join(root, "record-fault-backup-before-retry")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted unresolved registry/state fault: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "fixture state commit fault"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("exact retry did not repair registry/state link: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok {
+			t.Fatalf("record response has no artifact: %+v", response)
+		}
+		executionID, ok := artifact["execution_id"].(string)
+		if !ok {
+			t.Fatalf("record response has no execution ID: %+v", response)
+		}
+		outcomePath := filepath.Join(root, "record-fault-outcome.json")
+		writeMissionTestJSON(t, outcomePath, m03.OutcomeRecord{OutcomeID: "record-fault-outcome", EffectRef: m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: executionID}, ObservedAt: "2026-09-08T00:00:00Z", Status: "CANCELLED", Metrics: map[string]float64{}, SourceRef: "fixture:m10-outcome/record-fault"})
+		if code, response := missionCall(t, "m10-outcome", runtimeDir, outcomePath); code != 0 || response["status"] != "APPENDED" {
+			t.Fatalf("outcome setup after retry failed: code=%d response=%+v", code, response)
+		}
+	}
+	if code, response := backupCall(t, "create", runtimeDir, filepath.Join(root, "record-fault-backup-after-retry")); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed after exact retry repaired state: code=%d response=%+v", code, response)
+	}
 }
 
 func TestMissionM10RecordRejectsBeforeReservationWithoutMutation(t *testing.T) {
