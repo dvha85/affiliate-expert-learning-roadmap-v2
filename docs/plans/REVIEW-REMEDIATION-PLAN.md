@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-10 -->
-<!-- readiness-main-baseline: adb6e128f067a35383d0353eb104ee24f8dbbb4b -->
+<!-- readiness-as-of: 2026-09-11 -->
+<!-- readiness-main-baseline: 73bcc90762d2f63e2ecb382b99625f58d06786d0 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -738,6 +738,14 @@ canonical core registry đòi `AttemptedAt` từ `AuthorizedAt` đến trước
 authorization expiry, đồng bộ backup/runtime guard. Core regression và BR-18b
 set auth expiry đúng execution attempt đều fail closed. Không là executor hoặc
 atomic crash proof.
+
+**Cập nhật M11 reconciliation semantic graph (2026-09-11):** canonical core
+registry nay chỉ nhận resolution của `human`, `NOT_PERFORMED`, cho execution
+`RECONCILIATION_REQUIRED`/`UNKNOWN`, và resolution không thể có trước attempt.
+Core regression tạo một UNKNOWN fixture hợp lệ rồi reject resolution cho FAILED,
+`PERFORMED`, hoặc trước attempt. Điều này đồng bộ graph core với command/restore
+boundary; chưa chứng minh reconciliation bên ngoài, STOP graph hoàn chỉnh hay
+khả năng recovery/execution production.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

@@ -207,7 +207,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		case *ProductionReconciliationResolution:
 			lease, leaseOK := leases[x.LeaseID]
 			execution, executionOK := executions[x.ExecutionID]
-			if !leaseOK || !executionOK || execution.ProductionLeaseID != x.LeaseID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash {
+			resolvedAt, resolvedErr := time.Parse(time.RFC3339, x.ResolvedAt)
+			attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+			if !leaseOK || !executionOK || resolvedErr != nil || attemptedErr != nil || x.ResolvedBy != "human" || x.EffectState != "NOT_PERFORMED" || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || execution.ProductionLeaseID != x.LeaseID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || resolvedAt.Before(attemptedAt) {
 				return fmt.Errorf("production reconciliation has an orphaned or mismatched link")
 			}
 		case *ProductionRecoveryAdmission:

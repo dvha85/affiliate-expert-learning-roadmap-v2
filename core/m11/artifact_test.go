@@ -40,6 +40,38 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	unknownExecution := execution
+	unknownExecution.ExecutionID = "exec-unknown"
+	unknownExecution.Status = "RECONCILIATION_REQUIRED"
+	unknownExecution.SideEffectState = "UNKNOWN"
+	resolution := ProductionReconciliationResolution{ResolutionID: "resolution-1", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ExecutionID: unknownExecution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:02Z", EffectState: "NOT_PERFORMED", Reason: "fixture review"}
+	resolutionEntries := append([]ArtifactEntry(nil), entries[:9]...)
+	resolutionEntries[8] = m11Entry(t, ArtifactKindExecution, unknownExecution)
+	resolutionEntries = append(resolutionEntries, m11Entry(t, ArtifactKindReconciliation, resolution))
+	if err := ValidateArtifactGraph(resolutionEntries); err != nil {
+		t.Fatalf("valid reconciliation resolution rejected: %v", err)
+	}
+	wrongExecutionResolution := resolution
+	wrongExecutionResolution.ExecutionID = execution.ExecutionID
+	wrongExecutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)
+	wrongExecutionEntries[len(wrongExecutionEntries)-1] = m11Entry(t, ArtifactKindReconciliation, wrongExecutionResolution)
+	if err := ValidateArtifactGraph(wrongExecutionEntries); err == nil {
+		t.Fatal("resolution for a non-UNKNOWN execution was accepted")
+	}
+	performedResolution := resolution
+	performedResolution.EffectState = "PERFORMED"
+	performedResolutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)
+	performedResolutionEntries[len(performedResolutionEntries)-1] = m11Entry(t, ArtifactKindReconciliation, performedResolution)
+	if err := ValidateArtifactGraph(performedResolutionEntries); err == nil {
+		t.Fatal("PERFORMED reconciliation resolution was accepted")
+	}
+	preAttemptResolution := resolution
+	preAttemptResolution.ResolvedAt = "2026-09-08T00:00:00Z"
+	preAttemptResolutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)
+	preAttemptResolutionEntries[len(preAttemptResolutionEntries)-1] = m11Entry(t, ArtifactKindReconciliation, preAttemptResolution)
+	if err := ValidateArtifactGraph(preAttemptResolutionEntries); err == nil {
+		t.Fatal("reconciliation resolution before its UNKNOWN attempt was accepted")
+	}
 	brokenGate := gate
 	brokenGate.LedgerContentHash = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	brokenGateEntries := append([]ArtifactEntry(nil), entries...)
