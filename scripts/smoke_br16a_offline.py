@@ -1,4 +1,11 @@
-"""One shared-artifact BR-16a chain from M00 through M11 learner entrypoints."""
+"""One shared-artifact BR-16a chain from M00 through M11 learner entrypoints.
+
+Pass --workspace to retain the generated fixture artifacts for the beginner
+walkthrough. The supplied directory must be empty; the smoke never removes a
+caller-owned workspace.
+"""
+import argparse
+import contextlib
 import json
 import hashlib
 import os
@@ -13,6 +20,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BOT_DIR = ROOT / "lab/affiliate-bot"
 REGISTRY = ROOT / "lab/mission-runtime/testdata/m07-registry.json"
+
+
+def workspace_context(workspace):
+    """Return an owned temporary workspace or a validated retained workspace."""
+    if workspace is None:
+        return tempfile.TemporaryDirectory(prefix="br16a-shared-")
+    root = Path(workspace).expanduser().resolve()
+    if root.exists():
+        if not root.is_dir() or any(root.iterdir()):
+            raise ValueError("--workspace must name an empty directory")
+    else:
+        root.mkdir(parents=True)
+    return contextlib.nullcontext(str(root))
 
 
 def run(command, cwd=ROOT, expected=0, env=None):
@@ -168,9 +188,16 @@ def grounded_claim(field, value, evidence_id):
     return rendered, {"text": rendered, "field_or_claim": field, "value": value, "evidence_ids": [evidence_id]}
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workspace", help="empty directory retained after a successful smoke")
+    args = parser.parse_args(argv)
     go = shutil.which(os.environ.get("GO_BIN", "go")) or os.environ.get("GO_BIN", "go")
-    with tempfile.TemporaryDirectory(prefix="br16a-shared-") as directory:
+    try:
+        workspace = workspace_context(args.workspace)
+    except ValueError as error:
+        parser.error(str(error))
+    with workspace as directory:
         work = Path(directory); bot = work / "bot"; env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"))
         run([go, "build", "-o", bot, "./cmd/bot"], BOT_DIR, env=env)
         state = work / "runtime"; state.mkdir()
@@ -484,7 +511,36 @@ def main():
         assert status["artifact"]["stop"] is True
         assert invoke(bot, "mission", "m10-canary", state, grant, expected=1)["status"] == "STOPPED"
         assert invoke(bot, "mission", "init", state, expected=1)["status"] == "ALREADY_INITIALIZED"
-    print("BR-16a PASS: one shared runtime, M00→M11 artifacts, UNKNOWN reconciliation, backup/restore, restart/replay and durable STOP")
+        report = {
+            "version": "br16a-walkthrough-result/v1",
+            "scope": "offline fixture chain only; no provider call, live executor, business outcome, or production authority",
+            "checks": {
+                "m00_to_m11_shared_lineage": "PASS",
+                "history_replay_after_restore": "MATCH",
+                "m11_unknown_requires_stop": "PASS",
+                "restart_stop_blocks_canary": "PASS",
+                "recovery_admission_execution_permitted": False,
+            },
+            "paths": {
+                "bot": str(bot),
+                "runtime": str(state),
+                "restored_runtime": str(restored),
+                "backup": str(backup),
+                "m08_intent": str(intent),
+                "m08_policy": str(policy),
+                "m09_approval": str(approval),
+                "m10_grant": str(grant),
+                "m10_cost_bound": str(cost),
+                "m10_authorization": str(authorization),
+                "m11_production_lease": str(production_lease_path),
+                "m11_outcome": str(production_outcome),
+                "m11_evaluation": "br16-production-e",
+                "m11_cycle": "br16-production-cycle",
+            },
+        }
+        (work / "walkthrough-result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    suffix = f" workspace={Path(directory).resolve()}" if args.workspace else ""
+    print("BR-16a PASS: one shared runtime, M00→M11 artifacts, UNKNOWN reconciliation, backup/restore, restart/replay and durable STOP" + suffix)
 
 
 if __name__ == "__main__":

@@ -93,7 +93,15 @@ jobs:
       - name: BR-15c M07 output contract
         run: python scripts/validate_n8n_m07_output_cases.py
       - name: BR-16a shared M00-M11 learner chain
-        run: python scripts/smoke_br16a_offline.py
+        run: |
+          walkthrough_workspace="$(mktemp -d)"
+          python scripts/smoke_br16a_offline.py --workspace "$walkthrough_workspace"
+          test -f "$walkthrough_workspace/walkthrough-result.json"
+          test -f "$walkthrough_workspace/restored/history.jsonl"
+          if python scripts/smoke_br16a_offline.py --workspace "$walkthrough_workspace"; then
+            echo "expected a retained non-empty walkthrough workspace to be rejected" >&2
+            exit 1
+          fi
       - name: BR-18b M11 backup, reconciliation and restore
         run: python scripts/smoke_br18b_backup_restore.py
       - name: BR-19a readiness audit
