@@ -1,37 +1,44 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-> Cập nhật 09/09/2026: xem [kế hoạch sửa trước merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md)
-> cho bảy phát hiện PMR-01…07, thứ tự triển khai, regression và merge gate mới.
-> Các mục triển khai bên dưới là lịch sử; không dùng kết quả PASS cũ để đóng
-> các phát hiện này. Các sửa PMR đang ở worktree và chờ review/CI; chưa được
-> commit, push hay đề xuất merge.
+<!-- readiness-as-of: 2026-09-10 -->
+<!-- readiness-main-baseline: adb6e128f067a35383d0353eb104ee24f8dbbb4b -->
+
+> Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
+> Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
+> phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
+> bảng gói dưới đây là nguồn trạng thái hiện hành.
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
 - Baseline: `ece6a32619e5b9a05d0599b87f50023f38931cb9`.
-- Trạng thái: **PROPOSED** — PR này chỉ đề xuất kế hoạch và đính chính trạng thái; chưa triển khai các sửa lỗi R01–R16.
+- Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã
+  merge; không criterion nào được coi production-ready hoặc pilot-complete.
 - Cơ sở: [sổ phát hiện và bằng chứng baseline](evidence/REVIEW-ECE6A32.md).
 - Liên kết kế hoạch gốc: [BR-2026-09](BEGINNER-READINESS-PLAN.md); trạng thái tích hợp BR: [readiness matrix](READINESS-MATRIX.json).
 - Người lập kế hoạch: Codex theo yêu cầu chủ repo. Người triển khai/reviewer từng đợt: chưa phân công; điền khi nhận việc. Không mặc định chủ repo đã nghiệm thu kế hoạch hoặc cho phép live operation.
 
 Cập nhật sau review PR #94: bổ sung dependency RP-05 cho RP-06, tách nghiệm thu
 restore M00–M10 khỏi phần mở rộng M11 bắt buộc ở RP-07a, và giao rõ việc tạo/lưu/
-kiểm chuỗi cost-bound, gate, authorization, execution và EffectRef. Đây vẫn là
-sửa kế hoạch; các implementation gaps R01–R16 chưa được đóng.
+kiểm chuỗi cost-bound, gate, authorization, execution và EffectRef. Các phạm vi
+còn lại được ghi cụ thể `PARTIAL`/`OPEN`, không suy từ test PASS sang nghiệm thu
+toàn bộ R01–R16.
 
 ## 1. Mục tiêu và giới hạn
 
 Sửa những đường chạy đã tái hiện sai; thống nhất canonical implementation giữa learner Bot, harness và n8n; chứng minh một chuỗi artifact M00–M11 bằng runtime thật trong môi trường offline. Sau đó mới tổ chức pilot và kiểm chứng n8n/host/provider được chọn.
 
-PR kế hoạch này không sửa Go/Python/blueprint/schema, không đổi required checks/branch protection, không chạy live executor, không tạo tài khoản, không mua host hoặc dùng API trả phí. Các PR triển khai tiếp theo cần yêu cầu thực hiện riêng; việc merge kế hoạch không tự khởi động chúng.
+Kế hoạch gốc không tự cấp quyền sửa Go/Python/blueprint/schema, không đổi
+required checks/branch protection, không chạy live executor, không tạo tài khoản,
+không mua host hoặc dùng API trả phí. Các implementation đã merge vẫn giữ các
+giới hạn đó; công việc live/operated cần authority riêng.
 
 Không đổi `PROGRESS.md` hoặc công nhận Mission PASS cho học viên. `execution_permitted=false`, evidence synthetic và trạng thái `NOT_READY_FOR_PRODUCTION` vẫn được giữ. Hoàn tất offline không chứng minh business outcome, human pilot hoặc production readiness.
 
 Các từ trạng thái trong tài liệu:
 
-- `PROPOSED`: kế hoạch đang xin review; chưa phải implementation.
-- Công việc RP: `TODO → IN_PROGRESS → IN_REVIEW → VERIFIED_OFFLINE`; `BLOCKED` phải kèm blocker cụ thể.
-- R01–R16 mặc định OPEN; chỉ đóng khi có diff triển khai, regression trước/sau và reviewer xác nhận đúng baseline/head.
+- `PARTIAL`: có implementation/test được nêu rõ nhưng còn acceptance hoặc evidence thiếu.
+- `OPEN`: chưa bắt đầu, hoặc đòi authority/evidence ngoài repo.
+- R01–R16 chỉ đóng khi matrix/evidence graph ghi phạm vi, diff/regression và reviewer xác nhận baseline/head.
 - Trạng thái BR tổng hợp thuộc matrix; bảng BR trong kế hoạch gốc là bản trình bày của cùng trạng thái, không phải nguồn độc lập. RP là gói công việc, không phải mức readiness mới.
 
 ## 2. Quyết định thiết kế để triển khai
@@ -45,11 +52,14 @@ Các từ trạng thái trong tài liệu:
 7. **Clock rõ ràng.** Domain nhận clock để test; adapter vận hành dùng thời gian thực đáng tin trong process. Fixture clock không được dùng như override mở quyền trên đường vận hành.
 8. **Restore kiểm cả nội dung và quan hệ.** Manifest inventory đầy đủ; snapshot nhất quán; validate trong staging, chạy canonical loaders/replay/cross-store links trước khi công bố đích khôi phục sẵn dùng. Checksum không thay semantic validation.
 
-Tên package, endpoint và test file mới bên dưới là **đề xuất**, không phải implementation refs đã tồn tại. PR triển khai chốt versioned API/contract và cập nhật curriculum/mission/starter/checkpoint/eval bị ảnh hưởng cùng lúc.
+Các tên package/endpoint/test dưới đây xuất phát từ kế hoạch ban đầu; implementation
+refs hiện hữu được liệt kê trong matrix. Phần chưa có ref vẫn là đề xuất và phải
+được version/test trong PR riêng.
 
 ## 3. Bao phủ 16 phát hiện
 
-Tất cả hàng dưới đây còn OPEN. “Kiểm chứng bắt buộc” là test phải viết/chạy khi sửa, không phải test đã PASS.
+Các hàng dưới đây giữ acceptance target. Trạng thái hiện tại nằm ở matrix và
+bảng gói; “Kiểm chứng bắt buộc” không tự chứng minh test đã PASS.
 
 | Review / ưu tiên | Lỗi cần đóng | Gói chủ trì | Kiểm chứng bắt buộc |
 |---|---|---|---|
@@ -72,29 +82,57 @@ Tất cả hàng dưới đây còn OPEN. “Kiểm chứng bắt buộc” là 
 
 ## 4. Chia PR và dependency
 
-RP-00 là PR kế hoạch hiện tại; các mã RP khác chưa phải số PR GitHub đã tạo. Chỉ RP-00 đang xin review. Mỗi RP khi bắt đầu phải thêm người làm, reviewer, URL PR, baseline/head và evidence vào mục tương ứng.
+RP là package logic, không phải số PR GitHub. Bảng dưới phản ánh `main` tại
+baseline; mỗi thay đổi mới phải cập nhật matrix/evidence graph, baseline/head
+và regression tương ứng.
 
 | Gói | Phạm vi | Phụ thuộc trước khi merge | Quy mô | Trạng thái |
 |---|---|---|---|---|
 | RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
-| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
-| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | IN PROGRESS — implementation trên `codex/rp-01-path-safety`, chưa merge |
-| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | IN PROGRESS — chỉ foundation/registry/reservation, chưa đủ graph canonical |
-| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | IN PROGRESS — `core/m06`, CLI/HTTP/n8n fixture adapter và resolver M07/M08 đã dùng chung; regression key-order/field ID/DRIFT có trong learner. Generic source và n8n operated run vẫn mở |
-| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | IN PROGRESS — core/learner contract, adapter-owned trace/proposal store và blueprint ACK chain đã có; n8n/model operated evidence, generic deployment policy còn mở |
-| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | IN PROGRESS — manifest v3 typed inventory/profile, M07 replay và runtime gate cross-process; semantic coverage và fault/host proof còn mở |
-| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO |
-| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | IN PROGRESS — CI engine regression M06 + M07 policy-reject đã có; mutation, model-success và full scope còn mở |
-| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | IN PROGRESS — graph claim/matrix/plan/CI command đã được audit; remote CI và evidence ngoài repo còn mở |
-| RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | TODO |
+| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; inventory of every writer remains open |
+| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy with exact-number regression; broader M09 conformance/migration remains open |
+| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — offline approval/grant/cost/gate/authorization/reservation and no-side-effect records exist; expiry/rebind, complete EC coverage and multi-file crash proof remain open |
+| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver and n8n engine regression exist; governed selected-source profile and operated run remain open |
+| RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence and n8n stub path exist; selected-source/provider operated evidence remains open |
+| RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; semantic orphan breadth and crash/host proof remain open |
+| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; expiry/rebind and multi-file crash seams remain open |
+| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes and disposable M06/M07 n8n engine regressions run in CI; mutation breadth and operated parity remain open |
+| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured; remote CI and external evidence remain outside local audit |
+| RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Cập nhật triển khai — 2026-09-08
+### Runtime gap được chọn tiếp theo — RP-03 authority expiry/rebind
 
-Các thay đổi dưới đây nằm trên branch `codex/rp-01-path-safety` (head
-`df16783` khi ghi mục này), chưa có PR/merge nên **không thay đổi trạng thái
-nghiệm thu trên `main`**.
+Phạm vi tiếp theo là M09/M10 authority lifetime sau **process mới và
+backup/restore**. Đây là gap runtime lớn nhưng có nghiệm thu offline rõ ràng:
+không cần executor/provider, và không được biến fixture timestamp thành quyền
+vận hành.
+
+- Dựng authority hợp lệ qua learner Bot: intent/policy → approval → canary
+  grant → trusted cost-bound → gate/authorization/reservation.
+- Kiểm ranh giới `before` / `at` / `after` expiry cho intent, approval, grant
+  và cost-bound bằng clock seam do runtime kiểm soát; đường CLI vận hành không
+  được nhận caller timestamp để lùi thời gian cấp quyền.
+- Lặp lại mỗi boundary trong process mới và runtime đã `backup restore`.
+  Attempt hết hạn phải trả trạng thái đóng, không tăng usage, không tạo
+  reservation/authorization/execution artifact và không ghi portable output.
+- Thử rebind/reimport artifact cùng ID nhưng expiry/cap/currency đã thay đổi:
+  phải reject; chỉ authority mới có identity/hash và human review đúng luồng
+  mới được xét tiếp.
+- Regression phải snapshot bytes/registry/state trước và sau reject. Không gọi
+  executor, không tạo business outcome và không suy thành power-loss proof.
+
+**Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
+restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
+`PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
+
+### Snapshot lịch sử trước merge — 2026-09-08
+
+Các ghi chú dưới đây mô tả branch `codex/rp-01-path-safety` tại `df16783`
+trước khi các foundation được merge qua PR #95 và các PR sau đó. Chúng chỉ giữ
+ngữ cảnh quyết định; **bảng trạng thái ở trên và metadata baseline mới là trạng
+thái hiện tại của `main`**.
 
 - **RP-01, phần M08:** commit `b48cea7` chặn cùng path, symlink/hardlink và
   overwrite artifact khác; retry byte-identical trả `EXACT_DUPLICATE`. Test
