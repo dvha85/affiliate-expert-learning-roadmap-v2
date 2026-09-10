@@ -706,6 +706,12 @@ lease. Core regression dùng health tại expiry; BR-18b mutate backup checksum
 hợp lệ và restore `GRAPH_FAILED`. Đây chỉ là time-lineage offline, không là
 telemetry đáng tin cậy hay production health operation.
 
+**Cập nhật M11 health-after-activation graph (2026-09-11):** khi activation
+đã tồn tại, canonical registry reject health snapshot trước activation. BR-18b
+gọi learner để reject đăng ký này và dùng health mới đúng activation cho ca
+gate-before-activation; mutation restore vẫn fail closed. Draft chưa activation
+vẫn không bị suy diễn là active runtime. Đây chỉ là lineage fixture offline.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
