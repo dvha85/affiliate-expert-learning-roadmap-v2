@@ -111,6 +111,14 @@ def write_canary_grant(path, intent, policy, approval, max_executions, max_cost,
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def canonical_m10_snapshot(state):
+    """Bytes that a rejected M08-M10 authority operation must not mutate."""
+    return {
+        name: (state / name).read_bytes()
+        for name in ("mission-state.json", "m10-artifacts.jsonl", "trusted-cost-bounds.jsonl")
+    }
+
+
 def write_production_lease(path, grant, policy, intent):
     payload = {
         "lease_id": "br16-production-lease", "lease_version": "v1", "policy_version": policy["policy_version"],
@@ -260,6 +268,40 @@ def main(argv=None):
         assert invoke(bot, "mission", "m10-reserve", state, cost, "unregistered", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m10-cost-register", state, cost)["status"] == "EXACT_DUPLICATE"
+
+        # The shared M07→M08→M10 runtime must reject a same-ID rebind before
+        # it can discard the existing approval/grant lineage. Each rejected
+        # reimport below is checked against the canonical state bytes, not only
+        # against its response status.
+        rebind_request = work / "intent-request-rebind.json"
+        rebind_request_data = json.loads(request.read_text(encoding="utf-8"))
+        rebind_request_data["expires_at"] = "2099-09-03T04:00:00Z"
+        rebind_request.write_text(json.dumps(rebind_request_data), encoding="utf-8")
+        rebind_intent, rebind_policy = work / "intent-rebind.json", work / "policy-rebind.json"
+        assert invoke(bot, "mission", "m08-intent", history, rebind_request, agent_proposal, rebind_intent)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m08-policy", history, rebind_intent, policy_config, agent_proposal, rebind_policy)["status"] == "ALLOW"
+        before_rebind = canonical_m10_snapshot(state)
+        assert invoke(bot, "mission", "bind", state, rebind_intent, rebind_policy, expected=1)["status"] == "REJECTED"
+        assert canonical_m10_snapshot(state) == before_rebind
+
+        altered_grant = work / "grant-rebind-cap.json"
+        altered_grant_data = json.loads(grant.read_text(encoding="utf-8"))
+        altered_grant_data["max_cost_minor_total"] += 1
+        altered_grant_data.pop("grant_hash")
+        altered_grant_data["grant_hash"] = "sha256:" + hashlib.sha256(json.dumps(altered_grant_data, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        altered_grant.write_text(json.dumps(altered_grant_data), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-canary", state, altered_grant, expected=1)["status"] == "REJECTED"
+        assert canonical_m10_snapshot(state) == before_rebind
+
+        altered_cost = work / "cost-bound-rebind-currency.json"
+        altered_cost_data = json.loads(cost.read_text(encoding="utf-8"))
+        altered_cost_data["currency"] = "VND"
+        altered_cost_data.pop("cost_bound_hash")
+        altered_cost_data["cost_bound_hash"] = "sha256:" + hashlib.sha256(json.dumps(altered_cost_data, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        altered_cost.write_text(json.dumps(altered_cost_data), encoding="utf-8")
+        assert invoke(bot, "mission", "m10-cost-register", state, altered_cost, expected=1)["status"] == "REJECTED"
+        assert canonical_m10_snapshot(state) == before_rebind
+
         gate = work / "canary-gate.json"
         gate_time = "2026-09-08T00:00:00Z"
         gate_response = invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)
@@ -520,6 +562,7 @@ def main(argv=None):
             "checks": {
                 "m00_to_m11_shared_lineage": "PASS",
                 "history_replay_after_restore": "MATCH",
+                "m10_rebind_no_mutation": "PASS",
                 "m11_unknown_requires_stop": "PASS",
                 "restart_stop_blocks_canary": "PASS",
                 "recovery_admission_execution_permitted": False,
