@@ -695,6 +695,11 @@ backup graph reject admission thứ hai dùng cùng new lease hoặc cùng
 prior-runtime/resolution lineage. BR-18b gọi command thật với ID admission khác
 và nhận `REJECTED`; đây chỉ chống audit ambiguity offline.
 
+**Cập nhật M11 lease expiry/rebind regression (2026-09-11):** learner
+reject activation tại exact `ExpiresAt` mà không mutation registry; same
+lease ID với payload/hash canonical khác cũng bị reject. Chưa là coverage
+expiry/rebind đầy đủ cho mọi M11 artifact hay production authority.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

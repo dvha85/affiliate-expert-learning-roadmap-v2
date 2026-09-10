@@ -793,6 +793,17 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLeaseApproval, approvalInput); code != 0 || response["status"] != "APPENDED" {
 		t.Fatalf("M11 approval registration failed: code=%d response=%+v", code, response)
 	}
+	beforeExpiry, err := os.ReadFile(m11ArtifactRegistryPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, lease.ExpiresAt); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("M11 activation at lease expiry was accepted: code=%d response=%+v", code, response)
+	}
+	afterExpiry, err := os.ReadFile(m11ArtifactRegistryPath(dir))
+	if err != nil || !bytes.Equal(beforeExpiry, afterExpiry) {
+		t.Fatalf("M11 registry changed after rejected expiry activation: %v", err)
+	}
 	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code != 0 || response["status"] != "APPENDED" {
 		t.Fatalf("M11 activation failed: code=%d response=%+v", code, response)
 	}
@@ -809,6 +820,7 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 		t.Fatalf("M11 lease did not resolve: code=%d response=%+v", code, response)
 	}
 	lease.MaxCostMinorTotal = 2
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
 	tampered, err := json.Marshal(lease)
 	if err != nil {
 		t.Fatal(err)
