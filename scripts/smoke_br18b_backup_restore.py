@@ -352,6 +352,9 @@ def main():
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        forged_evaluation_evidence_backup = root / "forged-evaluation-evidence-backup"; shutil.copytree(backup, forged_evaluation_evidence_backup)
+        rewrite_m11_registry(forged_evaluation_evidence_backup, replace_m11_field("PRODUCTION_OUTCOME_EVALUATION", "evidence_ids", ["forged-evidence-id"]))
+        assert invoke(bot, "backup", "restore", forged_evaluation_evidence_backup, root / "forged-evaluation-evidence-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         reversed_cycle_time_backup = root / "reversed-cycle-time-backup"; shutil.copytree(backup, reversed_cycle_time_backup)
         rewrite_m11_registry(reversed_cycle_time_backup, replace_m11_field("PRODUCTION_CYCLE", "closed_at", "2026-09-08T00:00:03Z"))
         assert invoke(bot, "backup", "restore", reversed_cycle_time_backup, root / "reversed-cycle-time-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
