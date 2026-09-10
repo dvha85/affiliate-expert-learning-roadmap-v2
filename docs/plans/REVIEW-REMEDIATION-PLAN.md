@@ -589,6 +589,14 @@ backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở he
 đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
 dưới.
 
+**Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
+`--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi
+`walkthrough-result.json` có đường dẫn M08–M11 cùng các kiểm PASS/MATCH/STOP.
+CI chạy chính mode này rồi kiểm report và restored history tồn tại. Walkthrough
+BR-16b dùng report để learner replay/resolve artifact thật và xác nhận STOP
+reject canary; điều này không thay clean-machine pilot hoặc chứng minh người
+mới tự hoàn thành không trợ giúp.
+
 **Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc
