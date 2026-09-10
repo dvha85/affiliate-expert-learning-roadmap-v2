@@ -749,6 +749,7 @@ func validateM11BackupGraph(dir string) error {
 	healthSnapshots := map[string]corem11.ProductionHealthSnapshot{}
 	gates := map[string]corem11.ProductionGateDecision{}
 	ledgers := []corem11.ProductionLedger{}
+	ledgersByArtifactID := map[string]corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	authorizations := map[string]corem11.ProductionExecutionAuthorization{}
 	executions := []corem11.ProductionExecutionRecord{}
@@ -798,7 +799,9 @@ func validateM11BackupGraph(dir string) error {
 			if status != corem11.Valid {
 				return fmt.Errorf("M11 ledger artifact is invalid")
 			}
-			ledgers = append(ledgers, *value.(*corem11.ProductionLedger))
+			ledger := *value.(*corem11.ProductionLedger)
+			ledgers = append(ledgers, ledger)
+			ledgersByArtifactID[entry.ArtifactID] = ledger
 		case corem11.ArtifactKindReconciliation:
 			value, status := corem11.DecodeArtifact("resolution", entry.Artifact)
 			if status != corem11.Valid {
@@ -895,6 +898,15 @@ func validateM11BackupGraph(dir string) error {
 		ledgerAt, ledgerAtErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
 		if !found || activatedAtErr != nil || ledgerAtErr != nil || activation.LeaseVersion != ledger.LeaseVersion || activation.LeaseHash != ledger.LeaseHash || activatedAt.After(ledgerAt) {
 			return fmt.Errorf("M11 ledger is orphaned from its restored activation")
+		}
+	}
+	// A gate carries a budget snapshot for audit and later authorization. Its
+	// immutable ledger reference is insufficient if those copied counters are
+	// allowed to drift from the referenced ledger in a checksum-valid backup.
+	for _, gate := range gates {
+		ledger, found := ledgersByArtifactID[gate.LedgerArtifactID]
+		if !found || gate.ExecutionsTotalBefore != ledger.ExecutionsTotal || gate.ExecutionsInWindowBefore != ledger.ExecutionsInWindow || gate.CostMinorTotalBefore != ledger.CostMinorTotal || gate.PendingOutcomesBefore != ledger.PendingOutcomes {
+			return fmt.Errorf("M11 gate budget snapshot does not match its restored ledger")
 		}
 	}
 	// Authorization is a historical decision, so restore does not compare it
