@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
@@ -842,6 +843,78 @@ func TestBackupRestoreRejectsExecutionOutsideAuthorizationLifetime(t *testing.T)
 	}
 	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "execution-lifetime-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
 		t.Fatalf("restore accepted an execution at authorization expiry: code=%d response=%+v", code, response)
+	}
+}
+
+func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
+	runtime, boundPath, gatePath, expiryTime := authorityExpiryFixture(t, "cost")
+	reservationTime := expiryTime.Add(-30 * time.Second)
+	root := filepath.Dir(runtime)
+	authorizationPath := filepath.Join(root, "execution-order-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtime, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	missionClock = func() time.Time { return reservationTime }
+	if code, response := missionCall(t, "m10-reserve-authorization", runtime, authorizationPath, "execution-order-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "execution-order-record.json")
+	if code, response := missionCall(t, "m10-record-failed", runtime, authorizationPath, recordPath, reservationTime.Format(time.RFC3339), "fixture failure"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("record setup failed: code=%d response=%+v", code, response)
+	}
+	var record corem10.ExecutionRecord
+	if err := readJSON(recordPath, &record); err != nil {
+		t.Fatal(err)
+	}
+	outcome := m03.OutcomeRecord{OutcomeID: "execution-order-outcome", EffectRef: m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID}, ObservedAt: "2026-09-08T00:01:01Z", Status: "CANCELLED", Metrics: map[string]float64{}, SourceRef: "fixture:m10-outcome/execution-order"}
+	outcomePath := filepath.Join(root, "execution-order-outcome.json")
+	if err := writeJSON(outcomePath, outcome); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-outcome", runtime, outcomePath); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("outcome setup failed: code=%d response=%+v", code, response)
+	}
+	backup := filepath.Join(root, "execution-order-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	altered := record
+	altered.AttemptedAt = "2026-09-08T00:00:15Z"
+	alteredRaw, err := json.Marshal(altered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := m10ArtifactRegistryPath(runtime)
+	registryRaw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "execution-order-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted an execution before its reservation: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "execution-order-broken")
+	copyFlatBackup(t, backup, broken)
+	registryPath = m10ArtifactRegistryPath(broken)
+	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "execution-order-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted an execution before its reservation: code=%d response=%+v", code, response)
 	}
 }
 

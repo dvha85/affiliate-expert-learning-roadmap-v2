@@ -696,6 +696,10 @@ func validateM10BackupGraph(dir string) error {
 		if !found || record.AuthorizationID != reservation.AuthorizationID {
 			return fmt.Errorf("governed reservation execution is orphaned or mismatched")
 		}
+		attemptedAt, attemptedAtErr := time.Parse(time.RFC3339, record.AttemptedAt)
+		if attemptedAtErr != nil || attemptedAt.Before(reservedAt) {
+			return fmt.Errorf("governed reservation execution predates its reservation")
+		}
 	}
 	outcomes, err := loadM10FixtureOutcomes(dir, state)
 	if err != nil {

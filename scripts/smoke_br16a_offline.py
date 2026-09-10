@@ -326,27 +326,29 @@ def main(argv=None):
         assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "unreserved-execution.json", "2026-09-08T00:01:00Z", "must-reserve-before-execution-record", expected=1)["status"] == "REJECTED"
         reservation = invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")
         assert reservation["status"] == "RESERVED" and reservation["artifact"]["authorization_id"] == authorization_response["artifact"]["authorization_id"] and reservation["artifact"]["reservation_mode"] == "GOVERNED_AUTHORIZATION"
+        cancellation_attempted_at = reservation["artifact"]["reserved_at"]
         assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r2", expected=1)["status"] == "REJECTED"
         failed_reservation = invoke(bot, "mission", "m10-reserve-authorization", state, failed_authorization, "br16-governed-r2")
         assert failed_reservation["status"] == "RESERVED" and failed_reservation["artifact"]["authorization_id"] == failed_authorization_response["artifact"]["authorization_id"]
-        cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")
+        failed_attempted_at = failed_reservation["artifact"]["reserved_at"]
+        cancellation = invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, cancellation_attempted_at, "learner-cancelled-before-executor")
         assert cancellation["status"] == "APPENDED" and cancellation["artifact"]["status"] == "CANCELLED" and cancellation["artifact"]["side_effect_state"] == "NOT_PERFORMED"
-        assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, "2026-09-08T00:01:00Z", "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
-        assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "different-execution.json", "2026-09-08T00:02:00Z", "different-execution-is-rejected", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m10-cancel", state, authorization, cancelled, cancellation_attempted_at, "learner-cancelled-before-executor")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "different-execution.json", cancellation_attempted_at, "different-execution-is-rejected", expected=1)["status"] == "REJECTED"
         failed_execution = work / "fixture-failed-execution.json"
         failed_execution_conflict = work / "fixture-failed-execution-conflict.json"
         failed_execution_conflict.write_text("keep-this-portable-output", encoding="utf-8")
-        failed_conflict = invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution_conflict, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor", expected=1)
+        failed_conflict = invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution_conflict, failed_attempted_at, "fixture-dispatch-failed-before-executor", expected=1)
         assert failed_conflict["status"] == "CONFLICT"
         state_after_conflict = invoke(bot, "mission", "status", state)
         bound_reservation = next(item for item in state_after_conflict["artifact"]["reservations"] if item.get("authorization_id") == failed_authorization_response["artifact"]["authorization_id"])
         assert bound_reservation["execution_id"] == failed_conflict["artifact"]["execution_id"]
-        failed = invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor")
+        failed = invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, failed_attempted_at, "fixture-dispatch-failed-before-executor")
         assert failed["status"] == "APPENDED" and failed["artifact"]["status"] == "FAILED" and failed["artifact"]["side_effect_state"] == "NOT_PERFORMED"
-        assert invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor")["status"] == "EXACT_DUPLICATE"
+        assert invoke(bot, "mission", "m10-record-failed", state, failed_authorization, failed_execution, failed_attempted_at, "fixture-dispatch-failed-before-executor")["status"] == "EXACT_DUPLICATE"
         machine_outcome = work / "machine-outcome.json"
-        machine_outcome.write_text(json.dumps({"outcome_id":"br16-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br16-failed"}), encoding="utf-8")
+        machine_outcome.write_text(json.dumps({"outcome_id":"br16-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":failed_attempted_at,"status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br16-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "EXACT_DUPLICATE"
         forged_outcome = work / "forged-machine-outcome.json"
