@@ -556,6 +556,9 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
 		t.Fatalf("status did not fail closed on M10 execution journal: code=%d response=%+v", code, response)
 	}
+	if code, response := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionRecord, "unresolved-while-journal-pending"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("M10 resolver exposed a partial execution journal: code=%d response=%+v", code, response)
+	}
 	afterFaultState := missionRuntimeSnapshot(t, runtimeDir)
 	if !bytes.Equal(beforeState["mission-state.json"], afterFaultState["mission-state.json"]) {
 		t.Fatal("registry/state fault changed mutable mission state")
