@@ -594,6 +594,16 @@ chứng deterministic cho đúng recovery seam đó, không chứng minh atomici
 `backup create` cũng được test recovery journal này trước inventory, rồi
 restore xác nhận cùng outcome và post-outcome ledger từ runtime mới.
 
+**Cập nhật read/export boundary của M11 journal (2026-09-10):** trong khi bất
+kỳ journal `FAILED`, `UNKNOWN→STOP` hoặc outcome nào còn pending,
+`m11-resolve` và `m11-recovery-export` trả `RECOVERY_REQUIRED` trước khi đọc
+registry, resolve artifact hoặc tạo handoff. Fault regression tạo journal
+UNKNOWN→STOP thật sau lỗi ghi stopped ledger, rồi chứng minh cả resolver lẫn
+export đều không xuất partial lifecycle data hay file handoff; locked writer
+recovery vẫn là đường duy nhất để khôi phục. Guard này chỉ ngăn read-path quan
+sát trạng thái dở dang, **không** chứng minh atomicity đa-file, power-loss
+recovery hay external execution/outcome.
+
 **Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
 ghi `m11-failed-execution-journal/v1` trước cặp immutable
 `FAILED/NOT_PERFORMED` execution và post-execution ledger. Recovery chỉ replay
