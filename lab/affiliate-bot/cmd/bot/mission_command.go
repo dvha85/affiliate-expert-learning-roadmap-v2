@@ -103,8 +103,11 @@ type LearnerReservation struct {
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
-func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
-func m11OutcomeJournalPath(dir string) string   { return filepath.Join(dir, "m11-outcome-journal.json") }
+func m10ExecutionJournalPath(dir string) string {
+	return filepath.Join(dir, "m10-execution-journal.json")
+}
+func m11OutcomeStorePath(dir string) string   { return filepath.Join(dir, "m11-outcomes.jsonl") }
+func m11OutcomeJournalPath(dir string) string { return filepath.Join(dir, "m11-outcome-journal.json") }
 
 func missionErrorStatus(err error) string {
 	if err != nil && strings.HasPrefix(err.Error(), "durable STOP:") {
@@ -136,6 +139,16 @@ type m11OutcomeJournal struct {
 	PredecessorContentHash string                   `json:"predecessor_content_hash"`
 	Outcome                m03.OutcomeRecord        `json:"outcome"`
 	Ledger                 corem11.ProductionLedger `json:"ledger"`
+}
+
+// m10ExecutionJournal makes the immutable execution-record append and mutable
+// reservation binding recoverable as one bounded local transition. It records
+// no side effect and does not make the M10 fixture executor operational.
+type m10ExecutionJournal struct {
+	Version         string                  `json:"version"`
+	ReservationID   string                  `json:"reservation_id"`
+	AuthorizationID string                  `json:"authorization_id"`
+	Record          corem10.ExecutionRecord `json:"record"`
 }
 
 // m11FailedExecutionJournal makes the known FAILED/NOT_PERFORMED execution
@@ -925,6 +938,91 @@ func validateExecutionReservation(s LearnerMissionState, authorization corem10.E
 	return index, nil
 }
 
+func removeM10ExecutionJournal(dir string) error {
+	if err := os.Remove(m10ExecutionJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	parent, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = parent.Sync()
+	closeErr := parent.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func recoverM10ExecutionJournal(dir string) error {
+	raw, err := os.ReadFile(m10ExecutionJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m10ExecutionJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m10-execution-journal/v1" {
+		return fmt.Errorf("M10 execution journal is invalid")
+	}
+	recordRaw, err := json.Marshal(journal.Record)
+	if err != nil {
+		return err
+	}
+	if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
+		return fmt.Errorf("M10 execution journal record is invalid: %w", err)
+	}
+	s, err := loadMissionState(dir)
+	if err != nil {
+		return err
+	}
+	reservationIndex := -1
+	for index, reservation := range s.Reservations {
+		if reservation.ReservationID == journal.ReservationID {
+			reservationIndex = index
+			break
+		}
+	}
+	if reservationIndex == -1 || journal.AuthorizationID == "" || s.Reservations[reservationIndex].AuthorizationID != journal.AuthorizationID || journal.Record.AuthorizationID != journal.AuthorizationID {
+		return fmt.Errorf("M10 execution journal reservation does not resolve")
+	}
+	authorizationEntry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindExecutionAuthorization, journal.AuthorizationID, "")
+	if err != nil {
+		return fmt.Errorf("M10 execution journal authorization does not resolve: %w", err)
+	}
+	authorization, err := corem10.ValidateExecutionAuthorization(authorizationEntry.Artifact)
+	if err != nil || !authorizationBindsMissionState(authorization, s) {
+		return fmt.Errorf("M10 execution journal authorization is invalid or mismatched")
+	}
+	if _, err := validateExecutionReservation(s, authorization, journal.Record); err != nil {
+		return fmt.Errorf("M10 execution journal reservation is invalid: %w", err)
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
+		return fmt.Errorf("M10 execution journal registry recovery failed: %w", err)
+	}
+	if bound := s.Reservations[reservationIndex].ExecutionID; bound == "" {
+		s.Reservations[reservationIndex].ExecutionID = journal.Record.ExecutionID
+		if err := saveMissionState(dir, s); err != nil {
+			return err
+		}
+	} else if bound != journal.Record.ExecutionID {
+		return fmt.Errorf("M10 execution journal conflicts with bound reservation execution")
+	}
+	return removeM10ExecutionJournal(dir)
+}
+
+func commitM10ExecutionRecord(dir string, s LearnerMissionState, reservationIndex int, authorization corem10.ExecutionAuthorization, record corem10.ExecutionRecord) error {
+	if reservationIndex < 0 || reservationIndex >= len(s.Reservations) || s.Reservations[reservationIndex].AuthorizationID != authorization.AuthorizationID || record.AuthorizationID != authorization.AuthorizationID {
+		return fmt.Errorf("M10 execution record reservation does not match authorization")
+	}
+	journal := m10ExecutionJournal{Version: "m10-execution-journal/v1", ReservationID: s.Reservations[reservationIndex].ReservationID, AuthorizationID: authorization.AuthorizationID, Record: record}
+	if err := writeJSONAtomic(m10ExecutionJournalPath(dir), journal); err != nil {
+		return err
+	}
+	return recoverM10ExecutionJournal(dir)
+}
+
 // validateM10FixtureOutcome deliberately permits only a terminal no-side-effect
 // record. It is a local fixture measurement, not evidence of business impact.
 func validateM10FixtureOutcome(dir string, s LearnerMissionState, raw []byte) (m03.OutcomeRecord, string) {
@@ -1483,6 +1581,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		defer os.Remove(lockPath)
+		if err := recoverM10ExecutionJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := recoverM11FailedExecutionJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -1962,14 +2063,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
-		}
-		if s.Reservations[reservationIndex].ExecutionID == "" {
-			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
-			if err := saveMissionState(args[1], s); err != nil {
-				return emit("STORE_ERROR", nil, err, 1)
-			}
+		if err := commitM10ExecutionRecord(args[1], s, reservationIndex, authorization, record); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
 		}
 		// The registry record and mission reservation are canonical runtime state;
 		// the requested output is only a portable view. Bind the reservation
@@ -2020,14 +2115,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if _, err := corem10.ValidateExecutionRecord(recordRaw); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
-		}
-		if s.Reservations[reservationIndex].ExecutionID == "" {
-			s.Reservations[reservationIndex].ExecutionID = record.ExecutionID
-			if err := saveMissionState(args[1], s); err != nil {
-				return emit("STORE_ERROR", nil, err, 1)
-			}
+		if err := commitM10ExecutionRecord(args[1], s, reservationIndex, authorization, record); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
 		}
 		status, err := writeNewJSON(args[3], record)
 		if err != nil {
@@ -2365,6 +2454,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	case "status", "m11-status":
 		if len(args) != 2 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission status STATE_DIR"), 2)
+		}
+		if _, err := os.Stat(m10ExecutionJournalPath(args[1])); err == nil {
+			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M10 execution journal requires a locked writer recovery"), 1)
+		} else if !os.IsNotExist(err) {
+			return emit("STATE_ERROR", nil, err, 1)
 		}
 		if _, err := os.Stat(m11FailedExecutionJournalPath(args[1])); err == nil {
 			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 failed execution journal requires a locked writer recovery"), 1)

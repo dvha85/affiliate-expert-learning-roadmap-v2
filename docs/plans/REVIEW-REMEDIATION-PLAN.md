@@ -481,11 +481,12 @@ lệ. Không suy điều này thành proof cho multi-file crash hoặc executor 
 
 **Cập nhật M10 registry/state retry seam (2026-09-10):** fault test dừng
 `m10-record-failed` sau khi registry append nhưng trước atomic commit
-`mission-state`. Lúc dở dang, portable output không xuất hiện và backup
-fail-closed vì record chưa bind reservation; retry exact cùng authorization,
-attempt và reason bind state rồi cho backup hợp lệ. Đây là recovery theo retry
-do người gọi thực hiện sau lỗi được báo, **không** là transaction đa-file,
-automatic crash recovery hay power-loss proof.
+`mission-state`. Lúc dở dang, portable output không xuất hiện; journal M10
+bền yêu cầu `status` fail-closed. Lệnh writer có lock kế tiếp canonical-validate
+journal, append/replay record nếu cần, bind đúng reservation rồi mới xử lý retry
+exact và cho backup hợp lệ. Journal stale/tamper không được đoán hoặc bỏ qua.
+Đây là recovery cục bộ có giới hạn, **không** là transaction đa-file hay
+power-loss proof.
 
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
