@@ -873,6 +873,18 @@ func validateM11BackupGraph(dir string) error {
 			return fmt.Errorf("M11 ledger is orphaned from its restored activation")
 		}
 	}
+	// Reconciliation is a narrowly scoped human review of an UNKNOWN effect.
+	// The command path already enforces this before advancing a stopped ledger;
+	// mirror the boundary here so a checksum-valid backup cannot smuggle a
+	// generic (or pre-attempt) resolution into the restored audit history.
+	for executionID, resolution := range resolutions {
+		execution, found := executionsByID[executionID]
+		resolvedAt, resolvedAtErr := time.Parse(time.RFC3339, resolution.ResolvedAt)
+		attemptedAt, attemptedAtErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+		if !found || resolution.ResolvedBy != "human" || resolution.EffectState != "NOT_PERFORMED" || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || execution.ProductionLeaseID != resolution.LeaseID || execution.ProductionLeaseVersion != resolution.LeaseVersion || execution.ProductionLeaseHash != resolution.LeaseHash || resolvedAtErr != nil || attemptedAtErr != nil || resolvedAt.Before(attemptedAt) {
+			return fmt.Errorf("M11 reconciliation does not bind its restored unknown execution")
+		}
+	}
 	for _, record := range executions {
 		if record.Status == "FAILED" && !linked[record.ExecutionID] {
 			return fmt.Errorf("failed M11 execution is missing restored fixture outcome")

@@ -445,6 +445,9 @@ def main():
         invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"]["size_bytes"] = len(changed_bytes)
         (invalid_reconciliation_backup / "manifest.json").write_text(json.dumps(invalid_reconciliation_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_reconciliation_backup, root / "invalid-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        invalid_reconciliation_effect_backup = root / "invalid-reconciliation-effect-backup"; shutil.copytree(recovery_backup, invalid_reconciliation_effect_backup)
+        rewrite_m11_registry(invalid_reconciliation_effect_backup, replace_m11_field("PRODUCTION_RECONCILIATION", "effect_state", "PERFORMED"))
+        assert invoke(bot, "backup", "restore", invalid_reconciliation_effect_backup, root / "invalid-reconciliation-effect-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         duplicate_reconciliation_backup = root / "duplicate-reconciliation-backup"; shutil.copytree(recovery_backup, duplicate_reconciliation_backup)
         # Inserting the forged resolution before the valid one ensures a
         # last-write-wins map would still select the valid ID and miss it.
