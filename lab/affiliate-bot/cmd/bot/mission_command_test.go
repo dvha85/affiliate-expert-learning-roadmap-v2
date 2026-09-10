@@ -283,6 +283,56 @@ func missionBinaryCall(t *testing.T, binary string, args ...string) (int, map[st
 	return code, response
 }
 
+// TestMissionAuthorityExpirySubprocessHelper is a test-binary-only clock seam.
+// The production Bot neither reads this environment variable nor accepts a
+// caller-controlled clock. It lets the combined backup/restore regression run
+// the real command dispatch in a fresh process at exact expiry boundaries.
+func TestMissionAuthorityExpirySubprocessHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_AUTHORITY_EXPIRY_SUBPROCESS") != "1" {
+		return
+	}
+	clockValue, err := time.Parse(time.RFC3339Nano, os.Getenv("GO_AUTHORITY_EXPIRY_CLOCK"))
+	if err != nil {
+		os.Exit(2)
+	}
+	separator := -1
+	for index, value := range os.Args {
+		if value == "--" {
+			separator = index
+			break
+		}
+	}
+	if separator == -1 || separator+1 >= len(os.Args) {
+		os.Exit(2)
+	}
+	previousClock := missionClock
+	missionClock = func() time.Time { return clockValue }
+	defer func() { missionClock = previousClock }()
+	os.Exit(runMissionCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
+}
+
+func missionExpirySubprocessCall(t *testing.T, clock time.Time, args ...string) (int, map[string]any) {
+	t.Helper()
+	command := exec.Command(os.Args[0], append([]string{"-test.run=^TestMissionAuthorityExpirySubprocessHelper$", "--"}, args...)...)
+	command.Env = append(os.Environ(), "GO_WANT_AUTHORITY_EXPIRY_SUBPROCESS=1", "GO_AUTHORITY_EXPIRY_CLOCK="+clock.UTC().Format(time.RFC3339Nano))
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	err := command.Run()
+	code := 0
+	if err != nil {
+		exit, ok := err.(*exec.ExitError)
+		if !ok {
+			t.Fatal(err)
+		}
+		code = exit.ExitCode()
+	}
+	response := map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
+		t.Fatalf("decode expiry subprocess response %q: %v (stderr: %s)", stdout.String(), err, stderr.String())
+	}
+	return code, response
+}
+
 // authorityExpiryFixture drives the actual learner Bot M08→M10 admission
 // path. The unexported mission clock is a test-only runtime seam; command
 // arguments never select it.
@@ -407,6 +457,46 @@ func TestMissionM10AuthorityExpiryRejectsInFreshProcessWithoutMutation(t *testin
 			}
 			assertMissionRuntimeUnchanged(t, before, runtimeDir)
 		})
+	}
+}
+
+func TestMissionM10AuthorityExpiryBoundariesAfterBackupRestoreInFreshProcess(t *testing.T) {
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		for _, boundaryCase := range []struct {
+			name   string
+			delta  time.Duration
+			status string
+			code   int
+		}{
+			{name: "before", delta: -time.Nanosecond, status: "AUTHORIZED", code: 0},
+			{name: "at", delta: 0, status: "REJECTED", code: 1},
+			{name: "after", delta: time.Nanosecond, status: "REJECTED", code: 1},
+		} {
+			t.Run(expiring+"/"+boundaryCase.name, func(t *testing.T) {
+				runtimeDir, boundPath, gatePath, boundary := authorityExpiryFixture(t, expiring)
+				root := filepath.Dir(runtimeDir)
+				backupDir := filepath.Join(root, "boundary-backup")
+				restoredDir := filepath.Join(root, "boundary-restored")
+				if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+					t.Fatalf("backup failed: code=%d response=%+v", code, response)
+				}
+				if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+					t.Fatalf("restore failed: code=%d response=%+v", code, response)
+				}
+				outputPath := filepath.Join(root, "boundary-"+boundaryCase.name+".json")
+				before := missionRuntimeSnapshot(t, restoredDir)
+				code, response := missionExpirySubprocessCall(t, boundary.Add(boundaryCase.delta), "m10-authorize", restoredDir, boundPath, gatePath, outputPath, "2026-09-08T00:00:00Z", "fixture_stub")
+				if code != boundaryCase.code || response["status"] != boundaryCase.status {
+					t.Fatalf("%s %s boundary mismatch: code=%d response=%+v", expiring, boundaryCase.name, code, response)
+				}
+				if boundaryCase.code != 0 {
+					if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+						t.Fatalf("expired %s %s boundary created portable output: %v", expiring, boundaryCase.name, err)
+					}
+					assertMissionRuntimeUnchanged(t, before, restoredDir)
+				}
+			})
+		}
 	}
 }
 

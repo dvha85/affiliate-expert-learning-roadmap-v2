@@ -131,8 +131,10 @@ của từng authority mà không tạo portable output hay thay đổi
 `mission-state`/M10 registry. Cùng regression chặn rebind ID khi đổi expiry,
 cap hoặc currency; shared smoke M00–M11 dùng cùng runtime đã kiểm rebind và
 no-mutation, còn backup/restore bao phủ đủ bốn authority bằng binary Bot ở
-process mới. Còn thiếu một smoke duy nhất kết hợp các expiry boundary và
-coverage execution/ledger/cost state rộng hơn; không suy slice này thành
+process mới. Combined subprocess smoke dùng test-only clock seam (không có ở
+binary Bot vận hành), backup/restore từng authority rồi kiểm `before` / `at` /
+`after` expiry; reject không ghi portable output hay state. Coverage
+execution/ledger/cost state rộng hơn vẫn thiếu; không suy slice này thành
 complete acceptance.
 
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
