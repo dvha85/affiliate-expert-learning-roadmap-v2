@@ -476,6 +476,13 @@ fixture sau recovery rồi backup/restore runtime thật.
 Đây không biến hai file thành transaction power-loss hoặc chứng minh external
 execution/business outcome.
 
+**Cập nhật M11 reconciliation head guard (2026-09-10):** `m11-reconcile`
+chỉ tạo transition resolution từ stopped ledger đang là head. Retry exact của
+resolution đã nằm trên head vẫn trả `EXACT_DUPLICATE`, nhưng resolution khác
+trỏ predecessor cũ bị từ chối trước append, không thể fork ledger để làm mất
+link resolution trước đó. Đây là guard lineage offline; không cho phép nối lại
+lease cũ hay chứng minh recovery/execution ngoài fixture.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
