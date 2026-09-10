@@ -712,6 +712,11 @@ gọi learner để reject đăng ký này và dùng health mới đúng activat
 gate-before-activation; mutation restore vẫn fail closed. Draft chưa activation
 vẫn không bị suy diễn là active runtime. Đây chỉ là lineage fixture offline.
 
+**Cập nhật M11 gate lease-window graph (2026-09-11):** canonical graph reject
+gate trước `ValidFrom` hoặc tại/sau `ExpiresAt` của exact lease. Core regression
+và BR-18b mutation backup checksum-hợp-lệ tại expiry đều fail closed. Đây không
+xác nhận provider clock hay production gate operation.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

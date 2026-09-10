@@ -170,7 +170,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			snapshot, healthOK := health[x.HealthSnapshotID]
 			bound, costOK := costs[x.CostBoundID]
 			ledger, ledgerOK := ledgerEntries[x.LedgerArtifactID]
-			if !leaseOK || !healthOK || !costOK || !ledgerOK || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash {
+			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
+			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
+			expiresAt, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+			if !leaseOK || !healthOK || !costOK || !ledgerOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || !evaluatedAt.Before(expiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			gates[x.GateID] = *x

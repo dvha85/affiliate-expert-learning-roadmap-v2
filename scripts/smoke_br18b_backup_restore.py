@@ -411,6 +411,9 @@ def main():
         health_outside_lease_backup = root / "health-outside-lease-backup"; shutil.copytree(backup, health_outside_lease_backup)
         rewrite_m11_registry(health_outside_lease_backup, replace_m11_health_observed_at("2099-09-03T02:50:00Z"))
         assert invoke(bot, "backup", "restore", health_outside_lease_backup, root / "health-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        gate_outside_lease_backup = root / "gate-outside-lease-backup"; shutil.copytree(backup, gate_outside_lease_backup)
+        rewrite_m11_registry(gate_outside_lease_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2099-09-03T02:50:00Z"))
+        assert invoke(bot, "backup", "restore", gate_outside_lease_backup, root / "gate-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         ledger_before_activation_backup = root / "ledger-before-activation-backup"; shutil.copytree(backup, ledger_before_activation_backup)
         def ledger_before_activation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or not entry["artifact"].get("outcome_links"):
