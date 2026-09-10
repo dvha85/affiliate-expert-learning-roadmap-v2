@@ -430,6 +430,13 @@ checksum/manifest nhưng xóa entry trước khi staging có thể trở thành 
 RP-06 vẫn `PARTIAL`: các loại semantic orphan M10 khác cùng crash/host proof
 vẫn chưa được chứng minh.
 
+**Cập nhật M10 reservation-authorization link (2026-09-10):** reservation
+`GOVERNED_AUTHORIZATION` đã tiêu budget nhưng chưa có execution record cũng
+phải resolve authorization bất biến với cùng grant, intent và cost-bound
+binding. Backup create và restore staging cùng từ chối authorization bị xóa;
+regression sửa manifest checksum sau khi tamper để kiểm graph gate, không chỉ
+checksum. Các orphan state-to-registry còn lại vẫn mở.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.

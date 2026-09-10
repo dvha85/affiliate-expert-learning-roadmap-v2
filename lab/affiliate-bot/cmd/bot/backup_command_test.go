@@ -332,6 +332,89 @@ func TestBackupRestoreRejectsStateCanaryMissingRegistryGrant(t *testing.T) {
 	}
 }
 
+func removeM10ArtifactEntry(t *testing.T, path, kind, artifactID string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := make([][]byte, 0)
+	removed := false
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, err := corem10.ValidateArtifactEntry(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if entry.ArtifactKind == kind && entry.ArtifactID == artifactID {
+			removed = true
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if !removed {
+		t.Fatalf("missing M10 artifact to remove: %s/%s", kind, artifactID)
+	}
+	if err := os.WriteFile(path, append(bytes.Join(kept, []byte{'\n'}), '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBackupRestoreRejectsReservationMissingRegistryAuthorization(t *testing.T) {
+	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtime)
+	authorizationPath := filepath.Join(root, "authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtime, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtime, authorizationPath, "orphaned-authorization-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	var authorization corem10.ExecutionAuthorization
+	if err := readJSON(authorizationPath, &authorization); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(root, "authorization-link-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	registryPath := m10ArtifactRegistryPath(runtime)
+	registryRaw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionAuthorization, authorization.AuthorizationID)
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "authorization-link-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted a reservation missing its registry authorization: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "authorization-link-broken")
+	copyFlatBackup(t, backup, broken)
+	registryPath = filepath.Join(broken, "m10-artifacts.jsonl")
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionAuthorization, authorization.AuthorizationID)
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "authorization-link-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted a reservation missing its registry authorization: code=%d response=%+v", code, response)
+	}
+}
+
 func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
 	runtime := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
