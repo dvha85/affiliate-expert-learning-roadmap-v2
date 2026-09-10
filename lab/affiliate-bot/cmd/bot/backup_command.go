@@ -633,10 +633,18 @@ func validateM10BackupGraph(dir string) error {
 		return fmt.Errorf("restored state has invalid canary grant: %w", err)
 	}
 	grantFound := false
+	authorizations := map[string]corem10.ExecutionAuthorization{}
 	executions := map[string]corem10.ExecutionRecord{}
 	for _, entry := range entries {
 		if entry.ArtifactKind == corem10.ArtifactKindCanaryGrant && entry.ArtifactID == grantEntry.ArtifactID && entry.ContentHash == grantEntry.ContentHash && bytes.Equal(entry.Artifact, grantEntry.Artifact) {
 			grantFound = true
+		}
+		if entry.ArtifactKind == corem10.ArtifactKindExecutionAuthorization {
+			authorization, err := corem10.ValidateExecutionAuthorization(entry.Artifact)
+			if err != nil {
+				return fmt.Errorf("restored authorization is invalid: %w", err)
+			}
+			authorizations[authorization.AuthorizationID] = authorization
 		}
 		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
 			continue
@@ -649,6 +657,18 @@ func validateM10BackupGraph(dir string) error {
 	}
 	if !grantFound {
 		return fmt.Errorf("active canary grant is absent from restored registry")
+	}
+	// A pending reservation has already consumed mutable canary budget. It must
+	// continue to resolve to the immutable authorization that established its
+	// binding, even before an execution record exists to expose the orphan.
+	for _, reservation := range state.Reservations {
+		if reservation.ReservationMode != "GOVERNED_AUTHORIZATION" {
+			continue
+		}
+		authorization, found := authorizations[reservation.AuthorizationID]
+		if !found || !authorizationBindsMissionState(authorization, state) || authorization.CanaryGrantID != reservation.GrantID || authorization.IntentID != reservation.IntentID || authorization.IntentHash != reservation.IntentHash || authorization.CanaryCostBoundMinor != reservation.CostMinor || authorization.CanaryCostBoundID != reservation.CostBoundID || authorization.CanaryCostBoundHash != reservation.CostBoundHash {
+			return fmt.Errorf("governed reservation is orphaned from restored authorization")
+		}
 	}
 	outcomes, err := loadM10FixtureOutcomes(dir, state)
 	if err != nil {
