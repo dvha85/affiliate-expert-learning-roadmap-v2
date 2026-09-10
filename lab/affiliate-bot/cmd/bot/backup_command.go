@@ -757,6 +757,8 @@ func validateM11BackupGraph(dir string) error {
 	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
 	cycles := []corem11.ProductionCycleRecord{}
 	admissions := []corem11.ProductionRecoveryAdmission{}
+	admissionNewLeases := map[string]bool{}
+	admissionPriorResolutions := map[string]bool{}
 	for _, outcome := range outcomes {
 		if prior, exists := outcomeExecutionIDs[outcome.EffectRef.EffectID]; exists && prior != outcome.OutcomeID {
 			return fmt.Errorf("M11 execution has more than one restored fixture outcome")
@@ -854,6 +856,12 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 recovery admission artifact is invalid")
 			}
 			admissions = append(admissions, *value.(*corem11.ProductionRecoveryAdmission))
+			admission := *value.(*corem11.ProductionRecoveryAdmission)
+			priorKey := admission.PriorRuntimeDir + "\x00" + admission.ResolutionID
+			if admissionNewLeases[admission.NewLeaseID] || admissionPriorResolutions[priorKey] {
+				return fmt.Errorf("M11 recovery admission lineage is ambiguous")
+			}
+			admissionNewLeases[admission.NewLeaseID], admissionPriorResolutions[priorKey] = true, true
 		}
 	}
 	// The append-only registry permits a lease to be recorded before its human

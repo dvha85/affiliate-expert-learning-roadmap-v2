@@ -588,6 +588,10 @@ def main():
         assert invoke(bot, "mission", "m11-register", admission_runtime, "PRODUCTION_RECOVERY_ADMISSION", admission_input, expected=1, env=env)["status"] == "REJECTED"
         admission = invoke(bot, "mission", "m11-recovery-admit", admission_runtime, recovery_restored, restored_handoff, admission_input, env=env)
         assert admission["status"] == "APPENDED" and admission["execution_permitted"] is False
+        duplicate_admission = root / "duplicate-recovery-admission.json"
+        duplicate_payload = json.loads(admission_input.read_text(encoding="utf-8")); duplicate_payload["recovery_admission_id"] = "br18-recovery-admission-duplicate"
+        duplicate_admission.write_text(json.dumps(duplicate_payload), encoding="utf-8")
+        assert invoke(bot, "mission", "m11-recovery-admit", admission_runtime, recovery_restored, restored_handoff, duplicate_admission, expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-recovery-admit", admission_runtime, recovery_restored, restored_handoff, admission_input, env=env)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m11-recovery-admit", recovery_restored, recovery_restored, restored_handoff, admission_input, expected=1, env=env)["status"] == "PATH_ERROR"
         admission_backup, admission_restored = root / "recovery-admission-backup", root / "recovery-admission-restored"
