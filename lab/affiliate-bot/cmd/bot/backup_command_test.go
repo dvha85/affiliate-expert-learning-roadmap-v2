@@ -916,6 +916,42 @@ func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
 	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "execution-order-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
 		t.Fatalf("restore accepted an execution before its reservation: code=%d response=%+v", code, response)
 	}
+
+	// A manifest checksum only proves the attacker updated the copy
+	// consistently. The graph gate must still reject an outcome that claims to
+	// have been observed before the execution it cites.
+	outcomeBroken := filepath.Join(root, "execution-order-outcome-broken")
+	copyFlatBackup(t, backup, outcomeBroken)
+	outcomeStore := m10OutcomeStorePath(outcomeBroken)
+	outcomeRaw, err := os.ReadFile(outcomeStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var alteredOutcome m03.OutcomeRecord
+	if err := json.Unmarshal(bytes.TrimSpace(outcomeRaw), &alteredOutcome); err != nil {
+		t.Fatal(err)
+	}
+	alteredOutcome.ObservedAt = "2026-09-08T00:00:00Z"
+	alteredOutcomeRaw, err := json.Marshal(alteredOutcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outcomeStore, append(alteredOutcomeRaw, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(filepath.Join(outcomeBroken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-outcomes.jsonl"], err = backupFileMetadata(outcomeStore, "m10-outcomes.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(outcomeBroken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", outcomeBroken, filepath.Join(root, "execution-order-outcome-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted an outcome before its execution: code=%d response=%+v", code, response)
+	}
 }
 
 func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
