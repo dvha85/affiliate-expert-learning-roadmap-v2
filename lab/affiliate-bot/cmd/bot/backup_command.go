@@ -838,6 +838,26 @@ func validateM11BackupGraph(dir string) error {
 			return fmt.Errorf("M11 fixture outcome is orphaned from its restored execution")
 		}
 	}
+	// Fixture outcomes are not merely an auxiliary store: completing one also
+	// commits the corresponding lease ledger transition. Validate that link in
+	// both directions so a checksum-valid snapshot cannot retain an outcome
+	// while silently erasing its accounting/audit record (or invent one).
+	ledgerOutcomeLinks := map[string]bool{}
+	for _, ledger := range ledgers {
+		for _, link := range ledger.OutcomeLinks {
+			outcome, outcomeOK := outcomesByID[link.OutcomeID]
+			execution, executionOK := executionsByID[link.ExecutionID]
+			if !outcomeOK || !executionOK || outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" || outcome.EffectRef.EffectID != link.ExecutionID || outcome.ObservedAt != link.ObservedAt || execution.ProductionLeaseID != ledger.LeaseID || execution.ProductionLeaseVersion != ledger.LeaseVersion || execution.ProductionLeaseHash != ledger.LeaseHash {
+				return fmt.Errorf("M11 ledger outcome link is orphaned or mismatched")
+			}
+			ledgerOutcomeLinks[link.OutcomeID] = true
+		}
+	}
+	for outcomeID := range outcomesByID {
+		if !ledgerOutcomeLinks[outcomeID] {
+			return fmt.Errorf("M11 fixture outcome is absent from its restored ledger")
+		}
+	}
 	// A lease may remain registered but inactive. Once a ledger exists, however,
 	// it is a lifecycle state created after activation; restore must retain that
 	// exact activation rather than accepting a checksum-valid ledger detached
