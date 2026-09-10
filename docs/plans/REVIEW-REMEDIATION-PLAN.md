@@ -733,6 +733,12 @@ health, và health age nhỏ hơn lease limit tại thời điểm authorize. Co
 chặn non-ALLOW gate và stale health; BR-18b checksum-valid mutation chặn stale
 health. Đây không chứng minh health provider hay authority production.
 
+**Cập nhật M11 execution authorization-lifetime graph (2026-09-11):**
+canonical core registry đòi `AttemptedAt` từ `AuthorizedAt` đến trước
+authorization expiry, đồng bộ backup/runtime guard. Core regression và BR-18b
+set auth expiry đúng execution attempt đều fail closed. Không là executor hoặc
+atomic crash proof.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
