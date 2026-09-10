@@ -123,6 +123,16 @@ vận hành.
 - Regression phải snapshot bytes/registry/state trước và sau reject. Không gọi
   executor, không tạo business outcome và không suy thành power-loss proof.
 
+**Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
+Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
+CLI hay environment override). M08 → M10 regression tạo intent/policy/approval/
+grant/cost/gate thật, rồi chứng minh `m10-authorize` reject tại và sau expiry
+của từng authority mà không tạo portable output hay thay đổi
+`mission-state`/M10 registry. Cùng regression chặn rebind ID khi đổi expiry,
+cap hoặc currency; backup/restore đã kiểm một cost-bound hết hạn. Còn thiếu
+shared smoke subprocess, restore cho từng authority và coverage execution/
+ledger/cost state rộng hơn; không suy slice này thành complete acceptance.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
