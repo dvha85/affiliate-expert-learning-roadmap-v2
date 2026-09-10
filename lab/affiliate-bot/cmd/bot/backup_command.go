@@ -748,6 +748,7 @@ func validateM11BackupGraph(dir string) error {
 	activations := map[string]corem11.ProductionActivationRecord{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
+	authorizations := map[string]corem11.ProductionExecutionAuthorization{}
 	executions := []corem11.ProductionExecutionRecord{}
 	executionsByID := map[string]corem11.ProductionExecutionRecord{}
 	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
@@ -799,6 +800,13 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 execution has more than one restored reconciliation resolution")
 			}
 			resolutions[resolution.ExecutionID] = resolution
+		case corem11.ArtifactKindAuthorization:
+			value, status := corem11.DecodeArtifact("authorization", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 authorization artifact is invalid")
+			}
+			authorization := *value.(*corem11.ProductionExecutionAuthorization)
+			authorizations[authorization.AuthorizationID] = authorization
 		case corem11.ArtifactKindExecution:
 			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
 			if status != corem11.Valid {
@@ -883,6 +891,19 @@ func validateM11BackupGraph(dir string) error {
 		attemptedAt, attemptedAtErr := time.Parse(time.RFC3339, execution.AttemptedAt)
 		if !found || resolution.ResolvedBy != "human" || resolution.EffectState != "NOT_PERFORMED" || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || execution.ProductionLeaseID != resolution.LeaseID || execution.ProductionLeaseVersion != resolution.LeaseVersion || execution.ProductionLeaseHash != resolution.LeaseHash || resolvedAtErr != nil || attemptedAtErr != nil || resolvedAt.Before(attemptedAt) {
 			return fmt.Errorf("M11 reconciliation does not bind its restored unknown execution")
+		}
+	}
+	// Historical artifacts may be restored after their authority expires, but
+	// their recorded attempt cannot have happened outside that authority's
+	// lifetime. Preserve the command-path boundary in the semantic restore
+	// graph; no current-clock decision is made here.
+	for _, execution := range executions {
+		authorization, found := authorizations[execution.AuthorizationID]
+		attemptedAt, attemptedAtErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+		authorizedAt, authorizedAtErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
+		expiresAt, expiresAtErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
+		if !found || attemptedAtErr != nil || authorizedAtErr != nil || expiresAtErr != nil || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) {
+			return fmt.Errorf("M11 execution falls outside its restored authorization lifetime")
 		}
 	}
 	for _, record := range executions {
