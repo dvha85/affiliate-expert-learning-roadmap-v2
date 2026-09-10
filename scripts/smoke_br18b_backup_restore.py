@@ -109,7 +109,7 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def write_production_lease(path):
+def write_production_lease(path, max_executions=1, max_cost=4, max_pending_outcomes=1):
     payload = {
         "lease_id": "br18-production-lease", "lease_version": "v1", "policy_version": "br18-v1",
         "approval_ref": "br18-production-approval", "reviewed_by": "human", "reviewer_id": "pilot-human",
@@ -118,8 +118,8 @@ def write_production_lease(path):
         "source_canary_grant_hash": "sha256:" + "a" * 64, "valid_from": "2026-09-07T01:05:00Z",
         "expires_at": "2099-09-03T02:50:00Z", "allowed_risk_classes": ["RISK0"],
         "allowed_action_types": ["DRAFT"], "allowed_hosts": ["example.com"], "executor_ids": ["fixture_stub"],
-        "max_executions_total": 1, "max_executions_per_window": 1, "window_seconds": 60,
-        "max_cost_minor_total": 4, "currency": "USD", "max_pending_outcomes": 1,
+        "max_executions_total": max_executions, "max_executions_per_window": max_executions, "window_seconds": 60,
+        "max_cost_minor_total": max_cost, "currency": "USD", "max_pending_outcomes": max_pending_outcomes,
         "max_consecutive_failures": 1, "max_outcome_age_seconds": 60, "max_health_snapshot_age_seconds": 60,
         "kill_switch_required": True, "correlation_id": "br18-c", "hash_version": "go-json-v1",
     }
@@ -232,6 +232,24 @@ def main():
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
         early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", env=env)
         assert early_gate["status"] == "DENY" and early_gate["artifact"]["reason"] == "LEASE_INACTIVE"
+        # Two valid authorizations can coexist before the first reservation.
+        # The second must not consume budget after the first advances the
+        # ledger that its gate snapshot authorized.
+        stale_gate_runtime = root / "stale-gate-runtime"; stale_lease = root / "stale-gate-lease.json"; stale_approval = root / "stale-gate-approval.json"; stale_health = root / "stale-gate-health.json"
+        shutil.copytree(runtime, stale_gate_runtime)
+        write_production_lease(stale_lease, max_executions=2, max_cost=8, max_pending_outcomes=2)
+        write_production_lease_approval(stale_approval, stale_lease); write_production_health(stale_health, stale_lease)
+        for kind, artifact in (("PRODUCTION_LEASE", stale_lease), ("PRODUCTION_LEASE_APPROVAL", stale_approval), ("PRODUCTION_HEALTH_SNAPSHOT", stale_health), ("TRUSTED_COST_BOUND", cost)):
+            assert invoke(bot, "mission", "m11-register", stale_gate_runtime, kind, artifact, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", stale_gate_runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", stale_gate_runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
+        stale_gate_one = invoke(bot, "mission", "m11-gate", stale_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", env=env)
+        stale_gate_two = invoke(bot, "mission", "m11-gate", stale_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
+        stale_auth_one = invoke(bot, "mission", "m11-authorize", stale_gate_runtime, "br18-production-lease", stale_gate_one["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
+        stale_auth_two = invoke(bot, "mission", "m11-authorize", stale_gate_runtime, "br18-production-lease", stale_gate_two["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:01Z", env=env)
+        stale_reservation = invoke(bot, "mission", "m11-reserve-authorization", stale_gate_runtime, stale_auth_one["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:02Z", env=env)
+        stale_ledger_id = stale_reservation["artifact"]["lease_id"] + "/" + stale_reservation["artifact"]["updated_at"]
+        assert invoke(bot, "mission", "m11-reserve-authorization", stale_gate_runtime, stale_auth_two["artifact"]["authorization_id"], stale_ledger_id, "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-activate", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
