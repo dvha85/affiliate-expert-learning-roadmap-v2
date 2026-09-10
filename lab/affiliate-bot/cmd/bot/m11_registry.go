@@ -1002,6 +1002,13 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	if err != nil {
 		return corem11.ArtifactEntry{}, "", err
 	}
+	state, err := loadMissionState(newDir)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	if state.Stop {
+		return corem11.ArtifactEntry{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
 	providedRaw, err := os.ReadFile(handoffPath)
 	if err != nil {
 		return corem11.ArtifactEntry{}, "", err
@@ -1046,13 +1053,6 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	providedCanonical, _ := json.Marshal(provided)
 	if !bytes.Equal(expectedRaw, providedCanonical) {
 		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery handoff does not match the stopped runtime")
-	}
-	state, err := loadMissionState(newDir)
-	if err != nil {
-		return corem11.ArtifactEntry{}, "", err
-	}
-	if state.Stop {
-		return corem11.ArtifactEntry{}, "", fmt.Errorf("new runtime is durably stopped")
 	}
 	value, status := corem11.DecodeArtifact("recovery_admission", admissionRaw)
 	if status != corem11.Valid {

@@ -616,6 +616,12 @@ STOP và regression table kiểm cả registry lẫn outcome store không thay �
 reconciliation/handoff vẫn là đường recovery được giới hạn. Đây không chứng
 minh recovery tự động hay business outcome.
 
+**Cập nhật STOP admission boundary (2026-09-10):** `m11-recovery-admit` kiểm
+runtime mới trước khi đọc handoff/admission input, trả `STOPPED` nếu đích đã
+dừng và không tạo admission artifact. Regression dùng input paths không tồn tại
+để chứng minh STOP preempts input access. Điều này không thay thế review cho
+runtime/lease mới đang hoạt động.
+
 **Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc

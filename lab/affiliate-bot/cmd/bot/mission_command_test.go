@@ -337,6 +337,9 @@ func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	if err := os.WriteFile(outcomeInput, []byte(`{}`), 0600); err != nil {
 		t.Fatal(err)
 	}
+	oldRuntime := filepath.Join(dir, "old-runtime")
+	handoffInput := filepath.Join(dir, "handoff.json")
+	admissionInput := filepath.Join(dir, "admission.json")
 	for _, args := range [][]string{
 		{"m11-activate", "missing-lease", "2026-09-08T00:00:00Z"},
 		{"m11-ledger-init", "missing-lease", "2026-09-08T00:00:00Z"},
@@ -352,6 +355,9 @@ func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 		if code, response := missionCall(t, arguments...); code == 0 || response["status"] != "STOPPED" {
 			t.Fatalf("stopped %s did not fail closed: code=%d response=%+v", args[0], code, response)
 		}
+	}
+	if code, response := missionCall(t, "m11-recovery-admit", dir, oldRuntime, handoffInput, admissionInput); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("stopped m11-recovery-admit did not fail closed before reading inputs: code=%d response=%+v", code, response)
 	}
 	if _, err := os.Stat(m11ArtifactRegistryPath(dir)); !os.IsNotExist(err) {
 		t.Fatalf("stopped lifecycle command wrote an M11 registry artifact: %v", err)
