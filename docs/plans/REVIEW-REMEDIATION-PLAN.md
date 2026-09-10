@@ -684,6 +684,12 @@ minh clock đáng tin cậy, quyền executor hay production activation.
 restore fail-closed. Registry draft chưa activation vẫn đọc được; backup hoàn
 chỉnh đã yêu cầu activation riêng. Đây chỉ là invariant fixture offline.
 
+**Cập nhật M11 recovery-admission restore graph (2026-09-10):** backup graph
+decode `PRODUCTION_RECOVERY_ADMISSION` và yêu cầu exact new lease, approval,
+activation cùng normal non-reconciliation ledger; admission luôn non-authorizing.
+Không đọc hay suy diễn runtime cũ từ path. BR-18b xóa new ledger trong backup
+checksum-hợp-lệ và restore `GRAPH_FAILED`; không chứng minh recovery đa-runtime.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
