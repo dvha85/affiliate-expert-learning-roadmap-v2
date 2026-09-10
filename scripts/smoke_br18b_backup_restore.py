@@ -306,6 +306,11 @@ def main():
         orphan_outcome["outcome_id"] = "br18-production-o-missing"
         replace_backup_file(orphan_evaluation_backup, "m11-outcomes.jsonl", (json.dumps(orphan_outcome) + "\n").encode())
         assert invoke(bot, "backup", "restore", orphan_evaluation_backup, root / "orphan-evaluation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_effect_backup = root / "orphan-effect-backup"; shutil.copytree(backup, orphan_effect_backup)
+        orphan_effect = json.loads((orphan_effect_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8"))
+        orphan_effect["effect_ref"]["effect_id"] = "missing-m11-execution"
+        replace_backup_file(orphan_effect_backup, "m11-outcomes.jsonl", (json.dumps(orphan_effect) + "\n").encode())
+        assert invoke(bot, "backup", "restore", orphan_effect_backup, root / "orphan-effect-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"

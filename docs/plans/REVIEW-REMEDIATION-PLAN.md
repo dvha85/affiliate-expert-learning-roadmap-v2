@@ -609,6 +609,13 @@ activation của runtime có ledger, cập nhật checksum/manifest và restore 
 `GRAPH_FAILED` trước publish. Đây chỉ là kiểm graph deterministic, không suy
 ra live activation, external execution hay crash atomicity.
 
+**Cập nhật fixture-outcome execution link M11 (2026-09-10):** mọi fixture
+outcome M11 trong snapshot phải có `MACHINE_EXECUTION` EffectRef resolve tới
+execution record đã persist, kể cả khi chưa có evaluation/cycle. Smoke đổi
+EffectRef thành execution không tồn tại rồi cập nhật checksum/manifest; restore
+trả `GRAPH_FAILED` trước publish. Đây chỉ chặn orphan trong graph offline, không
+chứng minh business outcome hay external effect.
+
 **Cập nhật read/export boundary của M11 journal (2026-09-10):** trong khi bất
 kỳ journal `FAILED`, `UNKNOWN→STOP` hoặc outcome nào còn pending,
 `m11-resolve` và `m11-recovery-export` trả `RECOVERY_REQUIRED` trước khi đọc
