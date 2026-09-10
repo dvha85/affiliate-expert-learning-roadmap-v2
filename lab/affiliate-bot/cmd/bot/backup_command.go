@@ -905,6 +905,23 @@ func validateM11BackupGraph(dir string) error {
 		if !found || attemptedAtErr != nil || authorizedAtErr != nil || expiresAtErr != nil || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) {
 			return fmt.Errorf("M11 execution falls outside its restored authorization lifetime")
 		}
+		// The learner records only a governed execution that was first charged
+		// into a prior, normal ledger. Keep that predecessor link in the backup
+		// graph; the later outcome ledger alone cannot prove an execution was
+		// ever reserved within its lease budget.
+		reserved := false
+		for _, ledger := range ledgers {
+			ledgerAt, ledgerAtErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+			if ledgerAtErr != nil || ledger.LeaseID != execution.ProductionLeaseID || ledger.LeaseVersion != execution.ProductionLeaseVersion || ledger.LeaseHash != execution.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledgerAt.After(attemptedAt) {
+				continue
+			}
+			for _, pendingID := range ledger.PendingExecutionIDs {
+				reserved = reserved || pendingID == execution.ExecutionID
+			}
+		}
+		if !reserved {
+			return fmt.Errorf("M11 execution is orphaned from its restored reservation ledger")
+		}
 	}
 	for _, record := range executions {
 		if record.Status == "FAILED" && !linked[record.ExecutionID] {
