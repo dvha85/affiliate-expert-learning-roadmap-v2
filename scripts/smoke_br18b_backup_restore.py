@@ -179,11 +179,12 @@ def main():
         assert authorization_result["status"] == "AUTHORIZED"
         reservation = invoke(bot, "mission", "m10-reserve-authorization", runtime, authorization, "br18-governed-r1", env=env)
         assert reservation["status"] == "RESERVED"
+        failed_attempted_at = reservation["artifact"]["reserved_at"]
         failed_execution = root / "fixture-failed-execution.json"
-        failed = invoke(bot, "mission", "m10-record-failed", runtime, authorization, failed_execution, "2026-09-08T00:01:00Z", "fixture-dispatch-failed-before-executor", env=env)
+        failed = invoke(bot, "mission", "m10-record-failed", runtime, authorization, failed_execution, failed_attempted_at, "fixture-dispatch-failed-before-executor", env=env)
         assert failed["status"] == "APPENDED" and failed["artifact"]["status"] == "FAILED"
         machine_outcome = root / "machine-outcome.json"
-        machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":"2026-09-08T00:02:00Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
+        machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":failed_attempted_at,"status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
         production_lease = root / "production-lease.json"; write_production_lease(production_lease)
         recovery_runtime = root / "reconciliation-runtime"; recovery_backup = root / "reconciliation-backup"; recovery_restored = root / "reconciliation-restored"
