@@ -116,6 +116,9 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
 		t.Fatalf("journal was removed before recovery completed: %v", err)
 	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindLedger, ledgerEntry.ArtifactID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("M11 resolver exposed an outcome partial transition: code=%d response=%+v", code, response)
+	}
 	m11OutcomeAppendFault = nil
 	if err := recoverM11OutcomeJournal(dir); err != nil {
 		t.Fatalf("journal recovery failed: %v", err)

@@ -214,6 +214,9 @@ func TestM11FailedExecutionJournalRecoversAfterLedgerWriteFailure(t *testing.T) 
 			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
 				t.Fatalf("status did not fail closed on failed-execution journal: code=%d response=%+v", code, response)
 			}
+			if code, response := missionCall(t, "m11-resolve", fixture.dir, corem11.ArtifactKindLedger, fixture.ledgerEntry.ArtifactID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("M11 resolver exposed a FAILED partial transition: code=%d response=%+v", code, response)
+			}
 			m11RegistryAppendFault = nil
 			if err := recoverM11FailedExecutionJournal(fixture.dir); err != nil {
 				t.Fatalf("failed-execution journal recovery failed: %v", err)
