@@ -436,7 +436,16 @@ func m11Allowed(values []string, value string) bool {
 
 func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt string) (corem11.ProductionGateDecision, string, error) {
 	state, err := loadMissionState(dir)
-	if err != nil || state.Intent == nil || state.Policy == nil {
+	if err != nil {
+		return corem11.ProductionGateDecision{}, "", err
+	}
+	// STOP is a write boundary, not merely a decision value. Do not resolve
+	// supplied artifacts or append a new gate to a stopped runtime: the only
+	// permitted post-STOP mutation is the explicit reconciliation path.
+	if state.Stop {
+		return corem11.ProductionGateDecision{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
+	if state.Intent == nil || state.Policy == nil {
 		return corem11.ProductionGateDecision{}, "", fmt.Errorf("M11 gate requires persisted intent and policy")
 	}
 	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, leaseID)
@@ -482,9 +491,6 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 		}
 		_, status, e := registerM11Artifact(dir, corem11.ArtifactKindGate, raw)
 		return gate, status, e
-	}
-	if state.Stop {
-		return decision("STOP", "DURABLE_STOP")
 	}
 	validFrom, e1 := time.Parse(time.RFC3339, lease.ValidFrom)
 	expires, e2 := time.Parse(time.RFC3339, lease.ExpiresAt)
