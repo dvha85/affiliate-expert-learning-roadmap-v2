@@ -1,7 +1,20 @@
 {
   "version": "readiness-matrix/v1",
-  "as_of": "2026-09-09",
+  "as_of": "2026-09-10",
+  "main_baseline": "adb6e128f067a35383d0353eb104ee24f8dbbb4b",
   "overall": "NOT_READY_FOR_PRODUCTION",
+  "packages": [
+    {"id":"RP-01","status":"PARTIAL"},
+    {"id":"RP-02","status":"PARTIAL"},
+    {"id":"RP-03","status":"PARTIAL"},
+    {"id":"RP-04","status":"PARTIAL"},
+    {"id":"RP-05","status":"PARTIAL"},
+    {"id":"RP-06","status":"PARTIAL"},
+    {"id":"RP-07","status":"PARTIAL"},
+    {"id":"RP-08","status":"PARTIAL"},
+    {"id":"RP-09","status":"PARTIAL"},
+    {"id":"RP-10","status":"OPEN"}
+  ],
   "criteria": [
     {"id":"BR-13","title":"M06 watcher persists canonical history","status":"PARTIAL","implementation_refs":["core/m06/m06.go","core/m06/offer_fixture.go","lab/affiliate-bot/cmd/bot/watcher.go","lab/affiliate-bot/cmd/bot/canonical_resolver.go"],"test_refs":["core/m06/m06_test.go","lab/affiliate-bot/cmd/bot/watcher_test.go","scripts/smoke_br13b.py","scripts/smoke_br16a_offline.py","scripts/run_n8n_engine_regression.py"],"missing_evidence":["implementation: shared builder currently covers only the fixed synthetic offer-fixture profile; a separately governed selected-source profile remains future work","tests: CI engine executes the M06 blueprint node chain into canonical history and rejects same-correlation content conflicts plus an unsupported source without mutation; broader selected-source parser/profile cases remain open","external: operated n8n run against a selected source"]},
     {"id":"BR-14","title":"M06 n8n execution","status":"PARTIAL","implementation_refs":["lab/n8n/M06-readonly-watcher.blueprint.json","lab/affiliate-bot/cmd/bot/watcher.go","core/m06/offer_fixture.go"],"test_refs":["scripts/validate_n8n_m06.py","scripts/run_n8n_engine_regression.py","lab/affiliate-bot/cmd/bot/watcher_test.go"],"missing_evidence":["tests: CI n8n runs APPENDED, key-order EXACT_DUPLICATE, same-correlation conflict rejection, unsupported-source rejection, changed-event append, replay and unavailable-adapter failure using a disposable Execute Workflow Trigger substitution; schedule-trigger admission and broader source/profile drift cases remain open","external: independently operated import/execution in the selected supported n8n deployment"]},

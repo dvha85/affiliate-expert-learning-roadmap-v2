@@ -15,10 +15,51 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
+PACKAGE_IDS = {f"RP-{number:02d}" for number in range(1, 11)}
+PACKAGE_STATUSES = {"PARTIAL", "OPEN"}
+BASELINE_RE = re.compile(r"^[0-9a-f]{40}$")
+PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline): ([^>]+) -->$", re.MULTILINE)
+PLAN_PACKAGE_RE = re.compile(r"^\| (RP-\d+) \|.*\| (PARTIAL|OPEN) [—-]", re.MULTILINE)
 
 
 def fail(message):
     raise AssertionError(message)
+
+
+def audit_snapshot_metadata(matrix, graph, plan_text):
+    """Require the three readiness artifacts to describe one reviewed main base."""
+    plan_metadata = dict(PLAN_METADATA_RE.findall(plan_text))
+    if set(plan_metadata) != {"as-of", "main-baseline"}:
+        fail("plan lacks exact readiness snapshot metadata")
+    as_of = matrix.get("as_of")
+    baseline = matrix.get("main_baseline")
+    if not isinstance(as_of, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_of):
+        fail("matrix has invalid readiness as_of")
+    if not isinstance(baseline, str) or not BASELINE_RE.fullmatch(baseline):
+        fail("matrix has invalid main baseline")
+    if graph.get("as_of") != as_of or graph.get("main_baseline") != baseline:
+        fail("matrix/evidence graph readiness snapshot mismatch")
+    if plan_metadata["as-of"] != as_of or plan_metadata["main-baseline"] != baseline:
+        fail("matrix/plan readiness snapshot mismatch")
+
+
+def audit_package_statuses(matrix, plan_text):
+    packages = matrix.get("packages")
+    if not isinstance(packages, list):
+        fail("matrix lacks structured remediation packages")
+    expected = {}
+    for package in packages:
+        if not isinstance(package, dict):
+            fail("invalid remediation package")
+        package_id, status = package.get("id"), package.get("status")
+        if package_id in expected or package_id not in PACKAGE_IDS or status not in PACKAGE_STATUSES:
+            fail(f"invalid or duplicate remediation package: {package_id}")
+        expected[package_id] = status
+    if set(expected) != PACKAGE_IDS:
+        fail(f"unexpected remediation package IDs: {sorted(expected)}")
+    actual = dict(PLAN_PACKAGE_RE.findall(plan_text))
+    if actual != expected:
+        fail("plan package status does not match readiness matrix")
 
 
 def audit_evidence_graph(root, criteria_by_id):
@@ -93,10 +134,14 @@ def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    graph = json.loads((root / "docs/plans/READINESS-EVIDENCE-GRAPH.json").read_text(encoding="utf-8"))
+    plan_text = plan_path.read_text(encoding="utf-8")
     if matrix.get("version") != "readiness-matrix/v1":
         fail("unsupported readiness matrix version")
     if matrix.get("overall") != "NOT_READY_FOR_PRODUCTION":
         fail("readiness matrix must remain NOT_READY_FOR_PRODUCTION")
+    audit_snapshot_metadata(matrix, graph, plan_text)
+    audit_package_statuses(matrix, plan_text)
     criteria = matrix.get("criteria")
     if not isinstance(criteria, list) or not criteria:
         fail("readiness matrix requires non-empty criteria")
@@ -127,7 +172,7 @@ def audit(root):
     for script, workflow in CI_REQUIRED.items():
         if script not in (root / workflow).read_text(encoding="utf-8"):
             fail(f"required regression is not wired to CI: {script}")
-    for line_number, line in enumerate(plan_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, line in enumerate(plan_text.splitlines(), start=1):
         normalized = line.casefold()
         if "ready for production" in normalized and not re.search(r"not[ _-]?ready|chưa|không", normalized):
             fail(f"plan overclaims production readiness at line {line_number}")
@@ -140,6 +185,7 @@ def main():
     print(f"READINESS AUDIT: {matrix['overall']}")
     print("- structured partial/open criteria: " + ", ".join(partial))
     print("- implementation/test refs exist; required M00-M11 regressions are wired to CI")
+    print(f"- plan/matrix/evidence graph share main baseline {matrix['main_baseline'][:12]}")
     print(f"- evidence graph resolves {claim_count} scoped claims to matrix refs, plan markers and declared CI commands")
     print("- plan contains no unqualified production-readiness claim")
 

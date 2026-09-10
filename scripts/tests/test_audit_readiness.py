@@ -36,6 +36,18 @@ class ReadinessAuditTests(unittest.TestCase):
     def test_canonical_matrix(self):
         self.assertIn("NOT_READY_FOR_PRODUCTION", self.run_audit(True))
 
+    def test_snapshot_mismatch_is_rejected(self):
+        graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        graph["main_baseline"] = "0" * 40
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        self.assertIn("snapshot mismatch", self.run_audit(False))
+
+    def test_plan_package_status_mismatch_is_rejected(self):
+        plan_path = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
+        plan_path.write_text(plan_path.read_text(encoding="utf-8").replace("| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL", "| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | TODO"), encoding="utf-8")
+        self.assertIn("package status does not match", self.run_audit(False))
+
     def test_missing_reference_is_rejected(self):
         matrix_path = self.root / "docs/plans/READINESS-MATRIX.json"
         matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
