@@ -746,6 +746,8 @@ func validateM11BackupGraph(dir string) error {
 	leases := map[string]corem11.ProductionLease{}
 	leaseApprovals := map[string]corem11.ProductionLeaseApproval{}
 	activations := map[string]corem11.ProductionActivationRecord{}
+	healthSnapshots := map[string]corem11.ProductionHealthSnapshot{}
+	gates := map[string]corem11.ProductionGateDecision{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	authorizations := map[string]corem11.ProductionExecutionAuthorization{}
@@ -784,6 +786,13 @@ func validateM11BackupGraph(dir string) error {
 			}
 			activation := *value.(*corem11.ProductionActivationRecord)
 			activations[activation.LeaseID] = activation
+		case corem11.ArtifactKindHealth:
+			value, status := corem11.DecodeArtifact("health", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 health artifact is invalid")
+			}
+			snapshot := *value.(*corem11.ProductionHealthSnapshot)
+			healthSnapshots[snapshot.SnapshotID] = snapshot
 		case corem11.ArtifactKindLedger:
 			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
 			if status != corem11.Valid {
@@ -807,6 +816,13 @@ func validateM11BackupGraph(dir string) error {
 			}
 			authorization := *value.(*corem11.ProductionExecutionAuthorization)
 			authorizations[authorization.AuthorizationID] = authorization
+		case corem11.ArtifactKindGate:
+			value, status := corem11.DecodeArtifact("gate", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 gate artifact is invalid")
+			}
+			gate := *value.(*corem11.ProductionGateDecision)
+			gates[gate.GateID] = gate
 		case corem11.ArtifactKindExecution:
 			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
 			if status != corem11.Valid {
@@ -879,6 +895,19 @@ func validateM11BackupGraph(dir string) error {
 		ledgerAt, ledgerAtErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
 		if !found || activatedAtErr != nil || ledgerAtErr != nil || activation.LeaseVersion != ledger.LeaseVersion || activation.LeaseHash != ledger.LeaseHash || activatedAt.After(ledgerAt) {
 			return fmt.Errorf("M11 ledger is orphaned from its restored activation")
+		}
+	}
+	// Authorization is a historical decision, so restore does not compare it
+	// with the current clock. It must nevertheless retain the same antecedent
+	// ALLOW gate and health snapshot that the command path observed.
+	for _, authorization := range authorizations {
+		gate, gateOK := gates[authorization.ProductionGateID]
+		health, healthOK := healthSnapshots[authorization.ProductionHealthSnapshotID]
+		authorizedAt, authorizedAtErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
+		gateAt, gateAtErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
+		healthAt, healthAtErr := time.Parse(time.RFC3339, health.ObservedAt)
+		if !gateOK || !healthOK || authorizedAtErr != nil || gateAtErr != nil || healthAtErr != nil || gate.Decision != "ALLOW_PRODUCTION" || authorizedAt.Before(gateAt) || authorizedAt.Before(healthAt) {
+			return fmt.Errorf("M11 authorization lacks a prior restored allow gate and health snapshot")
 		}
 	}
 	// Reconciliation is a narrowly scoped human review of an UNKNOWN effect.
