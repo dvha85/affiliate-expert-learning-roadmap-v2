@@ -1371,6 +1371,13 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 	if err := recoverM11OutcomeJournal(dir); err != nil {
 		return m03.OutcomeRecord{}, corem11.ProductionLedger{}, "", err
 	}
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return m03.OutcomeRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	if state.Stop {
+		return m03.OutcomeRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
+	}
 	outcome, record, validation := validateM11FixtureOutcome(dir, raw)
 	if validation != "VALID" {
 		return outcome, corem11.ProductionLedger{}, "", fmt.Errorf("M11 outcome rejected: %s", validation)
@@ -2102,7 +2109,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := initializeM11Ledger(args[1], args[2], args[3])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-gate":
@@ -2120,7 +2127,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		authorization, status, err := authorizeM11Production(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, authorization, nil, 0)
 	case "m11-reserve-authorization":
@@ -2129,7 +2136,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := reserveM11Authorization(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-record-failed":
@@ -2138,7 +2145,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, executionLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "execution_ledger": executionLedger}, nil, 0)
 	case "m11-record-unknown":
@@ -2147,7 +2154,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, stoppedLedger, status, err := recordUnknownM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, nil, 0)
 	case "m11-reconcile":
@@ -2204,7 +2211,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		outcome, ledger, status, err := recordM11FixtureOutcome(args[1], args[3], raw)
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, map[string]any{"outcome": outcome, "post_ledger": ledger}, nil, 0)
 	case "m11-evaluate":
@@ -2213,7 +2220,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		evaluation, status, err := evaluateM11FixtureOutcome(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, evaluation, nil, 0)
 	case "m11-close-cycle":
@@ -2222,7 +2229,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		cycle, status, err := closeM11FixtureCycle(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, cycle, nil, 0)
 	case "m10-reserve", "reserve":

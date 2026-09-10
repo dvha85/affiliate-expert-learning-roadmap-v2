@@ -325,7 +325,7 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	}
 }
 
-func TestMissionM11GateDurableStopPreventsRegistryWrite(t *testing.T) {
+func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
 		t.Fatalf("init failed: code=%d response=%+v", code, response)
@@ -333,11 +333,31 @@ func TestMissionM11GateDurableStopPreventsRegistryWrite(t *testing.T) {
 	if code, response := missionCall(t, "m11-stop", dir, "gate-stop-drill"); code != 0 || response["status"] != "STOPPED" {
 		t.Fatalf("stop failed: code=%d response=%+v", code, response)
 	}
-	if code, response := missionCall(t, "m11-gate", dir, "missing-lease", "missing-health", "missing-cost", "missing-ledger", "2026-09-08T00:00:00Z"); code == 0 || response["status"] != "STOPPED" {
-		t.Fatalf("stopped gate did not fail closed: code=%d response=%+v", code, response)
+	outcomeInput := filepath.Join(dir, "outcome.json")
+	if err := os.WriteFile(outcomeInput, []byte(`{}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"m11-activate", "missing-lease", "2026-09-08T00:00:00Z"},
+		{"m11-ledger-init", "missing-lease", "2026-09-08T00:00:00Z"},
+		{"m11-gate", "missing-lease", "missing-health", "missing-cost", "missing-ledger", "2026-09-08T00:00:00Z"},
+		{"m11-authorize", "missing-lease", "missing-gate", "fixture_stub", "2026-09-08T00:00:00Z"},
+		{"m11-reserve-authorization", "missing-authorization", "missing-ledger", "2026-09-08T00:00:00Z"},
+		{"m11-record-failed", "missing-authorization", "missing-ledger", "2026-09-08T00:00:00Z", "fixture failure"},
+		{"m11-outcome", outcomeInput, "missing-ledger"},
+		{"m11-evaluate", "missing-outcome", "missing-evaluation", "2026-09-08T00:00:00Z"},
+		{"m11-close-cycle", "missing-cycle", "missing-evaluation", "2026-09-08T00:00:00Z"},
+	} {
+		arguments := append([]string{args[0], dir}, args[1:]...)
+		if code, response := missionCall(t, arguments...); code == 0 || response["status"] != "STOPPED" {
+			t.Fatalf("stopped %s did not fail closed: code=%d response=%+v", args[0], code, response)
+		}
 	}
 	if _, err := os.Stat(m11ArtifactRegistryPath(dir)); !os.IsNotExist(err) {
-		t.Fatalf("stopped gate wrote an M11 registry artifact: %v", err)
+		t.Fatalf("stopped lifecycle command wrote an M11 registry artifact: %v", err)
+	}
+	if _, err := os.Stat(m11OutcomeStorePath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("stopped lifecycle command wrote an M11 outcome artifact: %v", err)
 	}
 }
 
