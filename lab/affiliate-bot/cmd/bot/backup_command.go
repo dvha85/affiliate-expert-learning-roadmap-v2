@@ -669,6 +669,13 @@ func validateM10BackupGraph(dir string) error {
 		if !found || !authorizationBindsMissionState(authorization, state) || authorization.CanaryGrantID != reservation.GrantID || authorization.IntentID != reservation.IntentID || authorization.IntentHash != reservation.IntentHash || authorization.CanaryCostBoundMinor != reservation.CostMinor || authorization.CanaryCostBoundID != reservation.CostBoundID || authorization.CanaryCostBoundHash != reservation.CostBoundHash {
 			return fmt.Errorf("governed reservation is orphaned from restored authorization")
 		}
+		if reservation.ExecutionID == "" {
+			continue
+		}
+		record, found := executions[reservation.ExecutionID]
+		if !found || record.AuthorizationID != reservation.AuthorizationID {
+			return fmt.Errorf("governed reservation execution is orphaned or mismatched")
+		}
 	}
 	outcomes, err := loadM10FixtureOutcomes(dir, state)
 	if err != nil {
