@@ -756,6 +756,7 @@ func validateM11BackupGraph(dir string) error {
 	executionsByID := map[string]corem11.ProductionExecutionRecord{}
 	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
 	cycles := []corem11.ProductionCycleRecord{}
+	admissions := []corem11.ProductionRecoveryAdmission{}
 	for _, outcome := range outcomes {
 		if prior, exists := outcomeExecutionIDs[outcome.EffectRef.EffectID]; exists && prior != outcome.OutcomeID {
 			return fmt.Errorf("M11 execution has more than one restored fixture outcome")
@@ -847,6 +848,12 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 cycle artifact is invalid")
 			}
 			cycles = append(cycles, *value.(*corem11.ProductionCycleRecord))
+		case corem11.ArtifactKindRecoveryAdmission:
+			value, status := corem11.DecodeArtifact("recovery_admission", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 recovery admission artifact is invalid")
+			}
+			admissions = append(admissions, *value.(*corem11.ProductionRecoveryAdmission))
 		}
 	}
 	// The append-only registry permits a lease to be recorded before its human
@@ -881,6 +888,20 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 ledger outcome link is orphaned or mismatched")
 			}
 			ledgerOutcomeLinks[link.OutcomeID] = true
+		}
+	}
+	for _, admission := range admissions {
+		lease, leaseOK := leases[admission.NewLeaseID]
+		approval, approvalOK := leaseApprovals[admission.NewApprovalID]
+		activation, activationOK := activations[admission.NewLeaseID]
+		reviewedAt, reviewedErr := time.Parse(time.RFC3339, admission.ReviewedAt)
+		approvalAt, approvalErr := time.Parse(time.RFC3339, approval.ReviewedAt)
+		normalLedger := false
+		for _, ledger := range ledgers {
+			normalLedger = normalLedger || ledger.LeaseID == admission.NewLeaseID && ledger.LeaseVersion == admission.NewLeaseVersion && ledger.LeaseHash == admission.NewLeaseHash && ledger.ControlMode == "NORMAL" && !ledger.ReconciliationRequired
+		}
+		if !leaseOK || !approvalOK || !activationOK || reviewedErr != nil || approvalErr != nil || !reviewedAt.After(approvalAt) || admission.ExecutionPermitted || lease.LeaseVersion != admission.NewLeaseVersion || lease.LeaseHash != admission.NewLeaseHash || lease.ApprovalRef != admission.NewApprovalID || approval.LeaseID != lease.LeaseID || approval.LeaseVersion != lease.LeaseVersion || approval.LeaseHash != lease.LeaseHash || activation.LeaseVersion != lease.LeaseVersion || activation.LeaseHash != lease.LeaseHash || !normalLedger {
+			return fmt.Errorf("M11 recovery admission lacks a restored new-runtime admission boundary")
 		}
 	}
 	for outcomeID := range outcomesByID {
