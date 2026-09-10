@@ -661,6 +661,15 @@ trỏ predecessor cũ bị từ chối trước append, không thể fork ledger
 link resolution trước đó. Đây là guard lineage offline; không cho phép nối lại
 lease cũ hay chứng minh recovery/execution ngoài fixture.
 
+**Cập nhật M11 health-after-activation boundary (2026-09-10):** `m11-gate`
+từ chối health snapshot được quan sát trước activation của lease, dù hash,
+scope và tuổi snapshot còn hợp lệ; `m11-authorize` kiểm lại cùng quan hệ để
+không dùng gate cũ/đã persist sai làm quyền mới. Backup/restore cũng từ chối
+snapshot có checksum và manifest hợp lệ nhưng health của gate có timestamp trước
+activation. BR-18b gọi learner Bot cho ca gate âm và mutation restore thực tế.
+Đây chỉ là bảo toàn lineage thời gian cho fixture offline, không là telemetry
+thật, business outcome hay execution authority.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact
