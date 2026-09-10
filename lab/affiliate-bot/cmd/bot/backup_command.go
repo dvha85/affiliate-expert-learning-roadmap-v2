@@ -830,6 +830,14 @@ func validateM11BackupGraph(dir string) error {
 			return fmt.Errorf("M11 lease is orphaned from its restored approval")
 		}
 	}
+	for _, outcome := range outcomes {
+		if outcome.EffectRef.EffectKind != "MACHINE_EXECUTION" {
+			return fmt.Errorf("M11 fixture outcome has an unsupported effect kind")
+		}
+		if _, found := executionsByID[outcome.EffectRef.EffectID]; !found {
+			return fmt.Errorf("M11 fixture outcome is orphaned from its restored execution")
+		}
+	}
 	// A lease may remain registered but inactive. Once a ledger exists, however,
 	// it is a lifecycle state created after activation; restore must retain that
 	// exact activation rather than accepting a checksum-valid ledger detached
