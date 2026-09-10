@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -189,5 +190,42 @@ func TestM11OutcomeJournalRecoversAfterOutcomeAppendAckFailure(t *testing.T) {
 	_, head, err = m11LedgerHead(dir, journal.Ledger.LeaseID)
 	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
 		t.Fatalf("replay duplicated or changed the ledger transition: ledger=%+v err=%v", head, err)
+	}
+}
+
+func TestBackupCreateRecoversPendingM11OutcomeJournal(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init backup recovery fixture: code=%d response=%+v", code, response)
+	}
+	journal, _ := setupM11OutcomeJournalFixture(t, dir)
+	if _, err := buildBR10AdvisorFixture(dir); err != nil {
+		t.Fatalf("build backup history fixture: %v", err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("remove fixture-only backup input %s: %v", name, err)
+		}
+	}
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	backup, restored := filepath.Join(t.TempDir(), "backup"), filepath.Join(t.TempDir(), "restored")
+	if code, response := backupCall(t, "create", dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup create did not recover pending M11 outcome journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("outcome journal remains after backup recovery: %v", err)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("outcome-journal backup did not restore: code=%d response=%+v", code, response)
+	}
+	outcomes, err := loadM11FixtureOutcomes(restored)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("restored outcome differs after journal recovery: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err := m11LedgerHead(restored, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("restored ledger differs after journal recovery: ledger=%+v err=%v", head, err)
 	}
 }

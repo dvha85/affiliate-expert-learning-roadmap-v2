@@ -462,6 +462,8 @@ trước khi caller nhận ACK. Journal phải còn lại, outcome và ledger tr
 `EXACT_DUPLICATE`, xóa journal và không thêm outcome/ledger mới. Đây là bằng
 chứng deterministic cho đúng recovery seam đó, không chứng minh atomicity
 đa-file khi mất điện hoặc external business outcome.
+`backup create` cũng được test recovery journal này trước inventory, rồi
+restore xác nhận cùng outcome và post-outcome ledger từ runtime mới.
 
 **Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
 ghi `m11-failed-execution-journal/v1` trước cặp immutable
