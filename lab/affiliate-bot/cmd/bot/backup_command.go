@@ -633,6 +633,7 @@ func validateM10BackupGraph(dir string) error {
 		return fmt.Errorf("restored state has invalid canary grant: %w", err)
 	}
 	grantFound := false
+	bounds := map[string]corem10.TrustedCostBound{}
 	authorizations := map[string]corem10.ExecutionAuthorization{}
 	executions := map[string]corem10.ExecutionRecord{}
 	for _, entry := range entries {
@@ -645,6 +646,13 @@ func validateM10BackupGraph(dir string) error {
 				return fmt.Errorf("restored authorization is invalid: %w", err)
 			}
 			authorizations[authorization.AuthorizationID] = authorization
+		}
+		if entry.ArtifactKind == corem10.ArtifactKindTrustedCostBound {
+			bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
+			if status != "VALID" {
+				return fmt.Errorf("restored cost bound is invalid")
+			}
+			bounds[bound.CostBoundID] = bound
 		}
 		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
 			continue
@@ -662,6 +670,12 @@ func validateM10BackupGraph(dir string) error {
 	// continue to resolve to the immutable authorization that established its
 	// binding, even before an execution record exists to expose the orphan.
 	for _, reservation := range state.Reservations {
+		if reservation.CostBoundID != "" || reservation.CostBoundHash != "" {
+			bound, found := bounds[reservation.CostBoundID]
+			if !found || reservation.CostBoundID == "" || reservation.CostBoundHash == "" || bound.CostBoundHash != reservation.CostBoundHash || bound.IntentID != reservation.IntentID || bound.IntentHash != reservation.IntentHash || bound.MaxCostMinor != reservation.CostMinor {
+				return fmt.Errorf("reservation is orphaned from restored cost bound")
+			}
+		}
 		if reservation.ReservationMode != "GOVERNED_AUTHORIZATION" {
 			continue
 		}

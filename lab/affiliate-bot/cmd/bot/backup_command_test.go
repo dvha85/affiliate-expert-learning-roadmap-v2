@@ -598,6 +598,60 @@ func TestBackupRestoreRejectsReservationOutsideAuthorizationLifetime(t *testing.
 	}
 }
 
+func TestBackupRestoreRejectsReservationMissingRegistryCostBound(t *testing.T) {
+	runtime, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtime)
+	if code, response := missionCall(t, "m10-reserve", runtime, boundPath, "legacy-cost-bound-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	var bound corem10.TrustedCostBound
+	if err := readJSON(boundPath, &bound); err != nil {
+		t.Fatal(err)
+	}
+	var gate corem10.CanaryGateDecision
+	if err := readJSON(gatePath, &gate); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(root, "cost-bound-link-backup")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup failed: code=%d response=%+v", code, response)
+	}
+
+	registryPath := m10ArtifactRegistryPath(runtime)
+	registryRaw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindCanaryGate, gate.GateID)
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindTrustedCostBound, bound.CostBoundID)
+	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "cost-bound-link-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup accepted a reservation missing its registry cost bound: code=%d response=%+v", code, response)
+	}
+	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := filepath.Join(root, "cost-bound-link-broken")
+	copyFlatBackup(t, backup, broken)
+	registryPath = filepath.Join(broken, "m10-artifacts.jsonl")
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindCanaryGate, gate.GateID)
+	removeM10ArtifactEntry(t, registryPath, corem10.ArtifactKindTrustedCostBound, bound.CostBoundID)
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", broken, filepath.Join(root, "cost-bound-link-restored")); code == 0 || response["status"] != "GRAPH_FAILED" {
+		t.Fatalf("restore accepted a reservation missing its registry cost bound: code=%d response=%+v", code, response)
+	}
+}
+
 func TestBackupRejectsUnknownAndUninventoriedArtifacts(t *testing.T) {
 	runtime := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
