@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -619,8 +620,24 @@ func validateM10BackupGraph(dir string) error {
 	if err != nil {
 		return err
 	}
+	// The mutable mission state is never sufficient evidence of a delegation.
+	// On restore its active canary must resolve to the exact immutable registry
+	// entry; otherwise a checksum-valid backup could retain counters while
+	// silently dropping the grant that bounds them.
+	grantRaw, err := json.Marshal(state.Canary.CanaryGrant)
+	if err != nil {
+		return err
+	}
+	grantEntry, err := corem10.NewArtifactEntry(corem10.ArtifactKindCanaryGrant, grantRaw)
+	if err != nil {
+		return fmt.Errorf("restored state has invalid canary grant: %w", err)
+	}
+	grantFound := false
 	executions := map[string]corem10.ExecutionRecord{}
 	for _, entry := range entries {
+		if entry.ArtifactKind == corem10.ArtifactKindCanaryGrant && entry.ArtifactID == grantEntry.ArtifactID && entry.ContentHash == grantEntry.ContentHash && bytes.Equal(entry.Artifact, grantEntry.Artifact) {
+			grantFound = true
+		}
 		if entry.ArtifactKind != corem10.ArtifactKindExecutionRecord {
 			continue
 		}
@@ -629,6 +646,9 @@ func validateM10BackupGraph(dir string) error {
 			return fmt.Errorf("M10 execution record is orphaned from restored reservation")
 		}
 		executions[record.ExecutionID] = record
+	}
+	if !grantFound {
+		return fmt.Errorf("active canary grant is absent from restored registry")
 	}
 	outcomes, err := loadM10FixtureOutcomes(dir, state)
 	if err != nil {
@@ -932,6 +952,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		if e := validateAccesstradeBackupGraph(args[1]); e != nil {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime ACCESSTRADE receipt graph is invalid: %w", e), 1)
+		}
+		if e := validateM10BackupGraph(args[1]); e != nil {
+			return emit("INPUT_ERROR", nil, fmt.Errorf("runtime M10 graph is invalid: %w", e), 1)
 		}
 		files, e := backupFiles(args[1])
 		if e != nil {
