@@ -670,6 +670,14 @@ activation. BR-18b gọi learner Bot cho ca gate âm và mutation restore thực
 Đây chỉ là bảo toàn lineage thời gian cho fixture offline, không là telemetry
 thật, business outcome hay execution authority.
 
+**Cập nhật M11 activation lease-window graph (2026-09-10):** canonical M11
+registry decoder giờ reject activation có timestamp trước `ValidFrom` hoặc tại/
+sau `ExpiresAt` của exact lease, nên backup create và restore staging cùng fail
+closed với artifact checksum/manifest hợp lệ nhưng admission lifecycle không
+thể xảy ra. Core regression mutate activation trực tiếp; BR-18b mutate backup
+qua learner Bot. Đây chỉ kiểm graph timestamp của fixture runtime, không chứng
+minh clock đáng tin cậy, quyền executor hay production activation.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

@@ -47,6 +47,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenGateEntries); err == nil {
 		t.Fatal("gate with mismatched ledger head was accepted")
 	}
+	brokenActivation := activation
+	brokenActivation.ActivatedAt = "2026-09-07T23:59:59Z"
+	brokenActivationEntries := append([]ArtifactEntry(nil), entries...)
+	brokenActivationEntries[5] = m11Entry(t, ArtifactKindActivation, brokenActivation)
+	if err := ValidateArtifactGraph(brokenActivationEntries); err == nil {
+		t.Fatal("activation outside its lease lifetime was accepted")
+	}
 	brokenEvaluation := evaluation
 	brokenEvaluation.ExecutionID = "orphan-execution"
 	brokenEvaluationEntries := append([]ArtifactEntry(nil), entries...)

@@ -405,6 +405,9 @@ def main():
         pre_activation_health_backup = root / "pre-activation-health-backup"; shutil.copytree(backup, pre_activation_health_backup)
         rewrite_m11_registry(pre_activation_health_backup, replace_m11_health_observed_at("2026-09-07T23:59:59Z"))
         assert invoke(bot, "backup", "restore", pre_activation_health_backup, root / "pre-activation-health-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        activation_outside_lease_backup = root / "activation-outside-lease-backup"; shutil.copytree(backup, activation_outside_lease_backup)
+        rewrite_m11_registry(activation_outside_lease_backup, replace_m11_field("PRODUCTION_ACTIVATION", "activated_at", "2026-09-07T01:00:00Z"))
+        assert invoke(bot, "backup", "restore", activation_outside_lease_backup, root / "activation-outside-lease-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_m11_reservation_backup = root / "orphan-m11-reservation-backup"; shutil.copytree(backup, orphan_m11_reservation_backup)
         def orphan_m11_reservation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or production_failed["artifact"]["execution"]["execution_id"] not in entry["artifact"].get("pending_execution_ids", []):
@@ -609,7 +612,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":
