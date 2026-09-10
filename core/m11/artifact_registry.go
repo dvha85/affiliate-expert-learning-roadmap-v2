@@ -197,7 +197,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			authorizations[x.AuthorizationID] = *x
 		case *ProductionExecutionRecord:
 			auth, ok := authorizations[x.AuthorizationID]
-			if !ok || auth.IntentID != x.IntentID || auth.IntentHash != x.IntentHash || auth.ExecutorID != x.ExecutorID || auth.IdempotencyKey != x.IdempotencyKey || auth.CorrelationID != x.CorrelationID || auth.ProductionLeaseID != x.ProductionLeaseID || auth.ProductionLeaseVersion != x.ProductionLeaseVersion || auth.ProductionLeaseHash != x.ProductionLeaseHash || auth.ProductionGateID != x.ProductionGateID || auth.ProductionHealthSnapshotID != x.ProductionHealthSnapshotID || auth.ProductionHealthSnapshotHash != x.ProductionHealthSnapshotHash || auth.ProductionCostBoundID != x.ProductionCostBoundID || auth.ProductionCostBoundHash != x.ProductionCostBoundHash || auth.ProductionCostBoundMinor != x.ProductionCostBoundMinor {
+			attemptedAt, attemptedErr := time.Parse(time.RFC3339, x.AttemptedAt)
+			authorizedAt, authorizedErr := time.Parse(time.RFC3339, auth.AuthorizedAt)
+			expiresAt, expiryErr := time.Parse(time.RFC3339, auth.ExpiresAt)
+			if !ok || attemptedErr != nil || authorizedErr != nil || expiryErr != nil || auth.IntentID != x.IntentID || auth.IntentHash != x.IntentHash || auth.ExecutorID != x.ExecutorID || auth.IdempotencyKey != x.IdempotencyKey || auth.CorrelationID != x.CorrelationID || auth.ProductionLeaseID != x.ProductionLeaseID || auth.ProductionLeaseVersion != x.ProductionLeaseVersion || auth.ProductionLeaseHash != x.ProductionLeaseHash || auth.ProductionGateID != x.ProductionGateID || auth.ProductionHealthSnapshotID != x.ProductionHealthSnapshotID || auth.ProductionHealthSnapshotHash != x.ProductionHealthSnapshotHash || auth.ProductionCostBoundID != x.ProductionCostBoundID || auth.ProductionCostBoundHash != x.ProductionCostBoundHash || auth.ProductionCostBoundMinor != x.ProductionCostBoundMinor || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) {
 				return fmt.Errorf("production execution has an orphaned or mismatched link")
 			}
 			executions[x.ExecutionID] = *x

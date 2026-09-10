@@ -435,6 +435,9 @@ def main():
             return True
         rewrite_m11_registry(authorization_stale_health_backup, authorization_stale_health_change)
         assert invoke(bot, "backup", "restore", authorization_stale_health_backup, root / "authorization-stale-health-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        execution_at_authorization_expiry_backup = root / "execution-at-authorization-expiry-backup"; shutil.copytree(backup, execution_at_authorization_expiry_backup)
+        rewrite_m11_registry(execution_at_authorization_expiry_backup, replace_m11_field("PRODUCTION_EXECUTION_AUTHORIZATION", "expires_at", "2026-09-08T00:00:02Z"))
+        assert invoke(bot, "backup", "restore", execution_at_authorization_expiry_backup, root / "execution-at-authorization-expiry-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         ledger_before_activation_backup = root / "ledger-before-activation-backup"; shutil.copytree(backup, ledger_before_activation_backup)
         def ledger_before_activation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or not entry["artifact"].get("outcome_links"):
