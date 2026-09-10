@@ -443,9 +443,13 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	}
 	beforeState := missionRuntimeSnapshot(t, runtimeDir)
 	recordPath := filepath.Join(root, "record-fault.json")
+	atomicWrites := 0
 	missionStateWriteFault = func(phase string) error {
 		if phase == "before_rename" {
-			return errors.New("injected state commit fault after M10 registry append")
+			atomicWrites++ // journal, then reservation binding
+			if atomicWrites == 2 {
+				return errors.New("injected state commit fault after M10 registry append")
+			}
 		}
 		return nil
 	}
@@ -456,6 +460,12 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
 		t.Fatalf("state commit fault created portable output: %v", err)
 	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); err != nil {
+		t.Fatalf("M10 journal was not retained after state commit fault: %v", err)
+	}
+	if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("status did not fail closed on M10 execution journal: code=%d response=%+v", code, response)
+	}
 	afterFaultState := missionRuntimeSnapshot(t, runtimeDir)
 	if !bytes.Equal(beforeState["mission-state.json"], afterFaultState["mission-state.json"]) {
 		t.Fatal("registry/state fault changed mutable mission state")
@@ -463,12 +473,12 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	if bytes.Equal(beforeState["m10-artifacts.jsonl"], afterFaultState["m10-artifacts.jsonl"]) {
 		t.Fatal("fixture did not reach the registry-before-state failure seam")
 	}
-	if code, response := backupCall(t, "create", runtimeDir, filepath.Join(root, "record-fault-backup-before-retry")); code == 0 || response["status"] != "INPUT_ERROR" {
-		t.Fatalf("backup accepted unresolved registry/state fault: code=%d response=%+v", code, response)
-	}
 	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "fixture state commit fault"); code != 0 || response["status"] != "APPENDED" {
-		t.Fatalf("exact retry did not repair registry/state link: code=%d response=%+v", code, response)
+		t.Fatalf("locked writer did not recover registry/state link before exact retry: code=%d response=%+v", code, response)
 	} else {
+		if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("M10 journal remains after locked recovery: %v", err)
+		}
 		artifact, ok := response["artifact"].(map[string]any)
 		if !ok {
 			t.Fatalf("record response has no artifact: %+v", response)
