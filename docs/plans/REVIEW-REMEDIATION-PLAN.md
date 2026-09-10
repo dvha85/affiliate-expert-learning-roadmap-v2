@@ -473,6 +473,12 @@ và M10 registry graph cùng đòi `AttemptedAt` từ `AuthorizedAt` đến trư
 mutation; regression backup thay record trong registry, cập nhật checksum và
 manifest, rồi bị reject. Không biến fixture no-side-effect thành live execution.
 
+**Cập nhật M10 execution-reservation order (2026-09-10):** terminal record
+phải có `AttemptedAt` không sớm hơn `ReservedAt`, vì reservation mới là commit
+budget trước execution. Learner command reject record đến trước reservation mà
+không mutation; backup/restore reject registry tamper có checksum/manifest hợp
+lệ. Không suy điều này thành proof cho multi-file crash hoặc executor thật.
+
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.
 - Manifest dùng relative paths chuẩn hóa và checksum/size/type/version. Backup đệ quy theo inventory; layout chưa hỗ trợ phải reject rõ thay vì skip thư mục. Reject symlink/path traversal và đích backup nằm trong source gây self-inclusion.
 - Quiesce writer/lock snapshot hoặc dùng snapshot transaction. Copy bytes nhất quán với ledger/state/STOP; chỉ publish manifest sau snapshot hoàn tất.

@@ -917,6 +917,11 @@ func validateExecutionReservation(s LearnerMissionState, authorization corem10.E
 	if priorExecutionID := s.Reservations[index].ExecutionID; priorExecutionID != "" && priorExecutionID != record.ExecutionID {
 		return -1, fmt.Errorf("reservation already binds a different execution record")
 	}
+	reservedAt, reservedAtErr := time.Parse(time.RFC3339, s.Reservations[index].ReservedAt)
+	attemptedAt, attemptedAtErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	if reservedAtErr != nil || attemptedAtErr != nil || attemptedAt.Before(reservedAt) {
+		return -1, fmt.Errorf("execution record predates its budget reservation")
+	}
 	return index, nil
 }
 
