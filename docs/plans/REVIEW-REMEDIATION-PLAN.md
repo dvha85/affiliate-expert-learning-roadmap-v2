@@ -484,8 +484,10 @@ lệ. Không suy điều này thành proof cho multi-file crash hoặc executor 
 `mission-state`. Lúc dở dang, portable output không xuất hiện; journal M10
 bền yêu cầu `status` fail-closed. Lệnh writer có lock kế tiếp canonical-validate
 journal, append/replay record nếu cần, bind đúng reservation rồi mới xử lý retry
-exact và cho backup hợp lệ. Journal stale/tamper không được đoán hoặc bỏ qua.
-Đây là recovery cục bộ có giới hạn, **không** là transaction đa-file hay
+exact và cho backup hợp lệ. Regression journal có record hợp lệ nhưng
+`reservation_id` không resolve chứng minh writer và backup trả
+`RECOVERY_REQUIRED`, giữ nguyên journal/state/registry; tamper không được đoán
+hoặc bỏ qua. Đây là recovery cục bộ có giới hạn, **không** là transaction đa-file hay
 power-loss proof.
 
 - Định nghĩa inventory M00–M10: history, human action/outcome, evaluation, improvement/review, AgentProposal đã persist từ RP-05, intent/policy/per-action approval, canary grant/grant approval, TrustedCostBound, gate decision, ExecutionAuthorization, ExecutionRecord, machine outcome/EffectRef, reservation/pre-post ledger/consumed markers/STOP, và nested advisor bundle. Các artifact từ RP-03/RP-05 phải được tạo qua runtime trong test snapshot, không dựng file placeholder. Khai báo store ngoài runtime root; không tự gom secret hoặc gọi toàn bộ home là backup.

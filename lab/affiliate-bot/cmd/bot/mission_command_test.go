@@ -498,6 +498,52 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	}
 }
 
+func TestMissionM10ExecutionJournalTamperFailsClosed(t *testing.T) {
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "journal-tamper-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "journal-tamper-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	authorizationRaw, err := os.ReadFile(authorizationPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization, err := corem10.ValidateExecutionAuthorization(authorizationRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := corem10.FailCanaryExecutionFixture(corem10.FailedExecutionInput{Authorization: authorization, AttemptedAt: "2026-09-08T00:00:00Z", Reason: "fixture journal tamper"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	journal := m10ExecutionJournal{Version: "m10-execution-journal/v1", ReservationID: "missing-reservation", AuthorizationID: authorization.AuthorizationID, Record: record}
+	if err := writeJSONAtomic(m10ExecutionJournalPath(runtimeDir), journal); err != nil {
+		t.Fatal(err)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	outputPath := filepath.Join(root, "journal-tamper-output.json")
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, outputPath, "2026-09-08T00:00:00Z", "fixture journal tamper"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("writer accepted a tampered M10 execution journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("tampered journal created portable output: %v", err)
+	}
+	if code, response := backupCall(t, "create", runtimeDir, filepath.Join(root, "journal-tamper-backup")); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("backup accepted a tampered M10 execution journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); err != nil {
+		t.Fatalf("tampered M10 journal was removed: %v", err)
+	}
+	after := missionRuntimeSnapshot(t, runtimeDir)
+	if !bytes.Equal(before["mission-state.json"], after["mission-state.json"]) || !bytes.Equal(before["m10-artifacts.jsonl"], after["m10-artifacts.jsonl"]) {
+		t.Fatal("tampered M10 journal mutated canonical state")
+	}
+}
+
 func TestMissionM10RecordRejectsBeforeReservationWithoutMutation(t *testing.T) {
 	runtimeDir, boundPath, gatePath, expiryTime := authorityExpiryFixture(t, "cost")
 	reservationTime := expiryTime.Add(-30 * time.Second)
