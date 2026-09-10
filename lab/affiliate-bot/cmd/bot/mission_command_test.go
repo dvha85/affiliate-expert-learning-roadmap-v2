@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -246,6 +248,39 @@ func assertMissionRuntimeUnchanged(t *testing.T, before map[string][]byte, dir s
 	}
 }
 
+func buildMissionBinary(t *testing.T) string {
+	t.Helper()
+	binary := filepath.Join(t.TempDir(), "bot")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	if output, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build mission binary: %v: %s", err, output)
+	}
+	return binary
+}
+
+func missionBinaryCall(t *testing.T, binary string, args ...string) (int, map[string]any) {
+	t.Helper()
+	command := exec.Command(binary, args...)
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	err := command.Run()
+	code := 0
+	if err != nil {
+		exit, ok := err.(*exec.ExitError)
+		if !ok {
+			t.Fatal(err)
+		}
+		code = exit.ExitCode()
+	}
+	response := map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
+		t.Fatalf("decode mission binary response %q: %v (stderr: %s)", stdout.String(), err, stderr.String())
+	}
+	return code, response
+}
+
 // authorityExpiryFixture drives the actual learner Bot M08→M10 admission
 // path. The unexported mission clock is a test-only runtime seam; command
 // arguments never select it.
@@ -349,6 +384,26 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 				}
 				assertMissionRuntimeUnchanged(t, before, runtimeDir)
 			}
+		})
+	}
+}
+
+func TestMissionM10AuthorityExpiryRejectsInFreshProcessWithoutMutation(t *testing.T) {
+	binary := buildMissionBinary(t)
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		t.Run(expiring, func(t *testing.T) {
+			runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, expiring)
+			before := missionRuntimeSnapshot(t, runtimeDir)
+			authorizationPath := filepath.Join(filepath.Dir(runtimeDir), "fresh-process-authorization.json")
+			// The child has the normal production wall clock. Its authority can
+			// only be expired; no test clock reaches the command-line process.
+			if code, response := missionBinaryCall(t, binary, "mission", "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
+				t.Fatalf("fresh process accepted expired %s authority: code=%d response=%+v", expiring, code, response)
+			}
+			if _, err := os.Stat(authorizationPath); !os.IsNotExist(err) {
+				t.Fatalf("fresh process created output for expired %s authority: %v", expiring, err)
+			}
+			assertMissionRuntimeUnchanged(t, before, runtimeDir)
 		})
 	}
 }
