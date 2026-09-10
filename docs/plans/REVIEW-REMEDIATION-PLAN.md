@@ -594,6 +594,14 @@ chứng deterministic cho đúng recovery seam đó, không chứng minh atomici
 `backup create` cũng được test recovery journal này trước inventory, rồi
 restore xác nhận cùng outcome và post-outcome ledger từ runtime mới.
 
+**Cập nhật complete lease-approval snapshot link (2026-09-10):** registry có
+thể append lease trước approval trong flow cấp phát, nhưng backup/restore yêu
+cầu graph hoàn chỉnh: mọi lease đã persist phải resolve đúng approval theo ID,
+version/hash, promotion/canary refs và reviewer/time. Smoke tạo backup runtime
+mới thật, xóa approval M11 rồi cập nhật checksum/manifest; restore trả
+`GRAPH_FAILED` trước publish. Đây chỉ chứng minh semantic snapshot validation
+cho link đó, không là external review evidence hoặc atomic multi-file proof.
+
 **Cập nhật read/export boundary của M11 journal (2026-09-10):** trong khi bất
 kỳ journal `FAILED`, `UNKNOWN→STOP` hoặc outcome nào còn pending,
 `m11-resolve` và `m11-recovery-export` trả `RECOVERY_REQUIRED` trước khi đọc

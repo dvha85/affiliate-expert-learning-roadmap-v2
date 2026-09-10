@@ -43,6 +43,19 @@ def rewrite_m11_registry(backup, change):
     replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
 
 
+def remove_m11_entry(backup, kind, artifact_id):
+    lines, removed = [], False
+    for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        if entry["artifact_kind"] == kind and entry["artifact_id"] == artifact_id:
+            removed = True
+            continue
+        lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
+    if not removed:
+        raise AssertionError(("missing M11 artifact to remove", kind, artifact_id))
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
 def replace_m11_field(kind, field, value):
     def change(entry):
         if entry["artifact_kind"] != kind:
@@ -454,6 +467,10 @@ def main():
         rewrite_m11_registry(broken_approval_backup, replace_m11_field("PRODUCTION_LEASE_APPROVAL", "lease_hash", "sha256:" + "e" * 64))
         broken_approval_result = invoke(bot, "backup", "restore", broken_approval_backup, root / "broken-recovery-approval-restored", expected=1, env=env)
         assert broken_approval_result["status"] == "VERIFY_FAILED", broken_approval_result
+        missing_approval_backup = root / "missing-recovery-approval-backup"; shutil.copytree(admission_backup, missing_approval_backup)
+        remove_m11_entry(missing_approval_backup, "PRODUCTION_LEASE_APPROVAL", admission_lease_value["approval_ref"])
+        missing_approval_result = invoke(bot, "backup", "restore", missing_approval_backup, root / "missing-recovery-approval-restored", expected=1, env=env)
+        assert missing_approval_result["status"] == "GRAPH_FAILED", missing_approval_result
         assert invoke(bot, "backup", "restore", admission_backup, admission_restored, env=env)["status"] == "RESTORED"
         assert invoke(bot, "mission", "m11-resolve", admission_restored, "PRODUCTION_RECOVERY_ADMISSION", "br18-recovery-admission", env=env)["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-authorize", admission_restored, admission_lease_value["lease_id"], "missing-gate", "fixture_stub", "2026-09-08T00:00:08Z", expected=1, env=env)["status"] == "REJECTED"
