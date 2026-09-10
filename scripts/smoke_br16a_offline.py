@@ -415,7 +415,7 @@ def main(argv=None):
         assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
         unknown_status = invoke(bot, "mission", "status", state)["artifact"]
         assert unknown_status["stop"] is True and unknown_status["stop_reason"] == "RECONCILIATION_REQUIRED"
-        assert invoke(bot, "mission", "m11-activate", state, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m11-activate", state, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "STOPPED"
         recovery_resolution_path = work / "recovery-resolution.json"
         write_production_resolution(recovery_resolution_path, recovery_lease, recovery_unknown["artifact"]["execution"]["execution_id"])
         assert invoke(bot, "mission", "m11-register", state, "PRODUCTION_RECONCILIATION", recovery_resolution_path)["status"] == "APPENDED"
@@ -501,7 +501,7 @@ def main(argv=None):
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_EXECUTION_RECORD", recovery_unknown["artifact"]["execution"]["execution_id"])["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_RECONCILIATION", "br16-recovery-resolution")["status"] == "RESOLVED"
         assert invoke(bot, "mission", "m11-resolve", restored, "PRODUCTION_LEDGER", reviewed_ledger_id)["status"] == "RESOLVED"
-        assert invoke(bot, "mission", "m11-activate", restored, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m11-activate", restored, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "STOPPED"
         restored_handoff = invoke(bot, "mission", "m11-recovery-export", restored, "br16-recovery-resolution", reviewed_ledger_id, work / "restored-recovery-handoff.json")
         assert restored_handoff["status"] == "APPENDED" and restored_handoff["artifact"]["execution_permitted"] is False
         assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"

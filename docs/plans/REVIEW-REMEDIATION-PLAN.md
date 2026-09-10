@@ -597,6 +597,12 @@ BR-16b dùng report để learner replay/resolve artifact thật và xác nhận
 reject canary; điều này không thay clean-machine pilot hoặc chứng minh người
 mới tự hoàn thành không trợ giúp.
 
+**Cập nhật STOP response contract (2026-09-10):** sau khi load durable STOP,
+`mission m11-activate` trả envelope `STOPPED` (và exit non-zero) thay vì
+`REJECTED`; regression tạo lease/approval thật, STOP rồi thử lại activation.
+Runbook kiểm chính lệnh này sau restore. Đây chỉ là contract fail-closed của
+CLI, không làm lease fixture hợp lệ hay cấp authority.
+
 **Cập nhật race CI (2026-09-08):** `deterministic-runtime` chạy thêm
 `go test -race ./...` cho learner Bot. Local race suite PASS. Race detector là
 phủ trợ cho smoke multi-process, không chứng minh transaction đa-file hoặc
