@@ -690,6 +690,11 @@ activation cùng normal non-reconciliation ledger; admission luôn non-authorizi
 Không đọc hay suy diễn runtime cũ từ path. BR-18b xóa new ledger trong backup
 checksum-hợp-lệ và restore `GRAPH_FAILED`; không chứng minh recovery đa-runtime.
 
+**Cập nhật M11 recovery-admission cardinality (2026-09-10):** learner và
+backup graph reject admission thứ hai dùng cùng new lease hoặc cùng
+prior-runtime/resolution lineage. BR-18b gọi command thật với ID admission khác
+và nhận `REJECTED`; đây chỉ chống audit ambiguity offline.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

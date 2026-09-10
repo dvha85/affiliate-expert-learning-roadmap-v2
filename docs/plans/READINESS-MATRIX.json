@@ -6,6 +6,7 @@
   "recent_updates": [
     {"id":"RP-07-ledger-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"reject ledger times before a registered activation; interim registry drafts remain outside completed backup snapshots"},
     {"id":"RP-07-recovery-admission-restore","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/backup_command.go"],"test_refs":["scripts/smoke_br18b_backup_restore.py"],"scope":"validate new-runtime lease, approval, activation and normal-ledger links only; never infer the prior runtime from a path"}
+    ,{"id":"RP-07-recovery-admission-cardinality","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/m11_registry.go","lab/affiliate-bot/cmd/bot/backup_command.go"],"test_refs":["scripts/smoke_br18b_backup_restore.py"],"scope":"one admission per new lease and prior resolution lineage"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},

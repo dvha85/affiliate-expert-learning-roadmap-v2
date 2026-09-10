@@ -1113,6 +1113,23 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	if resolvedErr != nil || approvalErr != nil || admissionErr != nil || !approvalAt.After(resolvedAt) || !admissionAt.After(approvalAt) || lease.ApprovalRef != approval.ApprovalID || lease.LeaseVersion != admission.NewLeaseVersion || lease.LeaseHash != admission.NewLeaseHash || admission.PriorRuntimeDir != oldAbs || admission.NewRuntimeDir != newAbs || admission.PriorLeaseID != expected["prior_lease_id"] || admission.PriorLeaseVersion != expected["prior_lease_version"] || admission.PriorLeaseHash != expected["prior_lease_hash"] || admission.PriorApprovalID != expected["prior_approval_id"] || admission.ResolutionID != expected["resolution_id"] || admission.NewLeaseID != lease.LeaseID || admission.NewApprovalID != approval.ApprovalID || admission.ExecutionPermitted {
 		return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery admission does not bind a separately reviewed new runtime and lease")
 	}
+	newEntries, err := loadM11ArtifactRegistry(newDir)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	for _, entry := range newEntries {
+		if entry.ArtifactKind != corem11.ArtifactKindRecoveryAdmission {
+			continue
+		}
+		value, status := corem11.DecodeArtifact("recovery_admission", entry.Artifact)
+		if status != corem11.Valid {
+			return corem11.ArtifactEntry{}, "", fmt.Errorf("invalid registered recovery admission")
+		}
+		prior := value.(*corem11.ProductionRecoveryAdmission)
+		if prior.RecoveryAdmissionID != admission.RecoveryAdmissionID && (prior.NewLeaseID == admission.NewLeaseID || prior.PriorRuntimeDir == admission.PriorRuntimeDir && prior.ResolutionID == admission.ResolutionID) {
+			return corem11.ArtifactEntry{}, "", fmt.Errorf("recovery admission lineage is already bound")
+		}
+	}
 	return registerM11Artifact(newDir, corem11.ArtifactKindRecoveryAdmission, admissionRaw)
 }
 
