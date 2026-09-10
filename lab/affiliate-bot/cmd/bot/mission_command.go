@@ -959,12 +959,14 @@ func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRec
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
 	seen := map[string]bool{}
+	seenExecution := map[string]bool{}
 	for scanner.Scan() {
 		outcome, status := validateM10FixtureOutcome(dir, s, scanner.Bytes())
-		if status != "VALID" || seen[outcome.OutcomeID] {
+		if status != "VALID" || seen[outcome.OutcomeID] || seenExecution[outcome.EffectRef.EffectID] {
 			return nil, fmt.Errorf("invalid M10 fixture outcome store")
 		}
 		seen[outcome.OutcomeID] = true
+		seenExecution[outcome.EffectRef.EffectID] = true
 		outcomes = append(outcomes, outcome)
 	}
 	if err := scanner.Err(); err != nil {
@@ -2049,6 +2051,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, prior := range outcomes {
 			if prior.OutcomeID != outcome.OutcomeID {
+				if prior.EffectRef.EffectID == outcome.EffectRef.EffectID {
+					return emit("CONFLICT", nil, fmt.Errorf("execution already has a fixture outcome"), 1)
+				}
 				continue
 			}
 			if reflect.DeepEqual(prior, outcome) {
