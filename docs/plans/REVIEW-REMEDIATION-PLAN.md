@@ -151,7 +151,14 @@ nghiệm thu trên `main`**.
   `MACHINE_EXECUTION` resolve record đã registry cấp và state xác nhận bind
   reservation. Smoke cover record retry và forged EffectRef reject. Đây không
   phải execution success, business outcome, cross-store canonical outcome graph
-  hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
+hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
+- **RP-03 canonical binding before portable output (2026-09-10):**
+  `m10-record-failed` và `m10-cancel` bind `ExecutionID` vào reservation state
+  sau canonical registry append nhưng trước khi ghi output path do caller chọn.
+  BR-16a cố tình tạo output conflict, kiểm response `CONFLICT` vẫn có record
+  canonical, state đã bind exact execution, rồi retry sang path mới thành công.
+  Không coi portable output là commit boundary, không chứng minh transaction
+  registry/state khi crash và không cấp execution authority.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation
