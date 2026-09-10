@@ -909,10 +909,12 @@ func validateM11BackupGraph(dir string) error {
 			return fmt.Errorf("M11 gate budget snapshot does not match its restored ledger")
 		}
 		activation, activationOK := activations[gate.LeaseID]
+		health, healthOK := healthSnapshots[gate.HealthSnapshotID]
 		gateAt, gateAtErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
 		activatedAt, activatedAtErr := time.Parse(time.RFC3339, activation.ActivatedAt)
-		if !activationOK || gateAtErr != nil || activatedAtErr != nil || activation.LeaseVersion != gate.LeaseVersion || activation.LeaseHash != gate.LeaseHash || gateAt.Before(activatedAt) {
-			return fmt.Errorf("M11 gate predates its restored activation")
+		healthAt, healthAtErr := time.Parse(time.RFC3339, health.ObservedAt)
+		if !activationOK || !healthOK || gateAtErr != nil || activatedAtErr != nil || healthAtErr != nil || activation.LeaseVersion != gate.LeaseVersion || activation.LeaseHash != gate.LeaseHash || health.LeaseID != gate.LeaseID || health.LeaseVersion != gate.LeaseVersion || health.LeaseHash != gate.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) {
+			return fmt.Errorf("M11 gate or health predates its restored activation")
 		}
 	}
 	// Authorization is a historical decision, so restore does not compare it

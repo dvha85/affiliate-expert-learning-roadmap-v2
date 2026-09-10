@@ -83,6 +83,29 @@ def replace_m11_field(kind, field, value):
     return change
 
 
+def replace_m11_health_observed_at(value):
+    def change(entry):
+        if entry["artifact_kind"] != "PRODUCTION_HEALTH_SNAPSHOT":
+            return False
+        artifact = entry["artifact"]
+        artifact["observed_at"] = value
+        # Mirror core/m11's hash payload exactly, including deterministic
+        # source-ref ordering, so this is a checksum-valid semantic mutation.
+        payload = {
+            "snapshot_id": artifact["snapshot_id"], "lease_id": artifact["lease_id"],
+            "lease_version": artifact["lease_version"], "lease_hash": artifact["lease_hash"],
+            "observed_at": artifact["observed_at"], "source_refs": sorted(artifact["source_refs"]),
+            "dependency_state": artifact["dependency_state"], "telemetry_complete": artifact["telemetry_complete"],
+            "consecutive_failures": artifact["consecutive_failures"], "reconciliation_required": artifact["reconciliation_required"],
+            "compliance_alert_count": artifact["compliance_alert_count"],
+            "oldest_pending_outcome_age_seconds": artifact["oldest_pending_outcome_age_seconds"],
+            "hash_version": artifact["hash_version"],
+        }
+        artifact["snapshot_hash"] = "sha256:" + hashlib.sha256(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        return True
+    return change
+
+
 def write_canary_grant(path, intent, policy, approval, max_executions, max_cost):
     payload = {
         "grant_id": "br18-g", "grant_version": "v1", "policy_version": policy["policy_version"],
@@ -232,6 +255,8 @@ def main():
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
         early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", env=env)
         assert early_gate["status"] == "DENY" and early_gate["artifact"]["reason"] == "LEASE_INACTIVE"
+        pre_activation_health_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:10Z", env=env)
+        assert pre_activation_health_gate["status"] == "DENY" and pre_activation_health_gate["artifact"]["reason"] == "HEALTH_MISMATCH"
         # Two valid authorizations can coexist before the first reservation.
         # The second must not consume budget after the first advances the
         # ledger that its gate snapshot authorized.
@@ -377,6 +402,9 @@ def main():
         pre_activation_gate_backup = root / "pre-activation-gate-backup"; shutil.copytree(backup, pre_activation_gate_backup)
         rewrite_m11_registry(pre_activation_gate_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2026-09-07T23:59:59Z"))
         assert invoke(bot, "backup", "restore", pre_activation_gate_backup, root / "pre-activation-gate-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        pre_activation_health_backup = root / "pre-activation-health-backup"; shutil.copytree(backup, pre_activation_health_backup)
+        rewrite_m11_registry(pre_activation_health_backup, replace_m11_health_observed_at("2026-09-07T23:59:59Z"))
+        assert invoke(bot, "backup", "restore", pre_activation_health_backup, root / "pre-activation-health-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_m11_reservation_backup = root / "orphan-m11-reservation-backup"; shutil.copytree(backup, orphan_m11_reservation_backup)
         def orphan_m11_reservation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or production_failed["artifact"]["execution"]["execution_id"] not in entry["artifact"].get("pending_execution_ids", []):
@@ -581,7 +609,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":

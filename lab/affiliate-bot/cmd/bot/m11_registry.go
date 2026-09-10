@@ -517,7 +517,10 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 		return decision("DENY", "BUDGET_EXCEEDED")
 	}
 	observed, observedErr := time.Parse(time.RFC3339, health.ObservedAt)
-	if observedErr != nil || observed.After(now) || health.LeaseHash != lease.LeaseHash {
+	// A health observation made before this lease was activated cannot attest to
+	// the active runtime. It may be schema-valid and still be stale admission
+	// evidence, so fail closed before a gate can be used to authorize work.
+	if observedErr != nil || observed.Before(activatedAt) || observed.After(now) || health.LeaseHash != lease.LeaseHash {
 		return decision("DENY", "HEALTH_MISMATCH")
 	}
 	if now.Unix()-observed.Unix() >= int64(lease.MaxHealthSnapshotAgeSeconds) {
@@ -579,9 +582,15 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	if health.SnapshotHash != gate.HealthSnapshotHash || cost.CostBoundHash != gate.CostBoundHash || cost.MaxCostMinor != gate.CostBoundMinor || corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, now) != "VALID" {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate dependencies no longer resolve")
 	}
+	activationValue, activationLookupErr := m11ArtifactValue(dir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion)
+	if activationLookupErr != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", activationLookupErr
+	}
+	activation := activationValue.(*corem11.ProductionActivationRecord)
 	gateAt, gateErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
 	healthAt, healthErr := time.Parse(time.RFC3339, health.ObservedAt)
-	if gateErr != nil || healthErr != nil || gateAt.After(now) || healthAt.After(now) || now.Sub(healthAt) >= time.Duration(lease.MaxHealthSnapshotAgeSeconds)*time.Second {
+	activatedAt, activationErr := time.Parse(time.RFC3339, activation.ActivatedAt)
+	if gateErr != nil || healthErr != nil || activationErr != nil || activation.LeaseHash != lease.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) || gateAt.After(now) || healthAt.After(now) || now.Sub(healthAt) >= time.Duration(lease.MaxHealthSnapshotAgeSeconds)*time.Second {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate health is stale or temporally invalid")
 	}
 	currentLedgerEntry, currentLedger, headErr := m11LedgerHead(dir, lease.LeaseID)
