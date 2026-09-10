@@ -340,6 +340,9 @@ def main():
         expired_m11_execution_backup = root / "expired-m11-execution-backup"; shutil.copytree(backup, expired_m11_execution_backup)
         rewrite_m11_registry(expired_m11_execution_backup, replace_m11_field("PRODUCTION_EXECUTION_RECORD", "attempted_at", "2026-09-08T00:01:00Z"))
         assert invoke(bot, "backup", "restore", expired_m11_execution_backup, root / "expired-m11-execution-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        premature_m11_authorization_backup = root / "premature-m11-authorization-backup"; shutil.copytree(backup, premature_m11_authorization_backup)
+        rewrite_m11_registry(premature_m11_authorization_backup, replace_m11_field("PRODUCTION_EXECUTION_AUTHORIZATION", "authorized_at", "2026-09-07T23:59:59Z"))
+        assert invoke(bot, "backup", "restore", premature_m11_authorization_backup, root / "premature-m11-authorization-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_m11_reservation_backup = root / "orphan-m11-reservation-backup"; shutil.copytree(backup, orphan_m11_reservation_backup)
         def orphan_m11_reservation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or production_failed["artifact"]["execution"]["execution_id"] not in entry["artifact"].get("pending_execution_ids", []):
