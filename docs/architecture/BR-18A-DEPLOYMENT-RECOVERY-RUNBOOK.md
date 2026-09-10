@@ -47,6 +47,13 @@ redirect policy theo blueprint, rồi lưu execution ID cùng ACK của adapter.
 /tmp/affiliate-bot backup restore /tmp/affiliate-backup /tmp/affiliate-restored
 /tmp/affiliate-bot history replay /tmp/affiliate-restored/history.jsonl
 /tmp/affiliate-bot mission status /tmp/affiliate-restored
+
+# Stop phải còn chặn một lifecycle operation sau restore (exit non-zero).
+if /tmp/affiliate-bot mission m11-activate /tmp/affiliate-restored fixture-lease \
+  2026-09-03T00:00:00Z; then
+  echo "unexpected activation after durable STOP" >&2
+  exit 1
+fi
 ```
 
 Expected: `BACKED_UP`, `RESTORED`, `replay=MATCH`, rồi `stop: true`. Manifest
@@ -55,6 +62,10 @@ SHA-256 phải được kiểm trước khi chép file; target restore phải **
 loader/graph gate rồi mới publish atomically. Chạy
 `python3 scripts/smoke_br18b_backup_restore.py` để kiểm cả tamper, process mới,
 budget/canary link và STOP durable trong môi trường tạm.
+
+Lệnh `m11-activate` cuối phải in JSON `status: "STOPPED"` và exit non-zero.
+`fixture-lease` không được resolve/activate; nó chỉ chứng minh STOP được đọc
+trước mọi điều kiện lease, nên không thể biến drill này thành activation thật.
 
 Target của `backup create` cũng phải trống và không được là runtime hoặc thư
 mục con của runtime; tạo backup mới vào một thư mục khác thay vì ghi đè snapshot

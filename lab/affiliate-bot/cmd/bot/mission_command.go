@@ -97,6 +97,13 @@ func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
 func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
 func m11OutcomeJournalPath(dir string) string   { return filepath.Join(dir, "m11-outcome-journal.json") }
+
+func missionErrorStatus(err error) string {
+	if err != nil && strings.HasPrefix(err.Error(), "durable STOP:") {
+		return "STOPPED"
+	}
+	return "REJECTED"
+}
 func m11FailedExecutionJournalPath(dir string) string {
 	return filepath.Join(dir, "m11-failed-execution-journal.json")
 }
@@ -2086,7 +2093,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, status, err := activateM11Lease(args[1], args[2], args[3])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), nil, err, 1)
 		}
 		return emit(status, record, nil, 0)
 	case "m11-ledger-init":

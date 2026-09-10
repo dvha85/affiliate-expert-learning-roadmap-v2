@@ -317,6 +317,12 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	if code, response := missionCall(t, "m11-register", dir, corem11.ArtifactKindLease, input); code == 0 || response["status"] != "REJECTED" {
 		t.Fatalf("tampered M11 lease was registered: code=%d response=%+v", code, response)
 	}
+	if code, response := missionCall(t, "m11-stop", dir, "runbook-stop-drill"); code != 0 || response["status"] != "STOPPED" {
+		t.Fatalf("M11 stop failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, "2026-09-08T00:00:01Z"); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("M11 activation did not report durable STOP: code=%d response=%+v", code, response)
+	}
 }
 
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
