@@ -494,7 +494,8 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	}
 	validFrom, e1 := time.Parse(time.RFC3339, lease.ValidFrom)
 	expires, e2 := time.Parse(time.RFC3339, lease.ExpiresAt)
-	if e1 != nil || e2 != nil || now.Before(validFrom) || !now.Before(expires) || activation.LeaseHash != lease.LeaseHash {
+	activatedAt, e3 := time.Parse(time.RFC3339, activation.ActivatedAt)
+	if e1 != nil || e2 != nil || e3 != nil || now.Before(validFrom) || !now.Before(expires) || activatedAt.After(now) || activation.LeaseHash != lease.LeaseHash {
 		return decision("DENY", "LEASE_INACTIVE")
 	}
 	if ledger.LeaseHash != lease.LeaseHash || ledger.ControlMode == "STOPPED" {

@@ -218,14 +218,24 @@ def main():
         machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":failed_attempted_at,"status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
         production_lease = root / "production-lease.json"; write_production_lease(production_lease)
-        recovery_runtime = root / "reconciliation-runtime"; recovery_backup = root / "reconciliation-backup"; recovery_restored = root / "reconciliation-restored"
-        shutil.copytree(runtime, recovery_runtime)
-        assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         production_approval = root / "production-approval.json"; write_production_lease_approval(production_approval, production_lease)
+        recovery_runtime = root / "reconciliation-runtime"; recovery_backup = root / "reconciliation-backup"; recovery_restored = root / "reconciliation-restored"
+        early_gate_runtime = root / "early-gate-runtime"
+        shutil.copytree(runtime, recovery_runtime)
+        shutil.copytree(runtime, early_gate_runtime)
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-activate", early_gate_runtime, "br18-production-lease", "2026-09-08T00:00:10Z", env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-ledger-init", early_gate_runtime, "br18-production-lease", "2026-09-08T00:00:10Z", env=env)["status"] == "APPENDED"
+        production_health = root / "production-health.json"; write_production_health(production_health, production_lease)
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, env=env)["status"] == "APPENDED"
+        assert invoke(bot, "mission", "m11-register", early_gate_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
+        early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", env=env)
+        assert early_gate["status"] == "DENY" and early_gate["artifact"]["reason"] == "LEASE_INACTIVE"
+        assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-activate", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-ledger-init", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"
-        production_health = root / "production-health.json"; write_production_health(production_health, production_lease)
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-gate", runtime, "br18-production-lease", "missing-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:00Z", expected=1, env=env)["status"] == "REJECTED"
@@ -346,6 +356,9 @@ def main():
         drifted_m11_gate_backup = root / "drifted-m11-gate-backup"; shutil.copytree(backup, drifted_m11_gate_backup)
         rewrite_m11_registry(drifted_m11_gate_backup, replace_m11_field("PRODUCTION_GATE", "executions_total_before", 1))
         assert invoke(bot, "backup", "restore", drifted_m11_gate_backup, root / "drifted-m11-gate-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        pre_activation_gate_backup = root / "pre-activation-gate-backup"; shutil.copytree(backup, pre_activation_gate_backup)
+        rewrite_m11_registry(pre_activation_gate_backup, replace_m11_field("PRODUCTION_GATE", "evaluated_at", "2026-09-07T23:59:59Z"))
+        assert invoke(bot, "backup", "restore", pre_activation_gate_backup, root / "pre-activation-gate-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_m11_reservation_backup = root / "orphan-m11-reservation-backup"; shutil.copytree(backup, orphan_m11_reservation_backup)
         def orphan_m11_reservation_change(entry):
             if entry["artifact_kind"] != "PRODUCTION_LEDGER" or production_failed["artifact"]["execution"]["execution_id"] not in entry["artifact"].get("pending_execution_ids", []):
