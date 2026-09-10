@@ -337,6 +337,9 @@ def main():
             return True
         rewrite_m11_registry(orphan_ledger_outcome_backup, orphan_ledger_outcome_change)
         assert invoke(bot, "backup", "restore", orphan_ledger_outcome_backup, root / "orphan-ledger-outcome-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        expired_m11_execution_backup = root / "expired-m11-execution-backup"; shutil.copytree(backup, expired_m11_execution_backup)
+        rewrite_m11_registry(expired_m11_execution_backup, replace_m11_field("PRODUCTION_EXECUTION_RECORD", "attempted_at", "2026-09-08T00:01:00Z"))
+        assert invoke(bot, "backup", "restore", expired_m11_execution_backup, root / "expired-m11-execution-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
