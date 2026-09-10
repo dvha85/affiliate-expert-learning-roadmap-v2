@@ -408,6 +408,27 @@ func TestMissionM10AuthorityExpiryRejectsInFreshProcessWithoutMutation(t *testin
 	}
 }
 
+func TestMissionM10RecordRejectsAuthorizationExpiryWithoutMutation(t *testing.T) {
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "record-expiry-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "record-expiry-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	recordPath := filepath.Join(root, "expired-record.json")
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T02:00:00Z", "attempt after authorization expiry"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("record at authorization expiry was accepted: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
+		t.Fatalf("expired authorization record created output: %v", err)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
 func TestMissionIntentGrantAndCostRebindRejectWithoutMutation(t *testing.T) {
 	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "cost")
 	before := missionRuntimeSnapshot(t, runtimeDir)

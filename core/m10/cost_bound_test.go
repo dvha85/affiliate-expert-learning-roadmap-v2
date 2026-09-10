@@ -144,6 +144,9 @@ func TestCancelledCanaryExecutionRecordHasNoSideEffect(t *testing.T) {
 	if _, err := ValidateExecutionRecord(raw); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := FailCanaryExecutionFixture(FailedExecutionInput{Authorization: authorization, AttemptedAt: authorization.ExpiresAt, Reason: "fixture attempt after authorization expiry"}); err == nil {
+		t.Fatal("accepted fixture execution at authorization expiry")
+	}
 	record.Status = "SUCCEEDED"
 	raw, _ = json.Marshal(record)
 	if _, err := ValidateExecutionRecord(raw); err == nil {

@@ -258,7 +258,10 @@ func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
 	}
 	for _, record := range records {
 		authorization, exists := authorizations[record.AuthorizationID]
-		if !exists || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
+		attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+		authorizedAt, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
+		expiresAt, expiresErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
+		if !exists || attemptedErr != nil || authorizedErr != nil || expiresErr != nil || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
 			return fmt.Errorf("execution record has an orphaned or mismatched registry link")
 		}
 	}

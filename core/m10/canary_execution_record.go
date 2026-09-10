@@ -63,7 +63,8 @@ func terminalNoSideEffectExecution(authorization ExecutionAuthorization, attempt
 	}
 	attempted, attemptedErr := time.Parse(time.RFC3339, attemptedAt)
 	authorized, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
-	if attemptedErr != nil || authorizedErr != nil || attempted.Before(authorized) {
+	expires, expiresErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
+	if attemptedErr != nil || authorizedErr != nil || expiresErr != nil || attempted.Before(authorized) || !attempted.Before(expires) {
 		return ExecutionRecord{}, fmt.Errorf("execution timestamp is invalid")
 	}
 	reason = strings.TrimSpace(reason)
