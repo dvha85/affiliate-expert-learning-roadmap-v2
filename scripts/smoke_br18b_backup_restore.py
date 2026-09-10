@@ -56,6 +56,24 @@ def remove_m11_entry(backup, kind, artifact_id):
     replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
 
 
+def insert_duplicate_m11_resolution_before_original(backup):
+    lines, inserted = [], False
+    for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        if entry["artifact_kind"] == "PRODUCTION_RECONCILIATION" and not inserted:
+            duplicate = json.loads(json.dumps(entry))
+            duplicate["artifact"]["resolution_id"] += "-duplicate"
+            canonical = json.dumps(duplicate["artifact"], separators=(",", ":"), ensure_ascii=False).encode()
+            duplicate["artifact_id"] = duplicate["artifact"]["resolution_id"]
+            duplicate["content_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
+            lines.append(json.dumps(duplicate, separators=(",", ":"), ensure_ascii=False))
+            inserted = True
+        lines.append(line)
+    if not inserted:
+        raise AssertionError("missing M11 reconciliation artifact")
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
 def replace_m11_field(kind, field, value):
     def change(entry):
         if entry["artifact_kind"] != kind:
@@ -427,6 +445,11 @@ def main():
         invalid_reconciliation_manifest["files"]["m11-artifacts.jsonl"]["size_bytes"] = len(changed_bytes)
         (invalid_reconciliation_backup / "manifest.json").write_text(json.dumps(invalid_reconciliation_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_reconciliation_backup, root / "invalid-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        duplicate_reconciliation_backup = root / "duplicate-reconciliation-backup"; shutil.copytree(recovery_backup, duplicate_reconciliation_backup)
+        # Inserting the forged resolution before the valid one ensures a
+        # last-write-wins map would still select the valid ID and miss it.
+        insert_duplicate_m11_resolution_before_original(duplicate_reconciliation_backup)
+        assert invoke(bot, "backup", "restore", duplicate_reconciliation_backup, root / "duplicate-reconciliation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         partial_reconciliation_backup = root / "partial-reconciliation-backup"; shutil.copytree(recovery_backup, partial_reconciliation_backup)
         partial_lines = []
         for line in (partial_reconciliation_backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():

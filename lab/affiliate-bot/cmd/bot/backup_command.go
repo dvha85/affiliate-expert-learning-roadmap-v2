@@ -795,6 +795,9 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 reconciliation artifact is invalid")
 			}
 			resolution := *value.(*corem11.ProductionReconciliationResolution)
+			if _, exists := resolutions[resolution.ExecutionID]; exists {
+				return fmt.Errorf("M11 execution has more than one restored reconciliation resolution")
+			}
 			resolutions[resolution.ExecutionID] = resolution
 		case corem11.ArtifactKindExecution:
 			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
