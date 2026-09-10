@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 5548733156c07a5c74c664b81c8f39686b32dc19 -->
+<!-- readiness-main-baseline: db297acfc26533f839a03a8b60c398ce555880f6 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -752,6 +752,13 @@ registry chỉ nhận tối đa một resolution cho mỗi UNKNOWN execution, đ
 restore graph và head-guard của learner. Core regression thêm artifact resolution
 khác ID nhưng cùng execution và bị reject. Đây không thay thế human review,
 không chứng minh external reconciliation, và không làm durable STOP có thể mở lại.
+
+**Cập nhật M11 evaluation/cycle temporal graph (2026-09-11):** canonical
+registry yêu cầu offline evaluation không trước execution attempt và cycle chỉ
+đóng từ evaluation đã tồn tại, tại/sau `evaluated_at`. Core regression reject
+evaluation trước attempt và cycle đóng trước evaluation. Đây chỉ đồng bộ temporal
+lineage core với restore checker; không chứng minh outcome business hay lifecycle
+ngoài fixture.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
