@@ -97,6 +97,9 @@ func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
 func m11OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m11-outcomes.jsonl") }
 func m11OutcomeJournalPath(dir string) string   { return filepath.Join(dir, "m11-outcome-journal.json") }
+func m11FailedExecutionJournalPath(dir string) string {
+	return filepath.Join(dir, "m11-failed-execution-journal.json")
+}
 func m11UnknownStopJournalPath(dir string) string {
 	return filepath.Join(dir, "m11-unknown-stop-journal.json")
 }
@@ -118,6 +121,17 @@ type m11OutcomeJournal struct {
 	PredecessorContentHash string                   `json:"predecessor_content_hash"`
 	Outcome                m03.OutcomeRecord        `json:"outcome"`
 	Ledger                 corem11.ProductionLedger `json:"ledger"`
+}
+
+// m11FailedExecutionJournal makes the known FAILED/NOT_PERFORMED execution
+// transition replayable. The immutable execution and its post-execution ledger
+// must either both become visible or remain recoverable from this exact plan.
+type m11FailedExecutionJournal struct {
+	Version                string                            `json:"version"`
+	PredecessorArtifactID  string                            `json:"predecessor_artifact_id"`
+	PredecessorContentHash string                            `json:"predecessor_content_hash"`
+	Execution              corem11.ProductionExecutionRecord `json:"execution"`
+	Ledger                 corem11.ProductionLedger          `json:"ledger"`
 }
 
 // m11UnknownStopJournal makes the UNKNOWN → stopped-ledger → durable STOP
@@ -1136,6 +1150,116 @@ func recoverM11OutcomeJournal(dir string) error {
 	return closeErr
 }
 
+func nextM11FailedExecutionLedger(ledger corem11.ProductionLedger, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {
+	if record.Status != "FAILED" || record.SideEffectState != "NOT_PERFORMED" || ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 failed execution journal cannot transition its predecessor")
+	}
+	attempted, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
+	updated, updatedErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+	if attemptedErr != nil || updatedErr != nil || !attempted.After(updated) {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 failed execution time must advance the ledger")
+	}
+	pending := false
+	for _, id := range ledger.PendingExecutionIDs {
+		pending = pending || id == record.ExecutionID
+	}
+	if !pending || ledger.PendingOutcomes < 1 {
+		return corem11.ProductionLedger{}, fmt.Errorf("M11 failed execution has no pending reservation")
+	}
+	next := ledger
+	next.ConsecutiveFailures++
+	next.LastExecutionAt = record.AttemptedAt
+	next.UpdatedAt = record.AttemptedAt
+	return next, nil
+}
+
+// recoverM11FailedExecutionJournal completes the bounded execution → ledger
+// transition after a write error. It never manufactures an execution: both
+// payloads are validated against the exact predecessor before either append is
+// retried, and a competing head leaves the journal in place for investigation.
+func recoverM11FailedExecutionJournal(dir string) error {
+	raw, err := os.ReadFile(m11FailedExecutionJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m11FailedExecutionJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m11-failed-execution-journal/v1" {
+		return fmt.Errorf("M11 failed execution journal is invalid")
+	}
+	executionRaw, err := json.Marshal(journal.Execution)
+	if err != nil {
+		return err
+	}
+	if _, status := corem11.DecodeArtifact("execution", executionRaw); status != corem11.Valid {
+		return fmt.Errorf("M11 failed execution journal execution is invalid")
+	}
+	ledgerRaw, err := json.Marshal(journal.Ledger)
+	if err != nil {
+		return err
+	}
+	if _, status := corem11.DecodeArtifact("ledger", ledgerRaw); status != corem11.Valid {
+		return fmt.Errorf("M11 failed execution journal ledger is invalid")
+	}
+	predecessorEntry, err := resolveM11Artifact(dir, corem11.ArtifactKindLedger, journal.PredecessorArtifactID, journal.PredecessorContentHash)
+	if err != nil {
+		return fmt.Errorf("M11 failed execution journal predecessor does not resolve: %w", err)
+	}
+	predecessorValue, status := corem11.DecodeArtifact("ledger", predecessorEntry.Artifact)
+	if status != corem11.Valid {
+		return fmt.Errorf("M11 failed execution journal predecessor is invalid")
+	}
+	expectedLedger, err := nextM11FailedExecutionLedger(*predecessorValue.(*corem11.ProductionLedger), journal.Execution)
+	if err != nil || !reflect.DeepEqual(expectedLedger, journal.Ledger) {
+		return fmt.Errorf("M11 failed execution journal transition does not match its predecessor")
+	}
+	expectedLedgerEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		return err
+	}
+	expectedExecutionEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindExecution, executionRaw)
+	if err != nil {
+		return err
+	}
+	currentEntry, _, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil {
+		return err
+	}
+	if currentEntry.ArtifactID == predecessorEntry.ArtifactID && currentEntry.ContentHash == predecessorEntry.ContentHash {
+		if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindExecution, executionRaw); err != nil {
+			return fmt.Errorf("M11 failed execution journal execution recovery failed: %w", err)
+		}
+		if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLedger, ledgerRaw); err != nil {
+			return fmt.Errorf("M11 failed execution journal ledger recovery failed: %w", err)
+		}
+	} else if currentEntry.ArtifactID != expectedLedgerEntry.ArtifactID || currentEntry.ContentHash != expectedLedgerEntry.ContentHash {
+		return fmt.Errorf("M11 failed execution journal is no longer the active ledger transition")
+	} else {
+		executionEntry, resolveErr := resolveM11Artifact(dir, corem11.ArtifactKindExecution, journal.Execution.ExecutionID, expectedExecutionEntry.ContentHash)
+		if resolveErr != nil || executionEntry.ContentHash != expectedExecutionEntry.ContentHash {
+			if resolveErr != nil {
+				return fmt.Errorf("M11 failed execution journal execution is missing after ledger: %w", resolveErr)
+			}
+			return fmt.Errorf("M11 failed execution journal execution differs after ledger")
+		}
+	}
+	if err := os.Remove(m11FailedExecutionJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	parent, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = parent.Sync()
+	closeErr := parent.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
 func nextM11UnknownStopLedger(ledger corem11.ProductionLedger, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {
 	if record.Status != "RECONCILIATION_REQUIRED" || record.SideEffectState != "UNKNOWN" || ledger.LeaseID != record.ProductionLeaseID || ledger.LeaseVersion != record.ProductionLeaseVersion || ledger.LeaseHash != record.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledger.ReconciliationRequired || !mustM11Time(record.AttemptedAt).After(mustM11Time(ledger.UpdatedAt)) {
 		return corem11.ProductionLedger{}, fmt.Errorf("M11 unknown STOP journal cannot transition its predecessor")
@@ -1319,6 +1443,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		defer os.Remove(lockPath)
+		if err := recoverM11FailedExecutionJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := recoverM11UnknownStopJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -2171,6 +2298,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	case "status", "m11-status":
 		if len(args) != 2 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission status STATE_DIR"), 2)
+		}
+		if _, err := os.Stat(m11FailedExecutionJournalPath(args[1])); err == nil {
+			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 failed execution journal requires a locked writer recovery"), 1)
+		} else if !os.IsNotExist(err) {
+			return emit("STATE_ERROR", nil, err, 1)
 		}
 		if _, err := os.Stat(m11UnknownStopJournalPath(args[1])); err == nil {
 			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M11 unknown STOP journal requires a locked writer recovery"), 1)
