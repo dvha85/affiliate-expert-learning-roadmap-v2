@@ -743,6 +743,8 @@ func validateM11BackupGraph(dir string) error {
 	linked := map[string]bool{}
 	outcomesByID := map[string]m03.OutcomeRecord{}
 	outcomeExecutionIDs := map[string]string{}
+	leases := map[string]corem11.ProductionLease{}
+	leaseApprovals := map[string]corem11.ProductionLeaseApproval{}
 	ledgers := []corem11.ProductionLedger{}
 	resolutions := map[string]corem11.ProductionReconciliationResolution{}
 	executions := []corem11.ProductionExecutionRecord{}
@@ -759,6 +761,20 @@ func validateM11BackupGraph(dir string) error {
 	}
 	for _, entry := range entries {
 		switch entry.ArtifactKind {
+		case corem11.ArtifactKindLease:
+			value, status := corem11.DecodeArtifact("lease", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 lease artifact is invalid")
+			}
+			lease := *value.(*corem11.ProductionLease)
+			leases[lease.LeaseID] = lease
+		case corem11.ArtifactKindLeaseApproval:
+			value, status := corem11.DecodeArtifact("approval", entry.Artifact)
+			if status != corem11.Valid {
+				return fmt.Errorf("M11 lease approval artifact is invalid")
+			}
+			approval := *value.(*corem11.ProductionLeaseApproval)
+			leaseApprovals[approval.ApprovalID] = approval
 		case corem11.ArtifactKindLedger:
 			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
 			if status != corem11.Valid {
@@ -793,6 +809,17 @@ func validateM11BackupGraph(dir string) error {
 				return fmt.Errorf("M11 cycle artifact is invalid")
 			}
 			cycles = append(cycles, *value.(*corem11.ProductionCycleRecord))
+		}
+	}
+	// The append-only registry permits a lease to be recorded before its human
+	// approval arrives, but a backup is a complete runtime snapshot. Every
+	// persisted lease must therefore retain the exact approval it names; an
+	// otherwise checksum-valid snapshot must not restore a delegation whose
+	// review evidence has been removed.
+	for _, lease := range leases {
+		approval, found := leaseApprovals[lease.ApprovalRef]
+		if !found || approval.LeaseID != lease.LeaseID || approval.LeaseVersion != lease.LeaseVersion || approval.LeaseHash != lease.LeaseHash || approval.PromotionReviewRef != lease.PromotionReviewRef || approval.SourceCanaryGrantID != lease.SourceCanaryGrantID || approval.SourceCanaryGrantVersion != lease.SourceCanaryGrantVersion || approval.SourceCanaryGrantHash != lease.SourceCanaryGrantHash || approval.ReviewerID != lease.ReviewerID || approval.ReviewedAt != lease.ReviewedAt {
+			return fmt.Errorf("M11 lease is orphaned from its restored approval")
 		}
 	}
 	for _, record := range executions {
