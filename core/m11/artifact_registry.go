@@ -225,7 +225,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		case *ProductionOutcomeEvaluation:
 			lease, leaseOK := leases[x.LeaseID]
 			execution, executionOK := executions[x.ExecutionID]
-			if !leaseOK || !executionOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash {
+			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
+			attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
 				return fmt.Errorf("production outcome evaluation has an orphaned or mismatched link")
 			}
 			evaluations[x.EvaluationID] = *x
@@ -235,7 +237,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			auth, authOK := authorizations[x.AuthorizationID]
 			execution, executionOK := executions[x.ExecutionID]
 			evaluation, evaluationOK := evaluations[x.EvaluationID]
-			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || auth.ProductionGateID != x.GateID || execution.AuthorizationID != x.AuthorizationID || execution.ProductionGateID != x.GateID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID {
+			closedAt, closedErr := time.Parse(time.RFC3339, x.ClosedAt)
+			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, evaluation.EvaluatedAt)
+			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || closedErr != nil || evaluatedErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || auth.ProductionGateID != x.GateID || execution.AuthorizationID != x.AuthorizationID || execution.ProductionGateID != x.GateID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID || closedAt.Before(evaluatedAt) {
 				return fmt.Errorf("production cycle has an orphaned or mismatched link")
 			}
 		}

@@ -166,12 +166,26 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenEvaluationEntries); err == nil {
 		t.Fatal("evaluation with orphan execution was accepted")
 	}
+	preAttemptEvaluation := evaluation
+	preAttemptEvaluation.EvaluatedAt = "2026-09-08T00:00:00Z"
+	preAttemptEvaluationEntries := append([]ArtifactEntry(nil), entries...)
+	preAttemptEvaluationEntries[len(preAttemptEvaluationEntries)-2] = m11Entry(t, ArtifactKindEvaluation, preAttemptEvaluation)
+	if err := ValidateArtifactGraph(preAttemptEvaluationEntries); err == nil {
+		t.Fatal("evaluation before its execution attempt was accepted")
+	}
 	brokenCycle := cycle
 	brokenCycle.OutcomeID = "orphan-outcome"
 	brokenCycleEntries := append([]ArtifactEntry(nil), entries...)
 	brokenCycleEntries[len(brokenCycleEntries)-1] = m11Entry(t, ArtifactKindCycle, brokenCycle)
 	if err := ValidateArtifactGraph(brokenCycleEntries); err == nil {
 		t.Fatal("cycle with mismatched evaluation outcome was accepted")
+	}
+	preEvaluationCycle := cycle
+	preEvaluationCycle.ClosedAt = execution.AttemptedAt
+	preEvaluationCycleEntries := append([]ArtifactEntry(nil), entries...)
+	preEvaluationCycleEntries[len(preEvaluationCycleEntries)-1] = m11Entry(t, ArtifactKindCycle, preEvaluationCycle)
+	if err := ValidateArtifactGraph(preEvaluationCycleEntries); err == nil {
+		t.Fatal("cycle closed before its evaluation was accepted")
 	}
 	entries[len(entries)-1].Artifact = json.RawMessage(`{"execution_id":"orphan"}`)
 	if err := ValidateArtifactGraph(entries); err == nil {
