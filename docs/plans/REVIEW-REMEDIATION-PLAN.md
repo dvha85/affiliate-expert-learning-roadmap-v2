@@ -129,11 +129,11 @@ CLI hay environment override). M08 → M10 regression tạo intent/policy/approv
 grant/cost/gate thật, rồi chứng minh `m10-authorize` reject tại và sau expiry
 của từng authority mà không tạo portable output hay thay đổi
 `mission-state`/M10 registry. Cùng regression chặn rebind ID khi đổi expiry,
-cap hoặc currency; backup/restore bao phủ đủ bốn authority bằng binary Bot ở
-process mới. Còn thiếu shared smoke độc lập và coverage execution/ledger/cost
-state rộng hơn,
-nhưng chưa thay thế full acceptance smoke. Không suy slice này thành complete
-acceptance.
+cap hoặc currency; shared smoke M00–M11 dùng cùng runtime đã kiểm rebind và
+no-mutation, còn backup/restore bao phủ đủ bốn authority bằng binary Bot ở
+process mới. Còn thiếu một smoke duy nhất kết hợp các expiry boundary và
+coverage execution/ledger/cost state rộng hơn; không suy slice này thành
+complete acceptance.
 
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
