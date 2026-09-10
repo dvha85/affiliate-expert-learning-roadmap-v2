@@ -669,6 +669,12 @@ func validateM10BackupGraph(dir string) error {
 		if !found || !authorizationBindsMissionState(authorization, state) || authorization.CanaryGrantID != reservation.GrantID || authorization.IntentID != reservation.IntentID || authorization.IntentHash != reservation.IntentHash || authorization.CanaryCostBoundMinor != reservation.CostMinor || authorization.CanaryCostBoundID != reservation.CostBoundID || authorization.CanaryCostBoundHash != reservation.CostBoundHash {
 			return fmt.Errorf("governed reservation is orphaned from restored authorization")
 		}
+		reservedAt, reservedAtErr := time.Parse(time.RFC3339, reservation.ReservedAt)
+		authorizedAt, authorizedAtErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
+		expiresAt, expiresAtErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
+		if reservedAtErr != nil || authorizedAtErr != nil || expiresAtErr != nil || reservedAt.Before(authorizedAt) || !reservedAt.Before(expiresAt) {
+			return fmt.Errorf("governed reservation falls outside authorization lifetime")
+		}
 		if reservation.ExecutionID == "" {
 			continue
 		}
