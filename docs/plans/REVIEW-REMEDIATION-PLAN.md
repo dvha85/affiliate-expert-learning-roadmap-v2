@@ -678,6 +678,12 @@ thể xảy ra. Core regression mutate activation trực tiếp; BR-18b mutate b
 qua learner Bot. Đây chỉ kiểm graph timestamp của fixture runtime, không chứng
 minh clock đáng tin cậy, quyền executor hay production activation.
 
+**Cập nhật M11 ledger-after-activation graph (2026-09-10):** khi activation
+đã được đăng ký, canonical graph reject ledger có `window_started_at` hoặc
+`updated_at` trước activation; BR-18b mutate post-ledger checksum hợp lệ và
+restore fail-closed. Registry draft chưa activation vẫn đọc được; backup hoàn
+chỉnh đã yêu cầu activation riêng. Đây chỉ là invariant fixture offline.
+
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
 `EXACT_DUPLICATE`; request cùng authorization nhưng timestamp/ledger artifact

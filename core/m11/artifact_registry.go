@@ -114,6 +114,8 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	ledgerHeads := map[string]ProductionLedger{}
 	ledgerEntries := map[string]ArtifactEntry{}
+	ledgers := []ProductionLedger{}
+	activations := map[string]ProductionActivationRecord{}
 	for _, entry := range entries {
 		profile := kindProfile(entry.ArtifactKind)
 		value, status := DecodeArtifact(profile, entry.Artifact)
@@ -150,6 +152,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			}
 			ledgerHeads[x.LeaseID] = *x
 			ledgerEntries[entry.ArtifactID] = entry
+			ledgers = append(ledgers, *x)
 		case *ProductionActivationRecord:
 			lease, ok := leases[x.LeaseID]
 			activatedAt, activatedErr := time.Parse(time.RFC3339, x.ActivatedAt)
@@ -158,6 +161,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !ok || activatedErr != nil || validFromErr != nil || expiresErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || activatedAt.Before(validFrom) || !activatedAt.Before(expiresAt) {
 				return fmt.Errorf("production activation has an orphaned lease link")
 			}
+			activations[x.LeaseID] = *x
 		case *ProductionGateDecision:
 			lease, leaseOK := leases[x.LeaseID]
 			snapshot, healthOK := health[x.HealthSnapshotID]
@@ -209,6 +213,26 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || auth.ProductionGateID != x.GateID || execution.AuthorizationID != x.AuthorizationID || execution.ProductionGateID != x.GateID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID {
 				return fmt.Errorf("production cycle has an orphaned or mismatched link")
 			}
+		}
+	}
+	// Registry entries are append-only, but historical snapshots are validated
+	// as a graph. Check the activation relation after decoding all entries so a
+	// valid older inventory order cannot hide a ledger that began before its
+	// lease was admitted.
+	for _, ledger := range ledgers {
+		activation, ok := activations[ledger.LeaseID]
+		// An append-only registry may contain a historical lease draft before its
+		// activation record is appended. Dedicated learner commands never create
+		// that interim shape, and complete backup snapshots separately require an
+		// activation; do not make loading the append transition itself impossible.
+		if !ok {
+			continue
+		}
+		windowStartedAt, windowErr := time.Parse(time.RFC3339, ledger.WindowStartedAt)
+		updatedAt, updatedErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+		activatedAt, activationErr := time.Parse(time.RFC3339, activation.ActivatedAt)
+		if activation.LeaseVersion != ledger.LeaseVersion || activation.LeaseHash != ledger.LeaseHash || windowErr != nil || updatedErr != nil || activationErr != nil || windowStartedAt.Before(activatedAt) || updatedAt.Before(activatedAt) {
+			return fmt.Errorf("production ledger predates its activation")
 		}
 	}
 	return nil
