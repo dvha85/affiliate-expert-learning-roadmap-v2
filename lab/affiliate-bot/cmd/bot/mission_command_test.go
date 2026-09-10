@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -211,6 +212,190 @@ func TestMissionAuthorityRejectsExpiredApprovalBeforeReserve(t *testing.T) {
 	if err := missionAuthorityActive(s, now); err == nil {
 		t.Fatal("expired approval was accepted")
 	}
+}
+
+func writeMissionTestJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func missionRuntimeSnapshot(t *testing.T, dir string) map[string][]byte {
+	t.Helper()
+	result := map[string][]byte{}
+	for _, name := range []string{"mission-state.json", "m10-artifacts.jsonl", "trusted-cost-bounds.jsonl"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read runtime snapshot %s: %v", name, err)
+		}
+		result[name] = raw
+	}
+	return result
+}
+
+func assertMissionRuntimeUnchanged(t *testing.T, before map[string][]byte, dir string) {
+	t.Helper()
+	after := missionRuntimeSnapshot(t, dir)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("rejected authority operation changed canonical runtime state")
+	}
+}
+
+// authorityExpiryFixture drives the actual learner Bot M08→M10 admission
+// path. The unexported mission clock is a test-only runtime seam; command
+// arguments never select it.
+func authorityExpiryFixture(t *testing.T, expiring string) (string, string, string, time.Time) {
+	t.Helper()
+	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	far := base.Add(2 * time.Hour).Format(time.RFC3339)
+	boundary := base.Add(time.Minute)
+	expires := map[string]string{"intent": far, "approval": far, "grant": far, "cost": far}
+	expires[expiring] = boundary.Format(time.RFC3339)
+	clock := base
+	previousClock := missionClock
+	missionClock = func() time.Time { return clock }
+	t.Cleanup(func() { missionClock = previousClock })
+
+	dir, history, requestPath := missionFixture(t)
+	runtimeDir := filepath.Join(dir, "runtime")
+	var request learnerIntentRequest
+	if err := readJSON(requestPath, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.CreatedAt = base.Add(-time.Minute).Format(time.RFC3339)
+	request.ExpiresAt = expires["intent"]
+	writeMissionTestJSON(t, requestPath, request)
+	intentPath := filepath.Join(dir, "intent.json")
+	if code, response := missionCall(t, "m08-intent", history, requestPath, intentPath); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("intent setup failed: code=%d response=%+v", code, response)
+	}
+	// The backup validator resolves the intent's decision from canonical history,
+	// so place the real history artifact in this runtime before binding it.
+	historyRaw, err := os.ReadFile(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(runtimeDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "history.jsonl"), historyRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	policyPath := filepath.Join(dir, "policy.json")
+	policyOut := filepath.Join(dir, "policy-out.json")
+	writeMissionTestJSON(t, policyPath, learnerPolicyRequest{PolicyVersion: "expiry-policy", Now: base.Format(time.RFC3339), AllowedHosts: []string{"example.com"}, ActionRisk: map[string]string{"DRAFT": "RISK0"}, SeenIdempotency: map[string]string{}})
+	if code, response := missionCall(t, "m08-policy", intentPath, policyPath, policyOut); code != 0 || response["status"] != "ALLOW" {
+		t.Fatalf("policy setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyOut); code != 0 || response["status"] != "BOUND" {
+		t.Fatalf("bind setup failed: code=%d response=%+v", code, response)
+	}
+	var intent LearnerIntent
+	var policy LearnerPolicy
+	if err := readJSON(intentPath, &intent); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(policyOut, &policy); err != nil {
+		t.Fatal(err)
+	}
+	approvalPath := filepath.Join(dir, "approval.json")
+	writeMissionTestJSON(t, approvalPath, LearnerApproval{ApprovalID: "expiry-approval", IntentID: intent.IntentID, IntentHash: intent.IntentHash, PolicyVersion: policy.PolicyVersion, Decision: "APPROVE", ApprovedBy: "human", ApproverID: "expiry-reviewer", ApprovedAt: base.Format(time.RFC3339), ExpiresAt: expires["approval"], CorrelationID: intent.CorrelationID, OneTime: true})
+	if code, response := missionCall(t, "m09-approval", runtimeDir, approvalPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("approval setup failed: code=%d response=%+v", code, response)
+	}
+	grant := corem10.CanaryGrant{GrantID: "expiry-grant", GrantVersion: "v1", PolicyVersion: policy.PolicyVersion, ApprovalRef: "expiry-approval", ApprovedBy: "human", ApproverID: "expiry-reviewer", ApprovedAt: base.Format(time.RFC3339), ValidFrom: base.Format(time.RFC3339), ExpiresAt: expires["grant"], AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 2, MaxExecutionsPerWindow: 2, WindowSeconds: 60, MaxCostMinorTotal: 10, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
+	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
+	grantPath := filepath.Join(dir, "grant.json")
+	writeMissionTestJSON(t, grantPath, grant)
+	if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("grant setup failed: code=%d response=%+v", code, response)
+	}
+	bound := corem10.TrustedCostBound{CostBoundID: "expiry-cost", IntentID: intent.IntentID, IntentHash: intent.IntentHash, MaxCostMinor: 1, Currency: "USD", SourceRef: "fixture:expiry", ObservedAt: base.Format(time.RFC3339), ExpiresAt: expires["cost"], CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
+	bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+	boundPath := filepath.Join(dir, "cost.json")
+	writeMissionTestJSON(t, boundPath, bound)
+	if code, response := missionCall(t, "m10-cost-register", runtimeDir, boundPath); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("cost-bound setup failed: code=%d response=%+v", code, response)
+	}
+	gatePath := filepath.Join(dir, "gate.json")
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gatePath, base.Format(time.RFC3339)); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("pre-expiry gate failed: code=%d response=%+v", code, response)
+	}
+	return runtimeDir, boundPath, gatePath, boundary
+}
+
+func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		t.Run(expiring, func(t *testing.T) {
+			runtimeDir, boundPath, gatePath, boundary := authorityExpiryFixture(t, expiring)
+			clock := boundary
+			previousClock := missionClock
+			missionClock = func() time.Time { return clock }
+			t.Cleanup(func() { missionClock = previousClock })
+			before := missionRuntimeSnapshot(t, runtimeDir)
+			for _, now := range []time.Time{boundary, boundary.Add(time.Nanosecond)} {
+				clock = now
+				authorizationPath := filepath.Join(filepath.Dir(runtimeDir), "authorization-"+now.Format("150405.000000000")+".json")
+				if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code == 0 || response["status"] != "REJECTED" {
+					t.Fatalf("expired %s authority was accepted at %s: code=%d response=%+v", expiring, now, code, response)
+				}
+				if _, err := os.Stat(authorizationPath); !os.IsNotExist(err) {
+					t.Fatalf("expired %s authority created portable output: %v", expiring, err)
+				}
+				assertMissionRuntimeUnchanged(t, before, runtimeDir)
+			}
+		})
+	}
+}
+
+func TestMissionIntentGrantAndCostRebindRejectWithoutMutation(t *testing.T) {
+	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "cost")
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	state, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Rebinding the same intent ID with another sealed expiry must fail before
+	// it can clear the existing approval/grant/reservation lineage.
+	alteredIntent := *state.Intent
+	alteredIntent.ExpiresAt = "2026-09-08T03:00:00Z"
+	alteredIntent.IntentHash = learnerIntentHash(alteredIntent)
+	alteredIntentPath := filepath.Join(filepath.Dir(runtimeDir), "altered-intent.json")
+	writeMissionTestJSON(t, alteredIntentPath, alteredIntent)
+	policyPath := filepath.Join(filepath.Dir(runtimeDir), "rebind-policy.json")
+	writeMissionTestJSON(t, policyPath, LearnerPolicy{PolicyVersion: state.Policy.PolicyVersion, IntentID: alteredIntent.IntentID, IntentHash: alteredIntent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: "2026-09-08T00:00:00Z"})
+	if code, response := missionCall(t, "bind", runtimeDir, alteredIntentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("altered same-ID intent was rebound: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	grant := state.Canary.CanaryGrant
+	grant.MaxCostMinorTotal++
+	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
+	grantPath := filepath.Join(filepath.Dir(runtimeDir), "altered-grant.json")
+	writeMissionTestJSON(t, grantPath, grant)
+	if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("altered same-ID grant was rebound: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	var bound corem10.TrustedCostBound
+	if err := readJSON(boundPath, &bound); err != nil {
+		t.Fatal(err)
+	}
+	bound.Currency = "VND"
+	bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+	alteredBoundPath := filepath.Join(filepath.Dir(runtimeDir), "altered-cost.json")
+	writeMissionTestJSON(t, alteredBoundPath, bound)
+	if code, response := missionCall(t, "m10-cost-register", runtimeDir, alteredBoundPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("altered same-ID cost bound was rebound: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
 }
 
 func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
