@@ -213,6 +213,36 @@ func TestM11FailedExecutionJournalRecoversAfterLedgerWriteFailure(t *testing.T) 
 	}
 }
 
+func TestM11ReconcileRejectsStaleStoppedLedgerAfterPriorResolution(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	execution, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fixture timeout")
+	if err != nil || status != appendAdded {
+		t.Fatalf("create stopped UNKNOWN fixture: execution=%+v status=%s err=%v", execution, status, err)
+	}
+	stoppedEntry, _, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve stopped ledger: %v", err)
+	}
+	first := corem11.ProductionReconciliationResolution{ResolutionID: "resolution-first", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:03Z", EffectState: "NOT_PERFORMED", Reason: "human reviewed fixture timeout"}
+	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindReconciliation, first)
+	if resolution, ledger, status, err := reconcileM11Execution(fixture.dir, first.ResolutionID, stoppedEntry.ArtifactID); err != nil || status != appendAdded || len(ledger.ReconciliationResolutionIDs) != 1 || ledger.ReconciliationResolutionIDs[0] != first.ResolutionID || resolution.ResolutionID != first.ResolutionID {
+		t.Fatalf("first reconciliation did not advance the stopped ledger: resolution=%+v ledger=%+v status=%s err=%v", resolution, ledger, status, err)
+	}
+	if _, ledger, status, err := reconcileM11Execution(fixture.dir, first.ResolutionID, stoppedEntry.ArtifactID); err != nil || status != appendDuplicate || len(ledger.ReconciliationResolutionIDs) != 1 || ledger.ReconciliationResolutionIDs[0] != first.ResolutionID {
+		t.Fatalf("exact reconciliation retry did not resolve from the new head: ledger=%+v status=%s err=%v", ledger, status, err)
+	}
+	second := corem11.ProductionReconciliationResolution{ResolutionID: "resolution-stale", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-2", ResolvedAt: "2026-09-08T00:00:04Z", EffectState: "NOT_PERFORMED", Reason: "attempt stale fork"}
+	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindReconciliation, second)
+	if _, _, _, err := reconcileM11Execution(fixture.dir, second.ResolutionID, stoppedEntry.ArtifactID); err == nil {
+		t.Fatal("stale stopped ledger created a forked reconciliation transition")
+	}
+	_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil || len(head.ReconciliationResolutionIDs) != 1 || head.ReconciliationResolutionIDs[0] != first.ResolutionID || head.UpdatedAt != first.ResolvedAt {
+		t.Fatalf("stale reconciliation changed the current ledger head: ledger=%+v err=%v", head, err)
+	}
+}
+
 func TestBackupCreateRecoversPendingM11UnknownStopJournal(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"

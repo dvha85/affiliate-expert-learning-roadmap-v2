@@ -877,11 +877,22 @@ func reconcileM11Execution(dir, resolutionID, ledgerID string) (corem11.Producti
 	if err != nil {
 		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("invalid reconciliation time")
 	}
-	ledgerValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
+	ledgerEntry, ledger, err := m11LedgerHead(dir, resolution.LeaseID)
 	if err != nil {
 		return *resolution, corem11.ProductionLedger{}, "", err
 	}
-	ledger := ledgerValue.(*corem11.ProductionLedger)
+	// An exact retry may name the immutable predecessor after its successful
+	// reconciliation has advanced the head. Recognize that completed transition
+	// first; every new reconciliation must otherwise start from the current head
+	// so a stale stopped ledger cannot fork and discard prior resolution links.
+	for _, id := range ledger.ReconciliationResolutionIDs {
+		if id == resolution.ResolutionID {
+			return *resolution, ledger, appendDuplicate, nil
+		}
+	}
+	if ledgerEntry.ArtifactID != ledgerID {
+		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
+	}
 	executionValue, err := m11ArtifactValue(dir, corem11.ArtifactKindExecution, resolution.ExecutionID)
 	if err != nil {
 		return *resolution, corem11.ProductionLedger{}, "", err
@@ -890,12 +901,7 @@ func reconcileM11Execution(dir, resolutionID, ledgerID string) (corem11.Producti
 	if ledger.ControlMode != "STOPPED" || !ledger.ReconciliationRequired || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || ledger.LeaseID != resolution.LeaseID || ledger.LeaseVersion != resolution.LeaseVersion || ledger.LeaseHash != resolution.LeaseHash || execution.ProductionLeaseID != resolution.LeaseID || resolvedAt.Before(mustM11Time(execution.AttemptedAt)) {
 		return *resolution, corem11.ProductionLedger{}, "", fmt.Errorf("reconciliation does not bind the stopped unknown execution")
 	}
-	for _, id := range ledger.ReconciliationResolutionIDs {
-		if id == resolution.ResolutionID {
-			return *resolution, *ledger, appendDuplicate, nil
-		}
-	}
-	next := *ledger
+	next := ledger
 	next.ReconciliationRequired = false
 	next.StopReason = "RECOVERY_REVIEW_REQUIRED"
 	next.ReconciliationResolutionIDs = append(append([]string(nil), ledger.ReconciliationResolutionIDs...), resolution.ResolutionID)
