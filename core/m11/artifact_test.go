@@ -51,6 +51,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(resolutionEntries); err != nil {
 		t.Fatalf("valid reconciliation resolution rejected: %v", err)
 	}
+	duplicateResolution := resolution
+	duplicateResolution.ResolutionID = "resolution-2"
+	duplicateResolutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)
+	duplicateResolutionEntries = append(duplicateResolutionEntries, m11Entry(t, ArtifactKindReconciliation, duplicateResolution))
+	if err := ValidateArtifactGraph(duplicateResolutionEntries); err == nil {
+		t.Fatal("two reconciliation resolutions for one UNKNOWN execution were accepted")
+	}
 	wrongExecutionResolution := resolution
 	wrongExecutionResolution.ExecutionID = execution.ExecutionID
 	wrongExecutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)

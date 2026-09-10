@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 73bcc90762d2f63e2ecb382b99625f58d06786d0 -->
+<!-- readiness-main-baseline: 5548733156c07a5c74c664b81c8f39686b32dc19 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -746,6 +746,12 @@ Core regression tạo một UNKNOWN fixture hợp lệ rồi reject resolution c
 `PERFORMED`, hoặc trước attempt. Điều này đồng bộ graph core với command/restore
 boundary; chưa chứng minh reconciliation bên ngoài, STOP graph hoàn chỉnh hay
 khả năng recovery/execution production.
+
+**Cập nhật M11 reconciliation cardinality graph (2026-09-11):** canonical
+registry chỉ nhận tối đa một resolution cho mỗi UNKNOWN execution, đồng bộ với
+restore graph và head-guard của learner. Core regression thêm artifact resolution
+khác ID nhưng cùng execution và bị reject. Đây không thay thế human review,
+không chứng minh external reconciliation, và không làm durable STOP có thể mở lại.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

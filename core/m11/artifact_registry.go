@@ -111,6 +111,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]ProductionGateDecision{}
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
+	resolutions := map[string]ProductionReconciliationResolution{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	ledgerHeads := map[string]ProductionLedger{}
 	ledgerEntries := map[string]ArtifactEntry{}
@@ -212,6 +213,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !executionOK || resolvedErr != nil || attemptedErr != nil || x.ResolvedBy != "human" || x.EffectState != "NOT_PERFORMED" || execution.Status != "RECONCILIATION_REQUIRED" || execution.SideEffectState != "UNKNOWN" || execution.ProductionLeaseID != x.LeaseID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || resolvedAt.Before(attemptedAt) {
 				return fmt.Errorf("production reconciliation has an orphaned or mismatched link")
 			}
+			if _, exists := resolutions[x.ExecutionID]; exists {
+				return fmt.Errorf("production execution has more than one reconciliation resolution")
+			}
+			resolutions[x.ExecutionID] = *x
 		case *ProductionRecoveryAdmission:
 			lease, leaseOK := leases[x.NewLeaseID]
 			if !leaseOK || lease.LeaseVersion != x.NewLeaseVersion || lease.LeaseHash != x.NewLeaseHash || lease.ApprovalRef != x.NewApprovalID || x.ExecutionPermitted {
