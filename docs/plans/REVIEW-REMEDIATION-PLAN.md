@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 05fdbc18e8e963a49c1951cd28d8ba03d38c2e57 -->
+<!-- readiness-main-baseline: becd9ae6df92ccc22f028a122bcdc3dd3043aff0 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -816,6 +816,12 @@ không thể evaluate trước `health.observed_at` của exact snapshot. Core r
 giữ hash/lease/cost/activation hợp lệ nhưng dời health sau gate và bị reject.
 Đây chỉ là fixture chronology, không là telemetry freshness hay production health
 proof.
+
+**Cập nhật M11 ALLOW gate health safety graph (2026-09-11):** canonical
+`ALLOW_PRODUCTION` gate chỉ hợp lệ với health snapshot telemetry complete,
+dependency `HEALTHY`, không alert/reconciliation và nằm trong các ngưỡng lease.
+Core regression giữ lineage/hash hợp lệ nhưng đổi dependency sang `DEGRADED`
+rồi reject. Đây không là telemetry provider hay production health proof.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
