@@ -214,6 +214,13 @@ history), không trả derived context trong lúc write. Đây chỉ là exclusi
 filesystem một host; distributed/multi-host locking và proof crash/power-loss
 vẫn mở.
 
+**Cập nhật atomic immutable artifact publish (2026-09-11):** mọi portable JSON
+artifact qua `writeNewJSON` giờ write+fsync vào temporary sibling rồi publish
+bằng hard-link không overwrite. Regression inject lỗi trước publish: target và
+temporary không được còn lại; retry tạo artifact hoàn chỉnh và exact retry vẫn
+`EXACT_DUPLICATE`. Đây không chứng minh power-loss/filesystem durability hay
+multi-host atomicity, nên các phạm vi đó vẫn `PARTIAL`.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.
