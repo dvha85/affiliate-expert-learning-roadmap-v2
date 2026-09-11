@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 	"io"
 	"os"
 	"strings"
@@ -11,11 +12,11 @@ import (
 )
 
 func DecodeM09Approval(raw []byte) (ApprovalRecord, string) {
-	var a ApprovalRecord
-	if contracts.ValidateRaw("approval-record.schema.json", raw) != nil || contracts.DecodeStrict(raw, &a) != nil {
+	a, status := corem09.DecodeApproval(raw)
+	if status != corem09.Valid {
 		return ApprovalRecord{}, "INVALID_SCHEMA"
 	}
-	return a, missionValid
+	return ApprovalRecord(a), missionValid
 }
 func DecodeM09Authorization(raw []byte) (ExecutionAuthorization, string) {
 	var a ExecutionAuthorization
