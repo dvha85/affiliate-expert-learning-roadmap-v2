@@ -104,6 +104,8 @@ jobs:
           fi
       - name: BR-18b M11 backup, reconciliation and restore
         run: python scripts/smoke_br18b_backup_restore.py
+      - name: RP-08 M11 canonical identity mutation proof
+        run: python scripts/mutate_m11_identity_guard.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
       - name: Go vet
