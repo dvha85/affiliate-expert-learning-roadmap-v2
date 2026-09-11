@@ -112,6 +112,31 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	}
 }
 
+func TestHistoryHTTPReadAndHandoffFailClosedWhileWriterIsActive(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	record, err := watcherRecord(mustRawJSON(t, watchFixture()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(history, record); err != nil {
+		t.Fatal(err)
+	}
+	release, err := acquireHistoryRuntimeGate(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	read := httptest.NewRecorder()
+	historyReadHandler(history).ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/v1/history?record_id="+record.RecordID, nil))
+	if read.Code != http.StatusConflict || !strings.Contains(read.Body.String(), `"BUSY"`) {
+		t.Fatalf("history read did not fail closed: code=%d body=%s", read.Code, read.Body.String())
+	}
+	if _, _, err := appendResolvedHistory(history, record); err == nil {
+		t.Fatal("append/resolution handoff succeeded during writer activity")
+	}
+}
+
 func TestM06AdapterAndM08ResolveTheSameCanonicalFieldIDs(t *testing.T) {
 	dir := t.TempDir()
 	history := filepath.Join(dir, "history.jsonl")

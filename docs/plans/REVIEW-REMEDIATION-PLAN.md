@@ -199,6 +199,13 @@ history/action/outcome/evaluation pha trộn. Đây chỉ là exclusion trên
 filesystem một host; distributed/multi-host locking và proof crash/power-loss
 vẫn mở.
 
+**Cập nhật canonical HTTP history gate (2026-09-11):** `/v1/history` giờ giữ
+local history runtime gate trước khi resolve record, còn M06/fetch/HTTP handoff
+append và replayed ACK chạy chung một critical section. Regression giữ writer
+gate thật: HTTP read phải trả `BUSY` và append+resolve không được hoàn tất. Đây
+chỉ là exclusion trên filesystem một host; distributed/multi-host locking và
+proof crash/power-loss vẫn mở.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

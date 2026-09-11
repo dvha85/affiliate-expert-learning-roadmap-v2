@@ -19,6 +19,7 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m06"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 const watcherFixtureURL = "https://example.com/br13/offer"
@@ -154,7 +155,15 @@ func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
 }
 
 func appendResolvedHistory(historyPath string, record HistoryRecord) (string, HistoryRecord, error) {
-	status, err := AppendHistory(historyPath, record)
+	// A handoff ACK includes both the durable append status and the replayed
+	// canonical record. Keep them under one local critical section so another
+	// watcher cannot interleave a write between those two observations.
+	release, err := acquireHistoryRuntimeGate(historyPath)
+	if err != nil {
+		return "", HistoryRecord{}, err
+	}
+	defer release()
+	status, err := appendHistoryWith(store.JSONL{}, historyPath, record)
 	if err != nil {
 		return "", HistoryRecord{}, err
 	}
@@ -163,6 +172,40 @@ func appendResolvedHistory(historyPath string, record HistoryRecord) (string, Hi
 		return "", HistoryRecord{}, err
 	}
 	return status, resolved, nil
+}
+
+func historyReadHandler(historyPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD"}`+"\n")
+			return
+		}
+		recordID := strings.TrimSpace(r.URL.Query().Get("record_id"))
+		if recordID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"status":"RECORD_ID_REQUIRED"}`+"\n")
+			return
+		}
+		// The HTTP history endpoint is another canonical evidence consumer; do
+		// not read an in-flight local watcher append as an apparently complete
+		// replay-MATCH record.
+		release, err := acquireHistoryRuntimeGate(historyPath)
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "BUSY", "execution_permitted": false})
+			return
+		}
+		defer release()
+		found, err := resolveCanonicalRecord(historyPath, recordID)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"status":"NOT_FOUND"}`+"\n")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(found)
+	}
 }
 
 func m06AdapterHandler(historyPath string) http.HandlerFunc {
@@ -627,41 +670,15 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			_, _ = io.WriteString(w, `{"status":"INVALID_HISTORY","canonical_history_ack":false}`+"\n")
 			return
 		}
-		status, err := AppendHistory(historyPath, record)
+		status, resolved, err := appendResolvedHistory(historyPath, record)
 		if err != nil {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = io.WriteString(w, `{"status":"HANDOFF_ERROR","canonical_history_ack":false}`+"\n")
 			return
 		}
-		resolved, err := resolveCanonicalRecord(historyPath, record.RecordID)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_ = json.NewEncoder(w).Encode(map[string]any{"status": "RESOLUTION_ERROR", "canonical_history_ack": false, "execution_permitted": false})
-			return
-		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
 	})
-	mux.HandleFunc("/v1/history", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD"}`+"\n")
-			return
-		}
-		recordID := strings.TrimSpace(r.URL.Query().Get("record_id"))
-		if recordID == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = io.WriteString(w, `{"status":"RECORD_ID_REQUIRED"}`+"\n")
-			return
-		}
-		found, err := resolveCanonicalRecord(historyPath, recordID)
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = io.WriteString(w, `{"status":"NOT_FOUND"}`+"\n")
-			return
-		}
-		_ = json.NewEncoder(w).Encode(found)
-	})
+	mux.HandleFunc("/v1/history", historyReadHandler(historyPath))
 	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
 	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
