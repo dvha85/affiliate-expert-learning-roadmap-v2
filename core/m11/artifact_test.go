@@ -34,9 +34,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	gate := ProductionGateDecision{GateID: "gate-1", LedgerArtifactID: ledgerEntry.ArtifactID, LedgerContentHash: ledgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
 	authorization := ProductionExecutionAuthorization{AuthorizationID: "auth-1", IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "key-1", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
 	execution := ProductionExecutionRecord{ExecutionID: "exec-1", AuthorizationID: authorization.AuthorizationID, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, IntentID: cost.IntentID, IntentHash: cost.IntentHash, ExecutorID: authorization.ExecutorID, IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: "2026-09-08T00:00:01Z", Status: "FAILED", SideEffectState: "NOT_PERFORMED", CorrelationID: cost.CorrelationID}
+	reservationLedger := ledger
+	reservationLedger.ExecutionsTotal, reservationLedger.ExecutionsInWindow, reservationLedger.CostMinorTotal, reservationLedger.PendingOutcomes = 1, 1, 10, 1
+	reservationLedger.PendingExecutionIDs = []string{execution.ExecutionID}
+	reservationLedger.UpdatedAt = "2026-09-08T00:00:00.500Z"
 	evaluation := ProductionOutcomeEvaluation{EvaluationID: "evaluation-1", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ExecutionID: execution.ExecutionID, OutcomeID: "outcome-1", EvaluatedAt: "2026-09-08T00:00:02Z", Result: "FIXTURE_NO_SIDE_EFFECT", EvidenceIDs: []string{"outcome-1"}, Limitations: []string{"fixture only"}, SourceProfile: "OFFLINE_FIXTURE"}
 	cycle := ProductionCycleRecord{CycleID: "cycle-1", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ObservationIDs: []string{"observation-1"}, DecisionID: "decision-1", IntentID: cost.IntentID, IntentHash: cost.IntentHash, GateID: gate.GateID, AuthorizationID: authorization.AuthorizationID, ExecutionID: execution.ExecutionID, OutcomeID: evaluation.OutcomeID, EvaluationID: evaluation.EvaluationID, Status: "CLOSED", OpenedAt: execution.AttemptedAt, ClosedAt: "2026-09-08T00:00:03Z", CorrelationID: cost.CorrelationID}
-	entries := []ArtifactEntry{m11Entry(t, ArtifactKindLease, lease), m11Entry(t, ArtifactKindLeaseApproval, approval), m11Entry(t, ArtifactKindHealth, health), m11Entry(t, ArtifactKindCostBound, cost), ledgerEntry, m11Entry(t, ArtifactKindActivation, activation), m11Entry(t, ArtifactKindGate, gate), m11Entry(t, ArtifactKindAuthorization, authorization), m11Entry(t, ArtifactKindExecution, execution), m11Entry(t, ArtifactKindEvaluation, evaluation), m11Entry(t, ArtifactKindCycle, cycle)}
+	entries := []ArtifactEntry{m11Entry(t, ArtifactKindLease, lease), m11Entry(t, ArtifactKindLeaseApproval, approval), m11Entry(t, ArtifactKindHealth, health), m11Entry(t, ArtifactKindCostBound, cost), ledgerEntry, m11Entry(t, ArtifactKindActivation, activation), m11Entry(t, ArtifactKindGate, gate), m11Entry(t, ArtifactKindAuthorization, authorization), m11Entry(t, ArtifactKindLedger, reservationLedger), m11Entry(t, ArtifactKindExecution, execution), m11Entry(t, ArtifactKindEvaluation, evaluation), m11Entry(t, ArtifactKindCycle, cycle)}
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
@@ -44,9 +48,12 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	unknownExecution.ExecutionID = "exec-unknown"
 	unknownExecution.Status = "RECONCILIATION_REQUIRED"
 	unknownExecution.SideEffectState = "UNKNOWN"
+	unknownReservationLedger := reservationLedger
+	unknownReservationLedger.PendingExecutionIDs = []string{unknownExecution.ExecutionID}
 	resolution := ProductionReconciliationResolution{ResolutionID: "resolution-1", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ExecutionID: unknownExecution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:02Z", EffectState: "NOT_PERFORMED", Reason: "fixture review"}
-	resolutionEntries := append([]ArtifactEntry(nil), entries[:9]...)
-	resolutionEntries[8] = m11Entry(t, ArtifactKindExecution, unknownExecution)
+	resolutionEntries := append([]ArtifactEntry(nil), entries[:10]...)
+	resolutionEntries[8] = m11Entry(t, ArtifactKindLedger, unknownReservationLedger)
+	resolutionEntries[9] = m11Entry(t, ArtifactKindExecution, unknownExecution)
 	resolutionEntries = append(resolutionEntries, m11Entry(t, ArtifactKindReconciliation, resolution))
 	if err := ValidateArtifactGraph(resolutionEntries); err != nil {
 		t.Fatalf("valid reconciliation resolution rejected: %v", err)
@@ -139,9 +146,14 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	lateExecution := execution
 	lateExecution.AttemptedAt = authorization.ExpiresAt
 	lateExecutionEntries := append([]ArtifactEntry(nil), entries...)
-	lateExecutionEntries[8] = m11Entry(t, ArtifactKindExecution, lateExecution)
+	lateExecutionEntries[9] = m11Entry(t, ArtifactKindExecution, lateExecution)
 	if err := ValidateArtifactGraph(lateExecutionEntries); err == nil {
 		t.Fatal("execution at authorization expiry was accepted")
+	}
+	missingReservationEntries := append([]ArtifactEntry(nil), entries[:8]...)
+	missingReservationEntries = append(missingReservationEntries, entries[9:]...)
+	if err := ValidateArtifactGraph(missingReservationEntries); err == nil {
+		t.Fatal("execution without a prior reservation ledger was accepted")
 	}
 	duplicateAuthorizationExecution := execution
 	duplicateAuthorizationExecution.ExecutionID = "exec-duplicate-authorization"
