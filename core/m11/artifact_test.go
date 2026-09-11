@@ -137,6 +137,17 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(preHealthGateEntries); err == nil {
 		t.Fatal("gate before its health observation was accepted")
 	}
+	degradedHealth := health
+	degradedHealth.DependencyState = "DEGRADED"
+	degradedHealth.SnapshotHash = ComputeProductionHealthHash(degradedHealth)
+	degradedHealthGate := gate
+	degradedHealthGate.HealthSnapshotHash = degradedHealth.SnapshotHash
+	degradedHealthGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	degradedHealthGateEntries[2] = m11Entry(t, ArtifactKindHealth, degradedHealth)
+	degradedHealthGateEntries[6] = m11Entry(t, ArtifactKindGate, degradedHealthGate)
+	if err := ValidateArtifactGraph(degradedHealthGateEntries); err == nil {
+		t.Fatal("allow gate with degraded health was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
