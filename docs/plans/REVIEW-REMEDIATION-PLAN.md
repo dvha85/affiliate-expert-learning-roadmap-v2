@@ -102,23 +102,20 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-02 semantic binding M08 policy → M09 approval
+### Runtime gap được chọn tiếp theo — RP-07 canonical recovery-admission cardinality
 
-Phạm vi tiếp theo là chặn một policy M08 đã qua JSON schema nhưng có tổ hợp
-decision/risk không thể do evaluator canonical sinh ra (ví dụ `ALLOW` cho
-`RISK2`) trước khi nó được bind vào learner state và dùng làm tiền đề M09. Đây
-là một boundary offline: nó không thay thế việc reevaluate bằng policy context
-tại executor, không cấp execution authority, và không suy thành proof provider
-hay live executor.
+Phạm vi tiếp theo là đưa invariant recovery-admission đã có ở learner/backup
+vào canonical `core/m11` graph. Một recovery lineage không thể có hai admission
+dùng cùng lease mới, hoặc cùng `prior_runtime_dir` và human resolution. Đây là
+boundary audit offline; không chứng minh availability, power-loss hay recovery
+đa-host.
 
-- `core/m08` phải sở hữu semantic validator cho intent/policy link, time window,
-  non-authorizing mode, và mapping `ALLOW → RISK0`, `HUMAN_REVIEW → RISK1/RISK2`.
-- Learner `bind` decode strict raw policy trước mọi mutation; unknown/duplicate
-  key và tổ hợp semantic impossible phải không tạo `mission-state`.
-- `core/m09` và harness phải gọi cùng validator trước khi approval được coi là
-  valid. Policy context vẫn phải được reevaluate ở đường authorization có context.
-- Regression chạy implementation thật: policy schema-valid `ALLOW/RISK2` bị
-  reject và state bytes không đổi. Không gọi executor/provider.
+- `core/m11.ValidateArtifactGraph` phải reject duplicate new-lease binding và
+  duplicate prior-runtime/resolution lineage, kể cả qua generic registry path.
+- Regression tạo graph M11 hợp lệ rồi thêm từng admission conflict; không
+  chấp nhận error do artifact/schema hỏng ở điều kiện test.
+- Learner/backup guard hiện hữu vẫn là defense-in-depth; không mở authority hay
+  thay đổi durable STOP.
 
 **Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
 journal là regular file ngay trong runtime. Symlink hoặc special file trả
@@ -283,6 +280,12 @@ cùng validator khi revalidate approval. Một policy schema-valid nhưng
 `ALLOW/RISK2` bị từ chối trước khi tạo state. Đây không chứng minh policy
 context provenance hoặc thay executor-side reevaluation, nên RP-02 vẫn
 `PARTIAL`.
+
+**Cập nhật core M11 recovery-admission cardinality (2026-09-11):** canonical
+graph nay sở hữu một admission cho mỗi new lease và mỗi cặp prior runtime/human
+resolution. Regression bắt cả hai conflict trên graph hợp lệ, nên generic
+registry không lệch learner/backup boundary. Đây không chứng minh recovery
+atomic, power-loss hay multi-host, nên RP-07 vẫn `PARTIAL`.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không

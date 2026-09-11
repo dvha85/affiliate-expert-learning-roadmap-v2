@@ -395,6 +395,30 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(erasedOutcomeEntries); err == nil {
 		t.Fatal("later ledger erased an immutable outcome link")
 	}
+
+	admission := ProductionRecoveryAdmission{RecoveryAdmissionID: "admission-1", PriorRuntimeDir: "/runtime/old", PriorLeaseID: "lease-old", PriorLeaseVersion: "v1", PriorLeaseHash: lease.SourceCanaryGrantHash, PriorApprovalID: "approval-old", ResolutionID: "resolution-old", NewRuntimeID: "runtime-new", NewRuntimeDir: "/runtime/new", NewLeaseID: lease.LeaseID, NewLeaseVersion: lease.LeaseVersion, NewLeaseHash: lease.LeaseHash, NewApprovalID: approval.ApprovalID, ReviewedBy: "human", ReviewerID: "reviewer-new", ReviewedAt: "2026-09-08T00:00:01Z", ExecutionPermitted: false}
+	baseEntries := append([]ArtifactEntry(nil), entries...)
+	baseEntries[len(baseEntries)-1] = m11Entry(t, ArtifactKindCycle, cycle)
+	admissionEntries := append(baseEntries, m11Entry(t, ArtifactKindRecoveryAdmission, admission))
+	if err := ValidateArtifactGraph(admissionEntries); err != nil {
+		t.Fatalf("valid recovery admission rejected: %v", err)
+	}
+	secondAdmission := admission
+	secondAdmission.RecoveryAdmissionID, secondAdmission.PriorRuntimeDir, secondAdmission.ResolutionID = "admission-2", "/runtime/other", "resolution-other"
+	if err := ValidateArtifactGraph(append(admissionEntries, m11Entry(t, ArtifactKindRecoveryAdmission, secondAdmission))); err == nil {
+		t.Fatal("two recovery admissions for one new lease were accepted")
+	}
+	secondLease := lease
+	secondLease.LeaseID, secondLease.ApprovalRef = "lease-2", "approval-2"
+	secondLease.LeaseHash = ComputeProductionLeaseHash(secondLease)
+	secondApproval := approval
+	secondApproval.ApprovalID, secondApproval.LeaseID, secondApproval.LeaseHash = secondLease.ApprovalRef, secondLease.LeaseID, secondLease.LeaseHash
+	priorLineageAdmission := admission
+	priorLineageAdmission.RecoveryAdmissionID, priorLineageAdmission.NewLeaseID, priorLineageAdmission.NewLeaseVersion, priorLineageAdmission.NewLeaseHash, priorLineageAdmission.NewApprovalID = "admission-3", secondLease.LeaseID, secondLease.LeaseVersion, secondLease.LeaseHash, secondApproval.ApprovalID
+	priorLineageEntries := append(append([]ArtifactEntry(nil), admissionEntries...), m11Entry(t, ArtifactKindLease, secondLease), m11Entry(t, ArtifactKindLeaseApproval, secondApproval), m11Entry(t, ArtifactKindRecoveryAdmission, priorLineageAdmission))
+	if err := ValidateArtifactGraph(priorLineageEntries); err == nil {
+		t.Fatal("two recovery admissions for one prior resolution lineage were accepted")
+	}
 }
 
 func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing.T) {
