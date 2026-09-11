@@ -156,6 +156,15 @@ def canonical_m10_snapshot(state):
     }
 
 
+def canonical_m10_execution_snapshot(state):
+    """Canonical state that an invalid execution/outcome path must not mutate."""
+    names = ("mission-state.json", "m10-artifacts.jsonl", "trusted-cost-bounds.jsonl", "m10-outcomes.jsonl")
+    return {
+        name: (state / name).read_bytes() if (state / name).exists() else None
+        for name in names
+    }
+
+
 def write_production_lease(path, grant, policy, intent):
     payload = {
         "lease_id": "br16-production-lease", "lease_version": "v1", "policy_version": policy["policy_version"],
@@ -344,10 +353,14 @@ def main(argv=None):
         gate_response = invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)
         assert gate_response["status"] == "ALLOW_CANARY" and gate_response["artifact"]["execution_authorized"] is False
         assert invoke(bot, "mission", "m10-gate", state, cost, gate, gate_time)["status"] == "EXACT_DUPLICATE"
+        # EC-03: an unregistered gate or authorization is rejected before it
+        # can reserve budget or create the local fixture record.
+        ec03_gate_before = canonical_m10_execution_snapshot(state)
         forged_gate = work / "forged-canary-gate.json"
         forged_gate_data = json.loads(gate.read_text(encoding="utf-8")); forged_gate_data["gate_id"] = "gate-forged-but-schema-valid"
         forged_gate.write_text(json.dumps(forged_gate_data), encoding="utf-8")
         assert invoke(bot, "mission", "m10-authorize", state, cost, forged_gate, work / "forged-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
+        assert canonical_m10_execution_snapshot(state) == ec03_gate_before
         authorization = work / "canary-authorization.json"
         authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, authorization, gate_time, "local_sandbox")
         assert authorization_response["status"] == "AUTHORIZED" and authorization_response["artifact"]["execution_authorized"] is True
@@ -356,11 +369,13 @@ def main(argv=None):
         failed_authorization_response = invoke(bot, "mission", "m10-authorize", state, cost, gate, failed_authorization, gate_time, "fixture_stub")
         assert failed_authorization_response["status"] == "AUTHORIZED" and failed_authorization_response["artifact"]["executor_id"] == "fixture_stub"
         cancelled = work / "cancelled-execution.json"
+        ec03_execution_before = canonical_m10_execution_snapshot(state)
         forged_authorization = work / "forged-authorization.json"
         forged_authorization_data = json.loads(authorization.read_text(encoding="utf-8")); forged_authorization_data["authorization_id"] = "canary-auth-forged-but-schema-valid"
         forged_authorization.write_text(json.dumps(forged_authorization_data), encoding="utf-8")
         assert invoke(bot, "mission", "m10-cancel", state, forged_authorization, work / "forged-execution.json", "2026-09-08T00:01:00Z", "must-not-resolve-forged-authorization", expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-cancel", state, authorization, work / "unreserved-execution.json", "2026-09-08T00:01:00Z", "must-reserve-before-execution-record", expected=1)["status"] == "REJECTED"
+        assert canonical_m10_execution_snapshot(state) == ec03_execution_before
         reservation = invoke(bot, "mission", "m10-reserve-authorization", state, authorization, "br16-governed-r1")
         assert reservation["status"] == "RESERVED" and reservation["artifact"]["authorization_id"] == authorization_response["artifact"]["authorization_id"] and reservation["artifact"]["reservation_mode"] == "GOVERNED_AUTHORIZATION"
         cancellation_attempted_at = reservation["artifact"]["reserved_at"]
@@ -388,6 +403,19 @@ def main(argv=None):
         machine_outcome.write_text(json.dumps({"outcome_id":"br16-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":failed_attempted_at,"status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br16-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m10-outcome", state, machine_outcome)["status"] == "EXACT_DUPLICATE"
+        # EC-04: an outcome must name a registered MACHINE_EXECUTION, not a
+        # reservation, approval, or a different effect kind. Each rejection
+        # leaves both the execution graph and the outcome store untouched.
+        ec04_before = canonical_m10_execution_snapshot(state)
+        for name, effect_ref in {
+            "reservation": {"effect_kind": "MACHINE_EXECUTION", "effect_id": reservation["artifact"]["reservation_id"]},
+            "approval": {"effect_kind": "MACHINE_EXECUTION", "effect_id": json.loads(approval.read_text())["approval_id"]},
+            "wrong-kind": {"effect_kind": "HUMAN_ACTION", "effect_id": failed["artifact"]["execution_id"]},
+        }.items():
+            invalid_outcome = work / f"invalid-machine-outcome-{name}.json"
+            invalid_outcome.write_text(json.dumps({"outcome_id": f"br16-invalid-machine-{name}", "effect_ref": effect_ref, "observed_at": failed_attempted_at, "status": "CANCELLED", "metrics": {}, "source_ref": "fixture:m10-outcome/invalid"}), encoding="utf-8")
+            assert invoke(bot, "mission", "m10-outcome", state, invalid_outcome, expected=1)["status"] in {"ORPHAN_EXECUTION", "REQUIRE_MACHINE_EXECUTION"}
+        assert canonical_m10_execution_snapshot(state) == ec04_before
         forged_outcome = work / "forged-machine-outcome.json"
         forged_outcome.write_text(machine_outcome.read_text(encoding="utf-8").replace(failed["artifact"]["execution_id"], "canary-exec-orphan"), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", state, forged_outcome, expected=1)["status"] == "ORPHAN_EXECUTION"
@@ -437,11 +465,16 @@ def main(argv=None):
         assert governed_reservation["execution_id"] == cancellation["artifact"]["execution_id"]
         artifact_kinds = {entry["artifact_kind"] for entry in map(json.loads, (state / "m10-artifacts.jsonl").read_text(encoding="utf-8").splitlines()) if entry}
         assert {"CANARY_GRANT", "TRUSTED_COST_BOUND", "CANARY_GATE", "EXECUTION_AUTHORIZATION", "EXECUTION_RECORD"}.issubset(artifact_kinds)
+        # EC-02: missing/unregistered/tampered/expired cost inputs fail before
+        # reservation or authorization, and do not mutate the canonical ledger.
+        ec02_before = canonical_m10_execution_snapshot(state)
+        assert invoke(bot, "mission", "m10-gate", state, work / "missing-cost-bound.json", work / "missing-cost-gate.json", gate_time, expected=1)["status"] == "INPUT_ERROR"
         tampered = work / "cost-bound-tampered.json"; tampered.write_text(cost.read_text().replace('"max_cost_minor": 100', '"max_cost_minor": 1'), encoding="utf-8")
         assert invoke(bot, "mission", "m10-gate", state, tampered, work / "tampered-gate.json", gate_time, expected=1)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
         expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
         assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
+        assert canonical_m10_execution_snapshot(state) == ec02_before
         # STOP and reserve race on a cloned, otherwise identical runtime with
         # one remaining slot. Whichever operation gets the lock first is
         # allowed, but STOP must become durable and no reservation may be
@@ -512,6 +545,9 @@ def main(argv=None):
         recovery_reservation_id = recovery_reservation["artifact"]["lease_id"] + "/" + recovery_reservation["artifact"]["updated_at"]
         recovery_unknown = invoke(bot, "mission", "m11-record-unknown", state, recovery_authorization["artifact"]["authorization_id"], recovery_reservation_id, "2026-09-08T00:00:03Z", "fixture provider timeout after dispatch")
         assert recovery_unknown["status"] == "APPENDED" and recovery_unknown["artifact"]["execution"]["side_effect_state"] == "UNKNOWN"
+        # EC-05: the exact retry is idempotent; it neither refunds/re-reserves
+        # nor turns an UNKNOWN result into a successful fixture outcome.
+        assert invoke(bot, "mission", "m11-record-unknown", state, recovery_authorization["artifact"]["authorization_id"], recovery_reservation_id, "2026-09-08T00:00:03Z", "fixture provider timeout after dispatch")["status"] == "EXACT_DUPLICATE"
         unknown_status = invoke(bot, "mission", "status", state)["artifact"]
         assert unknown_status["stop"] is True and unknown_status["stop_reason"] == "RECONCILIATION_REQUIRED"
         registry_before_stopped_gate = (state / "m11-artifacts.jsonl").read_bytes()
@@ -620,6 +656,11 @@ def main(argv=None):
                 "m00_to_m11_shared_lineage": "PASS",
                 "history_replay_after_restore": "MATCH",
                 "m10_rebind_no_mutation": "PASS",
+                "EC-01_m09_m10_fixture_chain_persisted_reloaded": "PASS",
+                "EC-02_invalid_cost_rejects_without_mutation": "PASS",
+                "EC-03_invalid_gate_authorization_rejects_without_execution": "PASS",
+                "EC-04_invalid_effect_ref_rejects_without_outcome": "PASS",
+                "EC-05_unknown_retry_stop_restore_retains_reconciliation": "PASS",
                 "m11_unknown_requires_stop": "PASS",
                 "restart_stop_blocks_canary": "PASS",
                 "recovery_admission_execution_permitted": False,

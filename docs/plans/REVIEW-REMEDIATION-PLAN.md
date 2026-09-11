@@ -91,7 +91,7 @@ và regression tương ứng.
 | RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; inventory of every writer remains open |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy with exact-number regression; broader M09 conformance/migration remains open |
-| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — offline approval/grant/cost/gate/authorization/reservation and no-side-effect records exist; expiry/rebind, complete EC coverage and multi-file crash proof remain open |
+| RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — one shared learner-Bot fixture chain now exercises EC-01…EC-05 with byte-level no-mutation rejects, restore and restart; multi-file crash/power-loss, distributed locking and business-execution proof remain open |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver and n8n engine regression exist; governed selected-source profile and operated run remain open |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence and n8n stub path exist; selected-source/provider operated evidence remains open |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
@@ -164,6 +164,20 @@ còn một slot, cho `m10-reserve` và `m11-stop` qua một subprocess barrier. 
 operation lấy local runtime gate trước có thể hoàn tất; sau khi STOP durable,
 mọi reservation mới bị `STOPPED` và mutable state không đổi. Đây không suy ra
 ordering liên-host, transaction đa-file hay crash/power-loss recovery.
+
+**Cập nhật EC-01…EC-05 learner acceptance (2026-09-11):** cùng một shared
+workspace và Bot binary giờ ghi rõ năm ca execution chain trong
+`smoke_br16a_offline.py`. EC-01 sinh M09 approval, M10 grant/cost/gate/
+authorization/reservation, deterministic failed-before-dispatch fixture,
+EffectRef outcome, rồi backup/restore và resolve lại bằng process mới. EC-02
+chặn cost bound missing, unregistered/tampered và expired trước reservation;
+EC-03 chặn gate/authorization chưa register và execution chưa reserve; EC-04
+chặn outcome trỏ reservation, approval hoặc effect kind sai. Mỗi reject EC-02
+đến EC-04 so byte canonical state/registry/outcome trước-sau. EC-05 retry
+đúng UNKNOWN là exact duplicate, giữ reservation/reconciliation/STOP và vẫn
+được kiểm sau restore/restart. Đây là fixture no-side-effect, không phải
+executor, business outcome, transaction đa-file, power-loss hay multi-host
+proof; RP-03 vẫn `PARTIAL`.
 
 **Cập nhật cost overflow boundary (2026-09-11):** canonical M10 gate được
 regression tại ranh giới `int64`: ledger ở `MaxInt64 - 1` với bound 2 phải
