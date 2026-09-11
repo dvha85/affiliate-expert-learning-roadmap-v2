@@ -157,6 +157,16 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		if !grantOK || !boundOK || grant.GrantVersion != gate.GrantVersion || grant.GrantHash != gate.GrantHash || bound.CostBoundHash != gate.CostBoundHash || bound.MaxCostMinor != gate.CostBoundMinor || bound.IntentID != gate.IntentID || bound.IntentHash != gate.IntentHash || grant.PolicyVersion != gate.PolicyVersion {
 			return fmt.Errorf("canary gate has an orphaned or mismatched registry link")
 		}
+		expectedGateID := canaryGateID(CanaryGateInput{
+			Grant: grant, CostBound: bound, IntentID: gate.IntentID, IntentHash: gate.IntentHash, PolicyVersion: gate.PolicyVersion,
+			Ledger: CanaryLedgerSnapshot{
+				ExecutionsTotal: gate.ExecutionsTotalBefore, ExecutionsInWindow: gate.ExecutionsInWindowBefore,
+				CostMinorTotal: gate.CostMinorTotalBefore, PendingOutcomes: gate.PendingOutcomesBefore,
+			},
+		})
+		if gate.GateID != expectedGateID {
+			return fmt.Errorf("canary gate has a non-canonical gate ID")
+		}
 	}
 	for _, authorization := range authorizations {
 		grant, grantOK := grants[authorization.CanaryGrantID]
@@ -164,6 +174,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		bound, boundOK := bounds[authorization.CanaryCostBoundID]
 		if !grantOK || !gateOK || !boundOK || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
 			return fmt.Errorf("execution authorization has an orphaned or mismatched registry link")
+		}
+		expectedAuthorizationID := authorizationID(CanaryAuthorizationInput{
+			Gate: gate, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, ExecutorID: authorization.ExecutorID,
+			AuthorizedAt: authorization.AuthorizedAt, IdempotencyKey: authorization.IdempotencyKey,
+		})
+		if authorization.AuthorizationID != expectedAuthorizationID {
+			return fmt.Errorf("execution authorization has a non-canonical authorization ID")
 		}
 	}
 	for _, record := range records {

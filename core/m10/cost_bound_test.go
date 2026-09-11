@@ -141,6 +141,35 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatalf("valid M10 graph rejected: %v", err)
 	}
+	forgedGate := gate
+	forgedGate.GateID = "forged-gate-id"
+	forgedGateAuthorization := auth
+	forgedGateAuthorization.CanaryGateID = forgedGate.GateID
+	forgedGateAuthorization.AuthorizationID = authorizationID(CanaryAuthorizationInput{
+		Gate: forgedGate, IntentID: forgedGateAuthorization.IntentID, IntentHash: forgedGateAuthorization.IntentHash,
+		ExecutorID: forgedGateAuthorization.ExecutorID, AuthorizedAt: forgedGateAuthorization.AuthorizedAt,
+		IdempotencyKey: forgedGateAuthorization.IdempotencyKey,
+	})
+	forgedGateEntries := []ArtifactEntry{
+		m10Entry(t, ArtifactKindCanaryGrant, g),
+		m10Entry(t, ArtifactKindTrustedCostBound, cost),
+		m10Entry(t, ArtifactKindCanaryGate, forgedGate),
+		m10Entry(t, ArtifactKindExecutionAuthorization, forgedGateAuthorization),
+	}
+	if err := ValidateArtifactGraph(forgedGateEntries); err == nil {
+		t.Fatal("graph accepted a forged canary gate ID with otherwise matching links")
+	}
+	forgedAuthorization := auth
+	forgedAuthorization.AuthorizationID = "forged-authorization-id"
+	forgedAuthorizationEntries := []ArtifactEntry{
+		m10Entry(t, ArtifactKindCanaryGrant, g),
+		m10Entry(t, ArtifactKindTrustedCostBound, cost),
+		m10Entry(t, ArtifactKindCanaryGate, gate),
+		m10Entry(t, ArtifactKindExecutionAuthorization, forgedAuthorization),
+	}
+	if err := ValidateArtifactGraph(forgedAuthorizationEntries); err == nil {
+		t.Fatal("graph accepted a forged authorization ID with otherwise matching links")
+	}
 	if err := ValidateArtifactGraph(append(entries, entries[0])); err == nil {
 		t.Fatal("duplicate immutable grant entry was accepted by canonical M10 graph")
 	}
