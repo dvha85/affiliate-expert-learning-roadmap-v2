@@ -154,6 +154,7 @@ func ValidateArtifactEntry(raw []byte) (ArtifactEntry, error) {
 // ValidateArtifactGraph makes every registered M11 lifecycle link resolve to
 // exact, immutable parent artifacts. It deliberately does not authorize a run.
 func ValidateArtifactGraph(entries []ArtifactEntry) error {
+	entryIDs := map[string]bool{}
 	leases := map[string]ProductionLease{}
 	approvals := map[string]ProductionLeaseApproval{}
 	health := map[string]ProductionHealthSnapshot{}
@@ -172,6 +173,11 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	ledgers := []ProductionLedger{}
 	activations := map[string]ProductionActivationRecord{}
 	for _, entry := range entries {
+		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
+		if entryIDs[entryKey] {
+			return fmt.Errorf("duplicate M11 artifact in registry graph")
+		}
+		entryIDs[entryKey] = true
 		profile := kindProfile(entry.ArtifactKind)
 		value, status := DecodeArtifact(profile, entry.Artifact)
 		if status != Valid {
