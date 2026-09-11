@@ -84,6 +84,20 @@ func contains(values []string, wanted string) bool {
 	return false
 }
 
+func newlyAdded(current, previous []string) int {
+	prior := make(map[string]bool, len(previous))
+	for _, value := range previous {
+		prior[value] = true
+	}
+	added := 0
+	for _, value := range current {
+		if !prior[value] {
+			added++
+		}
+	}
+	return added
+}
+
 func NewArtifactEntry(kind string, raw []byte) (ArtifactEntry, error) {
 	profile := kindProfile(kind)
 	if profile == "" {
@@ -165,7 +179,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if previous, exists := ledgerHeads[x.LeaseID]; exists {
 				previousAt, previousErr := time.Parse(time.RFC3339, previous.UpdatedAt)
 				currentAt, currentErr := time.Parse(time.RFC3339, x.UpdatedAt)
-				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.WindowStartedAt != previous.WindowStartedAt || x.ExecutionsTotal < previous.ExecutionsTotal || x.ExecutionsInWindow < previous.ExecutionsInWindow || x.CostMinorTotal < previous.CostMinorTotal {
+				executionDelta := x.ExecutionsTotal - previous.ExecutionsTotal
+				windowDelta := x.ExecutionsInWindow - previous.ExecutionsInWindow
+				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.WindowStartedAt != previous.WindowStartedAt || executionDelta < 0 || windowDelta < 0 || x.CostMinorTotal < previous.CostMinorTotal || windowDelta != executionDelta || newlyAdded(x.PendingExecutionIDs, previous.PendingExecutionIDs) != executionDelta {
 					return fmt.Errorf("production ledger is not a monotonic lease history")
 				}
 			}

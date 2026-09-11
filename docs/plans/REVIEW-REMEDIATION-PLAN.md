@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 7efca2a129a97b4f66bde17919895c047b6a6f4c -->
+<!-- readiness-main-baseline: c11d6eea32bf82ddbfdd9751373543899fbfb4ae -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -850,6 +850,13 @@ history cho cùng lease không được đổi `window_started_at` hoặc giảm
 regression append ledger có window reset và counter window giảm, rồi reject.
 Điều này giữ fixed-window budget lineage của runtime hiện tại; không triển khai
 rolling-window reset hoặc chứng minh concurrent accounting.
+
+**Cập nhật M11 pending reservation continuity (2026-09-11):** giữa hai ledger
+entries của cùng lease, số pending execution ID mới phải đúng bằng delta
+`executions_total`, và `executions_in_window` phải tăng cùng delta. Core
+regression thay pending ID mà không tạo reservation/counter mới rồi reject.
+Đây chặn forged ledger swap trong deterministic graph; outcome/reconciliation
+transitions và crash atomicity đa-file vẫn là các phạm vi riêng.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
