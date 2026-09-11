@@ -380,6 +380,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	completedLedger.OutcomeLinks = []ProductionOutcomeLink{{OutcomeID: evaluation.OutcomeID, ExecutionID: execution.ExecutionID, ObservedAt: "2026-09-08T00:00:02Z"}}
 	completedLedger.LastOutcomeAt = "2026-09-08T00:00:02Z"
 	completedLedger.UpdatedAt = "2026-09-08T00:00:02Z"
+	forgedOutcomeLedger := completedLedger
+	forgedOutcomeLedger.OutcomeLinks = []ProductionOutcomeLink{{OutcomeID: evaluation.OutcomeID, ExecutionID: "orphan-execution", ObservedAt: "2026-09-08T00:00:02Z"}}
+	forgedOutcomeEntries := append([]ArtifactEntry(nil), entries...)
+	forgedOutcomeEntries = append(forgedOutcomeEntries, m11Entry(t, ArtifactKindLedger, forgedOutcomeLedger))
+	if err := ValidateArtifactGraph(forgedOutcomeEntries); err == nil {
+		t.Fatal("ledger outcome link to an orphan execution was accepted")
+	}
 	erasedOutcomeLedger := completedLedger
 	erasedOutcomeLedger.OutcomeLinks = []ProductionOutcomeLink{}
 	erasedOutcomeLedger.UpdatedAt = "2026-09-08T00:00:03Z"

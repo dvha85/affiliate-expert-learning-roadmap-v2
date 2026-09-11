@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 5edc20706c9d011a2fba8de1afc37700bba0f766 -->
+<!-- readiness-main-baseline: 5263a6428fe55be8df6f25487b21491d5950ac86 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -870,6 +870,12 @@ duplicate `(artifact_kind, artifact_id)` trước khi decode/link resolution. Co
 regression thêm lại activation y hệt và bị reject, nên map overwrite không thể
 ẩn duplicate input khi validator được dùng ngoài learner registry. Đây là
 integrity guard offline, không thay thế locking hay migration/version policy.
+
+**Cập nhật M11 ledger outcome execution link (2026-09-11):** mỗi outcome link
+trong canonical ledger phải resolve execution thật cùng lease lineage và không
+được có `observed_at` trước attempt. Core regression gắn outcome vào execution
+không tồn tại rồi reject, nên forged link không thể giải phóng pending budget.
+Đây là fixture graph validation, không xác thực business outcome external.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
