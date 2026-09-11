@@ -1218,6 +1218,16 @@ không rõ, test PASS, hoặc lỗi không liên quan đều làm script FAIL. �
 mutation proof hẹp cho ba ID immutable M11, không bao phủ ledger,
 backup/restore, blueprint, crash/power-loss, multi-host hay operated n8n.
 
+**Cập nhật mutation proof M10 (2026-09-12):** cùng job chạy
+`scripts/mutate_m10_identity_guard.py`. Script tạo copy riêng `core` và
+`contracts`, lần lượt bỏ các guard canonical gate, authorization và terminal
+execution ID M10, rồi gọi đúng `TestCanaryAuthorizationBindsGateWithoutExecuting`
+hoặc `TestCancelledCanaryExecutionRecordHasNoSideEffect` theo ca tương ứng.
+Mỗi copy chỉ PASS nếu assertion forged-ID đúng ca thất bại; lỗi compile hoặc lỗi
+không liên quan fail closed. Proof này chỉ kiểm immutable graph ID M10, không
+chứng minh ledger mutable, crash/power-loss, multi-host, executor hay outcome
+business thật.
+
 **Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
 `--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi
 `walkthrough-result.json` có đường dẫn M08–M11 cùng các kiểm PASS/MATCH/STOP.
