@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
@@ -18,6 +19,60 @@ func writeM07File(t *testing.T, path string, value any) {
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestM07RejectsOutputInputAliasesBeforeParsing(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-path-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-path-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(dir, "registry.json")
+	resultPath := filepath.Join(dir, "tool-result.json")
+	writeM07File(t, registryPath, []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}})
+	writeM07File(t, resultPath, corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-01T00:02:00Z", Body: json.RawMessage(`{"price":100}`)})
+	inputs := map[string][]byte{}
+	for _, path := range []string{historyPath, registryPath, resultPath} {
+		inputs[path], err = os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	outputs := []string{historyPath}
+	hardlink := filepath.Join(dir, "result-hardlink.json")
+	if err := os.Link(resultPath, hardlink); err != nil {
+		t.Fatal(err)
+	}
+	outputs = append(outputs, hardlink)
+	if runtime.GOOS != "windows" {
+		symlink := filepath.Join(dir, "history-symlink.json")
+		if err := os.Symlink(historyPath, symlink); err != nil {
+			t.Fatal(err)
+		}
+		outputs = append(outputs, symlink)
+	}
+	for _, output := range outputs {
+		t.Run(filepath.Base(output), func(t *testing.T) {
+			var out, errOut bytes.Buffer
+			if code := runM07([]string{"register-tool-result", historyPath, record.RecordID, registryPath, resultPath, output}, &out, &errOut); code == 0 {
+				t.Fatalf("input alias was accepted: output=%s response=%s", output, out.String())
+			}
+			var envelope map[string]any
+			if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "PATH_CONFLICT" {
+				t.Fatalf("alias did not fail at path preflight: output=%s envelope=%s err=%v stderr=%s", output, out.String(), err, errOut.String())
+			}
+			for path, before := range inputs {
+				after, err := os.ReadFile(path)
+				if err != nil || !bytes.Equal(before, after) {
+					t.Fatalf("input changed after rejected output alias %s: path=%s err=%v", output, path, err)
+				}
+			}
+		})
 	}
 }
 

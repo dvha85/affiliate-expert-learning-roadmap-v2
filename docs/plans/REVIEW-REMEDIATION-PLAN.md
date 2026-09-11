@@ -171,6 +171,12 @@ regression tại ranh giới `int64`: ledger ở `MaxInt64 - 1` với bound 2 ph
 authority. Đây là chứng cứ arithmetic cho core gate; không thay evidence về
 transaction đa-file hoặc recovery sau crash.
 
+**Cập nhật M07 output-path preflight (2026-09-11):** M07 tool-result/proposal
+giờ reject same path, hardlink và symlink output alias trước khi đọc bất kỳ
+history/model/registry/tool input nào. Regression gọi CLI implementation thật
+và kiểm input bytes không đổi. Đây chỉ mở rộng inventory output của M07; các
+writer khác vẫn phải được audit riêng trước khi đổi RP-01 khỏi `PARTIAL`.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.

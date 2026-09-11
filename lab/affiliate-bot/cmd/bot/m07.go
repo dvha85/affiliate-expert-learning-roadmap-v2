@@ -100,6 +100,23 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 	if (args[0] == "context" && len(args) != 3) || (args[0] == "register-tool-result" && len(args) != 6) || (args[0] == "register-proposal" && len(args) != 6 && len(args) != 7) || (args[0] == "validate" && len(args) != 5 && len(args) != 6) || (args[0] != "context" && args[0] != "register-tool-result" && args[0] != "register-proposal" && args[0] != "validate") {
 		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot m07 context HISTORY RECORD_ID | bot m07 register-tool-result HISTORY RECORD_ID REGISTRY TOOL_RESULT OUTPUT | bot m07 register-proposal HISTORY RECORD_ID MODEL_OUTPUT REGISTRY OUTPUT [REGISTERED_TOOL_RESULT] | bot m07 validate HISTORY RECORD_ID MODEL_OUTPUT REGISTRY [REGISTERED_TOOL_RESULT]"), 2)
 	}
+	// Reject every output/input alias before reading any model, registry, tool or
+	// history bytes. The output is immutable, but this preflight also makes the
+	// safety boundary independent of which input happens to parse successfully.
+	switch args[0] {
+	case "register-tool-result":
+		if err := distinctPaths(args[1], args[3], args[4], args[5]); err != nil {
+			return emit("PATH_CONFLICT", nil, err, 1)
+		}
+	case "register-proposal":
+		paths := []string{args[1], args[3], args[4], args[5]}
+		if len(args) == 7 {
+			paths = append(paths, args[6])
+		}
+		if err := distinctPaths(paths...); err != nil {
+			return emit("PATH_CONFLICT", nil, err, 1)
+		}
+	}
 	record, err := resolveCanonicalRecord(args[1], args[2])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)
@@ -126,9 +143,6 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		}
 		if registered.RecordID != record.RecordID {
 			return emit("TOOL_RESULT_REJECTED", nil, fmt.Errorf("tool result record_id does not match canonical record"), 1)
-		}
-		if err := distinctPaths(args[1], args[3], args[4], args[5]); err != nil {
-			return emit("PATH_CONFLICT", nil, err, 1)
 		}
 		status, err := writeNewJSON(args[5], registered)
 		if err != nil {
@@ -161,13 +175,6 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		proposal, err := corem07.RegisterAgentProposal([]byte(text), ctx.Evidence, registry, record.RecordID)
 		if err != nil {
 			return emit("PROPOSAL_REJECTED", nil, err, 1)
-		}
-		paths := []string{args[1], args[3], args[4], args[5]}
-		if len(args) == 7 {
-			paths = append(paths, args[6])
-		}
-		if err := distinctPaths(paths...); err != nil {
-			return emit("PATH_CONFLICT", nil, err, 1)
 		}
 		status, err := writeNewJSON(args[5], proposal)
 		if err != nil {
