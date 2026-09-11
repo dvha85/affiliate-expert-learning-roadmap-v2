@@ -111,6 +111,21 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(driftedGateEntries); err == nil {
 		t.Fatal("gate with drifted ledger counters was accepted")
 	}
+	lateActivation := activation
+	lateActivation.ActivatedAt = "2026-09-08T00:00:01Z"
+	activationBoundHealth := health
+	activationBoundHealth.ObservedAt = lateActivation.ActivatedAt
+	activationBoundHealth.SnapshotHash = ComputeProductionHealthHash(activationBoundHealth)
+	preActivationGate := gate
+	preActivationGate.EvaluatedAt = "2026-09-08T00:00:00.500Z"
+	preActivationGate.HealthSnapshotHash = activationBoundHealth.SnapshotHash
+	preActivationGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	preActivationGateEntries[2] = m11Entry(t, ArtifactKindHealth, activationBoundHealth)
+	preActivationGateEntries[5] = m11Entry(t, ArtifactKindActivation, lateActivation)
+	preActivationGateEntries[6] = m11Entry(t, ArtifactKindGate, preActivationGate)
+	if err := ValidateArtifactGraph(preActivationGateEntries); err == nil {
+		t.Fatal("gate before activation was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
