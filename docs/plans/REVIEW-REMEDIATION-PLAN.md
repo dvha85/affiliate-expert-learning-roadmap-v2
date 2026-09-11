@@ -652,6 +652,13 @@ không được có partial admission. Đây chỉ ràng buộc source đọc c�
 không khóa snapshot đa-runtime, không là transaction giữa hai runtime và không
 chứng minh power-loss/external recovery.
 
+**Cập nhật recovery-admission source gate (2026-09-11):** sau khi command đã
+giữ gate runtime mới, `m11-recovery-admit` giữ thêm runtime gate của **runtime
+cũ** xuyên suốt handoff/registry validation. Old writer đang chạy trả fail-closed
+trước khi admission đọc handoff input hoặc ghi artifact mới; regression giữ gate
+cũ rồi xác nhận new registry không đổi. Đây là local cross-runtime exclusion,
+không thay distributed lock, multi-host coordination hay power-loss recovery.
+
 **Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
 ghi `m11-failed-execution-journal/v1` trước cặp immutable
 `FAILED/NOT_PERFORMED` execution và post-execution ledger. Recovery chỉ replay

@@ -1026,6 +1026,15 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	if err != nil {
 		return corem11.ArtifactEntry{}, "", err
 	}
+	// The command dispatcher already holds the new-runtime gate. Hold the old
+	// runtime gate while validating its stopped lineage as well: otherwise an
+	// old writer could begin an interrupted journal transition after the
+	// preflight check and before its handoff is resolved.
+	releaseOld, err := acquireRuntimeGate(oldAbs)
+	if err != nil {
+		return corem11.ArtifactEntry{}, "", err
+	}
+	defer releaseOld()
 	// An admission is an immutable audit link from the old stopped runtime. It
 	// must not inspect, validate, or carry forward an old lifecycle while that
 	// runtime still has an interrupted journal transition awaiting its locked

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -81,6 +82,28 @@ func TestM11JournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
 		if err := os.Remove(journal); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestM11RecoveryAdmissionFailsClosedWhileOldRuntimeGateIsHeld(t *testing.T) {
+	oldDir, newDir := t.TempDir(), t.TempDir()
+	if code, response := missionCall(t, "init", oldDir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init old runtime: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "init", newDir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init new runtime: code=%d response=%+v", code, response)
+	}
+	release, err := acquireRuntimeGate(oldDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	_, _, err = admitM11Recovery(newDir, oldDir, filepath.Join(t.TempDir(), "unread-handoff.json"), nil)
+	if err == nil || !strings.Contains(err.Error(), "runtime is busy") {
+		t.Fatalf("recovery admission read an old runtime while its writer gate was held: %v", err)
+	}
+	if _, err := os.Stat(m11ArtifactRegistryPath(newDir)); !os.IsNotExist(err) {
+		t.Fatalf("blocked recovery admission mutated new runtime: %v", err)
 	}
 }
 
