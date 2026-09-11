@@ -489,14 +489,18 @@ func marshalJSON(value any) ([]byte, error) {
 	return append(b, '\n'), nil
 }
 
-// writeNewJSON creates an immutable command artifact. A retry is successful
-// only when it finds the byte-for-byte artifact it would have created; a
-// different existing file, symlink, or special file is never overwritten.
-func writeNewJSON(path string, value any) (string, error) {
-	b, err := marshalJSON(value)
-	if err != nil {
-		return "", err
+// artifactWriteFault is a test-only seam for the immutable artifact publish
+// boundary. Operators cannot set it via CLI arguments or environment.
+var artifactWriteFault func(phase string) error
+
+func artifactWriteFailure(phase string) error {
+	if artifactWriteFault == nil {
+		return nil
 	}
+	return artifactWriteFault(phase)
+}
+
+func existingNewJSONStatus(path string, expected []byte) (string, error) {
 	if info, err := os.Lstat(path); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return "", fmt.Errorf("artifact output must be a new regular file")
@@ -505,18 +509,41 @@ func writeNewJSON(path string, value any) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if bytes.Equal(existing, b) {
+		if bytes.Equal(existing, expected) {
 			return appendDuplicate, nil
 		}
 		return "", fmt.Errorf("artifact output already exists with different content")
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
+	return "", nil
+}
+
+// writeNewJSON creates an immutable command artifact. The bytes are written
+// and synced in a sibling temporary file, then published with a hard link
+// whose destination must not exist. A reader sees either no artifact or the
+// complete synced artifact; it never sees a direct-write partial file. A retry
+// is successful only when it finds byte-for-byte expected content.
+func writeNewJSON(path string, value any) (string, error) {
+	b, err := marshalJSON(value)
+	if err != nil {
+		return "", err
+	}
+	if status, err := existingNewJSONStatus(path, b); err != nil || status != "" {
+		return status, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return "", err
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, ".artifact-")
 	if err != nil {
+		return "", err
+	}
+	temporary := f.Name()
+	defer os.Remove(temporary)
+	if err := f.Chmod(0600); err != nil {
+		_ = f.Close()
 		return "", err
 	}
 	if _, err := f.Write(b); err != nil {
@@ -527,8 +554,33 @@ func writeNewJSON(path string, value any) (string, error) {
 		_ = f.Close()
 		return "", err
 	}
+	if err := artifactWriteFailure("after_temp_sync"); err != nil {
+		_ = f.Close()
+		return "", err
+	}
 	if err := f.Close(); err != nil {
 		return "", err
+	}
+	if err := artifactWriteFailure("before_publish"); err != nil {
+		return "", err
+	}
+	if err := os.Link(temporary, path); err != nil {
+		if os.IsExist(err) {
+			return existingNewJSONStatus(path, b)
+		}
+		return "", err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return "", err
+	}
+	err = d.Sync()
+	closeErr := d.Close()
+	if err != nil {
+		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
 	}
 	return appendAdded, nil
 }
