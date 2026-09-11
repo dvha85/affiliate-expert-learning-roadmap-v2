@@ -180,6 +180,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(preAttemptEvaluationEntries); err == nil {
 		t.Fatal("evaluation before its execution attempt was accepted")
 	}
+	duplicateExecutionEvaluation := evaluation
+	duplicateExecutionEvaluation.EvaluationID = "evaluation-duplicate-execution"
+	duplicateExecutionEvaluationEntries := append([]ArtifactEntry(nil), entries...)
+	duplicateExecutionEvaluationEntries = append(duplicateExecutionEvaluationEntries, m11Entry(t, ArtifactKindEvaluation, duplicateExecutionEvaluation))
+	if err := ValidateArtifactGraph(duplicateExecutionEvaluationEntries); err == nil {
+		t.Fatal("two evaluations for one execution were accepted")
+	}
 	brokenCycle := cycle
 	brokenCycle.OutcomeID = "orphan-outcome"
 	brokenCycleEntries := append([]ArtifactEntry(nil), entries...)
@@ -200,6 +207,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	pendingCycleEntries[len(pendingCycleEntries)-1] = m11Entry(t, ArtifactKindCycle, pendingCycle)
 	if err := ValidateArtifactGraph(pendingCycleEntries); err == nil {
 		t.Fatal("non-closed production cycle was accepted")
+	}
+	duplicateExecutionCycle := cycle
+	duplicateExecutionCycle.CycleID = "cycle-duplicate-execution"
+	duplicateExecutionCycleEntries := append([]ArtifactEntry(nil), entries...)
+	duplicateExecutionCycleEntries = append(duplicateExecutionCycleEntries, m11Entry(t, ArtifactKindCycle, duplicateExecutionCycle))
+	if err := ValidateArtifactGraph(duplicateExecutionCycleEntries); err == nil {
+		t.Fatal("two closed cycles for one execution were accepted")
 	}
 	entries[len(entries)-1].Artifact = json.RawMessage(`{"execution_id":"orphan"}`)
 	if err := ValidateArtifactGraph(entries); err == nil {

@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 9dd13b431d43cb3871d487363092d8e60577bbd6 -->
+<!-- readiness-main-baseline: 7efab16d77785f33f0d8e15be50f2d6c0a6f178f -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -772,6 +772,12 @@ authorization. Core regression append execution thứ hai với ID khác nhưng 
 mọi authorization binding hợp lệ và bị reject. Đây khớp single-reservation
 learner boundary, không chứng minh idempotency của executor ngoài fixture hay
 transaction đa-file.
+
+**Cập nhật M11 evaluation/cycle cardinality graph (2026-09-11):** canonical
+registry chỉ nhận một offline evaluation và một closed cycle cho mỗi execution,
+đồng bộ với learner command. Core regression append evaluation/cycle thứ hai có
+ID khác nhưng cùng execution rồi reject. Đây không mở rộng evidence outcome,
+không thay thế review workflow và không chứng minh business lifecycle.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

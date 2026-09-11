@@ -114,6 +114,8 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	executionAuthorizations := map[string]string{}
 	resolutions := map[string]ProductionReconciliationResolution{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
+	evaluationExecutions := map[string]string{}
+	cycleExecutions := map[string]string{}
 	ledgerHeads := map[string]ProductionLedger{}
 	ledgerEntries := map[string]ArtifactEntry{}
 	ledgers := []ProductionLedger{}
@@ -235,6 +237,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
 				return fmt.Errorf("production outcome evaluation has an orphaned or mismatched link")
 			}
+			if priorEvaluationID, exists := evaluationExecutions[x.ExecutionID]; exists && priorEvaluationID != x.EvaluationID {
+				return fmt.Errorf("production execution has more than one outcome evaluation")
+			}
+			evaluationExecutions[x.ExecutionID] = x.EvaluationID
 			evaluations[x.EvaluationID] = *x
 		case *ProductionCycleRecord:
 			lease, leaseOK := leases[x.LeaseID]
@@ -247,6 +253,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !gateOK || !authOK || !executionOK || !evaluationOK || closedErr != nil || evaluatedErr != nil || x.Status != "CLOSED" || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || auth.AuthorizationID != x.AuthorizationID || auth.ProductionGateID != x.GateID || execution.AuthorizationID != x.AuthorizationID || execution.ProductionGateID != x.GateID || execution.ExecutionID != x.ExecutionID || execution.AttemptedAt != x.OpenedAt || execution.CorrelationID != x.CorrelationID || evaluation.LeaseID != x.LeaseID || evaluation.ExecutionID != x.ExecutionID || evaluation.OutcomeID != x.OutcomeID || closedAt.Before(evaluatedAt) {
 				return fmt.Errorf("production cycle has an orphaned or mismatched link")
 			}
+			if priorCycleID, exists := cycleExecutions[x.ExecutionID]; exists && priorCycleID != x.CycleID {
+				return fmt.Errorf("production execution has more than one closed cycle")
+			}
+			cycleExecutions[x.ExecutionID] = x.CycleID
 		}
 	}
 	// Registry entries are append-only, but historical snapshots are validated
