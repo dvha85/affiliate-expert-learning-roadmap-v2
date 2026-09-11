@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 592ba49114b47aeb31cc1d093f8cbd0057d405b2 -->
+<!-- readiness-main-baseline: 5e30990a633f74997d0ffbdfc52b8cfa66f62c93 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -829,6 +829,13 @@ pending/cost capacity cho exact cost bound. Journal fixtures nay tạo gate trê
 pre-ledger rỗng rồi append reservation ledger, đúng command order; core regression
 reject ALLOW gate có ledger exhausted. Đây không chứng minh external budget,
 concurrency hay transaction đa-file.
+
+**Cập nhật M11 ALLOW gate risk scope (2026-09-11):** canonical
+`ALLOW_PRODUCTION` gate phải có `risk_class` nằm đồng thời trong immutable
+`lease.allowed_risk_classes` và `lease-approval.validated_risk_classes` exact
+của lease. Core regression chặn gate RISK1 dưới lease RISK0 và approval không
+validate RISK0; learner/backup dùng chính graph validator này trước append/publish.
+Đây là scope lineage offline, không là human approval hoặc production authority.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

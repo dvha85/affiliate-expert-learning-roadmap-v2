@@ -161,6 +161,20 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(exhaustedBudgetGateEntries); err == nil {
 		t.Fatal("allow gate with exhausted ledger budget was accepted")
 	}
+	leaseScopeBypassGate := gate
+	leaseScopeBypassGate.RiskClass = "RISK1"
+	leaseScopeBypassGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	leaseScopeBypassGateEntries[6] = m11Entry(t, ArtifactKindGate, leaseScopeBypassGate)
+	if err := ValidateArtifactGraph(leaseScopeBypassGateEntries); err == nil {
+		t.Fatal("allow gate outside immutable lease risk scope was accepted")
+	}
+	unvalidatedApproval := approval
+	unvalidatedApproval.ValidatedRiskClasses = []string{"RISK1"}
+	unvalidatedApprovalEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	unvalidatedApprovalEntries[1] = m11Entry(t, ArtifactKindLeaseApproval, unvalidatedApproval)
+	if err := ValidateArtifactGraph(unvalidatedApprovalEntries); err == nil {
+		t.Fatal("allow gate outside immutable approval risk scope was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
