@@ -177,6 +177,12 @@ history/model/registry/tool input nào. Regression gọi CLI implementation th�
 và kiểm input bytes không đổi. Đây chỉ mở rộng inventory output của M07; các
 writer khác vẫn phải được audit riêng trước khi đổi RP-01 khỏi `PARTIAL`.
 
+**Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
+offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
+cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.
+Không được suy diễn giá/hoa hồng từ field khác. Đây chỉ là profile fixture
+canonical; selected-source parser/profile vẫn là phạm vi riêng và `PARTIAL`.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
