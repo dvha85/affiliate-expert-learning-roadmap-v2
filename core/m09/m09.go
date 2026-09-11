@@ -59,8 +59,8 @@ func ValidateApproval(intent m08.Intent, policy m08.PolicyDecision, approval App
 	if intent.IntentHash == "" || intent.IntentHash != m08.ComputeIntentHash(intent) || intent.IntentMode != "PROPOSAL_ONLY" || intent.ExecutionAuthorized {
 		return InvalidIntent
 	}
-	if policy.IntentID != intent.IntentID || policy.IntentHash != intent.IntentHash || policy.PolicyVersion == "" ||
-		(policy.Decision != "ALLOW" && policy.Decision != "HUMAN_REVIEW") || policy.PolicyMode != "NON_AUTHORIZING" || policy.ExecutionAuthorized {
+	if status := m08.ValidatePolicyForIntent(intent, policy); status != "VALID" ||
+		(policy.Decision != "ALLOW" && policy.Decision != "HUMAN_REVIEW") {
 		return InvalidPolicy
 	}
 	if approval.Decision == "REJECT" {

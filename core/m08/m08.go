@@ -85,6 +85,47 @@ func DecodePolicy(raw []byte) (PolicyDecision, string) {
 	return p, "VALID"
 }
 
+// ValidatePolicyForIntent checks the semantic invariants which are available
+// from the two immutable artifacts alone. It intentionally does not replace
+// EvaluatePolicy: a caller that still owns its PolicyContext must re-evaluate
+// it before granting any authority. This boundary prevents a stored policy
+// from using a decision/risk combination that the canonical evaluator could
+// never emit for a successful proposal.
+func ValidatePolicyForIntent(i Intent, p PolicyDecision) string {
+	if i.IntentHash == "" || i.IntentHash != ComputeIntentHash(i) || i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
+		return "INVALID_INTENT"
+	}
+	if p.PolicyVersion == "" || p.IntentID != i.IntentID || p.IntentHash != i.IntentHash || p.PolicyMode != "NON_AUTHORIZING" || p.ExecutionAuthorized {
+		return "INVALID_POLICY"
+	}
+	created, createdErr := time.Parse(time.RFC3339, i.CreatedAt)
+	expires, expiryErr := time.Parse(time.RFC3339, i.ExpiresAt)
+	checked, checkedErr := time.Parse(time.RFC3339, p.PolicyCheckedAt)
+	if createdErr != nil || expiryErr != nil || checkedErr != nil || !expires.After(created) || checked.Before(created) || !checked.Before(expires) {
+		return "INVALID_TIME_BINDING"
+	}
+	if p.RiskClass != "RISK0" && p.RiskClass != "RISK1" && p.RiskClass != "RISK2" {
+		return "INVALID_POLICY"
+	}
+	switch p.Decision {
+	case "ALLOW":
+		if p.RiskClass != "RISK0" || p.PolicyReviewRequired {
+			return "INVALID_POLICY"
+		}
+	case "HUMAN_REVIEW":
+		if (p.RiskClass != "RISK1" && p.RiskClass != "RISK2") || !p.PolicyReviewRequired {
+			return "INVALID_POLICY"
+		}
+	case "DENY", "WAIT", "GET_MORE_DATA":
+		if p.PolicyReviewRequired {
+			return "INVALID_POLICY"
+		}
+	default:
+		return "INVALID_POLICY"
+	}
+	return "VALID"
+}
+
 type hashPayload struct {
 	IntentID            string         `json:"intent_id"`
 	DecisionID          string         `json:"decision_id"`

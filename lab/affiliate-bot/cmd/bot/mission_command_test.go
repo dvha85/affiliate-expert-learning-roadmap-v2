@@ -518,6 +518,28 @@ func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T
 	assertMissionRuntimeUnchanged(t, beforeDenied, runtimeDir)
 }
 
+func TestMissionBindRejectsSemanticallyImpossibleM08PolicyWithoutStateMutation(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	intentPath := filepath.Join(root, "intent.json")
+	policyPath := filepath.Join(root, "policy-out.json")
+	var policy LearnerPolicy
+	if err := readJSON(policyPath, &policy); err != nil {
+		t.Fatal(err)
+	}
+	// This remains schema-valid, but M08 can never emit ALLOW for RISK2.
+	policy.Decision, policy.RiskClass, policy.PolicyReviewRequired = "ALLOW", "RISK2", false
+	badPolicyPath := filepath.Join(root, "impossible-policy.json")
+	writeMissionTestJSON(t, badPolicyPath, policy)
+	cleanRuntime := filepath.Join(root, "unbound-runtime")
+	if code, response := missionCall(t, "bind", cleanRuntime, intentPath, badPolicyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("impossible policy bound into mission state: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(missionStatePath(cleanRuntime)); !os.IsNotExist(err) {
+		t.Fatalf("rejected policy mutated new state directory: %v", err)
+	}
+}
+
 func TestMissionM10CostRegisterCanonicalizesPrettyJSONIntoOneSyncedLine(t *testing.T) {
 	runtimeDir, _, _, _ := authorityExpiryFixture(t, "intent")
 	state, err := loadMissionState(runtimeDir)

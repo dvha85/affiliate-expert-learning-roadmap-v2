@@ -1807,7 +1807,6 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission bind STATE_DIR INTENT POLICY"), 2)
 		}
-		var p LearnerPolicy
 		intentRaw, err := os.ReadFile(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
@@ -1817,10 +1816,16 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
 		}
 		i := LearnerIntent(decodedIntent)
-		if err := readJSON(args[3], &p); err != nil {
+		policyRaw, err := os.ReadFile(args[3])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
-		if i.IntentHash != learnerIntentHash(i) || p.IntentID != i.IntentID || p.IntentHash != i.IntentHash {
+		decodedPolicy, policyState := corem08.DecodePolicy(policyRaw)
+		if policyState != "VALID" {
+			return emit("REJECTED", nil, fmt.Errorf("invalid canonical M08 policy"), 1)
+		}
+		p := LearnerPolicy(decodedPolicy)
+		if i.IntentHash != learnerIntentHash(i) || corem08.ValidatePolicyForIntent(corem08.Intent(i), decodedPolicy) != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("intent/policy link or hash invalid"), 1)
 		}
 		if err := os.MkdirAll(args[1], 0700); err != nil {
