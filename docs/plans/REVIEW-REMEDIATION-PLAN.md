@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: becd9ae6df92ccc22f028a122bcdc3dd3043aff0 -->
+<!-- readiness-main-baseline: 592ba49114b47aeb31cc1d093f8cbd0057d405b2 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -822,6 +822,13 @@ proof.
 dependency `HEALTHY`, không alert/reconciliation và nằm trong các ngưỡng lease.
 Core regression giữ lineage/hash hợp lệ nhưng đổi dependency sang `DEGRADED`
 rồi reject. Đây không là telemetry provider hay production health proof.
+
+**Cập nhật M11 ALLOW gate budget graph (2026-09-11):** canonical
+`ALLOW_PRODUCTION` gate chỉ hợp lệ khi referenced ledger còn execution/window/
+pending/cost capacity cho exact cost bound. Journal fixtures nay tạo gate trên
+pre-ledger rỗng rồi append reservation ledger, đúng command order; core regression
+reject ALLOW gate có ledger exhausted. Đây không chứng minh external budget,
+concurrency hay transaction đa-file.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
