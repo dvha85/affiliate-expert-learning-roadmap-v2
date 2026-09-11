@@ -244,6 +244,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(missingReservationEntries); err == nil {
 		t.Fatal("execution without a prior reservation ledger was accepted")
 	}
+	postReservationAuthorization := authorization
+	postReservationAuthorization.AuthorizedAt = "2026-09-08T00:00:00.750Z"
+	postReservationAuthorizationEntries := append([]ArtifactEntry(nil), entries...)
+	postReservationAuthorizationEntries[7] = m11Entry(t, ArtifactKindAuthorization, postReservationAuthorization)
+	if err := ValidateArtifactGraph(postReservationAuthorizationEntries); err == nil {
+		t.Fatal("execution with reservation ledger predating authorization was accepted")
+	}
 	duplicateAuthorizationExecution := execution
 	duplicateAuthorizationExecution.ExecutionID = "exec-duplicate-authorization"
 	duplicateAuthorizationExecutionEntries := append([]ArtifactEntry(nil), entries...)

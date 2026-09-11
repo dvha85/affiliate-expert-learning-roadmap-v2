@@ -325,11 +325,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	// execution without making the transition depend on an in-memory command
 	// implementation.
 	for _, execution := range executions {
+		authorization, authorizationOK := authorizations[execution.AuthorizationID]
 		attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+		authorizedAt, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
 		reserved := false
 		for _, ledger := range ledgers {
 			ledgerAt, ledgerErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
-			if ledgerErr != nil || attemptedErr != nil || ledger.LeaseID != execution.ProductionLeaseID || ledger.LeaseVersion != execution.ProductionLeaseVersion || ledger.LeaseHash != execution.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledgerAt.After(attemptedAt) {
+			if !authorizationOK || ledgerErr != nil || attemptedErr != nil || authorizedErr != nil || ledger.LeaseID != execution.ProductionLeaseID || ledger.LeaseVersion != execution.ProductionLeaseVersion || ledger.LeaseHash != execution.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledgerAt.Before(authorizedAt) || ledgerAt.After(attemptedAt) {
 				continue
 			}
 			for _, pendingExecutionID := range ledger.PendingExecutionIDs {

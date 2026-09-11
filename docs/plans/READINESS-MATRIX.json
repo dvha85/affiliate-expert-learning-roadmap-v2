@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-11",
-  "main_baseline": "5e30990a633f74997d0ffbdfc52b8cfa66f62c93",
+  "main_baseline": "68f87732f4328ce3ade3b6d251e0a964a2990000",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
     {"id":"RP-07-ledger-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"reject ledger times before a registered activation; interim registry drafts remain outside completed backup snapshots"},
@@ -30,6 +30,7 @@
     ,{"id":"RP-07-gate-health-safety","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ALLOW gate requires a healthy, complete, non-alert, non-reconciliation snapshot within lease thresholds"}
     ,{"id":"RP-07-gate-budget-limits","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go","lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"],"scope":"canonical ALLOW gate requires remaining execution, window, pending and cost capacity in its exact ledger snapshot"}
     ,{"id":"RP-07-gate-risk-scope","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ALLOW gate risk class must be permitted by both its immutable lease and exact human lease approval"}
+    ,{"id":"RP-07-reservation-authorization-order","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical execution reservation ledger must be NORMAL and recorded no earlier than its immutable authorization and no later than its attempt"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},
