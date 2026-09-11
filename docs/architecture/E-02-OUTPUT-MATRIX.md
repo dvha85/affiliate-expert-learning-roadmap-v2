@@ -2,9 +2,7 @@
 
 Trạng thái mới: #45 đã review/merge `2cf3bc1`. E-02b trong PR tiếp theo nối [governed_export.go](../../lab/mission-runtime/cmd/demo/governed_export.go) vào serializer mission-demo M10/M11. `TestGovernedDiagnosticExport` và `TestGovernedCanonicalExport` kiểm output bytes: diagnostic riêng, không có gate/authorization/authority; canonical artifact được kiểm và snapshot trước marshal. [E-03 review](E-03-ACCEPTANCE-REVIEW.md) đề nghị nghiệm thu có phạm vi sau review/merge. Các mục “chưa có export” bên dưới mô tả baseline #45, không phải trạng thái E-02b.
 
-IN_REVIEW: [PR #45](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/45), commit triển khai `f20e530`. Tests/vet ba module, 8 validators và 10 Python regressions local PASS. Chưa merge; E-02 còn quyết định export diagnostic bên dưới.
-
-Baseline main sau #44 `1c68ad2`; E-01 đã review/merge, CI 4/4 PASS. E-02 triển khai test + ma trận trên `codex/br-03e-02-output-matrix`, chờ review. Không thay runtime/schema; không đồng nhất độ phủ shape với độ phủ mọi lỗi hệ điều hành.
+> Lịch sử: đoạn dưới từng mô tả [PR #45](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/45) ở trạng thái `IN_REVIEW` trên baseline #44. PR #45 đã merge `2cf3bc1`; trạng thái readiness hiện hành thuộc [REVIEW-REMEDIATION-PLAN.md](../plans/REVIEW-REMEDIATION-PLAN.md) và [READINESS-MATRIX.json](../plans/READINESS-MATRIX.json), không suy từ ma trận output lịch sử này.
 
 ## Bằng chứng trực tiếp mới
 

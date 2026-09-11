@@ -1,9 +1,9 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 5263a6428fe55be8df6f25487b21491d5950ac86 -->
+<!-- readiness-main-baseline: a757b4ee804f2a88b1477fb842d92641894a8431 -->
 
-> Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
+> Reconcile 11/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
@@ -102,26 +102,35 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-03 authority expiry/rebind
+### Runtime gap được chọn tiếp theo — RP-07 recovery sau interrupted M11 write
 
-Phạm vi tiếp theo là M09/M10 authority lifetime sau **process mới và
-backup/restore**. Đây là gap runtime lớn nhưng có nghiệm thu offline rõ ràng:
-không cần executor/provider, và không được biến fixture timestamp thành quyền
-vận hành.
+Phạm vi tiếp theo là chứng minh learner Bot giữ fail-closed qua **process mới**
+khi một transition M11 đã ghi journal nhưng chưa hoàn tất registry, mutable
+state, fixture outcome hoặc STOP marker. Đây là gap runtime lớn còn lại có thể
+nghiệm thu offline: không gọi executor/provider và không suy thành power-loss
+hay multi-host proof.
 
-- Dựng authority hợp lệ qua learner Bot: intent/policy → approval → canary
-  grant → trusted cost-bound → gate/authorization/reservation.
-- Kiểm ranh giới `before` / `at` / `after` expiry cho intent, approval, grant
-  và cost-bound bằng clock seam do runtime kiểm soát; đường CLI vận hành không
-  được nhận caller timestamp để lùi thời gian cấp quyền.
-- Lặp lại mỗi boundary trong process mới và runtime đã `backup restore`.
-  Attempt hết hạn phải trả trạng thái đóng, không tăng usage, không tạo
-  reservation/authorization/execution artifact và không ghi portable output.
-- Thử rebind/reimport artifact cùng ID nhưng expiry/cap/currency đã thay đổi:
-  phải reject; chỉ authority mới có identity/hash và human review đúng luồng
-  mới được xét tiếp.
-- Regression phải snapshot bytes/registry/state trước và sau reject. Không gọi
-  executor, không tạo business outcome và không suy thành power-loss proof.
+- Tạo từng interruption có kiểm soát cho FAILED, UNKNOWN→STOP và fixture
+  outcome; khởi động binary Bot ở process mới trước khi bất kỳ writer nào chạy.
+- Process mới chỉ được report `RECOVERY_REQUIRED`; resolver, recovery export,
+  recovery admission, gate, authorization và portable output phải không lộ
+  graph dở dang hoặc tạo artifact ở runtime mới.
+- Chỉ locked writer recovery được replay exact journal; sau recovery, registry,
+  ledger, outcome và STOP phải khớp một trong các state hợp lệ đã định nghĩa.
+- Backup/restore phải từ chối snapshot journal dở dang hoặc recover có kiểm
+  trước khi publish manifest; retry không được duplicate execution/outcome hay
+  mở lại budget/lease cũ.
+- Regression snapshot bytes/state trước và sau reject, chạy trong process mới,
+  và giữ toàn bộ input/output fixture local.
+
+**Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
+journal là regular file ngay trong runtime. Symlink hoặc special file trả
+`RECOVERY_REQUIRED` trước resolver/writer, không đọc target ngoài runtime và
+không tạo registry entry. Regression khởi động binary Bot mới với cả FAILED,
+UNKNOWN→STOP và outcome journal: `status` chỉ trả `RECOVERY_REQUIRED`, còn
+writer có lock mới replay exact transition; UNKNOWN vẫn giữ STOP. Đây là
+path-integrity/restart guard offline, không phải proof power-loss, atomic
+multi-file commit hay multi-host recovery.
 
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ

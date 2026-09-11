@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -38,6 +39,127 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, raw); err != nil || status != appendDuplicate {
 		t.Fatalf("retry must be exact duplicate: status=%s err=%v", status, err)
 	}
+}
+
+func TestM11JournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	external := filepath.Join(t.TempDir(), "untrusted-journal.json")
+	if err := os.WriteFile(external, []byte(`{"version":"m11-unknown-stop-journal/v1"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary := buildMissionBinary(t)
+	for _, journal := range []string{m11OutcomeJournalPath(dir), m11FailedExecutionJournalPath(dir), m11UnknownStopJournalPath(dir)} {
+		if err := os.Symlink(external, journal); err != nil {
+			t.Fatal(err)
+		}
+		if err := m11JournalRecoveryRequired(dir); err == nil {
+			t.Fatal("symlinked M11 journal was not rejected before recovery")
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("status did not fail closed for %s: code=%d response=%+v", filepath.Base(journal), code, response)
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "m11-register", dir, corem11.ArtifactKindLease, filepath.Join(t.TempDir(), "unread-input.json")); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("writer reached input handling for %s: code=%d response=%+v", filepath.Base(journal), code, response)
+		}
+		if _, err := os.Stat(m11ArtifactRegistryPath(dir)); !os.IsNotExist(err) {
+			t.Fatalf("symlinked journal caused registry mutation: %v", err)
+		}
+		after, err := os.ReadFile(external)
+		if err != nil || string(after) != string(before) {
+			t.Fatalf("recovery touched external journal target: err=%v before=%q after=%q", err, before, after)
+		}
+		if err := os.Remove(journal); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// A journal may survive a process exit after it has been synced but before the
+// corresponding registry/state transition is complete. A fresh Bot process
+// must expose only RECOVERY_REQUIRED until its locked writer prelude replays
+// the exact journal; a read-only status call must never perform that replay.
+func TestM11InterruptedJournalFreshProcessFailsClosedThenLockedWriterRecovers(t *testing.T) {
+	binary := buildMissionBinary(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	t.Run("unknown_stop", func(t *testing.T) {
+		fixture := newM11UnknownStopFixture(t)
+		m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+			if entry.ArtifactKind == corem11.ArtifactKindLedger && phase == "before_write" {
+				return errors.New("injected interrupted UNKNOWN ledger write")
+			}
+			return nil
+		}
+		if _, _, _, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fresh-process fixture"); err == nil {
+			t.Fatal("interrupted UNKNOWN transition was not surfaced")
+		}
+		m11RegistryAppendFault = nil
+		if code, response := missionBinaryCall(t, binary, "mission", "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("fresh process exposed UNKNOWN transition: code=%d response=%+v", code, response)
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "m11-register", fixture.dir, corem11.ArtifactKindLease, filepath.Join(t.TempDir(), "unread.json")); code == 0 || response["status"] != "STOPPED" {
+			t.Fatalf("locked writer did not recover then retain STOP: code=%d response=%+v", code, response)
+		}
+		assertM11UnknownStopRecovered(t, fixture, attemptedAt, "fresh-process fixture")
+	})
+	t.Run("failed_execution", func(t *testing.T) {
+		fixture := newM11UnknownStopFixture(t)
+		m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+			if entry.ArtifactKind == corem11.ArtifactKindLedger && phase == "before_write" {
+				return errors.New("injected interrupted FAILED ledger write")
+			}
+			return nil
+		}
+		if _, _, _, err := recordFailedM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fresh-process fixture"); err == nil {
+			t.Fatal("interrupted FAILED transition was not surfaced")
+		}
+		m11RegistryAppendFault = nil
+		if code, response := missionBinaryCall(t, binary, "mission", "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("fresh process exposed FAILED transition: code=%d response=%+v", code, response)
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "m11-register", fixture.dir, corem11.ArtifactKindLease, filepath.Join(t.TempDir(), "unread.json")); code == 0 || response["status"] != "INPUT_ERROR" {
+			t.Fatalf("locked writer did not recover FAILED journal before input handling: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m11FailedExecutionJournalPath(fixture.dir)); !os.IsNotExist(err) {
+			t.Fatalf("fresh-process FAILED recovery left journal: %v", err)
+		}
+		_, ledger, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+		if err != nil || ledger.ConsecutiveFailures != 1 || ledger.LastExecutionAt != attemptedAt {
+			t.Fatalf("fresh-process FAILED recovery did not preserve exact ledger: ledger=%+v err=%v", ledger, err)
+		}
+	})
+	t.Run("fixture_outcome", func(t *testing.T) {
+		dir := t.TempDir()
+		if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+			t.Fatalf("init failed: code=%d response=%+v", code, response)
+		}
+		journal, _ := setupM11OutcomeJournalFixture(t, dir)
+		if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+			t.Fatal(err)
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("fresh process exposed outcome transition: code=%d response=%+v", code, response)
+		}
+		if code, response := missionBinaryCall(t, binary, "mission", "m11-register", dir, corem11.ArtifactKindLease, filepath.Join(t.TempDir(), "unread.json")); code == 0 || response["status"] != "INPUT_ERROR" {
+			t.Fatalf("locked writer did not recover outcome journal before input handling: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+			t.Fatalf("fresh-process outcome recovery left journal: %v", err)
+		}
+		outcomes, err := loadM11FixtureOutcomes(dir)
+		if err != nil || len(outcomes) != 1 || outcomes[0].OutcomeID != journal.Outcome.OutcomeID {
+			t.Fatalf("fresh-process outcome recovery was not exact: outcomes=%+v err=%v", outcomes, err)
+		}
+	})
 }
 
 type m11UnknownStopFixture struct {
