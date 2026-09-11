@@ -152,6 +152,13 @@ gate local trước khi kiểm journal hoặc registry. Writer đang hoạt đ�
 exclusion local cho read path, không thay transaction đa-file, distributed lock
 hay proof recovery sau power-loss.
 
+**Cập nhật M10 reservation barrier (2026-09-11):** shared smoke giờ khởi tạo
+24 subprocess Bot, xác nhận mọi wrapper đã sẵn sàng rồi mới publish một release
+file chung. Với đúng một slot cap/cost còn lại, chỉ một `RESERVED` được commit;
+retry của cả 23 loser đều phải `BUDGET_DENIED` và usage giữ nguyên. Đây chứng
+minh local cross-process cap=1 cho command/runtime lock hiện hữu, không chứng
+minh distributed/multi-host lock hoặc atomic recovery sau crash.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
