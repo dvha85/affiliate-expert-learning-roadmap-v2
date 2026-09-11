@@ -356,6 +356,26 @@ func ComputeProductionHealthHash(x ProductionHealthSnapshot) string {
 	return digest(healthHashPayload{SnapshotID: x.SnapshotID, LeaseID: x.LeaseID, LeaseVersion: x.LeaseVersion, LeaseHash: x.LeaseHash, ObservedAt: x.ObservedAt, SourceRefs: sorted(x.SourceRefs), DependencyState: x.DependencyState, TelemetryComplete: x.TelemetryComplete, ConsecutiveFailures: x.ConsecutiveFailures, ReconciliationRequired: x.ReconciliationRequired, ComplianceAlertCount: x.ComplianceAlertCount, OldestPendingOutcomeAgeSeconds: x.OldestPendingOutcomeAgeSeconds, HashVersion: x.HashVersion})
 }
 
+// ComputeProductionGateID binds a production gate to every immutable parent
+// used to evaluate it. The graph recomputes this value after resolving those
+// parents; callers must not treat a caller-selected gate ID as authoritative.
+func ComputeProductionGateID(lease ProductionLease, intentID, intentHash string, health ProductionHealthSnapshot, cost corem10.TrustedCostBound, ledger ArtifactEntry, evaluatedAt string) string {
+	identity := strings.Join([]string{lease.LeaseID, lease.LeaseVersion, lease.LeaseHash, intentID, intentHash, health.SnapshotID, health.SnapshotHash, cost.CostBoundID, cost.CostBoundHash, ledger.ArtifactID, ledger.ContentHash, evaluatedAt}, "\x00")
+	sum := sha256.Sum256([]byte(identity))
+	return "prod-gate-" + hex.EncodeToString(sum[:16])
+}
+
+// ComputeProductionAuthorizationID and ComputeProductionExecutionID derive
+// the learner profile's one authorization and one terminal attempt identity
+// from their immutable parent. They are audit identities, never authority.
+func ComputeProductionAuthorizationID(gateID, executorID string) string {
+	return "prod-auth-" + gateID + "-" + executorID
+}
+
+func ComputeProductionExecutionID(authorizationID string) string {
+	return "prod-exec-" + authorizationID
+}
+
 func before(left, right string) bool {
 	a, errA := time.Parse(time.RFC3339, left)
 	b, errB := time.Parse(time.RFC3339, right)

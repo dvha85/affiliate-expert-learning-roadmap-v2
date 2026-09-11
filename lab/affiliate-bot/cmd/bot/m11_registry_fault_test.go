@@ -242,7 +242,7 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 	health.SnapshotHash = corem11.ComputeProductionHealthHash(health)
 	cost := corem10.TrustedCostBound{CostBoundID: "unknown-journal-cost", IntentID: "unknown-journal-intent", IntentHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", MaxCostMinor: 10, Currency: "USD", SourceRef: "fixture:cost", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: lease.CorrelationID, HashVersion: "go-json-v1"}
 	cost.CostBoundHash = corem10.ComputeTrustedCostBoundHash(cost)
-	executionID := "prod-exec-unknown-journal-auth"
+	executionID := "pending-identity-not-yet-derived"
 	ledger := corem11.ProductionLedger{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ControlMode: "NORMAL", WindowStartedAt: "2026-09-08T00:00:00Z", ExecutionsTotal: 1, ExecutionsInWindow: 1, CostMinorTotal: 10, PendingOutcomes: 1, PendingExecutionIDs: []string{executionID}, SuccessfulIdempotencyKeys: []string{}, OutcomeLinks: []corem11.ProductionOutcomeLink{}, ReconciliationResolutionIDs: []string{}, UpdatedAt: "2026-09-08T00:00:01Z"}
 	ledgerRaw, err := json.Marshal(ledger)
 	if err != nil {
@@ -265,8 +265,19 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 		t.Fatal(err)
 	}
 	activation := corem11.ProductionActivationRecord{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ActivatedAt: "2026-09-08T00:00:00Z"}
-	gate := corem11.ProductionGateDecision{GateID: "unknown-journal-gate", LedgerArtifactID: gateLedgerEntry.ArtifactID, LedgerContentHash: gateLedgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
-	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: "unknown-journal-auth", IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "unknown-journal-key", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	gate := corem11.ProductionGateDecision{LedgerArtifactID: gateLedgerEntry.ArtifactID, LedgerContentHash: gateLedgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
+	gate.GateID = corem11.ComputeProductionGateID(lease, gate.IntentID, gate.IntentHash, health, cost, gateLedgerEntry, gate.EvaluatedAt)
+	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, "fixture_stub"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "unknown-journal-key", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	executionID = corem11.ComputeProductionExecutionID(authorization.AuthorizationID)
+	ledger.PendingExecutionIDs = []string{executionID}
+	ledgerRaw, err = json.Marshal(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledgerEntry, err = corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, item := range []struct {
 		kind  string
 		value any

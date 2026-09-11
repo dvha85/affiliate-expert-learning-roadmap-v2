@@ -252,6 +252,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !approvalOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || healthObservedErr != nil || costObservedErr != nil || costExpiryErr != nil || x.Decision == "ALLOW_PRODUCTION" && (!healthAllowsProduction || !allowBudgetAvailable || !contains(lease.AllowedRiskClasses, x.RiskClass) || !contains(approval.ValidatedRiskClasses, x.RiskClass)) || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || evaluatedAt.Before(healthObservedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
+			if x.GateID != ComputeProductionGateID(lease, x.IntentID, x.IntentHash, snapshot, bound, ledger, x.EvaluatedAt) {
+				return fmt.Errorf("production gate has a non-canonical gate ID")
+			}
 			gates[x.GateID] = *x
 		case *ProductionExecutionAuthorization:
 			lease, leaseOK := leases[x.ProductionLeaseID]
@@ -274,6 +277,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !gateOK || !healthOK || !costOK || authorizedErr != nil || authorizationExpiryErr != nil || validFromErr != nil || leaseExpiryErr != nil || gateTimeErr != nil || healthTimeErr != nil || costObservedErr != nil || costExpiryErr != nil || !executorAllowed || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.Decision != "ALLOW_PRODUCTION" || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || authorizedAt.Before(validFrom) || !authorizedAt.Before(leaseExpiresAt) || authorizationExpiresAt.After(leaseExpiresAt) || authorizedAt.Before(costObservedAt) || !authorizedAt.Before(costExpiresAt) || authorizationExpiresAt.After(costExpiresAt) || authorizedAt.Before(gateEvaluatedAt) || authorizedAt.Before(healthObservedAt) || authorizedAt.Sub(healthObservedAt) >= maxHealthAge || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
 				return fmt.Errorf("production authorization has an orphaned or mismatched link")
 			}
+			if x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID) {
+				return fmt.Errorf("production authorization has a non-canonical authorization ID")
+			}
 			authorizations[x.AuthorizationID] = *x
 		case *ProductionExecutionRecord:
 			auth, ok := authorizations[x.AuthorizationID]
@@ -282,6 +288,9 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			expiresAt, expiryErr := time.Parse(time.RFC3339, auth.ExpiresAt)
 			if !ok || attemptedErr != nil || authorizedErr != nil || expiryErr != nil || auth.IntentID != x.IntentID || auth.IntentHash != x.IntentHash || auth.ExecutorID != x.ExecutorID || auth.IdempotencyKey != x.IdempotencyKey || auth.CorrelationID != x.CorrelationID || auth.ProductionLeaseID != x.ProductionLeaseID || auth.ProductionLeaseVersion != x.ProductionLeaseVersion || auth.ProductionLeaseHash != x.ProductionLeaseHash || auth.ProductionGateID != x.ProductionGateID || auth.ProductionHealthSnapshotID != x.ProductionHealthSnapshotID || auth.ProductionHealthSnapshotHash != x.ProductionHealthSnapshotHash || auth.ProductionCostBoundID != x.ProductionCostBoundID || auth.ProductionCostBoundHash != x.ProductionCostBoundHash || auth.ProductionCostBoundMinor != x.ProductionCostBoundMinor || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) {
 				return fmt.Errorf("production execution has an orphaned or mismatched link")
+			}
+			if x.ExecutionID != ComputeProductionExecutionID(auth.AuthorizationID) {
+				return fmt.Errorf("production execution has a non-canonical execution ID")
 			}
 			if priorExecutionID, exists := executionAuthorizations[x.AuthorizationID]; exists && priorExecutionID != x.ExecutionID {
 				return fmt.Errorf("production authorization has more than one execution record")
