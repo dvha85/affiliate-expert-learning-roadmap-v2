@@ -398,16 +398,17 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_REQUEST", "execution_permitted": false})
 			return
 		}
-		mutatesRuntime := r.URL.Path == "/v1/m07/fetch-and-register" || r.URL.Path == "/v1/m07/register-tool-result" || r.URL.Path == "/v1/m07/register-proposal"
-		if mutatesRuntime {
-			release, lockErr := acquireHistoryRuntimeGate(historyPath)
-			if lockErr != nil {
-				w.WriteHeader(http.StatusConflict)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "BUSY", "execution_permitted": false})
-				return
-			}
-			defer release()
+		// All endpoints resolve canonical history before replying, including the
+		// nominally read-only context and preflight endpoints. Serialize those
+		// reads with watcher appends so callers never receive an evidence context
+		// from an in-flight local history mutation.
+		release, lockErr := acquireHistoryRuntimeGate(historyPath)
+		if lockErr != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "BUSY", "execution_permitted": false})
+			return
 		}
+		defer release()
 		ctx, err := m07AdapterContext(historyPath, request.RecordID)
 		if err != nil {
 			w.WriteHeader(http.StatusConflict)

@@ -117,6 +117,15 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 			return emit("PATH_CONFLICT", nil, err, 1)
 		}
 	}
+	// Canonical history is the source of every M07 evidence context. Hold the
+	// same local gate as AppendHistory before resolving it, so a watcher cannot
+	// append a partially observed record while this command creates, validates,
+	// or persists an M07 artifact from that context.
+	release, err := acquireHistoryRuntimeGate(args[1])
+	if err != nil {
+		return emit("BUSY", nil, err, 1)
+	}
+	defer release()
 	record, err := resolveCanonicalRecord(args[1], args[2])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)

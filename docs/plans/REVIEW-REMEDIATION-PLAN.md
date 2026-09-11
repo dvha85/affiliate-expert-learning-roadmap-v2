@@ -177,6 +177,13 @@ history/model/registry/tool input nào. Regression gọi CLI implementation th�
 và kiểm input bytes không đổi. Đây chỉ mở rộng inventory output của M07; các
 writer khác vẫn phải được audit riêng trước khi đổi RP-01 khỏi `PARTIAL`.
 
+**Cập nhật M07 history read gate (2026-09-11):** CLI M07 và adapter M07 giờ
+giữ cùng local history runtime gate với watcher trước khi resolve canonical
+record. Regression giữ writer gate thật rồi xác nhận cả `m07 context` và
+`/v1/m07/context` trả `BUSY`, không phát hành context từ history đang thay đổi.
+Đây chỉ là exclusion trên filesystem một host; distributed/multi-host locking
+và proof crash/power-loss vẫn mở.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

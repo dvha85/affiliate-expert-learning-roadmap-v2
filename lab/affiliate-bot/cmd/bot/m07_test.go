@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +21,62 @@ func writeM07File(t *testing.T, path string, value any) {
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestM07ContextFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-history-gate-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-history-gate-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	release, err := acquireHistoryRuntimeGate(historyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	var out, errOut bytes.Buffer
+	if code := runM07([]string{"context", historyPath, record.RecordID}, &out, &errOut); code == 0 {
+		t.Fatalf("M07 context succeeded during history writer activity: %s", out.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "BUSY" {
+		t.Fatalf("M07 context did not fail closed: response=%s err=%v stderr=%s", out.String(), err, errOut.String())
+	}
+}
+
+func TestM07AdapterContextFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-adapter-history-gate-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-adapter-history-gate-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(m07AdapterRequest{RecordID: record.RecordID, Registry: []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, err := acquireHistoryRuntimeGate(historyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	request := httptest.NewRequest(http.MethodPost, "/v1/m07/context", bytes.NewReader(body))
+	response := httptest.NewRecorder()
+	m07AdapterHandler(historyPath).ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("adapter status=%d body=%s, want %d", response.Code, response.Body.String(), http.StatusConflict)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil || envelope["status"] != "BUSY" {
+		t.Fatalf("adapter did not fail closed: response=%s err=%v", response.Body.String(), err)
 	}
 }
 
