@@ -294,6 +294,13 @@ func runAccesstradeReceiptList(args []string, stdout, stderr io.Writer) int {
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
 	}
+	// Receipt evidence is joined against canonical history and actions. Keep
+	// its list output on the same local boundary as outcome receipt imports.
+	release, lockErr := acquireHistoryRuntimeGate(args[1])
+	if lockErr != nil {
+		return emit("BUSY", nil, lockErr, 1)
+	}
+	defer release()
 	history, err := LoadHistory(args[1])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)

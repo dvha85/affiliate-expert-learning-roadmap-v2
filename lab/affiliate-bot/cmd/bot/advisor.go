@@ -176,6 +176,13 @@ func runAdvisor(args []string, stdout, stderr io.Writer) int {
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
 	}
+	// The mock advisor builds a joined history/action/outcome context. Refuse
+	// it while a local writer could make that evidence snapshot inconsistent.
+	release, err := acquireHistoryRuntimeGate(args[1])
+	if err != nil {
+		return emit("BUSY", nil, err, 1)
+	}
+	defer release()
 	raw, err := os.ReadFile(args[4])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)

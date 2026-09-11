@@ -206,6 +206,14 @@ gate thật: HTTP read phải trả `BUSY` và append+resolve không được ho
 chỉ là exclusion trên filesystem một host; distributed/multi-host locking và
 proof crash/power-loss vẫn mở.
 
+**Cập nhật history-consumer gates (2026-09-11):** `history` list/replay/decision,
+`advisor mock` và list receipt ACCESSTRADE giờ giữ local history runtime gate
+trước khi load/resolve chuỗi evidence. Regression giữ writer gate thật rồi gọi
+toàn bộ command: từng path phải fail closed (`BUSY` hoặc lỗi busy cho CLI
+history), không trả derived context trong lúc write. Đây chỉ là exclusion trên
+filesystem một host; distributed/multi-host locking và proof crash/power-loss
+vẫn mở.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

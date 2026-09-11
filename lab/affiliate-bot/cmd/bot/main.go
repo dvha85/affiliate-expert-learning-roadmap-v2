@@ -207,6 +207,11 @@ func runHistory(args []string) error {
 		if len(args) != 3 {
 			return fmt.Errorf("usage: history list <history.jsonl>")
 		}
+		release, err := acquireHistoryRuntimeGate(args[2])
+		if err != nil {
+			return err
+		}
+		defer release()
 		records, err := LoadHistory(args[2])
 		if err != nil {
 			return err
@@ -219,6 +224,11 @@ func runHistory(args []string) error {
 		if len(args) != 3 {
 			return fmt.Errorf("usage: history replay <history.jsonl>")
 		}
+		release, err := acquireHistoryRuntimeGate(args[2])
+		if err != nil {
+			return err
+		}
+		defer release()
 		records, err := LoadHistory(args[2])
 		if err != nil {
 			return err
