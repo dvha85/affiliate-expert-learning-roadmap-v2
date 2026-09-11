@@ -17,6 +17,7 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
+	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
@@ -815,14 +816,8 @@ func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
 	if s.Intent == nil || s.Policy == nil || s.Approval == nil {
 		return fmt.Errorf("intent, policy and approval are required")
 	}
-	intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt)
-	approvalExpiry, approvalErr := time.Parse(time.RFC3339, s.Approval.ExpiresAt)
-	policyChecked, policyErr := time.Parse(time.RFC3339, s.Policy.PolicyCheckedAt)
-	if intentErr != nil || approvalErr != nil || policyErr != nil || !intentExpiry.After(now) || !approvalExpiry.After(now) || policyChecked.After(now) {
-		return fmt.Errorf("intent, approval or policy time binding is invalid or expired")
-	}
-	if s.Approval.Decision != "APPROVE" || !s.Approval.OneTime || s.Approval.IntentID != s.Intent.IntentID || s.Approval.IntentHash != s.Intent.IntentHash || s.Approval.PolicyVersion != s.Policy.PolicyVersion || s.Approval.CorrelationID != s.Intent.CorrelationID {
-		return fmt.Errorf("approval does not bind to current intent/policy")
+	if status := corem09.ValidateApproval(corem08.Intent(*s.Intent), corem08.PolicyDecision(*s.Policy), corem09.ApprovalRecord(*s.Approval), now); status != corem09.Valid {
+		return corem09.Error(status)
 	}
 	return nil
 }
@@ -1866,22 +1861,22 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		var a LearnerApproval
-		if err = readJSON(args[2], &a); err != nil {
+		raw, err := os.ReadFile(args[2])
+		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
-		if s.Intent == nil || s.Policy == nil || (s.Policy.Decision != "ALLOW" && s.Policy.Decision != "HUMAN_REVIEW") || a.ApprovalID == "" || a.ApprovedBy != "human" || a.ApproverID == "" || a.IntentID != s.Intent.IntentID || a.IntentHash != s.Intent.IntentHash || a.PolicyVersion != s.Policy.PolicyVersion || a.CorrelationID != s.Intent.CorrelationID || a.Decision != "APPROVE" || !a.OneTime {
-			return emit("REJECTED", nil, fmt.Errorf("approval does not bind to current intent/policy"), 1)
+		approval, status := corem09.DecodeApproval(raw)
+		if status != corem09.Valid {
+			return emit("REJECTED", nil, corem09.Error(status), 1)
 		}
-		approvedAt, approvedErr := time.Parse(time.RFC3339, a.ApprovedAt)
-		expiresAt, expiresErr := time.Parse(time.RFC3339, a.ExpiresAt)
 		now := missionNowUTC()
-		if approvedErr != nil || expiresErr != nil || !expiresAt.After(approvedAt) || !expiresAt.After(now) || approvedAt.After(now) {
-			return emit("REJECTED", nil, fmt.Errorf("approval timestamps are invalid or expired"), 1)
+		if s.Intent == nil || s.Policy == nil {
+			return emit("REJECTED", nil, fmt.Errorf("intent and policy are required"), 1)
 		}
-		if intentExpiry, intentErr := time.Parse(time.RFC3339, s.Intent.ExpiresAt); intentErr != nil || !intentExpiry.After(now) {
-			return emit("REJECTED", nil, fmt.Errorf("intent is expired"), 1)
+		if status := corem09.ValidateApproval(corem08.Intent(*s.Intent), corem08.PolicyDecision(*s.Policy), approval, now); status != corem09.Valid {
+			return emit("REJECTED", nil, corem09.Error(status), 1)
 		}
+		a := LearnerApproval(approval)
 		if s.Approval != nil {
 			if *s.Approval == a {
 				return emit("EXACT_DUPLICATE", a, nil, 0)

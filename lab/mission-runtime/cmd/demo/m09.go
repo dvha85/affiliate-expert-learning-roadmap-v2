@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
+	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 )
 
 type ApprovalRecord struct {
@@ -64,13 +67,13 @@ type ExecutionRecord struct {
 }
 
 type M09State struct {
-	Intent               ShadowActionIntent       `json:"intent"`
-	Policy               ShadowPolicyDecision     `json:"policy"`
-	Approval             *ApprovalRecord          `json:"approval,omitempty"`
-	Authorization        *ExecutionAuthorization  `json:"authorization,omitempty"`
-	Execution            *ExecutionRecord         `json:"execution,omitempty"`
-	ConsumedApprovalIDs  map[string]bool          `json:"consumed_approval_ids,omitempty"`
-	SucceededIdempotency map[string]bool          `json:"succeeded_idempotency,omitempty"`
+	Intent               ShadowActionIntent      `json:"intent"`
+	Policy               ShadowPolicyDecision    `json:"policy"`
+	Approval             *ApprovalRecord         `json:"approval,omitempty"`
+	Authorization        *ExecutionAuthorization `json:"authorization,omitempty"`
+	Execution            *ExecutionRecord        `json:"execution,omitempty"`
+	ConsumedApprovalIDs  map[string]bool         `json:"consumed_approval_ids,omitempty"`
+	SucceededIdempotency map[string]bool         `json:"succeeded_idempotency,omitempty"`
 }
 
 type M09Context struct {
@@ -127,6 +130,31 @@ func executionForKey(state M09State, key string) *ExecutionRecord {
 	return state.Execution
 }
 
+func coreM09Policy(p ShadowPolicyDecision) corem08.PolicyDecision {
+	return corem08.PolicyDecision{PolicyVersion: p.PolicyVersion, IntentID: p.IntentID, IntentHash: p.IntentHash, Decision: p.Decision, RiskClass: p.RiskClass, Reason: p.Reason, PolicyReviewRequired: p.PolicyReviewRequired, PolicyMode: p.PolicyMode, ExecutionAuthorized: p.ExecutionAuthorized, PolicyCheckedAt: p.PolicyCheckedAt}
+}
+
+func harnessApprovalStatus(status string) string {
+	switch status {
+	case corem09.RejectedApproval:
+		return "DENY_REJECTED"
+	case corem09.InvalidApprover:
+		return "DENY_INVALID_APPROVER"
+	case corem09.ApprovalMismatch:
+		return "DENY_APPROVAL_MISMATCH"
+	case corem09.ExpiredIntent:
+		return "DENY_EXPIRED_INTENT"
+	case corem09.ExpiredApproval, corem09.InvalidTimeBinding:
+		return "DENY_EXPIRED_APPROVAL"
+	case corem09.ApprovalBeforePolicy:
+		return "DENY_APPROVAL_BEFORE_POLICY"
+	case corem09.InvalidPolicy:
+		return "DENY_POLICY_STATE"
+	default:
+		return "DENY_TAMPERED_INTENT"
+	}
+}
+
 func AuthorizeM09(state M09State, ctx M09Context) (ExecutionAuthorization, string) {
 	i, p := state.Intent, state.Policy
 	if i.IntentHash == "" || i.IntentHash != ComputeShadowIntentHash(i) {
@@ -165,28 +193,10 @@ func AuthorizeM09(state M09State, ctx M09Context) (ExecutionAuthorization, strin
 		return ExecutionAuthorization{}, "WAIT_APPROVAL"
 	}
 	a := *state.Approval
-	if a.ApprovedBy != "human" || strings.TrimSpace(a.ApproverID) == "" || !a.OneTime {
-		return ExecutionAuthorization{}, "DENY_INVALID_APPROVER"
+	if status := corem09.ValidateApproval(coreIntent(i), coreM09Policy(p), corem09.ApprovalRecord(a), now); status != corem09.Valid {
+		return ExecutionAuthorization{}, harnessApprovalStatus(status)
 	}
-	if a.Decision == "REJECT" {
-		return ExecutionAuthorization{}, "DENY_REJECTED"
-	}
-	if a.Decision != "APPROVE" {
-		return ExecutionAuthorization{}, "DENY_INVALID_APPROVER"
-	}
-	if a.IntentID != i.IntentID || a.IntentHash != i.IntentHash || a.PolicyVersion != p.PolicyVersion || a.CorrelationID != i.CorrelationID {
-		return ExecutionAuthorization{}, "DENY_APPROVAL_MISMATCH"
-	}
-
-	approvedAt, errApprovedAt := time.Parse(time.RFC3339, a.ApprovedAt)
-	approvalExpires, errApprovalExpires := time.Parse(time.RFC3339, a.ExpiresAt)
-	if errApprovedAt != nil || errApprovalExpires != nil || approvedAt.After(now) ||
-		!approvalExpires.After(now) || !approvalExpires.After(approvedAt) {
-		return ExecutionAuthorization{}, "DENY_EXPIRED_APPROVAL"
-	}
-	if approvedAt.Before(policyChecked) {
-		return ExecutionAuthorization{}, "DENY_APPROVAL_BEFORE_POLICY"
-	}
+	approvalExpires, _ := time.Parse(time.RFC3339, a.ExpiresAt)
 
 	if existing := executionForKey(state, i.IdempotencyKey); existing != nil {
 		switch existing.Status {
@@ -435,8 +445,8 @@ func demoM09() (map[string]any, error) {
 	}
 	s := M09State{Intent: i, Policy: p, Approval: &a}
 	ctx := M09Context{
-		Now: "2026-09-03T08:00:00Z",
-		Executor: ExecutorProfile{ExecutorID: "local_sandbox", AllowedActionTypes: []string{"UPDATE_DRAFT"}, AllowedHosts: []string{"example.com"}},
+		Now:                "2026-09-03T08:00:00Z",
+		Executor:           ExecutorProfile{ExecutorID: "local_sandbox", AllowedActionTypes: []string{"UPDATE_DRAFT"}, AllowedHosts: []string{"example.com"}},
 		AllowedExecutorIDs: []string{"local_sandbox"}, PolicyContext: policyCtx,
 	}
 	auth, status := AuthorizeM09(s, ctx)

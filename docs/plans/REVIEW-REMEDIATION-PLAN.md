@@ -90,7 +90,7 @@ và regression tương ứng.
 |---|---|---|---|---|
 | RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; inventory of every writer remains open |
-| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy with exact-number regression; broader M09 conformance/migration remains open |
+| RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy plus the strict M09 approval boundary; broader authorization/execution conformance and migration remain open |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — one shared learner-Bot fixture chain now exercises EC-01…EC-05 with byte-level no-mutation rejects, restore and restart; multi-file crash/power-loss, distributed locking and business-execution proof remain open |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver and n8n engine regression exist; governed selected-source profile and operated run remain open |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence and n8n stub path exist; selected-source/provider operated evidence remains open |
@@ -268,6 +268,16 @@ state commit, sau đó khởi động Bot binary mới. Process mới trả
 dở dang trước locked recovery. Backup vẫn là con đường recovery có kiểm; ca này
 không chứng minh kill/power-loss tại filesystem boundary, transaction đa-file
 hay recovery multi-host.
+
+**Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
+strict `approval-record` decode (schema, unknown/duplicate field rejection)
+và validation không-authorizing của proposal-only intent, policy state, human
+one-time approval, link và timeline. Learner dùng boundary đó cả khi append
+approval lẫn khi reload/revalidate authority; harness M09 dùng cùng decoder và
+validator trước authorization. Regression chứng minh duplicate-key approval
+không ghi state, và persisted policy bị đổi sang `DENY` không thể reserve sau
+reload. M09 authorization/execution contract rộng hơn, migration, executor
+thật và multi-file crash proof vẫn mở.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không

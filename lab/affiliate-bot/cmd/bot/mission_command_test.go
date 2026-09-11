@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -474,6 +475,47 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T) {
+	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	approvalPath := filepath.Join(root, "approval.json")
+	validApproval, err := os.ReadFile(approvalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	duplicated := strings.Replace(string(validApproval), `"approval_id":"expiry-approval"`, `"approval_id":"expiry-approval","approval_id":"forged"`, 1)
+	if duplicated == string(validApproval) {
+		t.Fatal("test approval did not contain approval_id")
+	}
+	if err := os.WriteFile(approvalPath, []byte(duplicated), 0600); err != nil {
+		t.Fatal(err)
+	}
+	beforeDuplicate := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m09-approval", runtimeDir, approvalPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("duplicate-key approval was accepted: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeDuplicate, runtimeDir)
+	if err := os.WriteFile(approvalPath, validApproval, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A checksum-valid but policy-DENY state must not become authority after a
+	// reload: missionCanaryActive delegates the same canonical M09 validator.
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Policy == nil {
+		t.Fatalf("load state: state=%+v err=%v", state, err)
+	}
+	state.Policy.Decision = "DENY"
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+	beforeDenied := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, "policy-deny-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("reloaded DENY policy admitted reservation: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeDenied, runtimeDir)
 }
 
 func TestMissionM10CostRegisterCanonicalizesPrettyJSONIntoOneSyncedLine(t *testing.T) {
