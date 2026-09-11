@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 21102912786f5e4047464959050e87c6c906d889 -->
+<!-- readiness-main-baseline: e37bafbb23a4e77b2b41522a0c35110fadc8f890 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -804,6 +804,12 @@ phải resolve exact activation cùng lease lineage và `evaluated_at` không tr
 rồi reject; BR-18b gọi command thật và xác nhận registry chặn candidate trước
 khi persist. Đây chỉ là temporal lineage fixture, không chứng minh health/gate
 operation production.
+
+**Cập nhật M11 authorization executor scope graph (2026-09-11):**
+canonical authorization chỉ hợp lệ nếu `executor_id` nằm trong immutable
+`lease.executor_ids`. Core regression dùng authorization cùng gate/health/cost
+nhưng executor lạ và bị reject. Đây là scope lineage offline, không chứng minh
+danh tính executor, provider hoặc execution production.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
