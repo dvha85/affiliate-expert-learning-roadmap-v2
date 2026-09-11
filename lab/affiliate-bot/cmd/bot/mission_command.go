@@ -1951,18 +1951,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if boundAlreadyRegistered {
 			return emit("EXACT_DUPLICATE", bound, nil, 0)
 		}
-		f, err := os.OpenFile(trustedCostBoundsPath(args[1]), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		// Persist a canonical single-line representation rather than caller raw
+		// JSON. Pretty-printed valid input must not split the append-only JSONL
+		// registry, and JSONL owns file plus directory sync before ACK.
+		persisted, err := json.Marshal(bound)
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		_, err = f.Write(append(bytes.TrimSpace(raw), '\n'))
-		if syncErr := f.Sync(); err == nil {
-			err = syncErr
-		}
-		if closeErr := f.Close(); err == nil {
-			err = closeErr
-		}
-		if err != nil {
+		if err := (store.JSONL{}).AppendLine(trustedCostBoundsPath(args[1]), persisted); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		return emit("APPENDED", bound, nil, 0)

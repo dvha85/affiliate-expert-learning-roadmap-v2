@@ -476,6 +476,39 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestMissionM10CostRegisterCanonicalizesPrettyJSONIntoOneSyncedLine(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "intent")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil {
+		t.Fatalf("load M10 fixture state: state=%+v err=%v", state, err)
+	}
+	bound := corem10.TrustedCostBound{CostBoundID: "pretty-cost-bound", IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, MaxCostMinor: 1, Currency: "USD", SourceRef: "fixture:pretty-cost", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
+	bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+	pretty, err := json.MarshalIndent(bound, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(filepath.Dir(runtimeDir), "pretty-cost.json")
+	if err := os.WriteFile(path, pretty, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-cost-register", runtimeDir, path); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("pretty cost bound was not accepted: code=%d response=%+v", code, response)
+	}
+	stored, err := os.ReadFile(trustedCostBoundsPath(runtimeDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := bytes.Split(bytes.TrimSpace(stored), []byte{'\n'})
+	if len(lines) != 2 {
+		t.Fatalf("pretty input split trusted-cost JSONL: lines=%d bytes=%s", len(lines), stored)
+	}
+	bounds, err := loadTrustedCostBounds(runtimeDir)
+	if err != nil || len(bounds) != 2 || bounds[1].CostBoundID != bound.CostBoundID || bounds[1].CostBoundHash != bound.CostBoundHash {
+		t.Fatalf("canonical pretty cost bound did not replay: bounds=%+v err=%v", bounds, err)
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
