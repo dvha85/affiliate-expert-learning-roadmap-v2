@@ -164,6 +164,8 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	executions := map[string]ProductionExecutionRecord{}
 	executionAuthorizations := map[string]string{}
 	resolutions := map[string]ProductionReconciliationResolution{}
+	admissionNewLeases := map[string]string{}
+	admissionPriorResolutions := map[string]string{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	evaluationExecutions := map[string]string{}
 	cycleExecutions := map[string]string{}
@@ -303,6 +305,15 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || lease.LeaseVersion != x.NewLeaseVersion || lease.LeaseHash != x.NewLeaseHash || lease.ApprovalRef != x.NewApprovalID || x.ExecutionPermitted {
 				return fmt.Errorf("production recovery admission has an orphaned or mismatched link")
 			}
+			priorKey := x.PriorRuntimeDir + "\x00" + x.ResolutionID
+			if priorAdmissionID, exists := admissionNewLeases[x.NewLeaseID]; exists && priorAdmissionID != x.RecoveryAdmissionID {
+				return fmt.Errorf("production recovery admission reuses a new lease")
+			}
+			if priorAdmissionID, exists := admissionPriorResolutions[priorKey]; exists && priorAdmissionID != x.RecoveryAdmissionID {
+				return fmt.Errorf("production recovery admission reuses a prior resolution lineage")
+			}
+			admissionNewLeases[x.NewLeaseID] = x.RecoveryAdmissionID
+			admissionPriorResolutions[priorKey] = x.RecoveryAdmissionID
 		case *ProductionOutcomeEvaluation:
 			lease, leaseOK := leases[x.LeaseID]
 			execution, executionOK := executions[x.ExecutionID]
