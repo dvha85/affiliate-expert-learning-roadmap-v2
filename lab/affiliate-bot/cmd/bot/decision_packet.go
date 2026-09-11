@@ -103,6 +103,13 @@ func exportHistoryDecision(w io.Writer, args []string) error {
 	if len(args) != 3 {
 		return fmt.Errorf("usage: history decision <history.jsonl> <record_id> <context.json>")
 	}
+	// Decision exports are canonical evidence consumers, not diagnostics. Hold
+	// the local writer boundary before selecting and replaying a history record.
+	release, err := acquireHistoryRuntimeGate(args[0])
+	if err != nil {
+		return err
+	}
+	defer release()
 	records, err := LoadHistory(args[0])
 	if err != nil {
 		return err
