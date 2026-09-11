@@ -6,6 +6,19 @@ import (
 	"time"
 )
 
+func m10Entry(t *testing.T, kind string, value any) ArtifactEntry {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := NewArtifactEntry(kind, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entry
+}
+
 func TestTrustedCostBoundDecodeAndBinding(t *testing.T) {
 	c := TrustedCostBound{CostBoundID: "c", IntentID: "i", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 9007199254740993, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:00:00Z", CorrelationID: "x", HashVersion: "go-json-v1"}
 	c.CostBoundHash = ComputeTrustedCostBoundHash(c)
@@ -123,6 +136,15 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	raw, _ := json.Marshal(auth)
 	if _, err := ValidateExecutionAuthorization(raw); err != nil {
 		t.Fatal(err)
+	}
+	entries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, g), m10Entry(t, ArtifactKindTrustedCostBound, cost), m10Entry(t, ArtifactKindCanaryGate, gate), m10Entry(t, ArtifactKindExecutionAuthorization, auth)}
+	if err := ValidateArtifactGraph(entries); err != nil {
+		t.Fatalf("valid M10 graph rejected: %v", err)
+	}
+	orphan := auth
+	orphan.CanaryGateID = "missing-gate"
+	if err := ValidateArtifactGraph(append(entries[:3:3], m10Entry(t, ArtifactKindExecutionAuthorization, orphan))); err == nil {
+		t.Fatal("orphan authorization was accepted by canonical M10 graph")
 	}
 	gate.Decision = "DENY"
 	if _, err := AuthorizeCanary(CanaryAuthorizationInput{Gate: gate, Grant: g, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", IdempotencyKey: "key", CorrelationID: "corr", IntentExpiresAt: "2026-09-08T01:45:00Z", ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T01:00:00Z"}); err == nil {

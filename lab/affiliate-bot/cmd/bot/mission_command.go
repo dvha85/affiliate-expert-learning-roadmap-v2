@@ -278,7 +278,9 @@ func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
 	return entries, nil
 }
 
-func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
+// legacyValidateM10ArtifactGraph is retained temporarily as a readable
+// migration reference while the runtime calls the canonical core validator.
+func legacyValidateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
 	grants := map[string]corem10.CanaryGrant{}
 	bounds := map[string]corem10.TrustedCostBound{}
 	gates := map[string]corem10.CanaryGateDecision{}
@@ -345,6 +347,10 @@ func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
 		}
 	}
 	return nil
+}
+
+func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
+	return corem10.ValidateArtifactGraph(entries)
 }
 
 func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, string, error) {
