@@ -148,6 +148,19 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(degradedHealthGateEntries); err == nil {
 		t.Fatal("allow gate with degraded health was accepted")
 	}
+	exhaustedGateLedger := ledger
+	exhaustedGateLedger.ExecutionsTotal, exhaustedGateLedger.ExecutionsInWindow, exhaustedGateLedger.CostMinorTotal, exhaustedGateLedger.PendingOutcomes = 1, 1, 10, 1
+	exhaustedGateLedger.PendingExecutionIDs = []string{"reserved-1"}
+	exhaustedGateLedgerEntry := m11Entry(t, ArtifactKindLedger, exhaustedGateLedger)
+	exhaustedBudgetGate := gate
+	exhaustedBudgetGate.LedgerArtifactID, exhaustedBudgetGate.LedgerContentHash = exhaustedGateLedgerEntry.ArtifactID, exhaustedGateLedgerEntry.ContentHash
+	exhaustedBudgetGate.ExecutionsTotalBefore, exhaustedBudgetGate.ExecutionsInWindowBefore, exhaustedBudgetGate.CostMinorTotalBefore, exhaustedBudgetGate.PendingOutcomesBefore = exhaustedGateLedger.ExecutionsTotal, exhaustedGateLedger.ExecutionsInWindow, exhaustedGateLedger.CostMinorTotal, exhaustedGateLedger.PendingOutcomes
+	exhaustedBudgetGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	exhaustedBudgetGateEntries[4] = exhaustedGateLedgerEntry
+	exhaustedBudgetGateEntries[6] = m11Entry(t, ArtifactKindGate, exhaustedBudgetGate)
+	if err := ValidateArtifactGraph(exhaustedBudgetGateEntries); err == nil {
+		t.Fatal("allow gate with exhausted ledger budget was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
