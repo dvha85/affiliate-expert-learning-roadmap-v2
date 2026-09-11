@@ -141,6 +141,9 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatalf("valid M10 graph rejected: %v", err)
 	}
+	if err := ValidateArtifactGraph(append(entries, entries[0])); err == nil {
+		t.Fatal("duplicate immutable grant entry was accepted by canonical M10 graph")
+	}
 	orphan := auth
 	orphan.CanaryGateID = "missing-gate"
 	if err := ValidateArtifactGraph(append(entries[:3:3], m10Entry(t, ArtifactKindExecutionAuthorization, orphan))); err == nil {
