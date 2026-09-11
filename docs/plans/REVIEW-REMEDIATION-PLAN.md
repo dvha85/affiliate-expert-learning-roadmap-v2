@@ -102,18 +102,18 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-03 canonical M10 duplicate registry entry
+### Runtime gap được chọn tiếp theo — RP-03 canonical M10 execution cardinality
 
-Phạm vi tiếp theo là bắt `core/m10` tự reject duplicate immutable entry. Một
-adapter không được là nơi duy nhất phát hiện hai envelope cùng kind/ID, vì core
-graph có thể được gọi từ backup/harness độc lập. Đây là boundary offline; nó
-không cấp authority, không thay ledger reservation runtime, và không chứng minh
-executor, power-loss hay multi-host transaction.
+Phạm vi tiếp theo là bắt `core/m10` giới hạn mỗi immutable authorization thành
+một terminal execution record. Learner reservation đã có binding này, nhưng core
+graph phải có invariant tương đương cho backup/harness hoặc caller độc lập. Đây
+là boundary offline; nó không cấp authority, không thay ledger reservation
+runtime, và không chứng minh executor, power-loss hay multi-host transaction.
 
-- `core/m10.ValidateArtifactGraph` reject duplicate `artifact_kind/artifact_id`
-  trước khi map/decode có thể che giấu entry trước đó.
-- Regression core dựng graph hợp lệ rồi append lại immutable grant entry.
-- Không gọi executor/provider và không tự suy from duplicate guard sang
+- `core/m10.ValidateArtifactGraph` reject execution record thứ hai bind cùng
+  authorization, kể cả khi record ID khác và từng record vẫn schema-valid.
+- Regression core dựng graph terminal hợp lệ rồi append second record cùng auth.
+- Không gọi executor/provider và không tự suy from cardinality guard sang
   multi-file transaction proof.
 
 **Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
@@ -297,6 +297,11 @@ reject duplicate envelope cùng artifact kind/ID trước khi tạo lookup map, 
 mọi caller dùng core không thể che entry bất biến bằng overwrite map. Đây chỉ
 là graph-integrity guard offline; ledger transaction, executor, power-loss và
 multi-host proof vẫn mở.
+
+**Cập nhật core M10 execution cardinality (2026-09-11):** canonical graph chỉ
+chấp nhận một terminal no-side-effect record cho mỗi governed authorization;
+record ID khác không thể bypass lineage này. Đây chỉ là graph-integrity guard
+offline; reservation ledger, executor, power-loss và multi-host proof vẫn mở.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không

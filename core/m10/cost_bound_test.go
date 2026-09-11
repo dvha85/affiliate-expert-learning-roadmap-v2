@@ -181,6 +181,15 @@ func TestCancelledCanaryExecutionRecordHasNoSideEffect(t *testing.T) {
 	if _, err := ValidateExecutionRecord(raw); err != nil {
 		t.Fatal(err)
 	}
+	entries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, grant), m10Entry(t, ArtifactKindTrustedCostBound, cost), m10Entry(t, ArtifactKindCanaryGate, gate), m10Entry(t, ArtifactKindExecutionAuthorization, authorization), m10Entry(t, ArtifactKindExecutionRecord, record)}
+	if err := ValidateArtifactGraph(entries); err != nil {
+		t.Fatalf("valid terminal execution graph rejected: %v", err)
+	}
+	secondRecord := record
+	secondRecord.ExecutionID = "canary-exec-second-terminal"
+	if err := ValidateArtifactGraph(append(entries, m10Entry(t, ArtifactKindExecutionRecord, secondRecord))); err == nil {
+		t.Fatal("two terminal execution records for one authorization were accepted")
+	}
 	if _, err := FailCanaryExecutionFixture(FailedExecutionInput{Authorization: authorization, AttemptedAt: authorization.ExpiresAt, Reason: "fixture attempt after authorization expiry"}); err == nil {
 		t.Fatal("accepted fixture execution at authorization expiry")
 	}

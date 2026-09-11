@@ -108,6 +108,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]CanaryGateDecision{}
 	authorizations := map[string]ExecutionAuthorization{}
 	records := []ExecutionRecord{}
+	executionAuthorizations := map[string]string{}
 	seenEntries := map[string]bool{}
 	for _, entry := range entries {
 		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
@@ -173,6 +174,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		if !exists || attemptedErr != nil || authorizedErr != nil || expiresErr != nil || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
 			return fmt.Errorf("execution record has an orphaned or mismatched registry link")
 		}
+		if priorExecutionID, found := executionAuthorizations[record.AuthorizationID]; found && priorExecutionID != record.ExecutionID {
+			return fmt.Errorf("execution authorization has more than one terminal record")
+		}
+		executionAuthorizations[record.AuthorizationID] = record.ExecutionID
 	}
 	return nil
 }
