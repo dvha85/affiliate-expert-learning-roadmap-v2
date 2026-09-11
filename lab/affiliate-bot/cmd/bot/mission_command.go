@@ -272,85 +272,10 @@ func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
 		seen[key] = entry.ContentHash
 		entries = append(entries, entry)
 	}
-	if err := validateM10ArtifactGraph(entries); err != nil {
+	if err := corem10.ValidateArtifactGraph(entries); err != nil {
 		return nil, err
 	}
 	return entries, nil
-}
-
-// legacyValidateM10ArtifactGraph is retained temporarily as a readable
-// migration reference while the runtime calls the canonical core validator.
-func legacyValidateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
-	grants := map[string]corem10.CanaryGrant{}
-	bounds := map[string]corem10.TrustedCostBound{}
-	gates := map[string]corem10.CanaryGateDecision{}
-	authorizations := map[string]corem10.ExecutionAuthorization{}
-	records := []corem10.ExecutionRecord{}
-	for _, entry := range entries {
-		switch entry.ArtifactKind {
-		case corem10.ArtifactKindCanaryGrant:
-			grant, status := corem10.DecodeCanaryGrant(entry.Artifact)
-			if status != "VALID" {
-				return fmt.Errorf("invalid registered canary grant")
-			}
-			grants[grant.GrantID] = grant
-		case corem10.ArtifactKindTrustedCostBound:
-			bound, status := corem10.DecodeTrustedCostBound(entry.Artifact)
-			if status != "VALID" {
-				return fmt.Errorf("invalid registered trusted cost bound")
-			}
-			bounds[bound.CostBoundID] = bound
-		case corem10.ArtifactKindCanaryGate:
-			gate, err := corem10.ValidateCanaryGateDecision(entry.Artifact)
-			if err != nil {
-				return fmt.Errorf("invalid registered canary gate: %w", err)
-			}
-			gates[gate.GateID] = gate
-		case corem10.ArtifactKindExecutionAuthorization:
-			authorization, err := corem10.ValidateExecutionAuthorization(entry.Artifact)
-			if err != nil {
-				return fmt.Errorf("invalid registered execution authorization: %w", err)
-			}
-			authorizations[authorization.AuthorizationID] = authorization
-		case corem10.ArtifactKindExecutionRecord:
-			record, err := corem10.ValidateExecutionRecord(entry.Artifact)
-			if err != nil {
-				return fmt.Errorf("invalid registered execution record: %w", err)
-			}
-			records = append(records, record)
-		default:
-			return fmt.Errorf("unsupported registered M10 artifact kind")
-		}
-	}
-	for _, gate := range gates {
-		grant, grantOK := grants[gate.GrantID]
-		bound, boundOK := bounds[gate.CostBoundID]
-		if !grantOK || !boundOK || grant.GrantVersion != gate.GrantVersion || grant.GrantHash != gate.GrantHash || bound.CostBoundHash != gate.CostBoundHash || bound.MaxCostMinor != gate.CostBoundMinor || bound.IntentID != gate.IntentID || bound.IntentHash != gate.IntentHash || grant.PolicyVersion != gate.PolicyVersion {
-			return fmt.Errorf("canary gate has an orphaned or mismatched registry link")
-		}
-	}
-	for _, authorization := range authorizations {
-		grant, grantOK := grants[authorization.CanaryGrantID]
-		gate, gateOK := gates[authorization.CanaryGateID]
-		bound, boundOK := bounds[authorization.CanaryCostBoundID]
-		if !grantOK || !gateOK || !boundOK || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
-			return fmt.Errorf("execution authorization has an orphaned or mismatched registry link")
-		}
-	}
-	for _, record := range records {
-		authorization, exists := authorizations[record.AuthorizationID]
-		attemptedAt, attemptedErr := time.Parse(time.RFC3339, record.AttemptedAt)
-		authorizedAt, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
-		expiresAt, expiresErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
-		if !exists || attemptedErr != nil || authorizedErr != nil || expiresErr != nil || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) || authorization.IntentID != record.IntentID || authorization.IntentHash != record.IntentHash || authorization.ExecutorID != record.ExecutorID || authorization.IdempotencyKey != record.IdempotencyKey || authorization.CorrelationID != record.CorrelationID || authorization.CanaryGrantID != record.CanaryGrantID || authorization.CanaryGrantVersion != record.CanaryGrantVersion || authorization.CanaryGrantHash != record.CanaryGrantHash || authorization.CanaryGateID != record.CanaryGateID || authorization.CanaryCostBoundID != record.CanaryCostBoundID || authorization.CanaryCostBoundHash != record.CanaryCostBoundHash || authorization.CanaryCostBoundMinor != record.CanaryCostBoundMinor {
-			return fmt.Errorf("execution record has an orphaned or mismatched registry link")
-		}
-	}
-	return nil
-}
-
-func validateM10ArtifactGraph(entries []corem10.ArtifactEntry) error {
-	return corem10.ValidateArtifactGraph(entries)
 }
 
 func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, string, error) {
@@ -371,7 +296,7 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 		}
 		return entry, "", fmt.Errorf("M10 artifact ID reused with different content")
 	}
-	if err := validateM10ArtifactGraph(append(entries, entry)); err != nil {
+	if err := corem10.ValidateArtifactGraph(append(entries, entry)); err != nil {
 		return entry, "", err
 	}
 	line, err := json.Marshal(entry)
