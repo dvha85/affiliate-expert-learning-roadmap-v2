@@ -361,6 +361,11 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(windowResetEntries); err == nil {
 		t.Fatal("later ledger window reset was accepted")
 	}
+	duplicateActivationEntries := append([]ArtifactEntry(nil), entries...)
+	duplicateActivationEntries = append(duplicateActivationEntries, entries[5])
+	if err := ValidateArtifactGraph(duplicateActivationEntries); err == nil {
+		t.Fatal("duplicate activation artifact was accepted")
+	}
 	pendingSwapLedger := reservationLedger
 	pendingSwapLedger.UpdatedAt = "2026-09-08T00:00:00.750Z"
 	pendingSwapLedger.PendingExecutionIDs = []string{"exec-without-reservation"}

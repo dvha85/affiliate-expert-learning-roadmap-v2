@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: b168cf36b21921838e17d8707fa7ca620e85f0d1 -->
+<!-- readiness-main-baseline: 5edc20706c9d011a2fba8de1afc37700bba0f766 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -864,6 +864,12 @@ reconciliation resolution ID. Core regression append post-outcome ledger rồi x
 link outcome ở entry tiếp theo, và graph reject. Đây giữ audit lineage của state
 hiện có; không biến journal thành transaction đa-file hay chứng minh outcome
 business bên ngoài fixture.
+
+**Cập nhật M11 artifact cardinality (2026-09-11):** canonical graph reject mọi
+duplicate `(artifact_kind, artifact_id)` trước khi decode/link resolution. Core
+regression thêm lại activation y hệt và bị reject, nên map overwrite không thể
+ẩn duplicate input khi validator được dùng ngoài learner registry. Đây là
+integrity guard offline, không thay thế locking hay migration/version policy.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
