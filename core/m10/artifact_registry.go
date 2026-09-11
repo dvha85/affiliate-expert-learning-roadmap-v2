@@ -108,7 +108,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]CanaryGateDecision{}
 	authorizations := map[string]ExecutionAuthorization{}
 	records := []ExecutionRecord{}
+	seenEntries := map[string]bool{}
 	for _, entry := range entries {
+		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
+		if seenEntries[entryKey] {
+			return fmt.Errorf("duplicate M10 artifact in registry graph")
+		}
+		seenEntries[entryKey] = true
 		switch entry.ArtifactKind {
 		case ArtifactKindCanaryGrant:
 			grant, status := DecodeCanaryGrant(entry.Artifact)
