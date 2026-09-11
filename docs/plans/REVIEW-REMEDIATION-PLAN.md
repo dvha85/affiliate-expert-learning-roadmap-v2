@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 7efab16d77785f33f0d8e15be50f2d6c0a6f178f -->
+<!-- readiness-main-baseline: 9b90d77b62baeb25699f12fdb72e0a3e1234e978 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -778,6 +778,12 @@ registry chỉ nhận một offline evaluation và một closed cycle cho mỗi 
 đồng bộ với learner command. Core regression append evaluation/cycle thứ hai có
 ID khác nhưng cùng execution rồi reject. Đây không mở rộng evidence outcome,
 không thay thế review workflow và không chứng minh business lifecycle.
+
+**Cập nhật M11 authorization cost-bound window graph (2026-09-11):**
+canonical authorization phải được cấp trong exact `TrustedCostBound` window và
+hết hạn không sau bound expiry. Core regression thay bound/gate/auth thành một
+lineage checksum-valid, rồi reject authorization còn sống sau cost expiry. Đây
+không chứng minh cost provider, clock vận hành hay production authority.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

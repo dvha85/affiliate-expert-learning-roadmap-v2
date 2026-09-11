@@ -122,6 +122,20 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(staleAuthorizationEntries); err == nil {
 		t.Fatal("authorization with stale health was accepted")
 	}
+	shortCostWindow := cost
+	shortCostWindow.ExpiresAt = "2026-09-08T00:00:30Z"
+	shortCostWindow.CostBoundHash = corem10.ComputeTrustedCostBoundHash(shortCostWindow)
+	shortCostGate := gate
+	shortCostGate.CostBoundHash = shortCostWindow.CostBoundHash
+	shortCostAuthorization := authorization
+	shortCostAuthorization.ProductionCostBoundHash = shortCostWindow.CostBoundHash
+	shortCostEntries := append([]ArtifactEntry(nil), entries...)
+	shortCostEntries[3] = m11Entry(t, ArtifactKindCostBound, shortCostWindow)
+	shortCostEntries[6] = m11Entry(t, ArtifactKindGate, shortCostGate)
+	shortCostEntries[7] = m11Entry(t, ArtifactKindAuthorization, shortCostAuthorization)
+	if err := ValidateArtifactGraph(shortCostEntries); err == nil {
+		t.Fatal("authorization outliving its cost bound was accepted")
+	}
 	lateExecution := execution
 	lateExecution.AttemptedAt = authorization.ExpiresAt
 	lateExecutionEntries := append([]ArtifactEntry(nil), entries...)
