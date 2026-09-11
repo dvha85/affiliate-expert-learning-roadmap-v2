@@ -96,7 +96,7 @@ và regression tương ứng.
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence and n8n stub path exist; selected-source/provider operated evidence remains open |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, and an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, while expiry/rebind and multi-file crash seams remain open |
-| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes and disposable M06/M07 n8n engine regressions run in CI; mutation breadth and operated parity remain open |
+| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured; remote CI and external evidence remain outside local audit |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
 
@@ -1207,6 +1207,15 @@ vào `main`. Đây là regression CI cho shared M00–M11 fixture lineage và M1
 backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở head cho
 đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
 dưới.
+
+**Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
+chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và
+`contracts`, bỏ đúng guard canonical `GateID` trong copy, rồi chạy lại chính
+`core/m11.TestArtifactGraphAcceptsExactProductionLifecycleLinks`. Script chỉ
+PASS khi test thật FAIL ở assertion forged-gate; anchor không rõ, test PASS,
+hoặc lỗi không liên quan đều làm script FAIL. Đây là một mutation proof hẹp cho
+gate ID M11, không bao phủ authorization/execution ID, ledger, backup/restore,
+blueprint, crash/power-loss, multi-host hay operated n8n.
 
 **Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
 `--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi
