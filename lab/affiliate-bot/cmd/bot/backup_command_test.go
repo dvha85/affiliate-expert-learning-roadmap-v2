@@ -1121,11 +1121,14 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 		t.Fatalf("interrupted backup was accepted: code=%d response=%+v", code, response)
 	}
 	backupCopyFault = nil
-	if _, err := os.Stat(filepath.Join(interrupted, "manifest.json")); !os.IsNotExist(err) {
-		t.Fatalf("interrupted backup published a manifest: %v", err)
+	if _, err := os.Stat(interrupted); !os.IsNotExist(err) {
+		t.Fatalf("interrupted backup occupied its target instead of cleaning staging: %v", err)
 	}
 	if code, response := backupCall(t, "restore", interrupted, filepath.Join(root, "interrupted-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
 		t.Fatalf("interrupted snapshot was restorable: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "create", runtime, interrupted); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("retry after interrupted backup did not publish a complete snapshot: code=%d response=%+v", code, response)
 	}
 
 	missionBytes, err := os.ReadFile(filepath.Join(runtime, "mission-state.json"))
