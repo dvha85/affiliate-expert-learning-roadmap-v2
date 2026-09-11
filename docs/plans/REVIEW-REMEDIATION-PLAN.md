@@ -239,6 +239,13 @@ regression mở rộng fault từ trước/sau write sang sau file và directory
 pending journal vẫn là boundary fail-closed và recovery exact. Đây không chứng
 minh power-loss hoặc multi-host transaction, nên vẫn `PARTIAL`.
 
+**Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
+canonicalize JSON đã decode trước khi append, nên input pretty-printed không
+thể tách thành nhiều line registry; append dùng chung file+directory sync trước
+ACK. Regression đưa input pretty JSON thật, kiểm chỉ thêm một line và resolver
+load lại đúng hash/ID. Đây không chứng minh power-loss hoặc multi-host
+transaction, nên vẫn `PARTIAL`.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.
