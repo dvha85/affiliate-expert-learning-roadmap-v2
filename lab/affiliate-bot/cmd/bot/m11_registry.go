@@ -116,11 +116,17 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 	if syncErr := f.Sync(); err == nil {
 		err = syncErr
 	}
-	if faultErr == nil {
-		faultErr = m11AppendFault("after_sync", entry)
-	}
 	if closeErr := f.Close(); err == nil {
 		err = closeErr
+	}
+	if err == nil {
+		err = syncDirectory(filepath.Dir(m11ArtifactRegistryPath(dir)))
+	}
+	if faultErr == nil {
+		// This fault now follows both file and directory sync, exercising the
+		// acknowledged-but-journal-bounded recovery path rather than a merely
+		// buffered append.
+		faultErr = m11AppendFault("after_sync", entry)
 	}
 	if err == nil && faultErr != nil {
 		err = faultErr

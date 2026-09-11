@@ -233,6 +233,12 @@ rỗng dưới target gate. Regression inject lỗi copy: staging bị dọn, ta
 bị chiếm và retry publish thành công. Đây không chứng minh crash/power-loss
 durability sau rename hay transaction multi-host, nên vẫn `PARTIAL`.
 
+**Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
+append giờ sync parent directory trước khi return success. M11 journal recovery
+regression mở rộng fault từ trước/sau write sang sau file và directory sync;
+pending journal vẫn là boundary fail-closed và recovery exact. Đây không chứng
+minh power-loss hoặc multi-host transaction, nên vẫn `PARTIAL`.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.
