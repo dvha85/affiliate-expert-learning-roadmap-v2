@@ -2206,6 +2206,16 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 && len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m10-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
 		}
+		// Do not resolve an artifact against a registry while a local writer can
+		// still change its journal or append the corresponding lifecycle state.
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			if os.IsNotExist(err) {
+				return emit("STATE_ERROR", nil, err, 1)
+			}
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
 		if _, err := os.Stat(m10ExecutionJournalPath(args[1])); err == nil {
 			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M10 execution journal requires a locked writer recovery"), 1)
 		} else if !os.IsNotExist(err) {

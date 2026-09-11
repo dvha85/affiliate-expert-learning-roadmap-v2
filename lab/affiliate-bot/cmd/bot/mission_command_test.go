@@ -440,6 +440,21 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init runtime: code=%d response=%+v", code, response)
+	}
+	release, err := acquireRuntimeGate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, response := missionCall(t, "m10-resolve", dir, corem10.ArtifactKindExecutionRecord, "unread-artifact"); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("M10 resolver read a runtime while its writer gate was held: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM10AuthorityExpiryRejectsInFreshProcessWithoutMutation(t *testing.T) {
 	binary := buildMissionBinary(t)
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {

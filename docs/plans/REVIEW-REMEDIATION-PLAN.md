@@ -146,6 +146,12 @@ binary Bot vận hành), backup/restore từng authority rồi kiểm `before` /
 execution/ledger/cost state rộng hơn vẫn thiếu; không suy slice này thành
 complete acceptance.
 
+**Cập nhật M10 resolver read gate (2026-09-11):** `m10-resolve` giữ runtime
+gate local trước khi kiểm journal hoặc registry. Writer đang hoạt động trả
+`BUSY`, thay vì resolver đọc artifact giữa lifecycle transition. Đây chỉ là
+exclusion local cho read path, không thay transaction đa-file, distributed lock
+hay proof recovery sau power-loss.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
