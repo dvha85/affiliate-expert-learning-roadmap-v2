@@ -277,7 +277,7 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 }
 
 func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.T) {
-	for _, phase := range []string{"before_write", "after_write"} {
+	for _, phase := range []string{"before_write", "after_write", "after_sync"} {
 		faultPhase := phase
 		t.Run(phase, func(t *testing.T) {
 			fixture := newM11UnknownStopFixture(t)
@@ -387,7 +387,7 @@ func TestM11UnknownStopJournalRecoversAfterDurableStopWriteFailure(t *testing.T)
 }
 
 func TestM11FailedExecutionJournalRecoversAfterLedgerWriteFailure(t *testing.T) {
-	for _, phase := range []string{"before_write", "after_write"} {
+	for _, phase := range []string{"before_write", "after_write", "after_sync"} {
 		faultPhase := phase
 		t.Run(phase, func(t *testing.T) {
 			fixture := newM11UnknownStopFixture(t)

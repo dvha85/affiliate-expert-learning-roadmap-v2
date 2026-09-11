@@ -353,6 +353,9 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 	if closeErr := f.Close(); err == nil {
 		err = closeErr
 	}
+	if err == nil {
+		err = syncDirectory(filepath.Dir(m10ArtifactRegistryPath(dir)))
+	}
 	if err != nil {
 		return entry, "", err
 	}
@@ -718,6 +721,22 @@ func missionWriteFault(phase string) error {
 	return missionStateWriteFault(phase)
 }
 
+// syncDirectory persists a prior create, link, rename or append name/update
+// boundary before its caller reports success. It is local-filesystem only and
+// deliberately makes no multi-host or power-loss claim beyond that syscall.
+func syncDirectory(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	closeErr := d.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
 // Mission state is mutable, unlike M08 artifacts. Commit it by atomic rename
 // while the mission directory lock is held; never truncate the prior state.
 func writeJSONAtomic(path string, value any) error {
@@ -760,16 +779,7 @@ func writeJSONAtomic(path string, value any) error {
 	if err := os.Rename(temporary, path); err != nil {
 		return err
 	}
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	err = d.Sync()
-	closeErr := d.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return syncDirectory(dir)
 }
 
 func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
