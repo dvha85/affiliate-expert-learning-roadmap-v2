@@ -1641,6 +1641,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1:]...); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
+		// M08 intent construction resolves canonical history through the shared
+		// M06/M07 evidence spine. Do not construct an intent from a context while
+		// a local watcher append is active.
+		releaseHistory, err := acquireHistoryRuntimeGate(args[1])
+		if err != nil {
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseHistory()
 		proposalPath, outputPath := "", args[3]
 		if len(args) == 5 {
 			proposalPath, outputPath = args[3], args[4]
@@ -1679,6 +1687,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			if len(args) != 6 {
 				return emit("INPUT_ERROR", nil, fmt.Errorf("agent intent policy requires HISTORY and persisted M07 proposal"), 1)
 			}
+			// Agent policy must resolve the same canonical record as its M07
+			// proposal. Exclude concurrent local watcher appends for the complete
+			// resolution and policy-output path.
+			releaseHistory, err := acquireHistoryRuntimeGate(args[1])
+			if err != nil {
+				return emit("BUSY", nil, err, 1)
+			}
+			defer releaseHistory()
 			record, err := resolveCanonicalRecord(args[1], i.DecisionID)
 			if err != nil {
 				return emit("INPUT_ERROR", nil, err, 1)

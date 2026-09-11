@@ -184,6 +184,13 @@ record. Regression giữ writer gate thật rồi xác nhận cả `m07 context`
 Đây chỉ là exclusion trên filesystem một host; distributed/multi-host locking
 và proof crash/power-loss vẫn mở.
 
+**Cập nhật M08 history read gate (2026-09-11):** `m08-intent` và nhánh agent
+của `m08-policy` giờ giữ local history runtime gate trước khi resolve canonical
+record/proposal. Regression giữ writer gate thật rồi xác nhận learner command
+trả `BUSY`, không tạo intent từ history đang thay đổi. Đây vẫn chỉ là exclusion
+trên filesystem một host; distributed/multi-host locking và proof
+crash/power-loss vẫn mở.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

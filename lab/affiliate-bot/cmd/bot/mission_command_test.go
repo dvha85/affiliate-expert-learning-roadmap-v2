@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
@@ -100,6 +101,41 @@ func TestMissionM08IntentRejectsInputOutputAliasesWithoutMutation(t *testing.T) 
 	}
 	if historyAfter, err := os.ReadFile(history); err != nil || !bytes.Equal(historyBefore, historyAfter) {
 		t.Fatalf("history changed through symlink alias: %v", err)
+	}
+}
+
+func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	release, err := acquireHistoryRuntimeGate(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, response := missionCall(t, "m08-intent", history, request, filepath.Join(dir, "intent.json")); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("M08 intent did not fail closed during history write: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM08AgentPolicyFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
+	dir, history, _ := missionFixture(t)
+	records, err := LoadHistory(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentIntent := corem08.SealIntent(corem08.Intent{
+		IntentID: "m08-agent-history-gate", DecisionID: records[0].RecordID, EvidenceIDs: records[0].RecordedResult.EvidenceIDs,
+		ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "agent", ProposalRef: "sha256:agent-proposal",
+		CreatedAt: "2026-09-07T00:00:00Z", ExpiresAt: "2099-09-07T03:00:00Z", CorrelationID: "m08-agent-history-correlation", IdempotencyKey: "m08-agent-history-key",
+	})
+	intentPath := filepath.Join(dir, "agent-intent.json")
+	writeMissionTestJSON(t, intentPath, agentIntent)
+	release, err := acquireHistoryRuntimeGate(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, response := missionCall(t, "m08-policy", history, intentPath, filepath.Join(dir, "policy.json"), filepath.Join(dir, "proposal.json"), filepath.Join(dir, "policy-out.json")); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("M08 agent policy did not fail closed during history write: code=%d response=%+v", code, response)
 	}
 }
 
