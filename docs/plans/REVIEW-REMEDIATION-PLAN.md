@@ -102,20 +102,18 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-07 canonical recovery-admission cardinality
+### Runtime gap được chọn tiếp theo — RP-03 canonical M10 registry graph
 
-Phạm vi tiếp theo là đưa invariant recovery-admission đã có ở learner/backup
-vào canonical `core/m11` graph. Một recovery lineage không thể có hai admission
-dùng cùng lease mới, hoặc cùng `prior_runtime_dir` và human resolution. Đây là
-boundary audit offline; không chứng minh availability, power-loss hay recovery
-đa-host.
+Phạm vi tiếp theo là đưa graph validation M10 đang nằm ở learner vào `core/m10`.
+Canary grant, cost bound, gate, authorization và terminal record phải resolve
+đúng immutable parents ở mọi caller. Đây là boundary offline; nó không cấp
+authority, không thay ledger reservation runtime, và không chứng minh executor,
+power-loss hay multi-host transaction.
 
-- `core/m11.ValidateArtifactGraph` phải reject duplicate new-lease binding và
-  duplicate prior-runtime/resolution lineage, kể cả qua generic registry path.
-- Regression tạo graph M11 hợp lệ rồi thêm từng admission conflict; không
-  chấp nhận error do artifact/schema hỏng ở điều kiện test.
-- Learner/backup guard hiện hữu vẫn là defense-in-depth; không mở authority hay
-  thay đổi durable STOP.
+- `core/m10.ValidateArtifactGraph` sở hữu exact link and lifetime checks.
+- Learner registry gọi trực tiếp core implementation thay vì validator copy.
+- Regression core dựng graph hợp lệ và reject authorization trỏ gate không tồn
+  tại. Không gọi executor/provider.
 
 **Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
 journal là regular file ngay trong runtime. Symlink hoặc special file trả
@@ -286,6 +284,12 @@ graph nay sở hữu một admission cho mỗi new lease và mỗi cặp prior r
 resolution. Regression bắt cả hai conflict trên graph hợp lệ, nên generic
 registry không lệch learner/backup boundary. Đây không chứng minh recovery
 atomic, power-loss hay multi-host, nên RP-07 vẫn `PARTIAL`.
+
+**Cập nhật core M10 registry graph (2026-09-11):** M10 immutable graph được
+canonicalize vào core và learner registry dùng trực tiếp implementation này.
+Core regression reject authorization orphan trên một graph còn schema-valid.
+Ledger/reservation state, executor, power-loss và multi-host proof vẫn ngoài
+scope, nên RP-03 vẫn `PARTIAL`.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không
