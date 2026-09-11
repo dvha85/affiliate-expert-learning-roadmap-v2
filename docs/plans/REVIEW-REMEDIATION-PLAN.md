@@ -221,6 +221,12 @@ temporary không được còn lại; retry tạo artifact hoàn chỉnh và exa
 `EXACT_DUPLICATE`. Đây không chứng minh power-loss/filesystem durability hay
 multi-host atomicity, nên các phạm vi đó vẫn `PARTIAL`.
 
+**Cập nhật JSONL acknowledgement boundary (2026-09-11):** canonical và derived
+JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Regression
+inject lỗi sau write nhưng trước sync: call phải trả error, không ACK thành
+công; append tiếp theo giữ line framing hợp lệ. Đây không là mô phỏng
+power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

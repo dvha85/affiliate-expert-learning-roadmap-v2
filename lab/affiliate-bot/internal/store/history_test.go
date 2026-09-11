@@ -2,11 +2,34 @@ package store
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestJSONLDoesNotAcknowledgeBeforeSyncBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.jsonl")
+	appendLineFault = func(phase string) error {
+		if phase == "after_write" {
+			return errors.New("injected before-sync interruption")
+		}
+		return nil
+	}
+	t.Cleanup(func() { appendLineFault = nil })
+	if err := (JSONL{}).AppendLine(path, []byte(`{"id":"one"}`)); err == nil {
+		t.Fatal("pre-sync fault was acknowledged as success")
+	}
+	appendLineFault = nil
+	if err := (JSONL{}).AppendLine(path, []byte(`{"id":"two"}`)); err != nil {
+		t.Fatalf("append after failed acknowledgement did not retry: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !bytes.HasSuffix(raw, []byte("\n")) || !bytes.Contains(raw, []byte(`{"id":"two"}`)) {
+		t.Fatalf("post-failure JSONL framing invalid: %q err=%v", raw, err)
+	}
+}
 
 func TestJSONLAppendAndRead(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "history.jsonl")

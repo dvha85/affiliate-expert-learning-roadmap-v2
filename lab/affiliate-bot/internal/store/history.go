@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 // History is the I/O seam. The application validates history and conflicts before
@@ -16,6 +17,17 @@ type History interface {
 }
 
 type JSONL struct{}
+
+// appendLineFault is an in-package test seam for the acknowledge-after-sync
+// boundary. It is never configurable by callers.
+var appendLineFault func(phase string) error
+
+func appendLineFailure(phase string) error {
+	if appendLineFault == nil {
+		return nil
+	}
+	return appendLineFault(phase)
+}
 
 // MaxHistoryRecordBytes is the JSON payload limit, excluding LF/CRLF framing.
 // Reader and writer share this bound; rejection occurs before opening a file.
@@ -38,12 +50,33 @@ func (JSONL) AppendLine(path string, record []byte) error {
 	copy(line, record)
 	line[len(record)] = '\n'
 	n, e := f.Write(line)
-	closeErr := f.Close()
 	if e != nil {
+		_ = f.Close()
 		return e
 	}
 	if n != len(line) {
+		_ = f.Close()
 		return io.ErrShortWrite
+	}
+	if e = appendLineFailure("after_write"); e != nil {
+		_ = f.Close()
+		return e
+	}
+	if e = f.Sync(); e != nil {
+		_ = f.Close()
+		return e
+	}
+	if e = f.Close(); e != nil {
+		return e
+	}
+	d, e := os.Open(filepath.Dir(path))
+	if e != nil {
+		return e
+	}
+	e = d.Sync()
+	closeErr := d.Close()
+	if e != nil {
+		return e
 	}
 	return closeErr
 }
