@@ -56,6 +56,24 @@
     {"id":"RP-09","status":"PARTIAL"},
     {"id":"RP-10","status":"OPEN"}
   ],
+  "review_findings": [
+    {"id":"R01","package":"RP-05","criteria":["BR-15"],"status":"PARTIAL","scope":"M07 deterministic grounding rejects prose not rendered from evidence-bound claims"},
+    {"id":"R02","package":"RP-04","criteria":["BR-13","BR-14"],"status":"PARTIAL","scope":"M06 canonical builder/hash/replay parity"},
+    {"id":"R03","package":"RP-04","criteria":["BR-13","BR-15","BR-16a"],"status":"PARTIAL","scope":"canonical field IDs across n8n, CLI and M08"},
+    {"id":"R04","package":"RP-04","criteria":["BR-13","BR-15","BR-16a"],"status":"PARTIAL","scope":"history replay and unique-record gates across HTTP/M08"},
+    {"id":"R05","package":"RP-05","criteria":["BR-15"],"status":"PARTIAL","scope":"registered read-only tool trace before citation"},
+    {"id":"R06","package":"RP-02","criteria":["BR-17"],"status":"PARTIAL","scope":"shared M08 decoder and policy conformance"},
+    {"id":"R07","package":"RP-02","criteria":["BR-17"],"status":"PARTIAL","scope":"exact JSON-number decoding and hash preservation"},
+    {"id":"R08","package":"RP-03","criteria":["BR-17","BR-18b"],"status":"PARTIAL","scope":"grant/ledger budget cannot reopen through rebind or replay"},
+    {"id":"R09","package":"RP-03","criteria":["BR-17","BR-18b"],"status":"PARTIAL","scope":"authority expiry rejects reservation across process and restore"},
+    {"id":"R10","package":"RP-03","criteria":["BR-17","BR-18b"],"status":"PARTIAL","scope":"local concurrent reserve, STOP and cost-bound arithmetic guards"},
+    {"id":"R11","package":"RP-01","criteria":["BR-16a","BR-17"],"status":"PARTIAL","scope":"input/output alias protection across learner artifact writers"},
+    {"id":"R12","package":"RP-06","criteria":["BR-18b"],"status":"PARTIAL","scope":"typed backup inventory including nested artifacts"},
+    {"id":"R13","package":"RP-06","criteria":["BR-18b"],"status":"PARTIAL","scope":"restore rejects broken M10/M11 semantic graphs"},
+    {"id":"R14","package":"RP-07","criteria":["BR-16a","BR-17","BR-18b"],"status":"PARTIAL","scope":"M00-M11 artifact/lifecycle continuity"},
+    {"id":"R15","package":"RP-08","criteria":["BR-14","BR-15","BR-16a"],"status":"PARTIAL","scope":"CI executes offline smoke and n8n implementation paths"},
+    {"id":"R16","package":"RP-09","criteria":["BR-19"],"status":"PARTIAL","scope":"readiness audit/matrix/plan/evidence consistency"}
+  ],
   "criteria": [
     {"id":"BR-13","title":"M06 watcher persists canonical history","status":"PARTIAL","implementation_refs":["core/m06/m06.go","core/m06/offer_fixture.go","lab/affiliate-bot/cmd/bot/watcher.go","lab/affiliate-bot/cmd/bot/canonical_resolver.go"],"test_refs":["core/m06/m06_test.go","lab/affiliate-bot/cmd/bot/watcher_test.go","scripts/smoke_br13b.py","scripts/smoke_br16a_offline.py","scripts/run_n8n_engine_regression.py"],"missing_evidence":["implementation: shared builder currently covers only the fixed synthetic offer-fixture profile; a separately governed selected-source profile remains future work","tests: CI engine executes the M06 blueprint node chain into canonical history and rejects same-correlation content conflicts plus an unsupported source without mutation; broader selected-source parser/profile cases remain open","external: operated n8n run against a selected source"]},
     {"id":"BR-14","title":"M06 n8n execution","status":"PARTIAL","implementation_refs":["lab/n8n/M06-readonly-watcher.blueprint.json","lab/affiliate-bot/cmd/bot/watcher.go","core/m06/offer_fixture.go"],"test_refs":["scripts/validate_n8n_m06.py","scripts/run_n8n_engine_regression.py","lab/affiliate-bot/cmd/bot/watcher_test.go"],"missing_evidence":["tests: CI n8n runs APPENDED, key-order EXACT_DUPLICATE, same-correlation conflict rejection, unsupported-source rejection, changed-event append, replay and unavailable-adapter failure using a disposable Execute Workflow Trigger substitution; schedule-trigger admission and broader source/profile drift cases remain open","external: independently operated import/execution in the selected supported n8n deployment"]},

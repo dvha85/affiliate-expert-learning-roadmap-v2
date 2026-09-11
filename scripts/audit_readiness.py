@@ -17,6 +17,8 @@ CI_REQUIRED = {
 }
 PACKAGE_IDS = {f"RP-{number:02d}" for number in range(1, 11)}
 PACKAGE_STATUSES = {"PARTIAL", "OPEN"}
+REVIEW_IDS = {f"R{number:02d}" for number in range(1, 17)}
+REVIEW_STATUSES = {"PARTIAL", "OPEN"}
 BASELINE_RE = re.compile(r"^[0-9a-f]{40}$")
 PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline): ([^>]+) -->$", re.MULTILINE)
 PLAN_PACKAGE_RE = re.compile(r"^\| (RP-\d+) \|.*\| (PARTIAL|OPEN) [—-]", re.MULTILINE)
@@ -60,6 +62,35 @@ def audit_package_statuses(matrix, plan_text):
     actual = dict(PLAN_PACKAGE_RE.findall(plan_text))
     if actual != expected:
         fail("plan package status does not match readiness matrix")
+
+
+def audit_review_findings(matrix, criteria_by_id, plan_text):
+    """Keep every reviewed risk explicitly linked to its owning package/BRs."""
+    findings = matrix.get("review_findings")
+    if not isinstance(findings, list):
+        fail("matrix lacks structured review findings")
+    seen = set()
+    for finding in findings:
+        if not isinstance(finding, dict):
+            fail("invalid review finding")
+        finding_id = finding.get("id")
+        package = finding.get("package")
+        criteria = finding.get("criteria")
+        status = finding.get("status")
+        scope = finding.get("scope")
+        if finding_id in seen or finding_id not in REVIEW_IDS:
+            fail(f"invalid or duplicate review finding: {finding_id}")
+        if package not in PACKAGE_IDS or status not in REVIEW_STATUSES:
+            fail(f"review finding has invalid package/status: {finding_id}")
+        if not isinstance(criteria, list) or not criteria or any(item not in criteria_by_id for item in criteria):
+            fail(f"review finding has invalid criteria links: {finding_id}")
+        if not isinstance(scope, str) or not scope.strip():
+            fail(f"review finding lacks scope: {finding_id}")
+        if not re.search(rf"^\| {re.escape(finding_id)} / P[12] \|", plan_text, re.MULTILINE):
+            fail(f"review finding is missing from plan: {finding_id}")
+        seen.add(finding_id)
+    if seen != REVIEW_IDS:
+        fail(f"review finding mapping is incomplete: {sorted(seen)}")
 
 
 def audit_evidence_graph(root, criteria_by_id):
@@ -168,6 +199,7 @@ def audit(root):
         criteria_by_id[item_id] = item
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
+    audit_review_findings(matrix, criteria_by_id, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     for script, workflow in CI_REQUIRED.items():
         if script not in (root / workflow).read_text(encoding="utf-8"):
