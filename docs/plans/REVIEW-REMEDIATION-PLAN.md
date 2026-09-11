@@ -659,6 +659,13 @@ trước khi admission đọc handoff input hoặc ghi artifact mới; regressio
 cũ rồi xác nhận new registry không đổi. Đây là local cross-runtime exclusion,
 không thay distributed lock, multi-host coordination hay power-loss recovery.
 
+**Cập nhật M11 read gate (2026-09-11):** `m11-recovery-export`, `m11-resolve`
+và `status` giữ runtime gate của nguồn xuyên suốt journal preflight và lifecycle
+read. Writer local đang hoạt động trả `BUSY`: recovery export không tạo handoff,
+resolver/status không lộ snapshot đua tranh. Đây chỉ là exclusion trên local
+filesystem; không chứng minh read transaction đa-host, distributed lock hay
+crash/power-loss recovery.
+
 **Cập nhật M11 failed-execution journal (2026-09-10):** `m11-record-failed`
 ghi `m11-failed-execution-journal/v1` trước cặp immutable
 `FAILED/NOT_PERFORMED` execution và post-execution ledger. Recovery chỉ replay

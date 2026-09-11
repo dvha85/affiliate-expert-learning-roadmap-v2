@@ -107,6 +107,43 @@ func TestM11RecoveryAdmissionFailsClosedWhileOldRuntimeGateIsHeld(t *testing.T) 
 	}
 }
 
+func TestM11RecoveryExportFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
+	dir, output := t.TempDir(), filepath.Join(t.TempDir(), "handoff.json")
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init runtime: code=%d response=%+v", code, response)
+	}
+	release, err := acquireRuntimeGate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, response := missionCall(t, "m11-recovery-export", dir, "unread-resolution", "unread-ledger", output); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("recovery export read a runtime while its writer gate was held: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("blocked recovery export wrote a handoff: %v", err)
+	}
+}
+
+func TestM11ReadCommandsFailClosedWhileRuntimeGateIsHeld(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init runtime: code=%d response=%+v", code, response)
+	}
+	_, ledgerEntry := setupM11OutcomeJournalFixture(t, dir)
+	release, err := acquireRuntimeGate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindLedger, ledgerEntry.ArtifactID); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("M11 resolver read a runtime while its writer gate was held: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "BUSY" {
+		t.Fatalf("mission status read a runtime while its writer gate was held: code=%d response=%+v", code, response)
+	}
+}
+
 // A journal may survive a process exit after it has been synced but before the
 // corresponding registry/state transition is complete. A fresh Bot process
 // must expose only RECOVERY_REQUIRED until its locked writer prelude replays

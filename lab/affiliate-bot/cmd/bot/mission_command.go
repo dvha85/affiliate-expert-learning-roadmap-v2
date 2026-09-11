@@ -2257,6 +2257,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 && len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-resolve STATE_DIR KIND ARTIFACT_ID [CONTENT_HASH]"), 2)
 		}
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			if os.IsNotExist(err) {
+				return emit("STATE_ERROR", nil, err, 1)
+			}
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
 		if err := m11JournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -2345,11 +2353,20 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 5 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission m11-recovery-export STATE_DIR RESOLUTION_ID STOPPED_LEDGER_ID OUT"), 2)
 		}
-		if err := m11JournalRecoveryRequired(args[1]); err != nil {
-			return emit("RECOVERY_REQUIRED", nil, err, 1)
-		}
 		if err := distinctPaths(args[1], args[4]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
+		}
+		// A recovery handoff must describe one coherent stopped-runtime
+		// snapshot. Treat its read as an exclusive local operation so a writer
+		// cannot append a journal or lifecycle artifact between the recovery
+		// preflight and the handoff resolution.
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
+		if err := m11JournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		handoff, err := m11RecoveryHandoff(args[1], args[2], args[3])
 		if err != nil {
@@ -2508,6 +2525,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 2 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission status STATE_DIR"), 2)
 		}
+		releaseGate, err := acquireRuntimeGate(args[1])
+		if err != nil {
+			if os.IsNotExist(err) {
+				return emit("STATE_ERROR", nil, err, 1)
+			}
+			return emit("BUSY", nil, err, 1)
+		}
+		defer releaseGate()
 		if _, err := os.Stat(m10ExecutionJournalPath(args[1])); err == nil {
 			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M10 execution journal requires a locked writer recovery"), 1)
 		} else if !os.IsNotExist(err) {
