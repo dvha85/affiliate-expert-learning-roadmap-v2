@@ -352,6 +352,15 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(resetEntries); err == nil {
 		t.Fatal("later ledger reset was accepted")
 	}
+	windowResetLedger := reservationLedger
+	windowResetLedger.WindowStartedAt = "2026-09-08T00:00:00.500Z"
+	windowResetLedger.UpdatedAt = "2026-09-08T00:00:00.750Z"
+	windowResetLedger.ExecutionsInWindow = 0
+	windowResetEntries := append([]ArtifactEntry(nil), entries...)
+	windowResetEntries = append(windowResetEntries, m11Entry(t, ArtifactKindLedger, windowResetLedger))
+	if err := ValidateArtifactGraph(windowResetEntries); err == nil {
+		t.Fatal("later ledger window reset was accepted")
+	}
 }
 
 func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing.T) {

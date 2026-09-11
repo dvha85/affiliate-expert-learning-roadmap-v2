@@ -165,7 +165,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if previous, exists := ledgerHeads[x.LeaseID]; exists {
 				previousAt, previousErr := time.Parse(time.RFC3339, previous.UpdatedAt)
 				currentAt, currentErr := time.Parse(time.RFC3339, x.UpdatedAt)
-				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.ExecutionsTotal < previous.ExecutionsTotal || x.CostMinorTotal < previous.CostMinorTotal {
+				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.WindowStartedAt != previous.WindowStartedAt || x.ExecutionsTotal < previous.ExecutionsTotal || x.ExecutionsInWindow < previous.ExecutionsInWindow || x.CostMinorTotal < previous.CostMinorTotal {
 					return fmt.Errorf("production ledger is not a monotonic lease history")
 				}
 			}

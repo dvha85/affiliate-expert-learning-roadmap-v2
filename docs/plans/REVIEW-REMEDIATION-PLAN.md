@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 68f87732f4328ce3ade3b6d251e0a964a2990000 -->
+<!-- readiness-main-baseline: 7efca2a129a97b4f66bde17919895c047b6a6f4c -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -843,6 +843,13 @@ immutable authorization được cấp đến execution attempt. Core regression
 authorization sau pre-ledger và reject, nên một pending execution ID được ghi
 trước authorization không thể hợp thức hoá attempt về sau. Đây là sequencing
 lineage offline, không chứng minh lock hoặc transaction đa-file.
+
+**Cập nhật M11 ledger window continuity (2026-09-11):** canonical ledger
+history cho cùng lease không được đổi `window_started_at` hoặc giảm
+`executions_in_window`; counters total/cost vẫn monotonic như trước. Core
+regression append ledger có window reset và counter window giảm, rồi reject.
+Điều này giữ fixed-window budget lineage của runtime hiện tại; không triển khai
+rolling-window reset hoặc chứng minh concurrent accounting.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
