@@ -93,6 +93,24 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenGateEntries); err == nil {
 		t.Fatal("gate with mismatched ledger head was accepted")
 	}
+	stoppedGateLedger := ledger
+	stoppedGateLedger.ControlMode, stoppedGateLedger.StopReason = "STOPPED", "fixture stop"
+	stoppedGateLedgerEntry := m11Entry(t, ArtifactKindLedger, stoppedGateLedger)
+	stoppedGate := gate
+	stoppedGate.LedgerContentHash = stoppedGateLedgerEntry.ContentHash
+	stoppedGateEntries := append([]ArtifactEntry(nil), entries...)
+	stoppedGateEntries[4] = stoppedGateLedgerEntry
+	stoppedGateEntries[6] = m11Entry(t, ArtifactKindGate, stoppedGate)
+	if err := ValidateArtifactGraph(stoppedGateEntries); err == nil {
+		t.Fatal("allow gate from a stopped ledger was accepted")
+	}
+	driftedGate := gate
+	driftedGate.ExecutionsTotalBefore = 1
+	driftedGateEntries := append([]ArtifactEntry(nil), entries...)
+	driftedGateEntries[6] = m11Entry(t, ArtifactKindGate, driftedGate)
+	if err := ValidateArtifactGraph(driftedGateEntries); err == nil {
+		t.Fatal("gate with drifted ledger counters was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)

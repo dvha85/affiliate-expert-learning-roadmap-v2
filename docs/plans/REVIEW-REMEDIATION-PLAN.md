@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 69a56bc6c6edb5fabeafc15e3b21d8a7d9a9b9a4 -->
+<!-- readiness-main-baseline: bd7574b32a2b59c89e5b6b9e03f39abc087457a4 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -791,6 +791,12 @@ có một NORMAL ledger trước/equal attempt, cùng lease/version/hash và gi�
 trong `pending_execution_ids`. Core regression dùng pre-ledger hợp lệ rồi reject
 inventory bỏ ledger này. Đây chỉ đồng bộ core với backup/learner fixture; không
 chứng minh atomic transaction, budget provider hay external execution.
+
+**Cập nhật M11 gate/ledger state graph (2026-09-11):** canonical gate
+phải bind exact NORMAL, non-reconciliation ledger cùng lease lineage, và bốn
+budget counters trên gate phải khớp immutable ledger. Core regression reject
+ALLOW gate từ stopped ledger và gate có counter drift. Đây chỉ đồng bộ core
+với learner/restore checker; không là production budget hay gate operation proof.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
