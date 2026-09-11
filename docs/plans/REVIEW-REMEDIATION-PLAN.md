@@ -102,21 +102,20 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-03 canonical M10 identifier integrity
+### Runtime gap được chọn tiếp theo — RP-03 canonical M10 execution identity
 
-Phạm vi tiếp theo là bắt `core/m10` tự tính lại ID deterministic của gate và
-authorization sau khi graph đã resolve immutable parents. Trước đó, liên kết
-grant/cost/gate/auth đúng vẫn có thể mang một `gate_id` hoặc `authorization_id`
-schema-valid nhưng bị forge cùng các tham chiếu downstream. Đây là boundary
-offline; nó không cấp authority, không thay ledger reservation runtime, và
-không chứng minh executor, power-loss hay multi-host transaction.
+Phạm vi tiếp theo là bắt `core/m10` tự tính lại ID deterministic của terminal
+execution sau khi graph đã resolve immutable authorization. Gate và
+authorization IDs đã được kiểm lại ở graph; record vẫn có thể mang một
+`execution_id` schema-valid nhưng bị forge khi tất cả link phụ huynh/downstream
+đã nhất quán. Đây là boundary offline; nó không cấp authority, không thay
+ledger reservation runtime, và không chứng minh executor, power-loss hay
+multi-host transaction.
 
-- `core/m10.ValidateArtifactGraph` recompute `gate_id` từ grant, cost bound,
-  intent/hash, policy version và immutable ledger snapshot; ID phải khớp.
-- Sau khi resolve gate, graph recompute `authorization_id` từ gate, intent/hash,
-  executor, authorized-at và idempotency key; ID phải khớp.
-- Regression core dựng graph hợp lệ, rồi thử gate ID forge cùng authorization
-  link đã cập nhật, và authorization ID forge khi mọi link khác vẫn đúng.
+- `core/m10.ValidateArtifactGraph` recompute `execution_id` từ authorization,
+  attempt time, terminal status và immutable reason; ID phải khớp.
+- Regression core dựng terminal graph hợp lệ rồi thay riêng `execution_id` khi
+  mọi field/schema/liên kết khác vẫn đúng; graph phải reject.
 - Không gọi executor/provider và không suy identifier guard thành proof ledger,
   multi-file transaction, power-loss hoặc multi-host.
 
@@ -315,6 +314,14 @@ authorization theo ID giả, cũng như sửa trực tiếp authorization ID, tr
 mọi field/schema/liên kết khác vẫn hợp lệ; cả hai bị chặn trước khi graph được
 chấp nhận. Đây chỉ là deterministic immutable graph guard offline; reservation
 ledger, executor, multi-file crash/power-loss và multi-host proof vẫn mở.
+
+**Cập nhật core M10 execution identity (2026-09-12):** sau khi resolve exact
+immutable authorization, canonical graph tự tính `execution_id` từ
+authorization, attempt time, terminal status và reason. Regression thay riêng
+ID trong một terminal record còn schema-valid và còn tất cả link đúng; graph
+chặn record đó. Đây chỉ là deterministic immutable graph guard offline;
+reservation ledger, executor, multi-file crash/power-loss và multi-host proof
+vẫn mở.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không

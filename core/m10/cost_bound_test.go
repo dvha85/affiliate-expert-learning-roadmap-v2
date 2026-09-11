@@ -214,6 +214,12 @@ func TestCancelledCanaryExecutionRecordHasNoSideEffect(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatalf("valid terminal execution graph rejected: %v", err)
 	}
+	forgedRecord := record
+	forgedRecord.ExecutionID = "forged-execution-id"
+	forgedRecordEntries := append(entries[:4:4], m10Entry(t, ArtifactKindExecutionRecord, forgedRecord))
+	if err := ValidateArtifactGraph(forgedRecordEntries); err == nil {
+		t.Fatal("graph accepted a forged execution ID with otherwise matching links")
+	}
 	secondRecord := record
 	secondRecord.ExecutionID = "canary-exec-second-terminal"
 	if err := ValidateArtifactGraph(append(entries, m10Entry(t, ArtifactKindExecutionRecord, secondRecord))); err == nil {

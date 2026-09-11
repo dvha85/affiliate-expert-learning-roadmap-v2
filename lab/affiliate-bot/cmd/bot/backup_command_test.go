@@ -375,9 +375,6 @@ func replaceM10ArtifactEntry(t *testing.T, path, kind, artifactID string, artifa
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replacement.ArtifactID != artifactID {
-		t.Fatalf("replacement M10 artifact ID mismatch: got %s want %s", replacement.ArtifactID, artifactID)
-	}
 	lines := make([][]byte, 0)
 	replaced := false
 	for _, line := range bytes.Split(raw, []byte{'\n'}) {
@@ -879,8 +876,14 @@ func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
 		t.Fatalf("backup failed: code=%d response=%+v", code, response)
 	}
 
-	altered := record
-	altered.AttemptedAt = "2026-09-08T00:00:15Z"
+	var authorization corem10.ExecutionAuthorization
+	if err := readJSON(authorizationPath, &authorization); err != nil {
+		t.Fatal(err)
+	}
+	altered, err := corem10.FailCanaryExecutionFixture(corem10.FailedExecutionInput{Authorization: authorization, AttemptedAt: "2026-09-08T00:00:15Z", Reason: record.Error})
+	if err != nil {
+		t.Fatal(err)
+	}
 	alteredRaw, err := json.Marshal(altered)
 	if err != nil {
 		t.Fatal(err)
@@ -890,11 +893,47 @@ func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	statePath := missionStatePath(runtime)
+	stateRaw, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcomeStorePath := m10OutcomeStorePath(runtime)
+	outcomeStoreRaw, err := os.ReadFile(outcomeStorePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var alteredOutcome m03.OutcomeRecord
+	if err := json.Unmarshal(bytes.TrimSpace(outcomeStoreRaw), &alteredOutcome); err != nil {
+		t.Fatal(err)
+	}
+	alteredOutcome.EffectRef.EffectID = altered.ExecutionID
+	alteredOutcomeRaw, err := json.Marshal(alteredOutcome)
+	if err != nil {
+		t.Fatal(err)
+	}
 	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	state, err := loadMissionState(runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Reservations[0].ExecutionID = altered.ExecutionID
+	if err := saveMissionState(runtime, state); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outcomeStorePath, append(alteredOutcomeRaw, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
 	if code, response := backupCall(t, "create", runtime, filepath.Join(root, "execution-order-source-invalid")); code == 0 || response["status"] != "INPUT_ERROR" {
 		t.Fatalf("backup accepted an execution before its reservation: code=%d response=%+v", code, response)
 	}
 	if err := os.WriteFile(registryPath, registryRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, stateRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outcomeStorePath, outcomeStoreRaw, 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -902,11 +941,31 @@ func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
 	copyFlatBackup(t, backup, broken)
 	registryPath = m10ArtifactRegistryPath(broken)
 	replaceM10ArtifactEntry(t, registryPath, corem10.ArtifactKindExecutionRecord, record.ExecutionID, alteredRaw)
+	state, err = loadMissionState(broken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Reservations[0].ExecutionID = altered.ExecutionID
+	if err := saveMissionState(broken, state); err != nil {
+		t.Fatal(err)
+	}
+	outcomeStorePath = m10OutcomeStorePath(broken)
+	if err := os.WriteFile(outcomeStorePath, append(alteredOutcomeRaw, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
 	var manifest backupManifest
 	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
 		t.Fatal(err)
 	}
 	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["mission-state.json"], err = backupFileMetadata(missionStatePath(broken), "mission-state.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Files["m10-outcomes.jsonl"], err = backupFileMetadata(outcomeStorePath, "m10-outcomes.jsonl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -927,16 +986,16 @@ func TestBackupRestoreRejectsExecutionBeforeReservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var alteredOutcome m03.OutcomeRecord
-	if err := json.Unmarshal(bytes.TrimSpace(outcomeRaw), &alteredOutcome); err != nil {
+	var earlyOutcome m03.OutcomeRecord
+	if err := json.Unmarshal(bytes.TrimSpace(outcomeRaw), &earlyOutcome); err != nil {
 		t.Fatal(err)
 	}
-	alteredOutcome.ObservedAt = "2026-09-08T00:00:00Z"
-	alteredOutcomeRaw, err := json.Marshal(alteredOutcome)
+	earlyOutcome.ObservedAt = "2026-09-08T00:00:00Z"
+	earlyOutcomeRaw, err := json.Marshal(earlyOutcome)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(outcomeStore, append(alteredOutcomeRaw, '\n'), 0600); err != nil {
+	if err := os.WriteFile(outcomeStore, append(earlyOutcomeRaw, '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := readJSON(filepath.Join(outcomeBroken, "manifest.json"), &manifest); err != nil {
