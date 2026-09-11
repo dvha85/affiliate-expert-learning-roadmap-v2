@@ -191,6 +191,14 @@ trả `BUSY`, không tạo intent từ history đang thay đổi. Đây vẫn ch
 trên filesystem một host; distributed/multi-host locking và proof
 crash/power-loss vẫn mở.
 
+**Cập nhật derived-store read gate (2026-09-11):** list của M03 action, M04
+outcome, M05 evaluation/proposal/review giờ giữ cùng local history runtime gate
+với import/watcher. Một regression gọi đúng năm learner list implementation
+trong khi giữ writer gate thật; tất cả phải trả `BUSY`, thay vì lộ snapshot
+history/action/outcome/evaluation pha trộn. Đây chỉ là exclusion trên
+filesystem một host; distributed/multi-host locking và proof crash/power-loss
+vẫn mở.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.

@@ -193,13 +193,13 @@ func runImprovementStore(kind string, args []string, stdout, stderr io.Writer) i
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
 	}
-	if args[0] == "import" {
-		release, lockErr := acquireHistoryRuntimeGate(args[1])
-		if lockErr != nil {
-			return emit("BUSY", nil, lockErr, 1)
-		}
-		defer release()
+	// Proposal/review listing resolves the complete history→evaluation chain.
+	// Gate all reads with imports to avoid a mixed local chain snapshot.
+	release, lockErr := acquireHistoryRuntimeGate(args[1])
+	if lockErr != nil {
+		return emit("BUSY", nil, lockErr, 1)
 	}
+	defer release()
 	h, err := LoadHistory(args[1])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)

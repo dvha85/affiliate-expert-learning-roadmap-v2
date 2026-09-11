@@ -118,13 +118,13 @@ func runActionStore(args []string, stdout, stderr io.Writer) int {
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
 	}
-	if args[0] == "record" {
-		release, err := acquireHistoryRuntimeGate(args[1])
-		if err != nil {
-			return emit("BUSY", nil, err, 1)
-		}
-		defer release()
+	// List responses join canonical history with derived records, so readers
+	// must observe the same local boundary as record writers and watcher appends.
+	release, err := acquireHistoryRuntimeGate(args[1])
+	if err != nil {
+		return emit("BUSY", nil, err, 1)
 	}
+	defer release()
 	records, err := LoadHistory(args[1])
 	if err != nil {
 		return emit("HISTORY_ERROR", nil, err, 1)
