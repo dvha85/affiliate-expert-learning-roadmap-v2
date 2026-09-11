@@ -48,6 +48,42 @@ def invoke(bot, *args, expected=0, env=None):
     return json.loads(result.stdout)
 
 
+def synchronized_bot_calls(bot, env, barrier_dir, calls):
+    """Run real Bot subprocesses after every test-owned wrapper is ready."""
+    calls = list(calls)
+    barrier_dir.mkdir()
+    release_path = barrier_dir / "release"
+    wait_code = "\n".join((
+        "import os, sys, time",
+        "open(sys.argv[2], 'x').close()",
+        "while not os.path.exists(sys.argv[1]):",
+        "    time.sleep(0.001)",
+        "os.execv(sys.argv[3], sys.argv[3:])",
+    ))
+    attempts = []
+    for label, command in calls:
+        attempts.append((label, subprocess.Popen(
+            [sys.executable, "-c", wait_code, str(release_path), str(barrier_dir / f"{label}.ready"), str(bot), *map(str, command)],
+            cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        )))
+    deadline = time.monotonic() + 10
+    while len(list(barrier_dir.glob("*.ready"))) != len(calls):
+        if time.monotonic() >= deadline:
+            raise AssertionError("Bot subprocess barrier did not become ready")
+        time.sleep(0.01)
+    release_path.touch()
+    responses = {}
+    for label, process in attempts:
+        stdout, stderr = process.communicate()
+        if process.returncode not in (0, 1):
+            raise AssertionError((label, stdout, stderr))
+        try:
+            responses[label] = json.loads(stdout)
+        except json.JSONDecodeError as error:
+            raise AssertionError((label, stdout, stderr)) from error
+    return responses
+
+
 def start_m07_adapter(bot, history, env):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(("127.0.0.1", 0))
@@ -406,6 +442,27 @@ def main(argv=None):
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
         expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
         assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
+        # STOP and reserve race on a cloned, otherwise identical runtime with
+        # one remaining slot. Whichever operation gets the lock first is
+        # allowed, but STOP must become durable and no reservation may be
+        # appended after it.
+        stop_race_state = work / "stop-reserve-race-state"
+        shutil.copytree(state, stop_race_state)
+        stop_race = synchronized_bot_calls(bot, env, work / "stop-reserve-barrier", (
+            ("reserve", ("mission", "m10-reserve", stop_race_state, cost, "br16-stop-race")),
+            ("stop", ("mission", "m11-stop", stop_race_state, "concurrent-stop-reserve")),
+        ))
+        assert stop_race["reserve"]["status"] in {"RESERVED", "BUSY", "STOPPED"}
+        assert stop_race["stop"]["status"] in {"STOPPED", "BUSY"}
+        if stop_race["stop"]["status"] == "BUSY":
+            assert invoke(bot, "mission", "m11-stop", stop_race_state, "concurrent-stop-reserve", env=env)["status"] == "STOPPED"
+        stopped_state = invoke(bot, "mission", "status", stop_race_state, env=env)["artifact"]
+        assert stopped_state["stop"] is True
+        race_reservations = [item for item in stopped_state["reservations"] if item["reservation_id"] == "br16-stop-race"]
+        assert len(race_reservations) == (1 if stop_race["reserve"]["status"] == "RESERVED" else 0)
+        assert invoke(bot, "mission", "m10-reserve", stop_race_state, cost, "br16-stop-after", expected=1, env=env)["status"] == "STOPPED"
+        assert invoke(bot, "mission", "status", stop_race_state, env=env)["artifact"] == stopped_state
+
         # Twenty-four independent processes wait on one test-owned release
         # file, then race for the single remaining execution/cost budget. This
         # is a real Bot subprocess barrier: every wrapper has reached its
@@ -413,34 +470,10 @@ def main(argv=None):
         # lock may make losers return BUSY; every loser is retried after the
         # winner commits and must then observe the exhausted budget.
         reservations = [f"br16-r{index}" for index in range(1, 25)]
-        barrier_dir = work / "reserve-barrier"
-        barrier_dir.mkdir()
-        release_path = barrier_dir / "release"
-        wait_code = "\n".join((
-            "import os, sys, time",
-            "open(sys.argv[2], 'x').close()",
-            "while not os.path.exists(sys.argv[1]):",
-            "    time.sleep(0.001)",
-            "os.execv(sys.argv[3], sys.argv[3:])",
+        responses = synchronized_bot_calls(bot, env, work / "reserve-barrier", (
+            (reservation, ("mission", "m10-reserve", state, cost, reservation))
+            for reservation in reservations
         ))
-        attempts = []
-        for reservation in reservations:
-            attempts.append(subprocess.Popen(
-                [sys.executable, "-c", wait_code, str(release_path), str(barrier_dir / f"{reservation}.ready"), str(bot), "mission", "m10-reserve", str(state), str(cost), reservation],
-                cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-            ))
-        deadline = time.monotonic() + 10
-        while len(list(barrier_dir.glob("*.ready"))) != len(reservations):
-            if time.monotonic() >= deadline:
-                raise AssertionError("M10 reservation subprocess barrier did not become ready")
-            time.sleep(0.01)
-        release_path.touch()
-        responses = {}
-        for reservation, process in zip(reservations, attempts):
-            stdout, stderr = process.communicate()
-            if process.returncode not in (0, 1):
-                raise AssertionError((stdout, stderr))
-            responses[reservation] = json.loads(stdout)
         assert sum(response["status"] == "RESERVED" for response in responses.values()) == 1
         assert all(response["status"] in {"RESERVED", "BUSY", "BUDGET_DENIED"} for response in responses.values())
         winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
