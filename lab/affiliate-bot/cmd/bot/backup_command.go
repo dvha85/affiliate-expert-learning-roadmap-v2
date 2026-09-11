@@ -43,10 +43,24 @@ type backupManifest struct {
 	Required []string              `json:"required"`
 }
 
-// backupCopyFault is a test-only seam for an interrupted snapshot. Manifest
-// publication remains after every copy succeeds, so a partial target never
-// advertises itself as a restorable backup.
+// backupCopyFault is a test-only seam for an interrupted snapshot. Backup
+// publication happens only after staging has a complete, verified manifest.
 var backupCopyFault func(relativePath string) error
+
+// backupTargetGate serializes managed snapshot publication to one destination.
+// It is separate from the source runtime gate: two callers can otherwise both
+// observe an empty target then race a final rename.
+func acquireBackupTargetGate(target string) (func(), error) {
+	identity := sha256.Sum256([]byte(filepath.Clean(target)))
+	path := filepath.Join(filepath.Dir(target), ".backup-target-"+hex.EncodeToString(identity[:16])+".lock")
+	if err := os.Mkdir(path, 0700); err != nil {
+		if os.IsExist(err) {
+			return nil, fmt.Errorf("backup target is busy or has an unrecovered publisher")
+		}
+		return nil, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
 
 // restoreTargetGate serializes managed restores to one destination. Rename(2)
 // can replace an empty directory on POSIX, so the preceding exists check alone
@@ -1227,9 +1241,46 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
 		}
-		if e = os.MkdirAll(args[2], 0700); e != nil {
+		parent := filepath.Dir(args[2])
+		if e = os.MkdirAll(parent, 0700); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
+		parentInfo, statErr := os.Lstat(parent)
+		if statErr != nil || !parentInfo.IsDir() || parentInfo.Mode()&os.ModeSymlink != 0 {
+			return emit("TARGET_ERROR", nil, fmt.Errorf("backup target parent must be a non-symlink directory"), 1)
+		}
+		releaseTargetGate, gateErr := acquireBackupTargetGate(args[2])
+		if gateErr != nil {
+			return emit("BUSY", nil, gateErr, 1)
+		}
+		defer releaseTargetGate()
+		// Recheck after claiming the cooperative target publisher gate. A caller
+		// may intentionally pre-create an empty target, but never a populated or
+		// symlink target.
+		if info, targetErr := os.Lstat(args[2]); targetErr == nil {
+			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+				return emit("TARGET_ERROR", nil, fmt.Errorf("backup target must be a non-symlink directory"), 1)
+			}
+			entries, readErr := os.ReadDir(args[2])
+			if readErr != nil {
+				return emit("TARGET_ERROR", nil, readErr, 1)
+			}
+			if len(entries) != 0 {
+				return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("backup target must be empty"), 1)
+			}
+		} else if !os.IsNotExist(targetErr) {
+			return emit("TARGET_ERROR", nil, targetErr, 1)
+		}
+		staging, stageErr := os.MkdirTemp(parent, ".backup-staging-")
+		if stageErr != nil {
+			return emit("STORE_ERROR", nil, stageErr, 1)
+		}
+		published := false
+		defer func() {
+			if !published {
+				_ = os.RemoveAll(staging)
+			}
+		}()
 		required, e := requiredBackupFiles(args[1])
 		if e != nil {
 			return emit("INPUT_ERROR", nil, e, 1)
@@ -1269,7 +1320,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			if e != nil {
 				return emit("INPUT_ERROR", nil, e, 1)
 			}
-			target := filepath.Join(args[2], clean)
+			target := filepath.Join(staging, clean)
 			if e = os.MkdirAll(filepath.Dir(target), 0700); e != nil {
 				return emit("STORE_ERROR", nil, e, 1)
 			}
@@ -1285,9 +1336,42 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			}
 			m.Files[name] = metadata
 		}
-		if e = writeJSON(filepath.Join(args[2], "manifest.json"), m); e != nil {
+		if e = writeJSONAtomic(filepath.Join(staging, "manifest.json"), m); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
+		if _, e = verifyBackup(staging); e != nil {
+			return emit("STORE_ERROR", nil, fmt.Errorf("staged backup verification failed: %w", e), 1)
+		}
+		if _, targetErr := os.Lstat(args[2]); targetErr == nil {
+			entries, readErr := os.ReadDir(args[2])
+			if readErr != nil || len(entries) != 0 {
+				if readErr != nil {
+					return emit("TARGET_ERROR", nil, readErr, 1)
+				}
+				return emit("TARGET_NOT_EMPTY", nil, fmt.Errorf("backup target changed while staging"), 1)
+			}
+			if e = os.Remove(args[2]); e != nil {
+				return emit("STORE_ERROR", nil, fmt.Errorf("prepare empty backup target for publish: %w", e), 1)
+			}
+		} else if !os.IsNotExist(targetErr) {
+			return emit("TARGET_ERROR", nil, targetErr, 1)
+		}
+		if e = os.Rename(staging, args[2]); e != nil {
+			return emit("STORE_ERROR", nil, fmt.Errorf("publish backup snapshot: %w", e), 1)
+		}
+		parentFile, parentErr := os.Open(parent)
+		if parentErr != nil {
+			return emit("STORE_ERROR", nil, parentErr, 1)
+		}
+		syncErr := parentFile.Sync()
+		closeErr := parentFile.Close()
+		if syncErr != nil {
+			return emit("STORE_ERROR", nil, syncErr, 1)
+		}
+		if closeErr != nil {
+			return emit("STORE_ERROR", nil, closeErr, 1)
+		}
+		published = true
 		return emit("BACKED_UP", m, nil, 0)
 	}
 	m, e := verifyBackup(args[1])

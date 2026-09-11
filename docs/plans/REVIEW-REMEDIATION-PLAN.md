@@ -227,6 +227,12 @@ inject lỗi sau write nhưng trước sync: call phải trả error, không ACK
 công; append tiếp theo giữ line framing hợp lệ. Đây không là mô phỏng
 power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
 
+**Cập nhật atomic backup publish (2026-09-11):** `backup create` copy và
+verify toàn bộ snapshot trong sibling staging, rồi publish qua rename tới target
+rỗng dưới target gate. Regression inject lỗi copy: staging bị dọn, target không
+bị chiếm và retry publish thành công. Đây không chứng minh crash/power-loss
+durability sau rename hay transaction multi-host, nên vẫn `PARTIAL`.
+
 **Cập nhật M06 missing-field projection (2026-09-11):** canonical synthetic
 offer builder giờ có regression cho `price:null` và `commission_rate` vắng mặt:
 cả hai projected field phải `value:null`, `state:missing`, `claim_kind:unknown`.
