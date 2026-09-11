@@ -131,13 +131,31 @@ func m11JournalRecoveryRequired(dir string) error {
 		{name: "unknown STOP", path: m11UnknownStopJournalPath(dir)},
 		{name: "outcome", path: m11OutcomeJournalPath(dir)},
 	} {
-		if _, err := os.Stat(item.path); err == nil {
+		info, err := os.Lstat(item.path)
+		if err == nil {
+			if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+				return fmt.Errorf("M11 %s journal path is not a regular file", item.name)
+			}
 			return fmt.Errorf("M11 %s journal requires a locked writer recovery", item.name)
 		} else if !os.IsNotExist(err) {
 			return err
 		}
 	}
 	return nil
+}
+
+// readM11Journal refuses a symlink or special file before parsing a recovery
+// plan. A pending journal is an authority boundary: following a path outside
+// the runtime could turn an unrelated file into a replay instruction.
+func readM11Journal(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("M11 journal path is not a regular file")
+	}
+	return os.ReadFile(path)
 }
 
 // m11OutcomeAppendFault is a test-only seam for the two-file M11 outcome
@@ -1228,7 +1246,7 @@ func nextM11FixtureOutcomeLedger(ledger corem11.ProductionLedger, outcome m03.Ou
 // idempotent, so a crash after the ledger append or after the outcome append
 // cannot leave a caller with a false ACK or a permanently orphaned transition.
 func recoverM11OutcomeJournal(dir string) error {
-	raw, err := os.ReadFile(m11OutcomeJournalPath(dir))
+	raw, err := readM11Journal(m11OutcomeJournalPath(dir))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -1327,7 +1345,7 @@ func nextM11FailedExecutionLedger(ledger corem11.ProductionLedger, record corem1
 // payloads are validated against the exact predecessor before either append is
 // retried, and a competing head leaves the journal in place for investigation.
 func recoverM11FailedExecutionJournal(dir string) error {
-	raw, err := os.ReadFile(m11FailedExecutionJournalPath(dir))
+	raw, err := readM11Journal(m11FailedExecutionJournalPath(dir))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -1434,7 +1452,7 @@ func nextM11UnknownStopLedger(ledger corem11.ProductionLedger, record corem11.Pr
 // retry is exact. A malformed, stale, or competing journal remains on disk and
 // blocks mutation rather than guessing which side effect occurred.
 func recoverM11UnknownStopJournal(dir string) error {
-	raw, err := os.ReadFile(m11UnknownStopJournalPath(dir))
+	raw, err := readM11Journal(m11UnknownStopJournalPath(dir))
 	if os.IsNotExist(err) {
 		return nil
 	}

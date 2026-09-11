@@ -11,9 +11,10 @@
 Đính chính ngày 08/09/2026 sau [review baseline ece6a32](evidence/REVIEW-ECE6A32.md):
 BR-13–BR-19 còn thiếu implementation/test trong repo, không chỉ thiếu operated
 evidence. [Kế hoạch sửa R01–R16](REVIEW-REMEDIATION-PLAN.md) chia các PR, dependency,
-negative cases và điều kiện nghiệm thu; kế hoạch đang PROPOSED, chưa triển khai
-các fix. Các đoạn nghiệm thu cũ bên dưới là lịch sử theo phạm vi/commit ghi tại
-đó, không thay thế trạng thái hiện tại trong bảng và readiness matrix.
+negative cases và điều kiện nghiệm thu; nhiều fix offline đã được merge nhưng
+các gói RP-01…RP-09 vẫn `PARTIAL` và RP-10 còn `OPEN`. Các đoạn nghiệm thu cũ
+bên dưới là lịch sử theo phạm vi/commit ghi tại đó, không thay thế trạng thái
+hiện tại trong bảng và readiness matrix.
 
 ## 1. Kết quả cần đạt
 
