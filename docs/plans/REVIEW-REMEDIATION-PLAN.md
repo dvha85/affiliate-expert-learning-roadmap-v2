@@ -165,6 +165,12 @@ operation lấy local runtime gate trước có thể hoàn tất; sau khi STOP 
 mọi reservation mới bị `STOPPED` và mutable state không đổi. Đây không suy ra
 ordering liên-host, transaction đa-file hay crash/power-loss recovery.
 
+**Cập nhật cost overflow boundary (2026-09-11):** canonical M10 gate được
+regression tại ranh giới `int64`: ledger ở `MaxInt64 - 1` với bound 2 phải
+`CANARY_COST_BUDGET_EXHAUSTED`, không wrap thành capacity hay execution
+authority. Đây là chứng cứ arithmetic cho core gate; không thay evidence về
+transaction đa-file hoặc recovery sau crash.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
