@@ -31,8 +31,11 @@ func TestValidateApproval(t *testing.T) {
 		t.Fatalf("valid approval: %s", status)
 	}
 	for name, mutate := range map[string]func(*m08.Intent, *m08.PolicyDecision, *ApprovalRecord){
-		"denied policy":          func(_ *m08.Intent, p *m08.PolicyDecision, _ *ApprovalRecord) { p.Decision = "DENY" },
-		"authorizing policy":     func(_ *m08.Intent, p *m08.PolicyDecision, _ *ApprovalRecord) { p.ExecutionAuthorized = true },
+		"denied policy":      func(_ *m08.Intent, p *m08.PolicyDecision, _ *ApprovalRecord) { p.Decision = "DENY" },
+		"authorizing policy": func(_ *m08.Intent, p *m08.PolicyDecision, _ *ApprovalRecord) { p.ExecutionAuthorized = true },
+		"allow risk2 policy": func(_ *m08.Intent, p *m08.PolicyDecision, _ *ApprovalRecord) {
+			p.Decision, p.RiskClass, p.PolicyReviewRequired = "ALLOW", "RISK2", false
+		},
 		"approval before policy": func(_ *m08.Intent, _ *m08.PolicyDecision, a *ApprovalRecord) { a.ApprovedAt = "2026-09-07T00:30:00Z" },
 		"approval mismatch":      func(_ *m08.Intent, _ *m08.PolicyDecision, a *ApprovalRecord) { a.CorrelationID = "other" },
 		"rejected":               func(_ *m08.Intent, _ *m08.PolicyDecision, a *ApprovalRecord) { a.Decision = "REJECT" },
