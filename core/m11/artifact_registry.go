@@ -173,6 +173,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			activations[x.LeaseID] = *x
 		case *ProductionGateDecision:
 			lease, leaseOK := leases[x.LeaseID]
+			activation, activationOK := activations[x.LeaseID]
 			snapshot, healthOK := health[x.HealthSnapshotID]
 			bound, costOK := costs[x.CostBoundID]
 			ledger, ledgerOK := ledgerEntries[x.LedgerArtifactID]
@@ -180,9 +181,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
 			validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
 			expiresAt, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+			activatedAt, activationErr := time.Parse(time.RFC3339, activation.ActivatedAt)
 			costObservedAt, costObservedErr := time.Parse(time.RFC3339, bound.ObservedAt)
 			costExpiresAt, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
-			if !leaseOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || costObservedErr != nil || costExpiryErr != nil || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
+			if !leaseOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || costObservedErr != nil || costExpiryErr != nil || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			gates[x.GateID] = *x

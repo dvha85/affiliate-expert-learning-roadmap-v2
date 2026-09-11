@@ -255,8 +255,12 @@ def main():
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", production_health, expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "PRODUCTION_HEALTH_SNAPSHOT", early_health, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", early_gate_runtime, "TRUSTED_COST_BOUND", cost, env=env)["status"] == "APPENDED"
-        early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", env=env)
-        assert early_gate["status"] == "DENY" and early_gate["artifact"]["reason"] == "LEASE_INACTIVE"
+        # The command computes a DENY candidate for an inactive lease, but the
+        # canonical registry now independently rejects a gate that predates its
+        # registered activation. The artifact must not be persisted through
+        # either boundary.
+        early_gate = invoke(bot, "mission", "m11-gate", early_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:10Z", "2026-09-08T00:00:05Z", expected=1, env=env)
+        assert early_gate["status"] == "REJECTED"
         # Two valid authorizations can coexist before the first reservation.
         # The second must not consume budget after the first advances the
         # ledger that its gate snapshot authorized.
