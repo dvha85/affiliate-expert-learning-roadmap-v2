@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 3900d5733c709b26f6cec0e689eaa18f17ea3693 -->
+<!-- readiness-main-baseline: 9dd13b431d43cb3871d487363092d8e60577bbd6 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -765,6 +765,13 @@ chỉ coi `ProductionCycleRecord` là lifecycle closure khi `status=CLOSED`, đ�
 bộ với restore graph. Core regression reject record `REVIEW_PENDING` dù các
 reference/time khác hợp lệ. Đây không thêm workflow pending/review hay chứng
 minh operation/outcome bên ngoài fixture.
+
+**Cập nhật M11 authorization/execution cardinality graph (2026-09-11):**
+canonical registry chỉ nhận một immutable `ProductionExecutionRecord` cho mỗi
+authorization. Core regression append execution thứ hai với ID khác nhưng giữ
+mọi authorization binding hợp lệ và bị reject. Đây khớp single-reservation
+learner boundary, không chứng minh idempotency của executor ngoài fixture hay
+transaction đa-file.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

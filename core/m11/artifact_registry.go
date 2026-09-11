@@ -111,6 +111,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]ProductionGateDecision{}
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
+	executionAuthorizations := map[string]string{}
 	resolutions := map[string]ProductionReconciliationResolution{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	ledgerHeads := map[string]ProductionLedger{}
@@ -204,6 +205,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !ok || attemptedErr != nil || authorizedErr != nil || expiryErr != nil || auth.IntentID != x.IntentID || auth.IntentHash != x.IntentHash || auth.ExecutorID != x.ExecutorID || auth.IdempotencyKey != x.IdempotencyKey || auth.CorrelationID != x.CorrelationID || auth.ProductionLeaseID != x.ProductionLeaseID || auth.ProductionLeaseVersion != x.ProductionLeaseVersion || auth.ProductionLeaseHash != x.ProductionLeaseHash || auth.ProductionGateID != x.ProductionGateID || auth.ProductionHealthSnapshotID != x.ProductionHealthSnapshotID || auth.ProductionHealthSnapshotHash != x.ProductionHealthSnapshotHash || auth.ProductionCostBoundID != x.ProductionCostBoundID || auth.ProductionCostBoundHash != x.ProductionCostBoundHash || auth.ProductionCostBoundMinor != x.ProductionCostBoundMinor || attemptedAt.Before(authorizedAt) || !attemptedAt.Before(expiresAt) {
 				return fmt.Errorf("production execution has an orphaned or mismatched link")
 			}
+			if priorExecutionID, exists := executionAuthorizations[x.AuthorizationID]; exists && priorExecutionID != x.ExecutionID {
+				return fmt.Errorf("production authorization has more than one execution record")
+			}
+			executionAuthorizations[x.AuthorizationID] = x.ExecutionID
 			executions[x.ExecutionID] = *x
 		case *ProductionReconciliationResolution:
 			lease, leaseOK := leases[x.LeaseID]
