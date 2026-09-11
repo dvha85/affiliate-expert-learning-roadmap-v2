@@ -12,6 +12,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -405,16 +406,37 @@ def main(argv=None):
         assert invoke(bot, "mission", "m10-reserve", state, tampered, "tampered", expected=1)["status"] == "REJECTED"
         expired = work / "cost-bound-expired.json"; write_cost_bound(expired, i, 100, "2026-09-07T01:07:00Z", "br16-expired")
         assert invoke(bot, "mission", "m10-cost-register", state, expired, expected=1)["status"] == "REJECTED"
-        # Two independent legacy-compatible processes race for the one
-        # remaining execution/cost budget after the governed attempt above.
-        # The directory lock may make one return BUSY; retrying it must then see
-        # the committed budget and cannot create a second reservation.
-        attempts = [
-            subprocess.Popen([str(bot), "mission", "m10-reserve", str(state), str(cost), reservation], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-            for reservation in ("br16-r1", "br16-r2")
-        ]
+        # Twenty-four independent processes wait on one test-owned release
+        # file, then race for the single remaining execution/cost budget. This
+        # is a real Bot subprocess barrier: every wrapper has reached its
+        # ready marker before the common release is published. The directory
+        # lock may make losers return BUSY; every loser is retried after the
+        # winner commits and must then observe the exhausted budget.
+        reservations = [f"br16-r{index}" for index in range(1, 25)]
+        barrier_dir = work / "reserve-barrier"
+        barrier_dir.mkdir()
+        release_path = barrier_dir / "release"
+        wait_code = "\n".join((
+            "import os, sys, time",
+            "open(sys.argv[2], 'x').close()",
+            "while not os.path.exists(sys.argv[1]):",
+            "    time.sleep(0.001)",
+            "os.execv(sys.argv[3], sys.argv[3:])",
+        ))
+        attempts = []
+        for reservation in reservations:
+            attempts.append(subprocess.Popen(
+                [sys.executable, "-c", wait_code, str(release_path), str(barrier_dir / f"{reservation}.ready"), str(bot), "mission", "m10-reserve", str(state), str(cost), reservation],
+                cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+            ))
+        deadline = time.monotonic() + 10
+        while len(list(barrier_dir.glob("*.ready"))) != len(reservations):
+            if time.monotonic() >= deadline:
+                raise AssertionError("M10 reservation subprocess barrier did not become ready")
+            time.sleep(0.01)
+        release_path.touch()
         responses = {}
-        for reservation, process in zip(("br16-r1", "br16-r2"), attempts):
+        for reservation, process in zip(reservations, attempts):
             stdout, stderr = process.communicate()
             if process.returncode not in (0, 1):
                 raise AssertionError((stdout, stderr))
@@ -422,11 +444,11 @@ def main(argv=None):
         assert sum(response["status"] == "RESERVED" for response in responses.values()) == 1
         assert all(response["status"] in {"RESERVED", "BUSY", "BUDGET_DENIED"} for response in responses.values())
         winner = next(reservation for reservation, response in responses.items() if response["status"] == "RESERVED")
-        loser = "br16-r2" if winner == "br16-r1" else "br16-r1"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 3
         assert invoke(bot, "mission", "m10-reserve", state, cost, winner)["status"] == "EXACT_DUPLICATE"
         assert invoke(bot, "mission", "m10-canary", state, grant)["artifact"]["executions_used"] == 3
-        assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
+        for loser in (reservation for reservation in reservations if reservation != winner):
+            assert invoke(bot, "mission", "m10-reserve", state, cost, loser, expected=1)["status"] == "BUDGET_DENIED"
         assert invoke(bot, "mission", "m10-authorize", state, cost, gate, work / "stale-authorization.json", gate_time, "local_sandbox", expected=1)["status"] == "REJECTED"
 
         # The UNKNOWN path keeps the same workspace, M07 proposal, M08 intent,
