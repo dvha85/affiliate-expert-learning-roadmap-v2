@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 5e30990a633f74997d0ffbdfc52b8cfa66f62c93 -->
+<!-- readiness-main-baseline: 68f87732f4328ce3ade3b6d251e0a964a2990000 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -836,6 +836,13 @@ concurrency hay transaction đa-file.
 của lease. Core regression chặn gate RISK1 dưới lease RISK0 và approval không
 validate RISK0; learner/backup dùng chính graph validator này trước append/publish.
 Đây là scope lineage offline, không là human approval hoặc production authority.
+
+**Cập nhật M11 reservation/authorization ordering (2026-09-11):** canonical
+execution chỉ resolve reservation ledger NORMAL có `updated_at` từ thời điểm
+immutable authorization được cấp đến execution attempt. Core regression dời
+authorization sau pre-ledger và reject, nên một pending execution ID được ghi
+trước authorization không thể hợp thức hoá attempt về sau. Đây là sequencing
+lineage offline, không chứng minh lock hoặc transaction đa-file.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả
