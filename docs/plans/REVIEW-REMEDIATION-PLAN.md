@@ -1210,12 +1210,13 @@ dưới.
 
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và
-`contracts`, bỏ đúng guard canonical `GateID` trong copy, rồi chạy lại chính
-`core/m11.TestArtifactGraphAcceptsExactProductionLifecycleLinks`. Script chỉ
-PASS khi test thật FAIL ở assertion forged-gate; anchor không rõ, test PASS,
-hoặc lỗi không liên quan đều làm script FAIL. Đây là một mutation proof hẹp cho
-gate ID M11, không bao phủ authorization/execution ID, ledger, backup/restore,
-blueprint, crash/power-loss, multi-host hay operated n8n.
+`contracts`, rồi lần lượt bỏ đúng từng guard canonical `GateID`,
+`AuthorizationID`, `ExecutionID` trong copy và chạy lại chính
+`core/m11.TestArtifactGraphAcceptsExactProductionLifecycleLinks`. Mỗi mutation
+chỉ được tính PASS khi test thật FAIL ở assertion forged-ID tương ứng; anchor
+không rõ, test PASS, hoặc lỗi không liên quan đều làm script FAIL. Đây là
+mutation proof hẹp cho ba ID immutable M11, không bao phủ ledger,
+backup/restore, blueprint, crash/power-loss, multi-host hay operated n8n.
 
 **Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
 `--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi
