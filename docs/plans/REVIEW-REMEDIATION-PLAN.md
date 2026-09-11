@@ -102,20 +102,22 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-03 canonical M10 execution identity
+### Runtime gap được chọn tiếp theo — RP-07 canonical M11 identity integrity
 
-Phạm vi tiếp theo là bắt `core/m10` tự tính lại ID deterministic của terminal
-execution sau khi graph đã resolve immutable authorization. Gate và
-authorization IDs đã được kiểm lại ở graph; record vẫn có thể mang một
-`execution_id` schema-valid nhưng bị forge khi tất cả link phụ huynh/downstream
-đã nhất quán. Đây là boundary offline; nó không cấp authority, không thay
-ledger reservation runtime, và không chứng minh executor, power-loss hay
-multi-host transaction.
+Phạm vi tiếp theo là chuyển công thức ID deterministic của M11 từ learner vào
+`core/m11`, rồi bắt canonical graph tự tính lại ID sau khi resolve parents.
+Trước đó, learner đã tạo gate/authorization/execution theo công thức cố định,
+nhưng backup/harness caller trực tiếp vẫn có thể nhận các ID schema-valid giả
+nếu thay đồng bộ liên kết downstream. Đây là boundary offline; nó không cấp
+authority, không thay ledger runtime, và không chứng minh executor, power-loss
+hay multi-host transaction.
 
-- `core/m10.ValidateArtifactGraph` recompute `execution_id` từ authorization,
-  attempt time, terminal status và immutable reason; ID phải khớp.
-- Regression core dựng terminal graph hợp lệ rồi thay riêng `execution_id` khi
-  mọi field/schema/liên kết khác vẫn đúng; graph phải reject.
+- `core/m11` owns gate ID từ lease/intent/health/cost/ledger/time, authorization
+  ID từ gate/executor và execution ID từ authorization.
+- `core/m11.ValidateArtifactGraph` resolve parents rồi require cả ba ID khớp
+  computation canonical; learner reuse chính helpers này.
+- Regression dựng graph M11 hợp lệ rồi thử forge từng gate, authorization và
+  execution ID khi các link còn lại đã được cập nhật nhất quán.
 - Không gọi executor/provider và không suy identifier guard thành proof ledger,
   multi-file transaction, power-loss hoặc multi-host.
 
@@ -322,6 +324,16 @@ ID trong một terminal record còn schema-valid và còn tất cả link đúng
 chặn record đó. Đây chỉ là deterministic immutable graph guard offline;
 reservation ledger, executor, multi-file crash/power-loss và multi-host proof
 vẫn mở.
+
+**Cập nhật core M11 identity integrity (2026-09-12):** `core/m11` nay owns
+deterministic gate/authorization/execution ID builders mà learner previously
+đã dùng riêng. Sau khi resolve lease, health, cost và ledger, graph tự tính
+`gate_id`; rồi tự tính `authorization_id` từ gate/executor và `execution_id`
+từ authorization. Learner gọi đúng helpers core; fixture journal dùng identity
+canonical thay ID tự đặt. Regression forge từng ID trong graph còn
+schema-valid/với link downstream đã rewrite và cả ba bị chặn. Đây chỉ là
+immutable graph guard offline; ledger transaction, executor, multi-file
+crash/power-loss và multi-host proof vẫn mở.
 
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không

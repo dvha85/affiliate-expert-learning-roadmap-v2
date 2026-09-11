@@ -31,9 +31,10 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	ledger := ProductionLedger{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ControlMode: "NORMAL", WindowStartedAt: "2026-09-08T00:00:00Z", PendingExecutionIDs: []string{}, SuccessfulIdempotencyKeys: []string{}, OutcomeLinks: []ProductionOutcomeLink{}, ReconciliationResolutionIDs: []string{}, UpdatedAt: "2026-09-08T00:00:00Z"}
 	ledgerEntry := m11Entry(t, ArtifactKindLedger, ledger)
 	activation := ProductionActivationRecord{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ActivatedAt: "2026-09-08T00:00:00Z"}
-	gate := ProductionGateDecision{GateID: "gate-1", LedgerArtifactID: ledgerEntry.ArtifactID, LedgerContentHash: ledgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
-	authorization := ProductionExecutionAuthorization{AuthorizationID: "auth-1", IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "key-1", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
-	execution := ProductionExecutionRecord{ExecutionID: "exec-1", AuthorizationID: authorization.AuthorizationID, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, IntentID: cost.IntentID, IntentHash: cost.IntentHash, ExecutorID: authorization.ExecutorID, IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: "2026-09-08T00:00:01Z", Status: "FAILED", SideEffectState: "NOT_PERFORMED", CorrelationID: cost.CorrelationID}
+	gate := ProductionGateDecision{LedgerArtifactID: ledgerEntry.ArtifactID, LedgerContentHash: ledgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
+	gate.GateID = ComputeProductionGateID(lease, gate.IntentID, gate.IntentHash, health, cost, ledgerEntry, gate.EvaluatedAt)
+	authorization := ProductionExecutionAuthorization{AuthorizationID: ComputeProductionAuthorizationID(gate.GateID, "fixture_stub"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "key-1", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	execution := ProductionExecutionRecord{ExecutionID: ComputeProductionExecutionID(authorization.AuthorizationID), AuthorizationID: authorization.AuthorizationID, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, IntentID: cost.IntentID, IntentHash: cost.IntentHash, ExecutorID: authorization.ExecutorID, IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: "2026-09-08T00:00:01Z", Status: "FAILED", SideEffectState: "NOT_PERFORMED", CorrelationID: cost.CorrelationID}
 	reservationLedger := ledger
 	reservationLedger.ExecutionsTotal, reservationLedger.ExecutionsInWindow, reservationLedger.CostMinorTotal, reservationLedger.PendingOutcomes = 1, 1, 10, 1
 	reservationLedger.PendingExecutionIDs = []string{execution.ExecutionID}
@@ -44,8 +45,35 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	forgedGate := gate
+	forgedGate.GateID = "forged-production-gate"
+	forgedGateAuthorization := authorization
+	forgedGateAuthorization.ProductionGateID = forgedGate.GateID
+	forgedGateAuthorization.AuthorizationID = ComputeProductionAuthorizationID(forgedGate.GateID, forgedGateAuthorization.ExecutorID)
+	forgedGateEntries := append([]ArtifactEntry(nil), entries[:8]...)
+	forgedGateEntries[6] = m11Entry(t, ArtifactKindGate, forgedGate)
+	forgedGateEntries[7] = m11Entry(t, ArtifactKindAuthorization, forgedGateAuthorization)
+	if err := ValidateArtifactGraph(forgedGateEntries); err == nil {
+		t.Fatal("graph accepted a forged production gate ID with otherwise matching links")
+	}
+	forgedAuthorization := authorization
+	forgedAuthorization.AuthorizationID = "forged-production-authorization"
+	forgedAuthorizationEntries := append([]ArtifactEntry(nil), entries[:8]...)
+	forgedAuthorizationEntries[7] = m11Entry(t, ArtifactKindAuthorization, forgedAuthorization)
+	if err := ValidateArtifactGraph(forgedAuthorizationEntries); err == nil {
+		t.Fatal("graph accepted a forged production authorization ID with otherwise matching links")
+	}
+	forgedExecution := execution
+	forgedExecution.ExecutionID = "forged-production-execution"
+	forgedExecutionLedger := reservationLedger
+	forgedExecutionLedger.PendingExecutionIDs = []string{forgedExecution.ExecutionID}
+	forgedExecutionEntries := append([]ArtifactEntry(nil), entries[:10]...)
+	forgedExecutionEntries[8] = m11Entry(t, ArtifactKindLedger, forgedExecutionLedger)
+	forgedExecutionEntries[9] = m11Entry(t, ArtifactKindExecution, forgedExecution)
+	if err := ValidateArtifactGraph(forgedExecutionEntries); err == nil {
+		t.Fatal("graph accepted a forged production execution ID with otherwise matching links")
+	}
 	unknownExecution := execution
-	unknownExecution.ExecutionID = "exec-unknown"
 	unknownExecution.Status = "RECONCILIATION_REQUIRED"
 	unknownExecution.SideEffectState = "UNKNOWN"
 	unknownReservationLedger := reservationLedger
@@ -67,8 +95,8 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	}
 	wrongExecutionResolution := resolution
 	wrongExecutionResolution.ExecutionID = execution.ExecutionID
-	wrongExecutionEntries := append([]ArtifactEntry(nil), resolutionEntries...)
-	wrongExecutionEntries[len(wrongExecutionEntries)-1] = m11Entry(t, ArtifactKindReconciliation, wrongExecutionResolution)
+	wrongExecutionEntries := append([]ArtifactEntry(nil), entries[:10]...)
+	wrongExecutionEntries = append(wrongExecutionEntries, m11Entry(t, ArtifactKindReconciliation, wrongExecutionResolution))
 	if err := ValidateArtifactGraph(wrongExecutionEntries); err == nil {
 		t.Fatal("resolution for a non-UNKNOWN execution was accepted")
 	}
