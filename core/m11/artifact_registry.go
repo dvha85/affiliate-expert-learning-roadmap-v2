@@ -75,6 +75,15 @@ func contentHash(raw []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
+func contains(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
 func NewArtifactEntry(kind string, raw []byte) (ArtifactEntry, error) {
 	profile := kindProfile(kind)
 	if profile == "" {
@@ -106,6 +115,7 @@ func ValidateArtifactEntry(raw []byte) (ArtifactEntry, error) {
 // exact, immutable parent artifacts. It deliberately does not authorize a run.
 func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	leases := map[string]ProductionLease{}
+	approvals := map[string]ProductionLeaseApproval{}
 	health := map[string]ProductionHealthSnapshot{}
 	costs := map[string]corem10.TrustedCostBound{}
 	gates := map[string]ProductionGateDecision{}
@@ -135,6 +145,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !ok || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.ApprovalRef != x.ApprovalID || lease.PromotionReviewRef != x.PromotionReviewRef || lease.SourceCanaryGrantID != x.SourceCanaryGrantID || lease.SourceCanaryGrantVersion != x.SourceCanaryGrantVersion || lease.SourceCanaryGrantHash != x.SourceCanaryGrantHash || lease.ReviewerID != x.ReviewerID || lease.ReviewedAt != x.ReviewedAt {
 				return fmt.Errorf("production lease approval has an orphaned or mismatched link")
 			}
+			approvals[x.ApprovalID] = *x
 		case *ProductionHealthSnapshot:
 			lease, ok := leases[x.LeaseID]
 			observedAt, observedErr := time.Parse(time.RFC3339, x.ObservedAt)
@@ -173,6 +184,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			activations[x.LeaseID] = *x
 		case *ProductionGateDecision:
 			lease, leaseOK := leases[x.LeaseID]
+			approval, approvalOK := approvals[lease.ApprovalRef]
 			activation, activationOK := activations[x.LeaseID]
 			snapshot, healthOK := health[x.HealthSnapshotID]
 			bound, costOK := costs[x.CostBoundID]
@@ -187,7 +199,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			costExpiresAt, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
 			healthAllowsProduction := snapshot.TelemetryComplete && snapshot.DependencyState == "HEALTHY" && snapshot.ComplianceAlertCount == 0 && !snapshot.ReconciliationRequired && snapshot.ConsecutiveFailures < lease.MaxConsecutiveFailures && snapshot.OldestPendingOutcomeAgeSeconds <= lease.MaxOutcomeAgeSeconds
 			allowBudgetAvailable := ledgerState.ExecutionsTotal < lease.MaxExecutionsTotal && ledgerState.ExecutionsInWindow < lease.MaxExecutionsPerWindow && ledgerState.PendingOutcomes < lease.MaxPendingOutcomes && x.CostBoundMinor <= lease.MaxCostMinorTotal-ledgerState.CostMinorTotal
-			if !leaseOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || healthObservedErr != nil || costObservedErr != nil || costExpiryErr != nil || x.Decision == "ALLOW_PRODUCTION" && (!healthAllowsProduction || !allowBudgetAvailable) || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || evaluatedAt.Before(healthObservedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
+			if !leaseOK || !approvalOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || healthObservedErr != nil || costObservedErr != nil || costExpiryErr != nil || x.Decision == "ALLOW_PRODUCTION" && (!healthAllowsProduction || !allowBudgetAvailable || !contains(lease.AllowedRiskClasses, x.RiskClass) || !contains(approval.ValidatedRiskClasses, x.RiskClass)) || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || evaluatedAt.Before(healthObservedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			gates[x.GateID] = *x
