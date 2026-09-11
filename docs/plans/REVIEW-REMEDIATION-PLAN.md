@@ -159,6 +159,12 @@ retry của cả 23 loser đều phải `BUDGET_DENIED` và usage giữ nguyên.
 minh local cross-process cap=1 cho command/runtime lock hiện hữu, không chứng
 minh distributed/multi-host lock hoặc atomic recovery sau crash.
 
+**Cập nhật STOP/reserve race (2026-09-11):** shared smoke clone cùng runtime
+còn một slot, cho `m10-reserve` và `m11-stop` qua một subprocess barrier. Chỉ
+operation lấy local runtime gate trước có thể hoàn tất; sau khi STOP durable,
+mọi reservation mới bị `STOPPED` và mutable state không đổi. Đây không suy ra
+ordering liên-host, transaction đa-file hay crash/power-loss recovery.
+
 **Nghiệm thu chọn scope:** một shared smoke dùng runtime thật, subprocess và
 restore; mỗi ca trả status xác định và kiểm no-mutation. Sau đó matrix vẫn
 `PARTIAL` cho tới khi EC-01…EC-05 breadth và multi-file crash seams được xử lý.
