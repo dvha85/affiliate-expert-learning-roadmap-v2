@@ -261,6 +261,14 @@ regression mở rộng fault từ trước/sau write sang sau file và directory
 pending journal vẫn là boundary fail-closed và recovery exact. Đây không chứng
 minh power-loss hoặc multi-host transaction, nên vẫn `PARTIAL`.
 
+**Cập nhật M10 partial-commit restart guard (2026-09-11):** regression inject
+fault sau khi M10 execution record đã vào registry nhưng trước khi reservation
+state commit, sau đó khởi động Bot binary mới. Process mới trả
+`RECOVERY_REQUIRED` cho status và resolver, nên không lộ graph registry/state
+dở dang trước locked recovery. Backup vẫn là con đường recovery có kiểm; ca này
+không chứng minh kill/power-loss tại filesystem boundary, transaction đa-file
+hay recovery multi-host.
+
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không
 thể tách thành nhiều line registry; append dùng chung file+directory sync trước

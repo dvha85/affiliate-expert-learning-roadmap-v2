@@ -637,11 +637,14 @@ func TestMissionM10RecordRetriesAfterRegistryStateCommitFault(t *testing.T) {
 	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); err != nil {
 		t.Fatalf("M10 journal was not retained after state commit fault: %v", err)
 	}
-	if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
-		t.Fatalf("status did not fail closed on M10 execution journal: code=%d response=%+v", code, response)
+	// The process that hit the fault cannot be the only observer: a fresh Bot
+	// must refuse the partial registry/state graph before a locked recovery.
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status did not fail closed on M10 execution journal: code=%d response=%+v", code, response)
 	}
-	if code, response := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionRecord, "unresolved-while-journal-pending"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
-		t.Fatalf("M10 resolver exposed a partial execution journal: code=%d response=%+v", code, response)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionRecord, "unresolved-while-journal-pending"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh M10 resolver exposed a partial execution journal: code=%d response=%+v", code, response)
 	}
 	afterFaultState := missionRuntimeSnapshot(t, runtimeDir)
 	if !bytes.Equal(beforeState["mission-state.json"], afterFaultState["mission-state.json"]) {
