@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: 9b90d77b62baeb25699f12fdb72e0a3e1234e978 -->
+<!-- readiness-main-baseline: 69a56bc6c6edb5fabeafc15e3b21d8a7d9a9b9a4 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -784,6 +784,13 @@ canonical authorization phải được cấp trong exact `TrustedCostBound` win
 hết hạn không sau bound expiry. Core regression thay bound/gate/auth thành một
 lineage checksum-valid, rồi reject authorization còn sống sau cost expiry. Đây
 không chứng minh cost provider, clock vận hành hay production authority.
+
+**Cập nhật M11 execution/reservation lineage graph (2026-09-11):** sau khi
+decode toàn bộ inventory append-only, canonical registry yêu cầu mọi execution
+có một NORMAL ledger trước/equal attempt, cùng lease/version/hash và giữ ID đó
+trong `pending_execution_ids`. Core regression dùng pre-ledger hợp lệ rồi reject
+inventory bỏ ledger này. Đây chỉ đồng bộ core với backup/learner fixture; không
+chứng minh atomic transaction, budget provider hay external execution.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

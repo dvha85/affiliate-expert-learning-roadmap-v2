@@ -295,5 +295,26 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			return fmt.Errorf("production health predates its activation")
 		}
 	}
+	// A governed execution is only valid after its immutable authorization has
+	// been charged into a prior normal ledger. Validate this after decoding the
+	// complete append-only inventory so the ledger can appear before the
+	// execution without making the transition depend on an in-memory command
+	// implementation.
+	for _, execution := range executions {
+		attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+		reserved := false
+		for _, ledger := range ledgers {
+			ledgerAt, ledgerErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
+			if ledgerErr != nil || attemptedErr != nil || ledger.LeaseID != execution.ProductionLeaseID || ledger.LeaseVersion != execution.ProductionLeaseVersion || ledger.LeaseHash != execution.ProductionLeaseHash || ledger.ControlMode != "NORMAL" || ledgerAt.After(attemptedAt) {
+				continue
+			}
+			for _, pendingExecutionID := range ledger.PendingExecutionIDs {
+				reserved = reserved || pendingExecutionID == execution.ExecutionID
+			}
+		}
+		if !reserved {
+			return fmt.Errorf("production execution is orphaned from its reservation ledger")
+		}
+	}
 	return nil
 }
