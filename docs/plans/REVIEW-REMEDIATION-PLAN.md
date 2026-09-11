@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: c11d6eea32bf82ddbfdd9751373543899fbfb4ae -->
+<!-- readiness-main-baseline: b168cf36b21921838e17d8707fa7ca620e85f0d1 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -857,6 +857,13 @@ entries của cùng lease, số pending execution ID mới phải đúng bằng 
 regression thay pending ID mà không tạo reservation/counter mới rồi reject.
 Đây chặn forged ledger swap trong deterministic graph; outcome/reconciliation
 transitions và crash atomicity đa-file vẫn là các phạm vi riêng.
+
+**Cập nhật M11 ledger outcome continuity (2026-09-11):** canonical append-only
+ledger history phải giữ mọi prior `outcome_links`, successful idempotency key và
+reconciliation resolution ID. Core regression append post-outcome ledger rồi xóa
+link outcome ở entry tiếp theo, và graph reject. Đây giữ audit lineage của state
+hiện có; không biến journal thành transaction đa-file hay chứng minh outcome
+business bên ngoài fixture.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

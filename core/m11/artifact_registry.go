@@ -98,6 +98,32 @@ func newlyAdded(current, previous []string) int {
 	return added
 }
 
+func retainsStrings(current, previous []string) bool {
+	available := make(map[string]bool, len(current))
+	for _, value := range current {
+		available[value] = true
+	}
+	for _, value := range previous {
+		if !available[value] {
+			return false
+		}
+	}
+	return true
+}
+
+func retainsOutcomeLinks(current, previous []ProductionOutcomeLink) bool {
+	available := make(map[ProductionOutcomeLink]bool, len(current))
+	for _, value := range current {
+		available[value] = true
+	}
+	for _, value := range previous {
+		if !available[value] {
+			return false
+		}
+	}
+	return true
+}
+
 func NewArtifactEntry(kind string, raw []byte) (ArtifactEntry, error) {
 	profile := kindProfile(kind)
 	if profile == "" {
@@ -181,7 +207,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 				currentAt, currentErr := time.Parse(time.RFC3339, x.UpdatedAt)
 				executionDelta := x.ExecutionsTotal - previous.ExecutionsTotal
 				windowDelta := x.ExecutionsInWindow - previous.ExecutionsInWindow
-				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.WindowStartedAt != previous.WindowStartedAt || executionDelta < 0 || windowDelta < 0 || x.CostMinorTotal < previous.CostMinorTotal || windowDelta != executionDelta || newlyAdded(x.PendingExecutionIDs, previous.PendingExecutionIDs) != executionDelta {
+				if previousErr != nil || currentErr != nil || !currentAt.After(previousAt) || x.WindowStartedAt != previous.WindowStartedAt || executionDelta < 0 || windowDelta < 0 || x.CostMinorTotal < previous.CostMinorTotal || windowDelta != executionDelta || newlyAdded(x.PendingExecutionIDs, previous.PendingExecutionIDs) != executionDelta || !retainsStrings(x.SuccessfulIdempotencyKeys, previous.SuccessfulIdempotencyKeys) || !retainsOutcomeLinks(x.OutcomeLinks, previous.OutcomeLinks) || !retainsStrings(x.ReconciliationResolutionIDs, previous.ReconciliationResolutionIDs) {
 					return fmt.Errorf("production ledger is not a monotonic lease history")
 				}
 			}
