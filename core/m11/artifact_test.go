@@ -129,6 +129,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(lateExecutionEntries); err == nil {
 		t.Fatal("execution at authorization expiry was accepted")
 	}
+	duplicateAuthorizationExecution := execution
+	duplicateAuthorizationExecution.ExecutionID = "exec-duplicate-authorization"
+	duplicateAuthorizationExecutionEntries := append([]ArtifactEntry(nil), entries...)
+	duplicateAuthorizationExecutionEntries = append(duplicateAuthorizationExecutionEntries, m11Entry(t, ArtifactKindExecution, duplicateAuthorizationExecution))
+	if err := ValidateArtifactGraph(duplicateAuthorizationExecutionEntries); err == nil {
+		t.Fatal("two execution records for one authorization were accepted")
+	}
 	brokenActivation := activation
 	brokenActivation.ActivatedAt = "2026-09-07T23:59:59Z"
 	brokenActivationEntries := append([]ArtifactEntry(nil), entries...)

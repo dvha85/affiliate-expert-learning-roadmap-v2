@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-11",
-  "main_baseline": "3900d5733c709b26f6cec0e689eaa18f17ea3693",
+  "main_baseline": "9dd13b431d43cb3871d487363092d8e60577bbd6",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
     {"id":"RP-07-ledger-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"reject ledger times before a registered activation; interim registry drafts remain outside completed backup snapshots"},
@@ -19,6 +19,7 @@
     ,{"id":"RP-07-reconciliation-cardinality-graph","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical registry accepts at most one reconciliation resolution per UNKNOWN execution"}
     ,{"id":"RP-07-evaluation-cycle-temporal-graph","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical registry requires evaluation after execution and cycle close at or after that evaluation"}
     ,{"id":"RP-07-cycle-closure-status-graph","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical production cycle records are accepted only when their lifecycle status is CLOSED"}
+    ,{"id":"RP-07-authorization-execution-cardinality","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical registry accepts at most one execution record per immutable authorization"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},
