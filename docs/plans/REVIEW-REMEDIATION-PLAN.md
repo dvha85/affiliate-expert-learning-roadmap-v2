@@ -132,6 +132,14 @@ writer có lock mới replay exact transition; UNKNOWN vẫn giữ STOP. Đây l
 path-integrity/restart guard offline, không phải proof power-loss, atomic
 multi-file commit hay multi-host recovery.
 
+**Cập nhật M10 execution-journal path guard (2026-09-11):** M10 dùng cùng
+`Lstat` regular-file boundary trước khi status/resolver đọc pending journal,
+và trước writer/backup recovery parse replay record. Regression tạo symlink tới
+file bên ngoài runtime rồi khởi động Bot binary mới: status, `m10-resolve`,
+writer và backup đều trả `RECOVERY_REQUIRED`; mutable state/registry và target
+bên ngoài giữ nguyên. Đây là path-integrity/restart guard cho M10 journal,
+không phải transaction đa-file, proof power-loss hay multi-host recovery.
+
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
 CLI hay environment override). M08 → M10 regression tạo intent/policy/approval/

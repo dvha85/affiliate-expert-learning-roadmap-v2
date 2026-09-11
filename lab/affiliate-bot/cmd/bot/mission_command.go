@@ -106,6 +106,35 @@ func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10
 func m10ExecutionJournalPath(dir string) string {
 	return filepath.Join(dir, "m10-execution-journal.json")
 }
+
+// m10ExecutionJournalRecoveryRequired treats a pending journal as an
+// authority boundary. In particular, do not follow a symlink from a runtime
+// directory to an arbitrary replay plan outside that runtime.
+func m10ExecutionJournalRecoveryRequired(dir string) error {
+	info, err := os.Lstat(m10ExecutionJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("M10 execution journal path is not a regular file")
+	}
+	return fmt.Errorf("M10 execution journal requires a locked writer recovery")
+}
+
+func readM10ExecutionJournal(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("M10 execution journal path is not a regular file")
+	}
+	return os.ReadFile(path)
+}
+
 func m11OutcomeStorePath(dir string) string   { return filepath.Join(dir, "m11-outcomes.jsonl") }
 func m11OutcomeJournalPath(dir string) string { return filepath.Join(dir, "m11-outcome-journal.json") }
 
@@ -1053,7 +1082,7 @@ func removeM10ExecutionJournal(dir string) error {
 }
 
 func recoverM10ExecutionJournal(dir string) error {
-	raw, err := os.ReadFile(m10ExecutionJournalPath(dir))
+	raw, err := readM10ExecutionJournal(m10ExecutionJournalPath(dir))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -2290,10 +2319,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
-		if _, err := os.Stat(m10ExecutionJournalPath(args[1])); err == nil {
-			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M10 execution journal requires a locked writer recovery"), 1)
-		} else if !os.IsNotExist(err) {
-			return emit("STATE_ERROR", nil, err, 1)
+		if err := m10ExecutionJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		contentHash := ""
 		if len(args) == 5 {
@@ -2617,10 +2644,8 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
-		if _, err := os.Stat(m10ExecutionJournalPath(args[1])); err == nil {
-			return emit("RECOVERY_REQUIRED", nil, fmt.Errorf("M10 execution journal requires a locked writer recovery"), 1)
-		} else if !os.IsNotExist(err) {
-			return emit("STATE_ERROR", nil, err, 1)
+		if err := m10ExecutionJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		if err := m11JournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)

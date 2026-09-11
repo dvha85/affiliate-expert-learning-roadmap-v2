@@ -731,6 +731,57 @@ func TestMissionM10ExecutionJournalTamperFailsClosed(t *testing.T) {
 	}
 }
 
+func TestMissionM10ExecutionJournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	external := filepath.Join(t.TempDir(), "untrusted-m10-journal.json")
+	if err := os.WriteFile(external, []byte(`{"version":"m10-execution-journal/v1"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	beforeExternal, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(dir, "mission-state.json")
+	beforeState, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, m10ExecutionJournalPath(dir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := m10ExecutionJournalRecoveryRequired(dir); err == nil {
+		t.Fatal("symlinked M10 execution journal was not rejected before recovery")
+	}
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("status did not fail closed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", dir, corem10.ArtifactKindExecutionRecord, "unread-record"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("resolver did not fail closed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-canary", dir, filepath.Join(t.TempDir(), "unread-grant.json")); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("writer reached input handling: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "backup", "create", dir, filepath.Join(t.TempDir(), "backup")); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("backup followed a symlinked journal: code=%d response=%+v", code, response)
+	}
+	if afterState, err := os.ReadFile(statePath); err != nil || !bytes.Equal(beforeState, afterState) {
+		t.Fatalf("symlinked journal changed mission state: err=%v", err)
+	}
+	if afterExternal, err := os.ReadFile(external); err != nil || !bytes.Equal(beforeExternal, afterExternal) {
+		t.Fatalf("recovery touched external journal target: err=%v", err)
+	}
+	if _, err := os.Stat(m10ArtifactRegistryPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("symlinked journal caused registry mutation: %v", err)
+	}
+}
+
 func TestMissionM10RecordRejectsBeforeReservationWithoutMutation(t *testing.T) {
 	runtimeDir, boundPath, gatePath, expiryTime := authorityExpiryFixture(t, "cost")
 	reservationTime := expiryTime.Add(-30 * time.Second)
