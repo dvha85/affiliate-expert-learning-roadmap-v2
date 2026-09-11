@@ -155,6 +155,13 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(brokenAuthorizationGateEntries); err == nil {
 		t.Fatal("authorization from a non-allow gate was accepted")
 	}
+	unauthorizedExecutor := authorization
+	unauthorizedExecutor.ExecutorID = "rogue-executor"
+	unauthorizedExecutorEntries := append([]ArtifactEntry(nil), entries[:8]...)
+	unauthorizedExecutorEntries[7] = m11Entry(t, ArtifactKindAuthorization, unauthorizedExecutor)
+	if err := ValidateArtifactGraph(unauthorizedExecutorEntries); err == nil {
+		t.Fatal("authorization for an executor outside the lease scope was accepted")
+	}
 	staleAuthorization := authorization
 	staleAuthorization.AuthorizedAt, staleAuthorization.ExpiresAt = "2026-09-08T00:01:00Z", "2026-09-08T00:02:00Z"
 	staleAuthorizationEntries := append([]ArtifactEntry(nil), entries...)
