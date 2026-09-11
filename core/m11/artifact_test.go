@@ -369,6 +369,20 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(pendingSwapEntries); err == nil {
 		t.Fatal("ledger pending execution swap without a new reservation was accepted")
 	}
+	completedLedger := reservationLedger
+	completedLedger.PendingOutcomes = 0
+	completedLedger.PendingExecutionIDs = []string{}
+	completedLedger.OutcomeLinks = []ProductionOutcomeLink{{OutcomeID: evaluation.OutcomeID, ExecutionID: execution.ExecutionID, ObservedAt: "2026-09-08T00:00:02Z"}}
+	completedLedger.LastOutcomeAt = "2026-09-08T00:00:02Z"
+	completedLedger.UpdatedAt = "2026-09-08T00:00:02Z"
+	erasedOutcomeLedger := completedLedger
+	erasedOutcomeLedger.OutcomeLinks = []ProductionOutcomeLink{}
+	erasedOutcomeLedger.UpdatedAt = "2026-09-08T00:00:03Z"
+	erasedOutcomeEntries := append([]ArtifactEntry(nil), entries...)
+	erasedOutcomeEntries = append(erasedOutcomeEntries, m11Entry(t, ArtifactKindLedger, completedLedger), m11Entry(t, ArtifactKindLedger, erasedOutcomeLedger))
+	if err := ValidateArtifactGraph(erasedOutcomeEntries); err == nil {
+		t.Fatal("later ledger erased an immutable outcome link")
+	}
 }
 
 func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing.T) {
