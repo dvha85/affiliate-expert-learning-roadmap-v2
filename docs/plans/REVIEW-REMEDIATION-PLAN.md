@@ -1136,6 +1136,12 @@ thiếu partition, ID trùng, marker/CI command không resolve, hoặc criterion
 trên isolated copy. Graph chỉ là evidence có trong checkout; nó không thay API
 GitHub, remote CI run hay independent/external evidence.
 
+**Cập nhật review-finding mapping (2026-09-11):** matrix giờ có mapping có cấu
+trúc R01–R16 → RP chủ trì → BR liên quan cùng scope/status. Audit yêu cầu đủ
+16 ID duy nhất, package/BR hợp lệ và marker R tương ứng trong plan; negative
+fixture bỏ một mapping phải fail. Đây làm R16 kiểm được liên kết review, không
+xác nhận remote CI, operated evidence hay đóng các finding `PARTIAL`.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.

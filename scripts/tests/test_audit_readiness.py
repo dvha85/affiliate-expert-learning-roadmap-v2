@@ -93,6 +93,13 @@ class ReadinessAuditTests(unittest.TestCase):
         graph_path.write_text(json.dumps(graph), encoding="utf-8")
         self.assertIn("evidence partition", self.run_audit(False))
 
+    def test_missing_review_finding_mapping_is_rejected(self):
+        matrix_path = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        matrix["review_findings"] = matrix["review_findings"][:-1]
+        matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
+        self.assertIn("review finding mapping is incomplete", self.run_audit(False))
+
 
 if __name__ == "__main__":
     unittest.main()
