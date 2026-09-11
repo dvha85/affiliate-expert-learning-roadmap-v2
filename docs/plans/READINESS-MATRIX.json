@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-11",
-  "main_baseline": "5edc20706c9d011a2fba8de1afc37700bba0f766",
+  "main_baseline": "5263a6428fe55be8df6f25487b21491d5950ac86",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
     {"id":"RP-07-ledger-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"reject ledger times before a registered activation; interim registry drafts remain outside completed backup snapshots"},
@@ -35,6 +35,7 @@
     ,{"id":"RP-07-pending-reservation-continuity","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ledger counters must increase exactly with newly pending reservation execution IDs; swaps cannot create uncharged capacity"}
     ,{"id":"RP-07-ledger-outcome-continuity","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ledger history cannot erase prior outcome links, successful idempotency keys, or reconciliation resolution IDs"}
     ,{"id":"RP-07-artifact-cardinality","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical graph rejects duplicate artifact kind/ID pairs before map-based link resolution"}
+    ,{"id":"RP-07-ledger-outcome-execution-link","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ledger outcome links must resolve a same-lease execution at or before observation time"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},

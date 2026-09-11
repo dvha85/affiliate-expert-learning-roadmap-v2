@@ -390,5 +390,15 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			return fmt.Errorf("production execution is orphaned from its reservation ledger")
 		}
 	}
+	for _, ledger := range ledgers {
+		for _, link := range ledger.OutcomeLinks {
+			execution, executionOK := executions[link.ExecutionID]
+			observedAt, observedErr := time.Parse(time.RFC3339, link.ObservedAt)
+			attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
+			if !executionOK || observedErr != nil || attemptedErr != nil || execution.ProductionLeaseID != ledger.LeaseID || execution.ProductionLeaseVersion != ledger.LeaseVersion || execution.ProductionLeaseHash != ledger.LeaseHash || observedAt.Before(attemptedAt) {
+				return fmt.Errorf("production ledger outcome link is orphaned or predates its execution")
+			}
+		}
+	}
 	return nil
 }
