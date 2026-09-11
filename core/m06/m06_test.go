@@ -123,3 +123,33 @@ func TestOfferFixtureBuildUsesOneCanonicalPacket(t *testing.T) {
 		t.Fatalf("equivalent Unicode fixture was not canonical: first=%+v second=%+v err=%v", first, second, err)
 	}
 }
+
+func TestOfferFixtureMarksMissingPriceAndCommissionWithoutInventingValues(t *testing.T) {
+	profile := m06.OfferFixtureProfile{FixtureURL: "https://example.com/br13/offer", SourceURL: "https://example.com/br13/offer", AllowHost: "example.com", Access: "local_fixture", Role: "synthetic_fixture", Limitation: "offline only"}
+	raw := []byte(`{"version":"br13-offer-fixture/v1","method":"GET","url":"https://example.com/br13/offer","observed_at":"2026-09-03T07:00:00+07:00","correlation_id":"event-missing","status_code":200,"body":"{\"product_id\":\"a\",\"product_name\":\"Fixture A\",\"currency\":\"USD\",\"price\":null}"}`)
+	built, err := m06.BuildOfferFixture(raw, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var packet struct {
+		Products []struct {
+			Fields []struct {
+				Field string `json:"field_or_claim"`
+				Value any    `json:"value"`
+				State string `json:"state"`
+				Claim string `json:"claim_kind"`
+			} `json:"fields"`
+		} `json:"products"`
+	}
+	if err := json.Unmarshal(built.Packet, &packet); err != nil || len(packet.Products) != 1 || len(packet.Products[0].Fields) != 2 {
+		t.Fatalf("decode missing-value packet: %v %s", err, built.Packet)
+	}
+	for _, field := range packet.Products[0].Fields {
+		if field.Field != "price" && field.Field != "commission_rate" {
+			t.Fatalf("unexpected projected field: %+v", field)
+		}
+		if field.Value != nil || field.State != "missing" || field.Claim != "unknown" {
+			t.Fatalf("missing source value was invented or misclassified: %+v", field)
+		}
+	}
+}
