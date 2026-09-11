@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-11 -->
-<!-- readiness-main-baseline: e37bafbb23a4e77b2b41522a0c35110fadc8f890 -->
+<!-- readiness-main-baseline: 05fdbc18e8e963a49c1951cd28d8ba03d38c2e57 -->
 
 > Reconcile 10/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -810,6 +810,12 @@ canonical authorization chỉ hợp lệ nếu `executor_id` nằm trong immutab
 `lease.executor_ids`. Core regression dùng authorization cùng gate/health/cost
 nhưng executor lạ và bị reject. Đây là scope lineage offline, không chứng minh
 danh tính executor, provider hoặc execution production.
+
+**Cập nhật M11 gate/health temporal order (2026-09-11):** canonical gate
+không thể evaluate trước `health.observed_at` của exact snapshot. Core regression
+giữ hash/lease/cost/activation hợp lệ nhưng dời health sau gate và bị reject.
+Đây chỉ là fixture chronology, không là telemetry freshness hay production health
+proof.
 
 **Cập nhật reservation concurrency (2026-09-08):** `m11-reserve-authorization`
 quét canonical registry trước khi append. Exact retry của cùng artifact trả

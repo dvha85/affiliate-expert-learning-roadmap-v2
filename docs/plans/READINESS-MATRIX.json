@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-11",
-  "main_baseline": "e37bafbb23a4e77b2b41522a0c35110fadc8f890",
+  "main_baseline": "05fdbc18e8e963a49c1951cd28d8ba03d38c2e57",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
     {"id":"RP-07-ledger-after-activation","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"reject ledger times before a registered activation; interim registry drafts remain outside completed backup snapshots"},
@@ -26,6 +26,7 @@
     ,{"id":"RP-07-gate-ledger-state","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical ALLOW gate must retain a normal non-reconciliation ledger with exact budget snapshot counters"}
     ,{"id":"RP-07-gate-activation-boundary","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go","scripts/smoke_br18b_backup_restore.py"],"scope":"canonical gate requires its exact lease activation and cannot evaluate before that activation"}
     ,{"id":"RP-07-authorization-executor-scope","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical authorization executor must be explicitly allowed by its immutable production lease"}
+    ,{"id":"RP-07-gate-health-temporal-order","status":"PARTIAL","implementation_refs":["core/m11/artifact_registry.go"],"test_refs":["core/m11/artifact_test.go"],"scope":"canonical gate evaluation cannot predate its exact health snapshot observation"}
   ],
   "packages": [
     {"id":"RP-01","status":"PARTIAL"},

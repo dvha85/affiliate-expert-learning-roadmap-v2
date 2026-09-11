@@ -126,6 +126,17 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(preActivationGateEntries); err == nil {
 		t.Fatal("gate before activation was accepted")
 	}
+	postGateHealth := health
+	postGateHealth.ObservedAt = "2026-09-08T00:00:01Z"
+	postGateHealth.SnapshotHash = ComputeProductionHealthHash(postGateHealth)
+	preHealthGate := gate
+	preHealthGate.HealthSnapshotHash = postGateHealth.SnapshotHash
+	preHealthGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	preHealthGateEntries[2] = m11Entry(t, ArtifactKindHealth, postGateHealth)
+	preHealthGateEntries[6] = m11Entry(t, ArtifactKindGate, preHealthGate)
+	if err := ValidateArtifactGraph(preHealthGateEntries); err == nil {
+		t.Fatal("gate before its health observation was accepted")
+	}
 	brokenGateWindow := gate
 	brokenGateWindow.EvaluatedAt = lease.ExpiresAt
 	brokenGateWindowEntries := append([]ArtifactEntry(nil), entries...)
