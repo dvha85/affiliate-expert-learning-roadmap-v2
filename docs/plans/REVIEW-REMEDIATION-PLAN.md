@@ -1481,7 +1481,18 @@ action, outcome, evaluation, improvement và ACCESSTRADE receipt đều propagat
 `Close` error sau parse thay vì trả artifact đã đọc. Regression đổi pathname
 sau open thành symlink cùng byte: bytes của descriptor vẫn đọc được nhưng
 `Close` fail và loader trả lỗi. Đây chưa phát hiện mutation in-place của inode
-đang mở, crash/power-loss hoặc multi-host transaction.
+đang mở; phạm vi đó được kiểm riêng ở cập nhật kế tiếp. Crash/power-loss hoặc
+multi-host transaction vẫn nằm ngoài boundary này.
+
+**Cập nhật canonical history content verification (2026-09-13):** khi parser
+đã đọc tới EOF, reader giữ SHA-256 của chính descriptor đã mở và đọc lại chính
+descriptor đó trên `Close`. Nếu nội dung bị rewrite in-place (kể cả cùng kích
+thước và cùng inode) sau khi parser nhận bytes, `Close` fail nên loader không
+ACK artifact đã parse. Regression gọi JSONL reader thật, đọc snapshot ban đầu,
+rewrite pathname qua cùng inode và xác nhận `Close` reject. Đây là kiểm nhất
+quán cục bộ của một snapshot đã consume, không phải snapshot atomic trước writer
+không hợp tác có thể race/restore bytes; crash/power-loss và multi-host
+transaction vẫn mở.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.

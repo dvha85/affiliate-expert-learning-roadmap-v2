@@ -3,7 +3,9 @@ package store
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"hash"
 	"io"
 	"io/fs"
 	"os"
@@ -52,14 +54,48 @@ func appendLineFailure(phase string) error {
 const MaxHistoryRecordBytes = 1 << 20
 
 type stableJSONLReader struct {
-	file   *os.File
-	path   string
-	opened fs.FileInfo
+	file       *os.File
+	path       string
+	opened     fs.FileInfo
+	snapshot   hash.Hash
+	reachedEOF bool
 }
 
-func (r *stableJSONLReader) Read(p []byte) (int, error) { return r.file.Read(p) }
+func (r *stableJSONLReader) Read(p []byte) (int, error) {
+	n, err := r.file.Read(p)
+	if n > 0 {
+		_, _ = r.snapshot.Write(p[:n])
+	}
+	if err == io.EOF {
+		r.reachedEOF = true
+	}
+	return n, err
+}
+
+// verifySnapshot detects an in-place rewrite of the descriptor that supplied
+// the fully-consumed JSONL bytes. It deliberately compares the opened
+// descriptor, not a second pathname open: a pathname may have been replaced
+// and is checked separately below. This is a local consistency check, not an
+// atomic filesystem snapshot against an uncooperative writer.
+func (r *stableJSONLReader) verifySnapshot() error {
+	if !r.reachedEOF {
+		return fmt.Errorf("history reader closed before complete snapshot")
+	}
+	if _, err := r.file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	current := sha256.New()
+	if _, err := io.Copy(current, r.file); err != nil {
+		return err
+	}
+	if !bytes.Equal(r.snapshot.Sum(nil), current.Sum(nil)) {
+		return fmt.Errorf("history content changed while reading")
+	}
+	return nil
+}
 
 func (r *stableJSONLReader) Close() error {
+	snapshotErr := r.verifySnapshot()
 	closeErr := r.file.Close()
 	after, err := os.Lstat(r.path)
 	if err != nil {
@@ -67,6 +103,9 @@ func (r *stableJSONLReader) Close() error {
 	}
 	if !after.Mode().IsRegular() || !os.SameFile(r.opened, after) {
 		return fmt.Errorf("history path changed while reading")
+	}
+	if snapshotErr != nil {
+		return snapshotErr
 	}
 	return closeErr
 }
@@ -102,7 +141,7 @@ func (JSONL) Open(path string) (io.ReadCloser, error) {
 			return nil, err
 		}
 	}
-	return &stableJSONLReader{file: f, path: path, opened: opened}, nil
+	return &stableJSONLReader{file: f, path: path, opened: opened, snapshot: sha256.New()}, nil
 }
 
 func (JSONL) AppendLine(path string, record []byte) error {
