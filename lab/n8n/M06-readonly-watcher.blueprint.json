@@ -62,7 +62,8 @@
             {"id": "status", "name": "result", "value": "={{ $json.status }}", "type": "string"},
             {"id": "record", "name": "record_id", "value": "={{ $json.record_id }}", "type": "string"},
             {"id": "ack", "name": "canonical_history_handoff", "value": "={{ $json.canonical_history_handoff }}", "type": "string"},
-            {"id": "persisted", "name": "canonical_history_persisted", "value": "={{ $json.canonical_history_persisted }}", "type": "boolean"}
+            {"id": "persisted", "name": "canonical_history_persisted", "value": "={{ $json.canonical_history_persisted }}", "type": "boolean"},
+            {"id": "execution", "name": "execution_permitted", "value": "={{ $json.execution_permitted }}", "type": "boolean"}
           ]
         }
       }
