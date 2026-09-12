@@ -130,6 +130,13 @@ writer có lock mới replay exact transition; UNKNOWN vẫn giữ STOP. Đây l
 path-integrity/restart guard offline, không phải proof power-loss, atomic
 multi-file commit hay multi-host recovery.
 
+**Cập nhật M11 special-file journal guard (2026-09-12):** trên Linux/macOS,
+regression tạo FIFO cho từng journal FAILED, UNKNOWN và outcome. Recovery
+prelude, `mission status` và reader đều phải trả fail-closed trước bất kỳ read
+FIFO nào. Điều này hoàn tất bằng chứng special-file của local path boundary;
+Windows giữ ngoài test do API FIFO khác, còn crash/power-loss/multi-host vẫn
+không được suy ra.
+
 **Cập nhật M11 runtime-loader orphan guard (2026-09-12):** registry loader
 được regression bằng một `PRODUCTION_LEASE_APPROVAL` schema-valid, integrity
 valid nhưng không có immutable lease cha. `loadM11ArtifactRegistry` phải gọi
