@@ -152,6 +152,11 @@ writer và backup đều trả `RECOVERY_REQUIRED`; mutable state/registry và t
 bên ngoài giữ nguyên. Đây là path-integrity/restart guard cho M10 journal,
 không phải transaction đa-file, proof power-loss hay multi-host recovery.
 
+**Cập nhật M10 special-file journal guard (2026-09-12):** trên Linux/macOS,
+regression tạo FIFO ở execution journal và xác nhận recovery prelude, status
+và reader fail-closed trước read. Windows FIFO semantics và proof
+crash/power-loss/multi-host vẫn nằm ngoài phạm vi.
+
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
 CLI hay environment override). M08 → M10 regression tạo intent/policy/approval/
