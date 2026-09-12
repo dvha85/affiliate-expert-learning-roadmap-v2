@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1450,5 +1451,61 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	}
 	if code, response := backupCall(t, "restore", badBackup, filepath.Join(root, "bad-restored")); code == 0 || response["status"] != "VERIFY_FAILED" {
 		t.Fatalf("checksum-valid forged M07 proposal was restored: code=%d response=%+v", code, response)
+	}
+}
+
+// validateM07BackupGraph reads adapter-owned tool evidence before a snapshot
+// can be accepted. It must not parse a same-byte external replacement after
+// opening that canonical sidecar path.
+func TestM07BackupGraphRejectsToolSidecarSymlinkSwapAfterOpen(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-backup-stable-reader", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-backup-stable-reader-o", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(history, record); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	tool, err := corem07.RegisterToolResult([]byte(`{"record_id":"m07-backup-stable-reader","tool_call":{"tool_name":"public_http","method":"GET","target":"https://example.com/a"},"status_code":200,"received_at":"2026-09-01T00:02:00Z","redirected":false,"body":{"price":100}}`), registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := m07ArtifactPath(history, "tool-results", tool.TraceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeNewJSON(path, tool); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(dir, "same-byte-external-tool-result.json")
+	if err := os.WriteFile(external, contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(path) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	if err := validateM07BackupGraph(dir); err == nil || !strings.Contains(err.Error(), "changed while reading stable regular file") {
+		t.Fatalf("backup graph accepted a same-byte M07 tool sidecar symlink swap: %v", err)
+	}
+	if !swapped {
+		t.Fatal("backup graph did not reach stable-reader swap seam")
 	}
 }

@@ -702,7 +702,7 @@ func validateM07BackupGraph(dir string) error {
 		if len(parts) != 2 || !validM07ArtifactFile(parts[0], parts[1], strings.TrimSuffix(parts[1], ".json")) {
 			return fmt.Errorf("invalid M07 artifact layout")
 		}
-		raw, err := os.ReadFile(path)
+		raw, _, err := readStableRegularFile(path)
 		if err != nil {
 			return err
 		}
@@ -726,7 +726,7 @@ func validateM07BackupGraph(dir string) error {
 	}
 	proposals := map[string]corem07.AgentOutput{}
 	for _, path := range proposalPaths {
-		raw, err := os.ReadFile(path)
+		raw, _, err := readStableRegularFile(path)
 		if err != nil {
 			return err
 		}
