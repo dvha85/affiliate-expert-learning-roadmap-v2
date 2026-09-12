@@ -134,6 +134,47 @@ func TestJSONLReaderReportsSameByteReplacementAfterOpen(t *testing.T) {
 	}
 }
 
+func TestJSONLReaderReportsInPlaceContentMutationAfterOpen(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "history.jsonl")
+	original := []byte(`{"id":"before"}` + "\n")
+	changed := []byte(`{"id":"after!"}` + "\n")
+	if len(original) != len(changed) {
+		t.Fatal("test requires same-size replacement")
+	}
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := (JSONL{}).Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, original) {
+		t.Fatalf("descriptor bytes = %q, want %q", data, original)
+	}
+	if err := os.WriteFile(path, changed, 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("test mutation replaced inode instead of rewriting it")
+	}
+	if err := reader.Close(); err == nil {
+		t.Fatal("in-place content mutation was acknowledged")
+	}
+}
+
 func TestOversizedRecordDoesNotCreateFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "history.jsonl")
 	if err := (JSONL{}).AppendLine(path, bytes.Repeat([]byte("x"), MaxHistoryRecordBytes+1)); err == nil {
