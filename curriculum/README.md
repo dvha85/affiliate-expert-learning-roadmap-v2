@@ -21,7 +21,13 @@
 15. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
 16. Khi M10 PASS: `M11.1 → M11.2 → M11.3`.
 
-M01–M11 hiện **authoring ready và learner-operable (sẵn sàng về nội dung và đường thực hành)**. M08 chỉ shadow; M09 machine execution cần approval từng lần; M10 mở governed canary; M11 mở finite production lease với trusted health/cost, DEGRADE read-only và sticky STOP. CI/sandbox không tự tạo Reality/Operated PASS.
+M01–M11 có tài liệu authoring và fixture lab để học capability/boundary; điều đó
+**không** chứng minh một người mới có thể tự hoàn tất độc lập toàn bộ M00–M11 với
+source, provider, deployment hay business outcome thật. Trạng thái repo hiện là
+`NOT_READY_FOR_PRODUCTION`: xem matrix readiness trước khi suy từ CI/sandbox sang
+Reality/Operated PASS. M08 chỉ shadow; M09 machine execution cần approval từng
+lần; M10 mở governed canary; M11 mở finite production lease với trusted
+health/cost, DEGRADE read-only và sticky STOP.
 
 ## Vòng học của learner
 

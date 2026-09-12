@@ -2,6 +2,10 @@
 
 Repo chính để học và xây một **Affiliate Intelligence Bot tiến hóa dần từ bằng chứng thật tới tự động hóa có kiểm soát**.
 
+Trạng thái hiện hành của repo là `NOT_READY_FOR_PRODUCTION`. Các fixture, lab và
+CI chứng minh capability/boundary có phạm vi; chúng không thay cho selected source,
+provider, deployment, beginner pilot hay business outcome độc lập.
+
 > Repo lịch sử: `dvha85/affiliate-expert-learning-roadmap`.
 
 ## Bắt đầu

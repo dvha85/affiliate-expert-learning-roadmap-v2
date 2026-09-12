@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -76,6 +76,16 @@ class ReadinessAuditTests(unittest.TestCase):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")
         self.assertIn("overclaims production readiness", self.run_audit(False))
+
+    def test_public_readiness_boundary_is_required(self):
+        curriculum = self.root / "curriculum/README.md"
+        curriculum.write_text(curriculum.read_text(encoding="utf-8").replace("NOT_READY_FOR_PRODUCTION", "CURRENT_STATUS"), encoding="utf-8")
+        self.assertIn("public readiness document lacks current boundary", self.run_audit(False))
+
+    def test_public_learner_operable_claim_is_rejected(self):
+        curriculum = self.root / "curriculum/README.md"
+        curriculum.write_text(curriculum.read_text(encoding="utf-8") + "\nThe curriculum is learner-operable.\n", encoding="utf-8")
+        self.assertIn("overclaims learner-operable readiness", self.run_audit(False))
 
     def test_graph_claim_with_unwired_ci_command_is_rejected(self):
         graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
