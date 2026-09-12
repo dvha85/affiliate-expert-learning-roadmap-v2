@@ -61,6 +61,56 @@ func TestRestoreTargetGateRejectsConcurrentManagedPublisher(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testing.T) {
+	runtime := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize staging-sync fixture: code=%d response=%+v", code, response)
+	}
+	root := filepath.Dir(runtime)
+	backup, restored := filepath.Join(root, "synced-backup"), filepath.Join(root, "synced-restored")
+	backupStagingWriteFault = func(phase, path string) error {
+		if phase == "after_file_sync" && filepath.Base(path) == "mission-state.json" {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	t.Cleanup(func() { backupStagingWriteFault = nil })
+	if code, response := backupCall(t, "create", runtime, backup); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("post-file-sync backup staging failure was published: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(backup); !os.IsNotExist(err) {
+		t.Fatalf("failed backup staging occupied target: %v", err)
+	}
+	backupStagingWriteFault = nil
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup retry after staging sync failure failed: code=%d response=%+v", code, response)
+	}
+	backupStagingWriteFault = func(phase, path string) error {
+		if phase == "before_directory_sync" && filepath.Base(path) == "mission-state.json" {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("pre-directory-sync restore staging failure was published: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(restored); !os.IsNotExist(err) {
+		t.Fatalf("failed restore staging occupied target: %v", err)
+	}
+	backupStagingWriteFault = nil
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("restore retry after staging sync failure failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
 		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])
