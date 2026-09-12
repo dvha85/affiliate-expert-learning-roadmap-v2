@@ -92,11 +92,11 @@ và regression tương ứng.
 | RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; inventory of every writer remains open |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy plus the strict M09 approval boundary; broader authorization/execution conformance and migration remain open |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — one shared learner-Bot fixture chain now exercises EC-01…EC-05 with byte-level no-mutation rejects, restore and restart; multi-file crash/power-loss, distributed locking and business-execution proof remain open |
-| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver and n8n engine regression exist; governed selected-source profile and operated run remain open |
+| RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver, n8n node-chain và real Schedule Trigger regressions exist; governed selected-source profile and deployment-operated run remain open |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence and n8n stub path exist; selected-source/provider operated evidence remains open |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, and an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, while expiry/rebind and multi-file crash seams remain open |
-| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
+| RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions including M06 Schedule Trigger admission, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured; remote CI and external evidence remain outside local audit |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
 
@@ -1306,8 +1306,14 @@ model-success hoặc received-redirect transport coverage/evidence business.
 same-correlation content conflict, unsupported source và changed event. Hai ca
 reject phải dừng ở adapter trước ACK/report và không được thay đổi bytes history;
 changed event mới phải persist record riêng và replay `MATCH`. Phạm vi vẫn là
-fixture synthetic; schedule admission và selected-source profile không được suy
-ra là đã nghiệm thu.
+fixture synthetic; selected-source profile không được suy ra là đã nghiệm thu.
+
+**M06 Schedule Trigger CI (2026-09-12):** runner riêng khởi động `n8n start`
+trên SQLite disposable và active một copy M06 có Schedule Trigger thật cadence
+một giây. Nó đòi execution `mode=trigger` thành công, report ACK/read-only,
+record history duy nhất và replay `MATCH`; adapter loopback không khả dụng phải
+tạo lỗi trước ACK/report không ghi history. Điều này đóng schedule admission
+offline, không là deployment hay selected-source operated evidence.
 
 **Mở rộng M07 model-stub CI (2026-09-09):** cùng job import credential disposable
 chỉ trỏ endpoint OpenAI-compatible loopback, thay network fetch ở bản copy test

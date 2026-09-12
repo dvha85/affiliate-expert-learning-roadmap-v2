@@ -90,7 +90,9 @@ jobs:
           node-version: "24"
       - name: Install pinned n8n engine for disposable offline runtime
         run: npm install --prefix "$RUNNER_TEMP/n8n-rp08" --no-audit --no-fund n8n@2.38.1
-      - name: Run M06 engine path and M07 policy-rejection path
+      - name: Run M06/M07 engine paths and real M06 Schedule Trigger admission
         run: |
           python scripts/run_n8n_engine_regression.py \
+            --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
+          python scripts/run_n8n_m06_schedule_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"

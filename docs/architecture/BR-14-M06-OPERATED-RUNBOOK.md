@@ -44,6 +44,21 @@ python3 scripts/validate_n8n_m06_operated_execution.py \
   --expect-reject --expected-record-count 1
 ```
 
+## Regression Schedule Trigger cô lập
+
+CI còn chạy entrypoint lịch thật, thay vì suy ra nó từ `n8n execute`. Lệnh dưới
+tạo database, Bot adapter và server n8n tạm; workflow copy được active ở cadence
+một giây, rồi bị xóa cùng runtime. Nó không đọc credential n8n local.
+
+```bash
+python3 scripts/run_n8n_m06_schedule_regression.py --n8n-cli /path/to/n8n
+```
+
+Ca success bắt buộc có execution `mode=trigger`, report ACK/read-only, một record
+canonical và replay `MATCH`. Ca adapter không khả dụng phải dừng ở handoff, không
+có ACK/report hay history. Đây là coverage CI synthetic/read-only, không thay
+cho bằng chứng deployment hoặc source được chọn.
+
 `PASS` chỉ chứng minh một M06 synthetic/read-only path trong n8n engine. Nó không
 chứng minh nguồn được chọn, seller/business truth, business outcome hay quyền thực
 thi.

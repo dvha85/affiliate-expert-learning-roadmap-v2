@@ -32,7 +32,7 @@ này” một cách tổng quát.
 
 ```text
 tested_n8n_version: UNVERIFIED
-tested_node_versions: declared above; engine support unverified
+tested_node_versions: declared above; only the documented synthetic 2.38.1 fixture paths are verified
 upgrade_review_cadence: trước mỗi lần nâng n8n engine và ít nhất mỗi quý
 ```
 
@@ -52,6 +52,12 @@ Scope là fixture synthetic/read-only; không có campaign, provider diversity,
 received-redirect transport, production deployment, business outcome hoặc
 MACHINE_EXECUTION. PR #96/#97 bổ sung CI n8n `2.38.1` cho M06 và M07 negative
 paths, nhưng không đưa credential/model-success vào CI.
+
+M06 hiện cũng có regression disposable trên n8n `2.38.1`: một workflow copy
+active giữ node Schedule Trigger thật ở cadence một giây, append/replay canonical
+history qua adapter loopback, và fail closed khi adapter không khả dụng. Điều này
+chỉ xác minh đường fixture synthetic/read-only; không nâng release admission,
+không chứng minh selected source hoặc deployment topology.
 
 ## Smoke test bắt buộc
 
