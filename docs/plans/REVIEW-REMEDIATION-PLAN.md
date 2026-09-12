@@ -159,8 +159,8 @@ crash/power-loss/multi-host vẫn nằm ngoài phạm vi.
 
 **Cập nhật canonical runtime-store path guard (2026-09-12):** trước parser hay
 graph validation, learner chỉ đọc `mission-state.json`, `STOP`, M10 artifact
-registry/cost-bound registry và M11 artifact registry qua `Lstat → open/fstat
-→ Lstat`. Regression thay từng path bằng symlink đến bytes ngoài runtime vẫn
+registry/cost-bound registry/fixture outcomes và M11 artifact registry/fixture
+outcomes qua `Lstat → open/fstat → Lstat`. Regression thay từng path bằng symlink đến bytes ngoài runtime vẫn
 hợp lệ (state dùng đúng bytes đã initialize) và nhận reject trước khi dùng state
 hoặc authority artifact; external target không đổi. CI mutation đồng thời bỏ
 các guard trong checkout tạm và đòi mọi assertion runtime-store thật fail. Đây

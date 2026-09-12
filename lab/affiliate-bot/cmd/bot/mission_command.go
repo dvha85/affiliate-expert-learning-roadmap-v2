@@ -1121,15 +1121,14 @@ func validateM10FixtureOutcome(dir string, s LearnerMissionState, raw []byte) (m
 }
 
 func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRecord, error) {
-	f, err := (store.JSONL{}).Open(m10OutcomeStorePath(dir))
+	raw, _, err := readStableRegularFile(m10OutcomeStorePath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
 	seen := map[string]bool{}
@@ -1177,15 +1176,14 @@ func validateM11FixtureOutcome(dir string, raw []byte) (m03.OutcomeRecord, corem
 }
 
 func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
-	f, err := (store.JSONL{}).Open(m11OutcomeStorePath(dir))
+	raw, _, err := readStableRegularFile(m11OutcomeStorePath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
 	seen := map[string]bool{}
