@@ -1255,12 +1255,14 @@ business thật.
 **Cập nhật backup source-identity mutation (2026-09-12):** cùng job chạy
 `scripts/mutate_backup_source_guard.py`. Script tạo một copy riêng của learner
 Bot, rồi đồng thời bỏ ba bước `Lstat → open/fstat → Lstat` trong
-`readStableRegularFile`. Regression thực tế đổi `mission-state.json` sau
-inventory thành symlink đến một file ngoài có **cùng bytes**; bản mutation chỉ
-PASS nếu test thật fail tại assertion source-symlink-swap riêng. Vì bytes và
-metadata file vẫn khớp inventory, đây chứng minh guard identity path thay vì chỉ
-digest mismatch. Đây là proof hẹp cho guard local này; không chứng minh mọi race,
-crash/power-loss, filesystem, multi-host hay backup operated.
+`readStableRegularFile`. Hai regression thực tế đổi `mission-state.json` sau
+inventory khi backup, hoặc sau `verifyBackup` khi restore, thành symlink đến một
+file ngoài có **cùng bytes**; bản mutation chỉ PASS nếu cả hai test thật fail tại
+assertion source-symlink-swap riêng. Restore còn đối chiếu metadata của bytes
+vừa đọc với manifest đã verify. Vì bytes và metadata file vẫn khớp inventory,
+đây chứng minh guard identity path thay vì chỉ digest mismatch. Đây là proof hẹp
+cho guard local này; không chứng minh mọi race, crash/power-loss, filesystem,
+multi-host hay backup operated.
 
 **Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi ba
 lệnh mutation M10/M11 và backup source identity là required regression của

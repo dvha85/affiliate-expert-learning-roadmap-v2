@@ -172,6 +172,69 @@ func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {
 	}
 }
 
+func TestRestoreRejectsBackupSourceSymlinkSwapAfterVerification(t *testing.T) {
+	runtime := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize restore source-swap fixture: code=%d response=%+v", code, response)
+	}
+	root := filepath.Dir(runtime)
+	backup, restored := filepath.Join(root, "restore-source-swap-backup"), filepath.Join(root, "restore-source-swap-restored")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("create restore source-swap backup: code=%d response=%+v", code, response)
+	}
+	statePath := filepath.Join(backup, "mission-state.json")
+	original, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(root, "external-restored-mission-state.json")
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	restoreCopyFault = func(name string) error {
+		if name != "mission-state.json" || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(statePath); err != nil {
+			return err
+		}
+		return os.Symlink(external, statePath)
+	}
+	t.Cleanup(func() { restoreCopyFault = nil })
+	if code, response := backupCall(t, "restore", backup, restored); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("restore followed backup source symlink swapped after verification: code=%d response=%+v", code, response)
+	}
+	if !swapped {
+		t.Fatal("restore did not execute source-swap seam")
+	}
+	if _, err := os.Stat(restored); !os.IsNotExist(err) {
+		t.Fatalf("rejected restore source swap occupied target: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, original) {
+		t.Fatalf("restore source-swap changed external target: %q err=%v", got, err)
+	}
+	if err := os.Remove(statePath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	restoreCopyFault = nil
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("restore retry after source-swap rejection failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
 		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])
