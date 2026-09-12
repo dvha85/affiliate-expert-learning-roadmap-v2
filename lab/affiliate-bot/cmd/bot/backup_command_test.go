@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -1507,5 +1508,47 @@ func TestM07BackupGraphRejectsToolSidecarSymlinkSwapAfterOpen(t *testing.T) {
 	}
 	if !swapped {
 		t.Fatal("backup graph did not reach stable-reader swap seam")
+	}
+}
+
+func TestReadStableRegularFileRejectsInPlaceContentMutation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runtime.json")
+	original := []byte(`{"state":"before"}`)
+	changed := []byte(`{"state":"after!"}`)
+	if len(original) != len(changed) {
+		t.Fatal("test requires same-size rewrite")
+	}
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutated := false
+	stableRegularFileContentHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(path) || mutated {
+			return nil
+		}
+		mutated = true
+		if err := os.WriteFile(path, changed, 0600); err != nil {
+			return err
+		}
+		after, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if !os.SameFile(before, after) {
+			return fmt.Errorf("test rewrite replaced inode")
+		}
+		return nil
+	}
+	t.Cleanup(func() { stableRegularFileContentHook = nil })
+	if _, _, err := readStableRegularFile(path); err == nil || !strings.Contains(err.Error(), "content changed while reading stable regular file") {
+		t.Fatalf("stable runtime reader accepted in-place rewrite: %v", err)
+	}
+	if !mutated {
+		t.Fatal("stable runtime reader did not reach content-check seam")
 	}
 }
