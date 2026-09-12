@@ -281,13 +281,9 @@ func loadM07ToolArtifact(historyPath, id string, registry []corem07.ToolSpec, re
 	if err != nil {
 		return corem07.RegisteredToolResult{}, err
 	}
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() {
-		return corem07.RegisteredToolResult{}, fmt.Errorf("registered M07 tool artifact not found")
-	}
-	raw, err := os.ReadFile(path)
+	raw, _, err := readStableRegularFile(path)
 	if err != nil {
-		return corem07.RegisteredToolResult{}, err
+		return corem07.RegisteredToolResult{}, fmt.Errorf("registered M07 tool artifact is not a stable regular file: %w", err)
 	}
 	return corem07.ValidateRegisteredToolResult(raw, registry, recordID)
 }

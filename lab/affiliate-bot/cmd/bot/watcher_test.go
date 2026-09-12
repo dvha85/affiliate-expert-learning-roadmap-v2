@@ -298,6 +298,60 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	}
 }
 
+// Tool-result IDs resolve to adapter-owned sidecar paths, not caller-supplied
+// portable input. Reject a same-byte external symlink replacement after open
+// before it can become evidence for grounding or proposal persistence.
+func TestM07ToolArtifactRejectsSymlinkSwapAfterOpen(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
+	watchRun(t, history, input, watchFixture(), "APPENDED")
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal(err, records)
+	}
+	record := records[0]
+	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	result := corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-03T00:01:00Z", Body: json.RawMessage(`{"amount":100}`)}
+	registered, err := corem07.RegisterToolResult(mustRawJSON(t, result), registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := m07ArtifactPath(history, "tool-results", registered.TraceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeNewJSON(path, registered); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(dir, "same-byte-external-tool-result.json")
+	if err := os.WriteFile(external, contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(path) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+
+	if _, err := loadM07ToolArtifact(history, registered.TraceID, registry, record.RecordID); err == nil || !strings.Contains(err.Error(), "changed while reading stable regular file") {
+		t.Fatalf("M07 tool loader accepted a same-byte symlink swap: %v", err)
+	}
+	if !swapped {
+		t.Fatal("M07 tool loader did not reach stable-reader swap seam")
+	}
+}
+
 func TestM07TransportRejectsPrivateDNSAndOversizedResponse(t *testing.T) {
 	for _, raw := range []string{"127.0.0.1", "10.0.0.1", "100.64.0.1", "169.254.1.1", "::1", "fe80::1"} {
 		if m07PublicAddress(net.ParseIP(raw)) {
