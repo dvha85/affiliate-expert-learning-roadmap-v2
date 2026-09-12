@@ -13,6 +13,8 @@ CLAIM_STATUSES = {"IMPLEMENTED_OFFLINE", "VERIFIED_OFFLINE", "PARTIAL", "MISSING
 CI_REQUIRED = {
     "scripts/smoke_br16a_offline.py": ".github/workflows/curriculum-ci.yml",
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
 PACKAGE_IDS = {f"RP-{number:02d}" for number in range(1, 11)}

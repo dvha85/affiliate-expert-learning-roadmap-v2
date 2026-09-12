@@ -1228,6 +1228,12 @@ không liên quan fail closed. Proof này chỉ kiểm immutable graph ID M10, k
 chứng minh ledger mutable, crash/power-loss, multi-host, executor hay outcome
 business thật.
 
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi hai
+lệnh mutation M10/M11 là required regression của `curriculum-ci.yml`; negative
+fixture xoá lệnh M10 khỏi workflow phải làm audit fail. Audit này chỉ xác minh
+text workflow đang khai báo lệnh, không thay bằng chứng GitHub Actions ở head
+hay mở rộng mutation coverage ra ngoài các ID immutable.
+
 **Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
 `--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi
 `walkthrough-result.json` có đường dẫn M08–M11 cùng các kiểm PASS/MATCH/STOP.
