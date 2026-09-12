@@ -7,6 +7,12 @@ trong n8n local; không đưa vào repository, log chia sẻ hoặc execution ca
 ## Điều kiện trước khi chạy
 
 - N8n local chỉ bind `127.0.0.1` và workflow M07 đã import từ blueprint hiện hành.
+- Trước khi chạy, mở graph của workflow đã import và xác nhận đường chính có đủ
+  `Require Grounded Proposal -> Persist Agent Proposal Adapter -> Require Persisted
+  Agent Proposal ACK -> Report Persisted M07 Proposal`. Một workflow local được
+  import từ blueprint cũ có thể còn node nhưng thiếu cạnh này; khi đó n8n có thể báo
+  workflow `success` sau grounding mà không hề persist proposal. Đồng bộ/re-import
+  workflow trước khi tiếp tục, không suy diễn persistence từ trạng thái `success`.
 - Learner Bot watcher adapter đang chạy ở loopback với canonical history synthetic.
 - Chat model đã được thử thành công trong Cockpit; model phải hỗ trợ JSON output của
   n8n Agent. Model/account không khả dụng phải được coi là provider failure, không đổi
