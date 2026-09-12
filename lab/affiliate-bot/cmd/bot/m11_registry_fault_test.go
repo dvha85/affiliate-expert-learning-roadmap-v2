@@ -42,11 +42,65 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	}
 }
 
+func TestM11RegistryAppendRejectsSameByteNameReplacement(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	makeLease := func(id string) ([]byte, error) {
+		lease := corem11.ProductionLease{LeaseID: id, LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "approval-" + id, ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "corr-" + id, HashVersion: "go-json-v1"}
+		lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+		return json.Marshal(lease)
+	}
+	first, err := makeLease("lease-append-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLease, first); err != nil {
+		t.Fatal(err)
+	}
+	registry := m11ArtifactRegistryPath(dir)
+	original, err := os.ReadFile(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-registry.jsonl")
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	second, err := makeLease("lease-append-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileAppendHook = func(path string) error {
+		if path != registry {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { stableRegularFileAppendHook = nil })
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLease, second); err == nil {
+		t.Fatal("same-byte M11 registry replacement reached append")
+	}
+	if !swapped {
+		t.Fatal("M11 append replacement seam was not reached")
+	}
+	after, err := os.ReadFile(external)
+	if err != nil || string(after) != string(original) {
+		t.Fatalf("external registry was changed: err=%v", err)
+	}
+}
+
 func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T) {
 	dir := t.TempDir()
 	approval := corem11.ProductionLeaseApproval{
 		ApprovalID: "orphan-approval", LeaseID: "missing-lease", LeaseVersion: "v1",
-		LeaseHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		LeaseHash:          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		PromotionReviewRef: "fixture-review", SourceCanaryGrantID: "fixture-grant",
 		SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"},

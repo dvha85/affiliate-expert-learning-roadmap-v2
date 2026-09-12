@@ -1088,6 +1088,60 @@ func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
 	}
 }
 
+func TestM10RegistryAppendRejectsSameByteNameReplacement(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	makeBound := func(id string) ([]byte, error) {
+		bound := corem10.TrustedCostBound{CostBoundID: id, IntentID: "intent-" + id, IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "corr-" + id, HashVersion: "go-json-v1"}
+		bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+		return json.Marshal(bound)
+	}
+	first, err := makeBound("cost-append-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, first); err != nil {
+		t.Fatal(err)
+	}
+	registry := m10ArtifactRegistryPath(dir)
+	original, err := os.ReadFile(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-registry.jsonl")
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	second, err := makeBound("cost-append-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileAppendHook = func(path string) error {
+		if path != registry {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { stableRegularFileAppendHook = nil })
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, second); err == nil {
+		t.Fatal("same-byte M10 registry replacement reached append")
+	}
+	if !swapped {
+		t.Fatal("M10 append replacement seam was not reached")
+	}
+	after, err := os.ReadFile(external)
+	if err != nil || !bytes.Equal(after, original) {
+		t.Fatalf("external registry was changed: err=%v", err)
+	}
+}
+
 func TestM10ArtifactRegistryRejectsOrphanAuthorization(t *testing.T) {
 	dir := t.TempDir()
 	authorization := corem10.ExecutionAuthorization{
