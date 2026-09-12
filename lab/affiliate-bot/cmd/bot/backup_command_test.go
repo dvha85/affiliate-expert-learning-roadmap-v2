@@ -130,7 +130,9 @@ func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	external := filepath.Join(filepath.Dir(runtime), "external-mission-state.json")
-	if err := os.WriteFile(external, []byte(`{"outside":"must-not-be-read"}`), 0600); err != nil {
+	// Keep replacement bytes identical to the inventory. The rejection must
+	// therefore come from stable path identity, not merely a digest mismatch.
+	if err := os.WriteFile(external, original, 0600); err != nil {
 		t.Fatal(err)
 	}
 	backup := filepath.Join(filepath.Dir(runtime), "source-swap-backup")
@@ -155,7 +157,7 @@ func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {
 	if _, err := os.Stat(backup); !os.IsNotExist(err) {
 		t.Fatalf("rejected source swap occupied backup target: %v", err)
 	}
-	if got, err := os.ReadFile(external); err != nil || string(got) != `{"outside":"must-not-be-read"}` {
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, original) {
 		t.Fatalf("source-swap backup changed external target: %q err=%v", got, err)
 	}
 	if err := os.Remove(statePath); err != nil {
