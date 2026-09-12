@@ -57,6 +57,13 @@ var restoreCopyFault func(relativePath string) error
 // through the command line or environment.
 var backupStagingWriteFault func(phase, path string) error
 
+// stableRegularFileReadHook is a test-only seam for a same-byte replacement
+// after the stable reader has opened its file. It is never configurable from
+// the CLI or environment. Recovery journals use the same reader as backups,
+// so this seam proves their authority boundary rather than only the backup
+// copy path.
+var stableRegularFileReadHook func(path string) error
+
 func backupStagingFailure(phase, path string) error {
 	if backupStagingWriteFault == nil {
 		return nil
@@ -170,7 +177,7 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		return nil, nil, err
 	}
 	if !before.Mode().IsRegular() {
-		return nil, nil, fmt.Errorf("%s must be a regular file", path)
+		return nil, nil, fmt.Errorf("%s is not a regular file", path)
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -183,7 +190,13 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 	}
 	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
 		_ = f.Close()
-		return nil, nil, fmt.Errorf("%s changed while opening backup source", path)
+		return nil, nil, fmt.Errorf("%s changed while opening stable regular file", path)
+	}
+	if stableRegularFileReadHook != nil {
+		if err := stableRegularFileReadHook(path); err != nil {
+			_ = f.Close()
+			return nil, nil, err
+		}
 	}
 	data, readErr := io.ReadAll(f)
 	closeErr := f.Close()
@@ -198,7 +211,7 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, nil, fmt.Errorf("%s changed while reading backup source", path)
+		return nil, nil, fmt.Errorf("%s changed while reading stable regular file", path)
 	}
 	return data, opened, nil
 }

@@ -112,6 +112,8 @@ jobs:
         run: python scripts/mutate_backup_source_guard.py
       - name: RP-08 canonical runtime-store path mutation proof
         run: python scripts/mutate_runtime_store_path_guard.py
+      - name: RP-08 recovery-journal path mutation proof
+        run: python scripts/mutate_recovery_journal_path_guard.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
       - name: Go vet

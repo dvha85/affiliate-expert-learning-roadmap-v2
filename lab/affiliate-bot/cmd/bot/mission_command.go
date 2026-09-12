@@ -126,14 +126,11 @@ func m10ExecutionJournalRecoveryRequired(dir string) error {
 }
 
 func readM10ExecutionJournal(path string) ([]byte, error) {
-	info, err := os.Lstat(path)
+	raw, _, err := readStableRegularFile(path)
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("M10 execution journal path is not a regular file")
-	}
-	return os.ReadFile(path)
+	return raw, nil
 }
 
 func m11OutcomeStorePath(dir string) string   { return filepath.Join(dir, "m11-outcomes.jsonl") }
@@ -178,14 +175,11 @@ func m11JournalRecoveryRequired(dir string) error {
 // plan. A pending journal is an authority boundary: following a path outside
 // the runtime could turn an unrelated file into a replay instruction.
 func readM11Journal(path string) ([]byte, error) {
-	info, err := os.Lstat(path)
+	raw, _, err := readStableRegularFile(path)
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("M11 journal path is not a regular file")
-	}
-	return os.ReadFile(path)
+	return raw, nil
 }
 
 // m11OutcomeAppendFault is a test-only seam for the two-file M11 outcome
