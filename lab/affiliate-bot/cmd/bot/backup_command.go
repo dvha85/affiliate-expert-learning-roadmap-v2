@@ -47,6 +47,83 @@ type backupManifest struct {
 // publication happens only after staging has a complete, verified manifest.
 var backupCopyFault func(relativePath string) error
 
+// backupStagingWriteFault is a test-only seam for the file/directory sync
+// boundary while a backup or restore is still private staging. It cannot be set
+// through the command line or environment.
+var backupStagingWriteFault func(phase, path string) error
+
+func backupStagingFailure(phase, path string) error {
+	if backupStagingWriteFault == nil {
+		return nil
+	}
+	return backupStagingWriteFault(phase, path)
+}
+
+// syncStagingDirectories persists every directory edge from a copied file back
+// to the owned staging root. A file sync alone does not make a newly-created
+// nested artifact name durable. This is a local filesystem boundary; it does
+// not claim atomic recovery from an interrupted kernel or multi-host writes.
+func syncStagingDirectories(root, dir string) error {
+	root = filepath.Clean(root)
+	relative, err := filepath.Rel(root, dir)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("staging directory %s is outside root %s", dir, root)
+	}
+	for {
+		if err := syncDirectory(dir); err != nil {
+			return err
+		}
+		if filepath.Clean(dir) == root {
+			return nil
+		}
+		next := filepath.Dir(dir)
+		if next == dir {
+			return fmt.Errorf("staging directory %s is outside root %s", dir, root)
+		}
+		dir = next
+	}
+}
+
+// writeBackupStagingFile writes one new immutable snapshot file and does not
+// acknowledge it to the staging caller until file contents and its directory
+// lineage are synced. The final backup/restore directory is still unpublished
+// until the caller verifies the graph and atomically renames the staging root.
+func writeBackupStagingFile(root, path string, data []byte) error {
+	if err := backupStagingFailure("before_write", path); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	if _, err = f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = backupStagingFailure("after_write", path); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = backupStagingFailure("after_file_sync", path); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	if err = backupStagingFailure("before_directory_sync", path); err != nil {
+		return err
+	}
+	if err = syncStagingDirectories(root, filepath.Dir(path)); err != nil {
+		return err
+	}
+	return backupStagingFailure("after_directory_sync", path)
+}
+
 // backupTargetGate serializes managed snapshot publication to one destination.
 // It is separate from the source runtime gate: two callers can otherwise both
 // observe an empty target then race a final rename.
@@ -1275,6 +1352,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if stageErr != nil {
 			return emit("STORE_ERROR", nil, stageErr, 1)
 		}
+		if e = syncDirectory(parent); e != nil {
+			_ = os.RemoveAll(staging)
+			return emit("STORE_ERROR", nil, e, 1)
+		}
 		published := false
 		defer func() {
 			if !published {
@@ -1324,7 +1405,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			if e = os.MkdirAll(filepath.Dir(target), 0700); e != nil {
 				return emit("STORE_ERROR", nil, e, 1)
 			}
-			if e = os.WriteFile(target, b, 0600); e != nil {
+			if e = writeBackupStagingFile(staging, target, b); e != nil {
 				return emit("STORE_ERROR", nil, e, 1)
 			}
 			metadata, metadataErr := backupFileMetadata(target, name)
@@ -1410,6 +1491,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	if stageErr != nil {
 		return emit("STORE_ERROR", nil, stageErr, 1)
 	}
+	if e = syncDirectory(parent); e != nil {
+		_ = os.RemoveAll(staging)
+		return emit("STORE_ERROR", nil, e, 1)
+	}
 	published := false
 	defer func() {
 		if !published {
@@ -1434,7 +1519,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e = os.MkdirAll(filepath.Dir(target), 0700); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
-		if e = os.WriteFile(target, b, 0600); e != nil {
+		if e = writeBackupStagingFile(staging, target, b); e != nil {
 			return emit("STORE_ERROR", nil, e, 1)
 		}
 	}
