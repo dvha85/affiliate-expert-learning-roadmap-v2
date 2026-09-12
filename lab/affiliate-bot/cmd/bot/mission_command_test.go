@@ -105,6 +105,73 @@ func TestMissionM08IntentRejectsInputOutputAliasesWithoutMutation(t *testing.T) 
 	}
 }
 
+func TestCanonicalRuntimeStoresRejectExternalSymlinkPaths(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize canonical-store fixture: code=%d response=%+v", code, response)
+	}
+	t.Run("mission state", func(t *testing.T) {
+		statePath := missionStatePath(dir)
+		stateBytes, err := os.ReadFile(statePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		externalState := filepath.Join(filepath.Dir(dir), "external-mission-state.json")
+		if err := os.WriteFile(externalState, stateBytes, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(statePath); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(externalState, statePath); err != nil {
+			t.Fatal(err)
+		}
+		if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "STATE_ERROR" {
+			t.Fatalf("status accepted external mission-state symlink: code=%d response=%+v", code, response)
+		}
+		if got, err := os.ReadFile(externalState); err != nil || !bytes.Equal(got, stateBytes) {
+			t.Fatalf("state-symlink rejection changed external bytes: %q err=%v", got, err)
+		}
+		if err := os.Remove(statePath); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(statePath, stateBytes, 0600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	for _, fixture := range []struct {
+		name     string
+		path     string
+		external []byte
+		load     func() error
+	}{
+		{name: "M10 artifact registry", path: m10ArtifactRegistryPath(dir), external: []byte("\n"), load: func() error { _, err := loadM10ArtifactRegistry(dir); return err }},
+		{name: "trusted cost-bound registry", path: trustedCostBoundsPath(dir), external: []byte("\n"), load: func() error { _, err := loadTrustedCostBounds(dir); return err }},
+		{name: "M11 artifact registry", path: m11ArtifactRegistryPath(dir), external: []byte("\n"), load: func() error { _, err := loadM11ArtifactRegistry(dir); return err }},
+		{name: "durable STOP", path: filepath.Join(dir, "STOP"), external: []byte(`{"active":false}`), load: func() error { _, err := stopMarkerActive(dir); return err }},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			external := filepath.Join(filepath.Dir(dir), strings.ReplaceAll(fixture.name, " ", "-")+".json")
+			if err := os.WriteFile(external, fixture.external, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(external, fixture.path); err != nil {
+				t.Fatal(err)
+			}
+			if err := fixture.load(); err == nil {
+				t.Fatalf("accepted external %s symlink", fixture.name)
+			}
+			if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, fixture.external) {
+				t.Fatalf("%s symlink rejection changed external bytes: %q err=%v", fixture.name, got, err)
+			}
+			if err := os.Remove(fixture.path); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 	dir, history, request := missionFixture(t)
 	release, err := acquireHistoryRuntimeGate(history)

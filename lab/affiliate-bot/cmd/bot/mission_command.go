@@ -244,7 +244,7 @@ type m11UnknownStopJournal struct {
 // canonical compact JSON used for later resolution; user-supplied output files
 // are only portable views of those registered artifacts.
 func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
-	raw, err := os.ReadFile(m10ArtifactRegistryPath(dir))
+	raw, _, err := readStableRegularFile(m10ArtifactRegistryPath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -358,7 +358,7 @@ func resolveM10ArtifactByID(dir, kind, artifactID, contentHash string) (corem10.
 }
 
 func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
-	raw, err := os.ReadFile(trustedCostBoundsPath(dir))
+	raw, _, err := readStableRegularFile(trustedCostBoundsPath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -557,10 +557,25 @@ func readJSON(path string, value any) error {
 	decoder.UseNumber()
 	return decoder.Decode(value)
 }
+
+// readCanonicalRuntimeJSON accepts only a stable regular file from the runtime
+// directory. Canonical state is not a user-supplied portable input: following
+// a symlink here could turn unrelated external bytes into state, STOP or an
+// authority decision before the runtime's graph checks run.
+func readCanonicalRuntimeJSON(path string, value any) error {
+	b, _, err := readStableRegularFile(path)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	return decoder.Decode(value)
+}
+
 func missionStatePath(dir string) string { return filepath.Join(dir, "mission-state.json") }
 func loadMissionState(dir string) (LearnerMissionState, error) {
 	var s LearnerMissionState
-	if err := readJSON(missionStatePath(dir), &s); err != nil {
+	if err := readCanonicalRuntimeJSON(missionStatePath(dir), &s); err != nil {
 		return s, err
 	}
 	if s.Version != missionStateVersion {
@@ -576,7 +591,7 @@ func stopMarkerActive(dir string) (bool, error) {
 	var marker struct {
 		Active bool `json:"active"`
 	}
-	if err := readJSON(filepath.Join(dir, "STOP"), &marker); err != nil {
+	if err := readCanonicalRuntimeJSON(filepath.Join(dir, "STOP"), &marker); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}

@@ -157,6 +157,16 @@ regression tạo FIFO ở execution journal và xác nhận recovery prelude, st
 và reader fail-closed trước read. Windows FIFO semantics và proof
 crash/power-loss/multi-host vẫn nằm ngoài phạm vi.
 
+**Cập nhật canonical runtime-store path guard (2026-09-12):** trước parser hay
+graph validation, learner chỉ đọc `mission-state.json`, `STOP`, M10 artifact
+registry/cost-bound registry và M11 artifact registry qua `Lstat → open/fstat
+→ Lstat`. Regression thay từng path bằng symlink đến bytes ngoài runtime vẫn
+hợp lệ (state dùng đúng bytes đã initialize) và nhận reject trước khi dùng state
+hoặc authority artifact; external target không đổi. CI mutation đồng thời bỏ
+các guard trong checkout tạm và đòi mọi assertion runtime-store thật fail. Đây
+chỉ là guard path local cho các store nêu tên, không bao phủ mọi JSONL runtime,
+TOCTOU ngoài primitive này, crash/power-loss, multi-host hay executor.
+
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
 CLI hay environment override). M08 → M10 regression tạo intent/policy/approval/
