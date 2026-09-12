@@ -6,10 +6,11 @@ Validator kiểm tra workflow chỉ đưa fixture synthetic vào shared adapter
 `HistoryRecord`. Adapter phải append, resolve/replay record rồi mới trả ACK.
 N8n không có canonical history hoặc watcher cache trong profile này.
 
-Đây chỉ là contract/drift evidence. Nó không chứng minh blueprint import hoặc
-execution thành công trên một engine n8n cụ thể. `lab/n8n/COMPATIBILITY.md` tiếp
-tục giữ `tested_n8n_version: UNVERIFIED` cho tới khi có instance, ngày thử,
-import result, execution IDs và history refs.
+Đây chỉ là contract/drift evidence. Nó không tự chứng minh blueprint import hoặc
+execution thành công trên một engine n8n cụ thể. Disposable regression hiện chạy
+M06 trên n8n `2.38.1`, gồm Schedule Trigger, bằng fixture synthetic/read-only;
+release admission trong `lab/n8n/COMPATIBILITY.md` vẫn `UNVERIFIED` vì chưa có
+ma trận smoke đầy đủ trên topology/deployment được chọn.
 
 Chạy kiểm tra:
 

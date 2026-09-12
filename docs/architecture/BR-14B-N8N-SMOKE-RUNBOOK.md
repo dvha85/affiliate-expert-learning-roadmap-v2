@@ -1,8 +1,10 @@
 # BR-14b — runbook smoke n8n M06
 
 Đây là runbook để maintainer ghi integration evidence trên **một n8n engine cụ
-thể**. Repo hiện chưa có instance được cấp quyền, nên `tested_n8n_version` vẫn
-`UNVERIFIED`; không dùng JSON parse hoặc contract test offline để thay thế.
+thể**. Repo có regression disposable n8n `2.38.1` với fixture synthetic/read-only,
+gồm cả Schedule Trigger; `tested_n8n_version` vẫn `UNVERIFIED` cho release vì
+chưa có ma trận smoke đầy đủ trên topology/deployment được chọn. Không dùng JSON
+parse hoặc contract test offline để thay thế.
 
 ## Bản ghi bắt buộc
 

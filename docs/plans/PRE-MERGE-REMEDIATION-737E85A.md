@@ -274,6 +274,18 @@ hợp lệ phải `APPENDED` với record ID khác rồi replay `MATCH`. Đây l
 cho fixed synthetic profile, chưa là schedule admission, parser nguồn thật hay
 operated selected-source evidence.
 
+**M06 Schedule Trigger regression (2026-09-12):** `run_n8n_m06_schedule_regression.py`
+tạo SQLite n8n cô lập, import một copy fixture và chỉ đổi cadence thành một giây,
+rồi tạo active-version graph hợp lệ trong database tạm trước khi khởi động `n8n
+start`. Regression phải thấy `execution_entity.mode=trigger` thành công, đọc
+report thật từ payload n8n, bind ACK/history/record ID, giữ
+`execution_permitted=false`, và replay `MATCH`. Ca adapter loopback không chạy
+phải tạo trigger execution lỗi tại canonical handoff, không ACK/report và không
+ghi history. CI chạy cả hai ca; blueprint checked-in vẫn inactive, fixture
+synthetic/read-only và không có provider/source/credential/executor. Đây đóng
+gap schedule admission của coverage offline, không phải deployment hay source
+selected operated evidence.
+
 ## 6. Compatibility, bàn giao và merge gate
 
 Trước khi sửa schema/store, mỗi changeset phải chốt: version mới nếu có, loader hỗ trợ bản nào, cách xử lý snapshot cũ, migration read-only hay explicit command, rollback code sau khi đã ghi format mới có an toàn không. Không tự migrate dữ liệu của người dùng trong lúc review/test. Thay đổi PMR-02 thêm ledger ref bắt buộc vào gate: gate cũ không đủ proof để authorize và sẽ fail closed; tạo lại gate từ ledger hiện hành qua luồng review thay vì rewrite artifact cũ. Bản backup cũ không đủ graph proof không được tự nhận là restore đầy đủ; runtime lịch sử chỉ đọc không được tự cấp quyền mới.
