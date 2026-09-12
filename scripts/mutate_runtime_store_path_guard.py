@@ -3,7 +3,7 @@
 This narrow composite mutation changes a disposable Bot copy so state/STOP,
 M10 registry/cost bounds, and the M11 registry use ordinary path-following
 reads. The real runtime-store symlink regression must then fail at every
-matching assertion. It does not cover every canonical JSONL store, races,
+matching assertion. It does not cover every canonical runtime store, races,
 crashes, multi-host filesystems, or operated runtime evidence.
 """
 import os

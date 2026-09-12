@@ -148,7 +148,9 @@ func TestCanonicalRuntimeStoresRejectExternalSymlinkPaths(t *testing.T) {
 	}{
 		{name: "M10 artifact registry", path: m10ArtifactRegistryPath(dir), external: []byte("\n"), load: func() error { _, err := loadM10ArtifactRegistry(dir); return err }},
 		{name: "trusted cost-bound registry", path: trustedCostBoundsPath(dir), external: []byte("\n"), load: func() error { _, err := loadTrustedCostBounds(dir); return err }},
+		{name: "M10 fixture outcome store", path: m10OutcomeStorePath(dir), external: []byte("\n"), load: func() error { _, err := loadM10FixtureOutcomes(dir, LearnerMissionState{}); return err }},
 		{name: "M11 artifact registry", path: m11ArtifactRegistryPath(dir), external: []byte("\n"), load: func() error { _, err := loadM11ArtifactRegistry(dir); return err }},
+		{name: "M11 fixture outcome store", path: m11OutcomeStorePath(dir), external: []byte("\n"), load: func() error { _, err := loadM11FixtureOutcomes(dir); return err }},
 		{name: "durable STOP", path: filepath.Join(dir, "STOP"), external: []byte(`{"active":false}`), load: func() error { _, err := stopMarkerActive(dir); return err }},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
