@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-13",
-  "main_baseline": "587f2a7aa9a8e887518e677a9d83a92e2c95ed94",
+  "main_baseline": "6d09687126cb8639cfcbe1ad8521fe93c060def1",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
 	{"id":"RP-01-history-stable-io","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/internal/store/history.go"],"test_refs":["lab/affiliate-bot/internal/store/history_test.go"],"scope":"canonical JSONL history reads reject a symlink or same-byte name replacement from Lstat through open/fstat, while appends retain inode identity through sync, close and acknowledgement. Existing targets retain identity; a target that appears after an absent append check must be created with O_EXCL. This bounded local filesystem guard excludes post-open read mutation, crash/power-loss and multi-host transactions"},
