@@ -23,6 +23,9 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+from validate_n8n_m06_operated_execution import validate_rejection as validate_m06_operated_rejection
+from validate_n8n_m06_operated_execution import validate_success as validate_m06_operated_success
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BOT_DIR = ROOT / "lab" / "affiliate-bot"
@@ -277,7 +280,7 @@ def require_m06_success(execution: dict, expected_status: str) -> str:
     report = node_json(execution, "Report Canonical M06 Result")
     if report.get("result") != expected_status or report.get("canonical_history_handoff") != "ACK":
         raise AssertionError(f"M06 did not return {expected_status} canonical ACK")
-    if report.get("canonical_history_persisted") is not True or not report.get("record_id"):
+    if report.get("canonical_history_persisted") is not True or report.get("execution_permitted") is not False or not report.get("record_id"):
         raise AssertionError("M06 reported persistence without a canonical record ID")
     return str(report["record_id"])
 
@@ -389,9 +392,11 @@ def main() -> None:
             import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06", port)
             first = execute(prefix, env, "rp08-m06")
             record_id = require_m06_success(first, "APPENDED")
+            validate_m06_operated_success(first, history, expected_result="APPENDED")
             second = execute(prefix, env, "rp08-m06")
             if require_m06_success(second, "EXACT_DUPLICATE") != record_id:
                 raise AssertionError("M06 duplicate did not resolve the original canonical record")
+            validate_m06_operated_success(second, history, expected_result="EXACT_DUPLICATE")
             reordered = m06_fixture(body='{"commission_rate":0.08,"price":100,"currency":"USD","product_name":"Fixture A","product_id":"a"}')
             import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-reordered", port, m06_fixture=reordered)
             if require_m06_success(execute(prefix, env, "rp08-m06-reordered"), "EXACT_DUPLICATE") != record_id:
@@ -399,12 +404,16 @@ def main() -> None:
             history_before_rejections = history.read_bytes()
             changed_same_event = m06_fixture(body='{"product_id":"a","product_name":"Fixture A","currency":"USD","price":120,"commission_rate":0.08}')
             import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-conflict", port, m06_fixture=changed_same_event)
-            require_m06_rejection(execute(prefix, env, "rp08-m06-conflict", expected=1))
+            conflict = execute(prefix, env, "rp08-m06-conflict", expected=1)
+            require_m06_rejection(conflict)
+            validate_m06_operated_rejection(conflict, history, expected_record_count=1)
             if history.read_bytes() != history_before_rejections:
                 raise AssertionError("M06 conflicting content changed canonical history")
             bad_source = m06_fixture(url="https://other.invalid/br13/offer")
             import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-source-reject", port, m06_fixture=bad_source)
-            require_m06_rejection(execute(prefix, env, "rp08-m06-source-reject", expected=1))
+            source_rejection = execute(prefix, env, "rp08-m06-source-reject", expected=1)
+            require_m06_rejection(source_rejection)
+            validate_m06_operated_rejection(source_rejection, history, expected_record_count=1)
             if history.read_bytes() != history_before_rejections:
                 raise AssertionError("M06 rejected source changed canonical history")
             changed_new_event = m06_fixture(correlation_id="event-2", body=changed_same_event["body"])

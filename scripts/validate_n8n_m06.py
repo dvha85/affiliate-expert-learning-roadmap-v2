@@ -41,6 +41,13 @@ for marker in {"CANONICAL_HISTORY_NOT_ACKNOWLEDGED", "canonical_history_ack!==tr
     if marker not in ack:
         raise SystemExit(f"M06 ACK boundary marker missing: {marker}")
 
+report_fields = {
+    item["name"]
+    for item in nodes["Report Canonical M06 Result"]["parameters"]["assignments"]["assignments"]
+}
+if "execution_permitted" not in report_fields:
+    raise SystemExit("M06 final report must preserve execution_permitted=false")
+
 connections = blueprint.get("connections", {})
 for source, target in [
     ("Schedule Trigger", "M06 Adapter Input"),
