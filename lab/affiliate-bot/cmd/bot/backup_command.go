@@ -1353,7 +1353,17 @@ func containsAll(files, required []string) bool {
 
 func verifyBackup(dir string) (backupManifest, error) {
 	var m backupManifest
-	if err := readJSON(filepath.Join(dir, "manifest.json"), &m); err != nil {
+	// The manifest selects the inventory and expected digests for every later
+	// restore read. Treat it as a backup-owned artifact boundary rather than a
+	// portable input: a symlink or name/content race must fail before inventory
+	// validation can make the external bytes authoritative.
+	manifestRaw, _, err := readStableRegularFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return m, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(manifestRaw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&m); err != nil {
 		return m, err
 	}
 	if m.Version != backupManifestVersion || len(m.Files) == 0 {

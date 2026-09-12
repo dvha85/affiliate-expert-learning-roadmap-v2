@@ -1503,6 +1503,13 @@ nhận reject. Điều này không là snapshot atomic trước writer không h�
 thể race/restore bytes, cũng không chứng minh crash/power-loss, transaction đa
 file hay multi-host recovery.
 
+**Cập nhật backup-manifest stable reader (2026-09-13):** manifest là artifact
+chọn inventory và digest cho restore, nên `verifyBackup` đọc nó bằng shared
+stable reader trước khi duyệt layout. Regression tạo backup hợp lệ, thay
+`manifest.json` bằng symlink cùng byte ra ngoài, rồi xác nhận restore trả
+`VERIFY_FAILED`, không publish target và không đổi file ngoài. Đây không thay
+thế proof snapshot atomic, crash/power-loss hoặc recovery multi-host.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.

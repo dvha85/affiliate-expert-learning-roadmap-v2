@@ -237,6 +237,50 @@ func TestRestoreRejectsBackupSourceSymlinkSwapAfterVerification(t *testing.T) {
 	}
 }
 
+func TestRestoreRejectsSymlinkedManifestBeforeInventory(t *testing.T) {
+	runtime := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize manifest fixture: code=%d response=%+v", code, response)
+	}
+	root := filepath.Dir(runtime)
+	backup, restored := filepath.Join(root, "manifest-source-backup"), filepath.Join(root, "manifest-source-restored")
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("create manifest fixture backup: code=%d response=%+v", code, response)
+	}
+	manifestPath := filepath.Join(backup, "manifest.json")
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(root, "external-manifest.json")
+	if err := os.WriteFile(external, manifest, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code == 0 || response["status"] != "VERIFY_FAILED" {
+		t.Fatalf("restore followed a same-byte manifest symlink: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(restored); !os.IsNotExist(err) {
+		t.Fatalf("manifest rejection occupied restore target: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, manifest) {
+		t.Fatalf("manifest rejection changed external source: %q err=%v", got, err)
+	}
+}
+
 func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
 		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])
