@@ -1494,6 +1494,15 @@ quán cục bộ của một snapshot đã consume, không phải snapshot atomi
 không hợp tác có thể race/restore bytes; crash/power-loss và multi-host
 transaction vẫn mở.
 
+**Cập nhật canonical runtime-store content verification (2026-09-13):** shared
+`readStableRegularFile` của mission state/STOP, M10/M11 authority stores,
+backup/restore, M07 sidecar và recovery journal nay reread chính descriptor sau
+lần đọc hoàn chỉnh đầu tiên rồi so SHA-256 trước ACK. Regression gọi đúng
+primitive, rewrite nội dung cùng kích thước trên cùng inode giữa hai lần đọc và
+nhận reject. Điều này không là snapshot atomic trước writer không hợp tác có
+thể race/restore bytes, cũng không chứng minh crash/power-loss, transaction đa
+file hay multi-host recovery.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.

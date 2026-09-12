@@ -64,6 +64,12 @@ var backupStagingWriteFault func(phase, path string) error
 // copy path.
 var stableRegularFileReadHook func(path string) error
 
+// stableRegularFileContentHook runs in tests only after the shared reader has
+// captured its first descriptor snapshot and before it verifies that snapshot.
+// It proves a same-inode content rewrite is rejected on the real runtime-store
+// read path, without making the timing configurable to production callers.
+var stableRegularFileContentHook func(path string) error
+
 // stableRegularFileAppendHook is the write-side equivalent of the reader
 // hook. It is test-only: production callers cannot select an append target or
 // influence the moment between the name check and open. Keeping this seam at
@@ -174,10 +180,10 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 }
 
 // readStableRegularFile reads a file only if the name stayed bound to the same
-// regular inode from pre-open through the read. Canonical runtime stores and
-// backup/restore copies share this local path-race guard, so neither follows a
-// symlink or silently accepts a replacement during the read. It is not a
-// multi-host snapshot transaction.
+// regular inode from pre-open through the read. A fully-read descriptor is
+// hashed and reread before acknowledgement, so a same-inode content rewrite is
+// also rejected. Canonical runtime stores and backup/restore copies share this
+// local path-race guard. It is not an atomic multi-host snapshot transaction.
 func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 	before, err := os.Lstat(path)
 	if err != nil {
@@ -206,9 +212,29 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		}
 	}
 	data, readErr := io.ReadAll(f)
-	closeErr := f.Close()
 	if readErr != nil {
+		_ = f.Close()
 		return nil, nil, readErr
+	}
+	if stableRegularFileContentHook != nil {
+		if err := stableRegularFileContentHook(path); err != nil {
+			_ = f.Close()
+			return nil, nil, err
+		}
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		_ = f.Close()
+		return nil, nil, err
+	}
+	current, readErr := io.ReadAll(f)
+	if readErr != nil {
+		_ = f.Close()
+		return nil, nil, readErr
+	}
+	contentChanged := sha256.Sum256(data) != sha256.Sum256(current)
+	closeErr := f.Close()
+	if contentChanged {
+		return nil, nil, fmt.Errorf("%s content changed while reading stable regular file", path)
 	}
 	if closeErr != nil {
 		return nil, nil, closeErr
