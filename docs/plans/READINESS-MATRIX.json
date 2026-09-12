@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
-  "as_of": "2026-09-12",
-  "main_baseline": "74b27e85201001d4f0ef31b6f470c4bade558fe8",
+  "as_of": "2026-09-13",
+  "main_baseline": "587f2a7aa9a8e887518e677a9d83a92e2c95ed94",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
 	{"id":"RP-01-m10-m11-registry-stable-append","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/backup_command.go","lab/affiliate-bot/cmd/bot/mission_command.go","lab/affiliate-bot/cmd/bot/m11_registry.go"],"test_refs":["lab/affiliate-bot/cmd/bot/mission_command_test.go","lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"],"scope":"M10 and M11 append-only registries now require a stable regular-file name from Lstat through open and after sync before ACK. The real registry tests replace a prechecked registry with a same-byte external symlink immediately before append and prove the external target remains byte-identical. This is a bounded local filesystem guard; crash, power-loss, multi-host transactions and unaudited writers remain open"},
