@@ -67,6 +67,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/smoke_br16a_offline.py", "python scripts/removed.py"), encoding="utf-8")
         self.assertIn("unresolved CI evidence", self.run_audit(False))
 
+    def test_missing_identity_mutation_proof_is_rejected(self):
+        workflow = self.root / ".github/workflows/curriculum-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m10_identity_guard.py", "python scripts/removed.py"), encoding="utf-8")
+        self.assertIn("required regression is not wired", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")
