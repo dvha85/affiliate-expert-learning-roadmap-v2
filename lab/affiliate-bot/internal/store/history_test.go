@@ -64,6 +64,39 @@ func TestJSONLAppendAndRead(t *testing.T) {
 	}
 }
 
+func TestJSONLOpenRejectsSameByteSymlinkReplacement(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "history.jsonl")
+	external := filepath.Join(dir, "external-history.jsonl")
+	original := []byte(`{"id":"same-byte"}` + "\n")
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	openPathHook = func(got string) error {
+		if got != path {
+			t.Fatalf("hook path = %q, want %q", got, path)
+		}
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { openPathHook = nil })
+	if _, err := (JSONL{}).Open(path); err == nil {
+		t.Fatal("reader followed a same-byte symlink replacement")
+	}
+	after, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, original) {
+		t.Fatalf("reader mutated external target: %q", after)
+	}
+}
+
 func TestOversizedRecordDoesNotCreateFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "history.jsonl")
 	if err := (JSONL{}).AppendLine(path, bytes.Repeat([]byte("x"), MaxHistoryRecordBytes+1)); err == nil {
