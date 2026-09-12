@@ -271,8 +271,11 @@ copy/verify toàn bộ snapshot trong sibling staging, rồi publish qua rename 
 target rỗng dưới target gate. Mỗi copied file mới phải `fsync`; mọi directory edge
 từ file tới staging root cũng sync trước graph verify/publish. Regression inject
 lỗi sau file-sync và trước directory-sync: staging bị dọn, target không bị chiếm
-và retry publish/restore thành công. Đây không chứng minh crash/power-loss
-durability sau rename hay transaction multi-host, nên vẫn `PARTIAL`.
+và retry publish/restore thành công. Reader snapshot cũng kiểm
+`Lstat → open/fstat → Lstat` của regular file; regression swap `mission-state`
+thành symlink sau inventory phải reject trước copy/publish, không đọc hay đổi
+external target. Đây không chứng minh crash/power-loss durability sau rename hay
+transaction multi-host, nên vẫn `PARTIAL`.
 
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery

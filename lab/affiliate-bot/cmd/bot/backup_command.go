@@ -154,10 +154,54 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 	return func() { _ = os.Remove(path) }, nil
 }
 
+// readStableRegularFile reads a file only if the name stayed bound to the same
+// regular inode from pre-open through the read. It prevents a backup from
+// following a symlink or silently copying a replacement between inventory and
+// snapshot copy. This is a local path-race guard, not a multi-host snapshot
+// transaction.
+func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !before.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("%s must be a regular file", path)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	opened, statErr := f.Stat()
+	if statErr != nil {
+		_ = f.Close()
+		return nil, nil, statErr
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("%s changed while opening backup source", path)
+	}
+	data, readErr := io.ReadAll(f)
+	closeErr := f.Close()
+	if readErr != nil {
+		return nil, nil, readErr
+	}
+	if closeErr != nil {
+		return nil, nil, closeErr
+	}
+	after, err := os.Lstat(path)
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) {
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("%s changed while reading backup source", path)
+	}
+	return data, opened, nil
+}
+
 func fileDigest(path string) (string, error) {
-	b, e := os.ReadFile(path)
-	if e != nil {
-		return "", e
+	b, _, err := readStableRegularFile(path)
+	if err != nil {
+		return "", err
 	}
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:]), nil
@@ -227,18 +271,26 @@ func backupFileMetadata(path, name string) (backupFile, error) {
 	if err != nil {
 		return backupFile{}, err
 	}
-	info, err := os.Stat(path)
+	data, info, err := readStableRegularFile(path)
 	if err != nil {
 		return backupFile{}, err
 	}
-	if !info.Mode().IsRegular() {
-		return backupFile{}, fmt.Errorf("%s must be a regular file", path)
-	}
-	digest, err := fileDigest(path)
-	if err != nil {
-		return backupFile{}, err
-	}
+	digestBytes := sha256.Sum256(data)
+	digest := hex.EncodeToString(digestBytes[:])
 	return backupFile{Kind: kind, SizeBytes: info.Size(), SHA256: digest}, nil
+}
+
+func backupFileDataAndMetadata(path, name string) ([]byte, backupFile, error) {
+	kind, err := backupArtifactKind(name)
+	if err != nil {
+		return nil, backupFile{}, err
+	}
+	data, info, err := readStableRegularFile(path)
+	if err != nil {
+		return nil, backupFile{}, err
+	}
+	digestBytes := sha256.Sum256(data)
+	return data, backupFile{Kind: kind, SizeBytes: info.Size(), SHA256: hex.EncodeToString(digestBytes[:])}, nil
 }
 
 func backupSourceInventory(source string, files []string) (map[string]backupFile, error) {
@@ -1393,9 +1445,12 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 					return emit("STORE_ERROR", nil, e, 1)
 				}
 			}
-			b, e := os.ReadFile(filepath.Join(args[1], name))
-			if e != nil {
-				return emit("INPUT_ERROR", nil, e, 1)
+			b, sourceMetadata, readErr := backupFileDataAndMetadata(filepath.Join(args[1], name), name)
+			if readErr != nil {
+				return emit("INPUT_ERROR", nil, readErr, 1)
+			}
+			if sourceMetadata != sourceInventory[name] {
+				return emit("SNAPSHOT_CONFLICT", nil, fmt.Errorf("runtime changed while reading %s", name), 1)
 			}
 			clean, e := backupRelativePath(name)
 			if e != nil {

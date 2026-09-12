@@ -111,6 +111,65 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 	}
 }
 
+func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {
+	runtime := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtime); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtime, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize source-swap fixture: code=%d response=%+v", code, response)
+	}
+	statePath := missionStatePath(runtime)
+	original, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(filepath.Dir(runtime), "external-mission-state.json")
+	if err := os.WriteFile(external, []byte(`{"outside":"must-not-be-read"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(filepath.Dir(runtime), "source-swap-backup")
+	swapped := false
+	backupCopyFault = func(name string) error {
+		if name != "mission-state.json" || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(statePath); err != nil {
+			return err
+		}
+		return os.Symlink(external, statePath)
+	}
+	t.Cleanup(func() { backupCopyFault = nil })
+	if code, response := backupCall(t, "create", runtime, backup); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("backup followed source symlink swapped after inventory: code=%d response=%+v", code, response)
+	}
+	if !swapped {
+		t.Fatal("backup did not execute source-swap seam")
+	}
+	if _, err := os.Stat(backup); !os.IsNotExist(err) {
+		t.Fatalf("rejected source swap occupied backup target: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || string(got) != `{"outside":"must-not-be-read"}` {
+		t.Fatalf("source-swap backup changed external target: %q err=%v", got, err)
+	}
+	if err := os.Remove(statePath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	backupCopyFault = nil
+	if code, response := backupCall(t, "create", runtime, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup retry after source-swap rejection failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_RUNTIME_GATE_HELPER") == "1" {
 		_, err := acquireRuntimeGate(os.Args[len(os.Args)-1])
