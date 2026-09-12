@@ -123,6 +123,11 @@ def audit_evidence_graph(root, criteria_by_id):
             kinds.add(kind)
             if not isinstance(claim.get("scope"), str) or not claim["scope"].strip():
                 fail(f"{claim_id} lacks evidence scope")
+            if kind == "operated" and status == "VERIFIED_OFFLINE":
+                scope = claim["scope"].casefold()
+                for boundary in ("synthetic", "read-only", "local"):
+                    if boundary not in scope:
+                        fail(f"{claim_id} operated scope must retain {boundary} boundary")
             matrix_field = claim.get("matrix_field")
             if kind in {"implementation", "test"}:
                 expected_field = f"{kind}_refs"
