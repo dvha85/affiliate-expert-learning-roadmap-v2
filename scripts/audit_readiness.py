@@ -18,6 +18,7 @@ CI_REQUIRED = {
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
     "scripts/run_n8n_m06_schedule_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
+PUBLIC_READINESS_DOCS = ("README.md", "curriculum/README.md")
 PACKAGE_IDS = {f"RP-{number:02d}" for number in range(1, 11)}
 PACKAGE_STATUSES = {"PARTIAL", "OPEN"}
 REVIEW_IDS = {f"R{number:02d}" for number in range(1, 17)}
@@ -169,6 +170,22 @@ def audit_evidence_graph(root, criteria_by_id):
     return len(claim_ids)
 
 
+def audit_public_readiness_boundary(root, overall):
+    """Keep the two public entrypoints aligned with the scoped readiness state."""
+    if overall != "NOT_READY_FOR_PRODUCTION":
+        return
+    for relative in PUBLIC_READINESS_DOCS:
+        path = root / relative
+        if not path.is_file():
+            fail(f"public readiness document is missing: {relative}")
+        content = path.read_text(encoding="utf-8")
+        if "NOT_READY_FOR_PRODUCTION" not in content:
+            fail(f"public readiness document lacks current boundary: {relative}")
+    curriculum = (root / "curriculum/README.md").read_text(encoding="utf-8").casefold()
+    if "learner-operable" in curriculum:
+        fail("curriculum overclaims learner-operable readiness while production remains not ready")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -209,6 +226,7 @@ def audit(root):
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_review_findings(matrix, criteria_by_id, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
+    audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():
         if script not in (root / workflow).read_text(encoding="utf-8"):
             fail(f"required regression is not wired to CI: {script}")
@@ -227,7 +245,7 @@ def main():
     print("- implementation/test refs exist; required M00-M11 regressions are wired to CI")
     print(f"- plan/matrix/evidence graph share main baseline {matrix['main_baseline'][:12]}")
     print(f"- evidence graph resolves {claim_count} scoped claims to matrix refs, plan markers and declared CI commands")
-    print("- plan contains no unqualified production-readiness claim")
+    print("- plan and public entrypoints retain scoped readiness boundaries")
 
 
 if __name__ == "__main__":

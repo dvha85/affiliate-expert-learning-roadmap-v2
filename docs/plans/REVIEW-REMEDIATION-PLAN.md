@@ -97,7 +97,7 @@ và regression tương ứng.
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
 | RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, and an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, while expiry/rebind and multi-file crash seams remain open |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions including M06 Schedule Trigger admission, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
-| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured; remote CI and external evidence remain outside local audit |
+| RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured and public entrypoints retain scoped NOT_READY boundary; remote CI and external evidence remain outside local audit |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
@@ -1364,6 +1364,13 @@ trúc R01–R16 → RP chủ trì → BR liên quan cùng scope/status. Audit y�
 16 ID duy nhất, package/BR hợp lệ và marker R tương ứng trong plan; negative
 fixture bỏ một mapping phải fail. Đây làm R16 kiểm được liên kết review, không
 xác nhận remote CI, operated evidence hay đóng các finding `PARTIAL`.
+
+**Cập nhật public readiness boundary (2026-09-12):** audit còn đọc hai entrypoint
+`README.md` và `curriculum/README.md` khi matrix giữ `NOT_READY_FOR_PRODUCTION`.
+Cả hai phải giữ marker này; curriculum không được tự gọi toàn bộ đường học là
+`learner-operable`. Negative fixtures xóa marker hoặc đưa lại claim đó phải fail
+trên chính audit. Điều này chỉ chặn overclaim public-facing, không chứng minh
+pilot, selected source, provider hay deployment evidence.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
