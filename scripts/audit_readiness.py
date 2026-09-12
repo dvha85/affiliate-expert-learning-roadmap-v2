@@ -22,6 +22,7 @@ CI_REQUIRED = {
     "scripts/mutate_m07_backup_sidecar_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m08_m07_proposal_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m07_strict_output_decoder.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m07_registry_strict_decoder.py": ".github/workflows/curriculum-ci.yml",
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
     "scripts/run_n8n_m06_schedule_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }

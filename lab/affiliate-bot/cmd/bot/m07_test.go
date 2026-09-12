@@ -24,6 +24,37 @@ func writeM07File(t *testing.T, path string, value any) {
 	}
 }
 
+func TestLoadM07RegistryRejectsNonCanonicalPolicyJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "registry.json")
+	valid := `[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":1000,"follow_redirects":false}]`
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{"duplicate read-only policy", `[{"name":"public_http","read_only":false,"read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":1000,"follow_redirects":false}]`},
+		{"case-variant policy field", `[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":1000,"follow_redirects":false,"Allowed_Hosts":["attacker.example"]}]`},
+		{"unknown policy field", `[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":1000,"follow_redirects":false,"unreviewed_redirect_host":"attacker.example"}]`},
+		{"trailing policy JSON", valid + ` []`},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if err := os.WriteFile(path, []byte(test.raw), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := loadM07Registry(path); err == nil {
+				t.Fatalf("non-canonical registry policy was accepted: %s", test.raw)
+			}
+		})
+	}
+	if err := os.WriteFile(path, []byte(valid), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM07Registry(path); err != nil {
+		t.Fatalf("valid registry policy was rejected: %v", err)
+	}
+}
+
 func TestM07ContextFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 	dir := t.TempDir()
 	historyPath := filepath.Join(dir, "history.jsonl")
