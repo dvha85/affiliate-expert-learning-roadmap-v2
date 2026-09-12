@@ -279,9 +279,10 @@ tạo SQLite n8n cô lập, import một copy fixture và chỉ đổi cadence t
 rồi tạo active-version graph hợp lệ trong database tạm trước khi khởi động `n8n
 start`. Regression phải thấy `execution_entity.mode=trigger` thành công, đọc
 report thật từ payload n8n, bind ACK/history/record ID, giữ
-`execution_permitted=false`, và replay `MATCH`. Ca adapter loopback không chạy
-phải tạo trigger execution lỗi tại canonical handoff, không ACK/report và không
-ghi history. CI chạy cả hai ca; blueprint checked-in vẫn inactive, fixture
+`execution_permitted=false`, chạy tick thứ hai `EXACT_DUPLICATE` rồi restart cả
+n8n/adapter trước tick `EXACT_DUPLICATE` thứ ba và replay `MATCH`. Ca adapter
+loopback không chạy phải tạo trigger execution lỗi tại canonical handoff, không
+ACK/report và không ghi history. CI chạy cả hai ca; blueprint checked-in vẫn inactive, fixture
 synthetic/read-only và không có provider/source/credential/executor. Đây đóng
 gap schedule admission của coverage offline, không phải deployment hay source
 selected operated evidence.

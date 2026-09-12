@@ -54,10 +54,11 @@ MACHINE_EXECUTION. PR #96/#97 bổ sung CI n8n `2.38.1` cho M06 và M07 negative
 paths, nhưng không đưa credential/model-success vào CI.
 
 M06 hiện cũng có regression disposable trên n8n `2.38.1`: một workflow copy
-active giữ node Schedule Trigger thật ở cadence một giây, append/replay canonical
-history qua adapter loopback, và fail closed khi adapter không khả dụng. Điều này
-chỉ xác minh đường fixture synthetic/read-only; không nâng release admission,
-không chứng minh selected source hoặc deployment topology.
+active giữ node Schedule Trigger thật ở cadence một giây, append rồi
+`EXACT_DUPLICATE` trước/sau restart n8n và adapter, replay canonical history qua
+adapter loopback, và fail closed khi adapter không khả dụng. Điều này chỉ xác
+minh đường fixture synthetic/read-only; không nâng release admission, không
+chứng minh selected source hoặc deployment topology.
 
 ## Smoke test bắt buộc
 

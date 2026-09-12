@@ -1310,9 +1310,10 @@ fixture synthetic; selected-source profile không được suy ra là đã nghi�
 
 **M06 Schedule Trigger CI (2026-09-12):** runner riêng khởi động `n8n start`
 trên SQLite disposable và active một copy M06 có Schedule Trigger thật cadence
-một giây. Nó đòi execution `mode=trigger` thành công, report ACK/read-only,
-record history duy nhất và replay `MATCH`; adapter loopback không khả dụng phải
-tạo lỗi trước ACK/report không ghi history. Điều này đóng schedule admission
+một giây. Nó đòi execution `mode=trigger` `APPENDED`, rồi `EXACT_DUPLICATE`
+cùng record trước và sau restart n8n/adapter, report ACK/read-only, record history
+duy nhất và replay `MATCH`; adapter loopback không khả dụng phải tạo lỗi trước
+ACK/report không ghi history. Điều này đóng schedule admission/idempotency
 offline, không là deployment hay selected-source operated evidence.
 
 **Mở rộng M07 model-stub CI (2026-09-09):** cùng job import credential disposable
