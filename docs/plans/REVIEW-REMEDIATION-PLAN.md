@@ -1274,10 +1274,20 @@ vừa đọc với manifest đã verify. Vì bytes và metadata file vẫn khớ
 cho guard local này; không chứng minh mọi race, crash/power-loss, filesystem,
 multi-host hay backup operated.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi ba
-lệnh mutation M10/M11 và backup source identity là required regression của
-`curriculum-ci.yml`, đồng thời đòi script hiện diện; negative fixture xoá lệnh
-M10 hoặc backup khỏi workflow phải làm audit fail. Audit này chỉ xác minh text
+**Cập nhật stable recovery-journal reader (2026-09-12):** M10 execution và
+M11 FAILED/UNKNOWN/outcome recovery parser nay đọc cùng
+`readStableRegularFile` với backup/restore (`Lstat → open/fstat → Lstat`).
+Regression thực thay journal đang mở bằng symlink đến file ngoài có cùng bytes;
+parser phải fail trước khi decode replay plan. CI tạo Bot copy riêng, thay cả
+hai reader bằng `os.ReadFile`, và chỉ PASS mutation nếu assertion swap thật
+thất bại. Đây là guard path identity cục bộ, không chứng minh crash/power-loss,
+filesystem phân tán, multi-host hay các runtime store khác.
+
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi bốn
+lệnh mutation M10/M11, backup source identity và recovery-journal path identity
+là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
+negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
+làm audit fail. Audit này chỉ xác minh text
 workflow đang khai báo lệnh, không thay bằng chứng GitHub Actions ở head hay mở
 rộng mutation coverage ra ngoài các guard đã nêu.
 

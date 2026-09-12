@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -80,6 +80,11 @@ class ReadinessAuditTests(unittest.TestCase):
     def test_missing_runtime_store_path_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_runtime_store_path_guard.py", "python scripts/removed.py"), encoding="utf-8")
+        self.assertIn("unresolved CI evidence", self.run_audit(False))
+
+    def test_missing_recovery_journal_path_mutation_proof_is_rejected(self):
+        workflow = self.root / ".github/workflows/curriculum-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_recovery_journal_path_guard.py", "python scripts/removed.py"), encoding="utf-8")
         self.assertIn("unresolved CI evidence", self.run_audit(False))
 
     def test_unqualified_production_claim_is_rejected(self):
