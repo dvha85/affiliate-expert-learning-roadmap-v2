@@ -1461,6 +1461,15 @@ symlink cùng byte trỏ ra file ngoài ngay trước append, rồi xác nhận 
 reject và file ngoài không đổi. Đây chỉ là guard filesystem cục bộ; không là
 transaction đa-file, recovery power-loss, multi-host lock hay proof executor.
 
+**Cập nhật canonical history stable append (2026-09-13):** writer JSONL của
+learner không còn mở append trực tiếp vào một pathname. Với target có sẵn, nó
+giữ identity của regular file từ `Lstat` qua open/fstat, sync/close và kiểm lại
+trước ACK; với target chưa tồn tại, nó dùng `O_EXCL` để không theo tên xuất hiện
+sau check. Regression thay history đã kiểm bằng symlink cùng byte trỏ tới file
+ngoài, và tạo symlink sau absent check; cả hai đều reject và file ngoài giữ
+nguyên. Đây chưa bảo vệ toàn bộ read path, không chứng minh crash/power-loss hay
+multi-host transaction.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.
