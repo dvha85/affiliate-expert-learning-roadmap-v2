@@ -118,6 +118,8 @@ jobs:
         run: python scripts/mutate_m07_tool_artifact_path_guard.py
       - name: RP-08 M07 backup sidecar path mutation proof
         run: python scripts/mutate_m07_backup_sidecar_path_guard.py
+      - name: RP-08 M08 M07-proposal path mutation proof
+        run: python scripts/mutate_m08_m07_proposal_path_guard.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
       - name: Go vet

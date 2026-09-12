@@ -1298,8 +1298,17 @@ tool-result sau open thành symlink cùng bytes; validation reject. Mutation CI
 bỏ riêng tool-result guard và đòi assertion thật fail. Đây không chứng minh mọi
 sidecar mutation, crash/power-loss, multi-host hay backup operated.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi sáu
-lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result và backup-sidecar path identity
+**Cập nhật M08 M07-proposal stable reader (2026-09-12):** M08 chỉ bind agent
+intent với proposal immutable của M07 sau khi resolver giữ stable regular-file
+identity. Regression gọi learner CLI thật, đổi proposal sau open thành symlink
+ngoài cùng bytes và yêu cầu M08 reject trước khi ghi intent. Mutation CI bỏ
+riêng reader đó và đòi assertion thật fail. Đây chỉ là guard identity cục bộ;
+portable input khác, crash/power-loss, multi-host và authority/executor vẫn
+ngoài phạm vi.
+
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi bảy
+lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result,
+backup-sidecar và M08 M07-proposal path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
 làm audit fail. Audit này chỉ xác minh text
