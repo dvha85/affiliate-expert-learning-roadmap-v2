@@ -69,15 +69,20 @@ func linkedOutcome(raw []byte, actions []m03.HumanActionRecord) (m03.OutcomeReco
 	return o, m03.ValidateActionOutcomeLink(*selected, o)
 }
 
-func loadOutcomes(path string, actions []m03.HumanActionRecord) ([]m03.OutcomeRecord, error) {
+func loadOutcomes(path string, actions []m03.HumanActionRecord) (out []m03.OutcomeRecord, err error) {
 	f, err := (store.JSONL{}).Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			out = nil
+			err = closeErr
+		}
+	}()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
-	out := []m03.OutcomeRecord{}
+	out = []m03.OutcomeRecord{}
 	ids := map[string]bool{}
 	for scanner.Scan() {
 		if len(scanner.Bytes()) > store.MaxHistoryRecordBytes {

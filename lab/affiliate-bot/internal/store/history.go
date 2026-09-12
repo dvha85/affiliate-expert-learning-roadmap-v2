@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -32,6 +33,13 @@ var appendLinePathHook func(path string) error
 // it to select or mutate a source path.
 var openPathHook func(path string) error
 
+// readPathHook runs only in store tests after a descriptor has been bound to
+// the inspected inode and before that descriptor is returned to a caller.
+// The stable reader checks the name again on Close, so this lets a regression
+// prove that a post-open replacement is surfaced to callers that complete a
+// parse and check Close.
+var readPathHook func(path string) error
+
 func appendLineFailure(phase string) error {
 	if appendLineFault == nil {
 		return nil
@@ -42,6 +50,26 @@ func appendLineFailure(phase string) error {
 // MaxHistoryRecordBytes is the JSON payload limit, excluding LF/CRLF framing.
 // Reader and writer share this bound; rejection occurs before opening a file.
 const MaxHistoryRecordBytes = 1 << 20
+
+type stableJSONLReader struct {
+	file   *os.File
+	path   string
+	opened fs.FileInfo
+}
+
+func (r *stableJSONLReader) Read(p []byte) (int, error) { return r.file.Read(p) }
+
+func (r *stableJSONLReader) Close() error {
+	closeErr := r.file.Close()
+	after, err := os.Lstat(r.path)
+	if err != nil {
+		return err
+	}
+	if !after.Mode().IsRegular() || !os.SameFile(r.opened, after) {
+		return fmt.Errorf("history path changed while reading")
+	}
+	return closeErr
+}
 
 func (JSONL) Open(path string) (io.ReadCloser, error) {
 	before, err := os.Lstat(path)
@@ -68,7 +96,13 @@ func (JSONL) Open(path string) (io.ReadCloser, error) {
 		}
 		return nil, fmt.Errorf("history path changed while opening")
 	}
-	return f, nil
+	if readPathHook != nil {
+		if err := readPathHook(path); err != nil {
+			_ = f.Close()
+			return nil, err
+		}
+	}
+	return &stableJSONLReader{file: f, path: path, opened: opened}, nil
 }
 
 func (JSONL) AppendLine(path string, record []byte) error {

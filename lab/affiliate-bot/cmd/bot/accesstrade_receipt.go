@@ -120,15 +120,20 @@ func sameStringSet(left, right []string) bool {
 	return true
 }
 
-func loadAccesstradeReceipts(path string) ([]AccesstradeImportReceipt, error) {
+func loadAccesstradeReceipts(path string) (receipts []AccesstradeImportReceipt, err error) {
 	f, err := (store.JSONL{}).Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			receipts = nil
+			err = closeErr
+		}
+	}()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
-	receipts := []AccesstradeImportReceipt{}
+	receipts = []AccesstradeImportReceipt{}
 	seen := map[string]bool{}
 	for scanner.Scan() {
 		var receipt AccesstradeImportReceipt

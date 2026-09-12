@@ -1473,9 +1473,15 @@ multi-host transaction.
 **Cập nhật canonical history stable reader (2026-09-13):** reader JSONL dùng
 cùng boundary đầu vào: `Lstat` regular file rồi open/fstat cùng inode trước khi
 trả handle cho parser. Regression thay history đã kiểm bằng symlink cùng byte
-trỏ tới file ngoài ngay trước open và reader reject. Điều này không kiểm inode
-lần nữa sau khi caller đọc xong, vì vậy post-open mutation, crash/power-loss và
-multi-host transaction vẫn là gaps được giữ `PARTIAL`.
+trỏ tới file ngoài ngay trước open và reader reject.
+
+**Cập nhật canonical history close verification (2026-09-13):** reader giữ
+inode đã open và kiểm lại pathname trên `Close`; mọi loader canonical history,
+action, outcome, evaluation, improvement và ACCESSTRADE receipt đều propagate
+`Close` error sau parse thay vì trả artifact đã đọc. Regression đổi pathname
+sau open thành symlink cùng byte: bytes của descriptor vẫn đọc được nhưng
+`Close` fail và loader trả lỗi. Đây chưa phát hiện mutation in-place của inode
+đang mở, crash/power-loss hoặc multi-host transaction.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.

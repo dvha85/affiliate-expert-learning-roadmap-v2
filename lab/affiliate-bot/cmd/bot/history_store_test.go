@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -9,14 +10,24 @@ import (
 )
 
 type faultHistory struct {
-	raw               []byte
-	readErr, writeErr error
-	writes            int
+	raw                         []byte
+	readErr, closeErr, writeErr error
+	writes                      int
 }
+
+type closeErrorReader struct {
+	*bytes.Reader
+	err error
+}
+
+func (r closeErrorReader) Close() error { return r.err }
 
 func (s *faultHistory) Open(string) (io.ReadCloser, error) {
 	if s.readErr != nil {
 		return nil, s.readErr
+	}
+	if s.closeErr != nil {
+		return closeErrorReader{Reader: bytes.NewReader(s.raw), err: s.closeErr}, nil
 	}
 	return io.NopCloser(bytes.NewReader(s.raw)), nil
 }
@@ -78,5 +89,20 @@ func TestHistoryStoreSeamFailClosed(t *testing.T) {
 	}
 	if !bytes.Equal(before, s.raw) {
 		t.Fatal("lost prefix")
+	}
+}
+
+func TestLoadHistoryPropagatesCloseFailure(t *testing.T) {
+	record, err := NewHistoryRecord("r-close", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("o-close", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage := &faultHistory{raw: append(raw, '\n'), closeErr: errors.New("history changed while reading")}
+	if records, err := loadHistoryWith(storage, "history.jsonl"); err == nil || records != nil {
+		t.Fatalf("close failure was acknowledged: records=%v err=%v", records, err)
 	}
 }
