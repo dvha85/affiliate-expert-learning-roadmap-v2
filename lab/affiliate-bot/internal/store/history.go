@@ -22,6 +22,11 @@ type JSONL struct{}
 // boundary. It is never configurable by callers.
 var appendLineFault func(phase string) error
 
+// appendLinePathHook is a test-only seam for replacing a name after its
+// pre-open check. It is intentionally package-private: callers cannot choose
+// an append target or interfere with the write boundary in production.
+var appendLinePathHook func(path string) error
+
 func appendLineFailure(phase string) error {
 	if appendLineFault == nil {
 		return nil
@@ -42,9 +47,35 @@ func (JSONL) AppendLine(path string, record []byte) error {
 	if len(record) == 0 || bytes.ContainsAny(record, "\r\n") {
 		return fmt.Errorf("history record must be one nonempty JSON line")
 	}
-	f, e := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	before, e := os.Lstat(path)
+	newFile := os.IsNotExist(e)
+	if e != nil && !newFile {
+		return e
+	}
+	if !newFile && !before.Mode().IsRegular() {
+		return fmt.Errorf("history path is not a regular file")
+	}
+	if appendLinePathHook != nil {
+		if e := appendLinePathHook(path); e != nil {
+			return e
+		}
+	}
+	flags := os.O_APPEND | os.O_WRONLY
+	if newFile {
+		// Do not follow a name that appeared after the absent check.
+		flags |= os.O_CREATE | os.O_EXCL
+	}
+	f, e := os.OpenFile(path, flags, 0600)
 	if e != nil {
 		return e
+	}
+	opened, statErr := f.Stat()
+	if statErr != nil || !opened.Mode().IsRegular() || (!newFile && !os.SameFile(before, opened)) {
+		_ = f.Close()
+		if statErr != nil {
+			return statErr
+		}
+		return fmt.Errorf("history path changed while opening for append")
 	}
 	line := make([]byte, len(record)+1)
 	copy(line, record)
@@ -69,6 +100,13 @@ func (JSONL) AppendLine(path string, record []byte) error {
 	if e = f.Close(); e != nil {
 		return e
 	}
+	after, e := os.Lstat(path)
+	if e != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) {
+		if e != nil {
+			return e
+		}
+		return fmt.Errorf("history path changed while appending")
+	}
 	d, e := os.Open(filepath.Dir(path))
 	if e != nil {
 		return e
@@ -78,5 +116,17 @@ func (JSONL) AppendLine(path string, record []byte) error {
 	if e != nil {
 		return e
 	}
-	return closeErr
+	if closeErr != nil {
+		return closeErr
+	}
+	// Directory sync is part of the acknowledgement boundary. Recheck the
+	// name afterwards so callers do not receive success for a replaced path.
+	after, e = os.Lstat(path)
+	if e != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) {
+		if e != nil {
+			return e
+		}
+		return fmt.Errorf("history path changed before append acknowledgement")
+	}
+	return nil
 }

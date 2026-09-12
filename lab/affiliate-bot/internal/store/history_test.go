@@ -96,3 +96,63 @@ func TestJSONLDoesNotCreateParentOrTruncate(t *testing.T) {
 		t.Fatal("truncated blocker")
 	}
 }
+
+func TestJSONLAppendRejectsSameByteSymlinkReplacement(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "history.jsonl")
+	external := filepath.Join(dir, "external-history.jsonl")
+	original := []byte(`{"id":"same-byte"}` + "\n")
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	appendLinePathHook = func(got string) error {
+		if got != path {
+			t.Fatalf("hook path = %q, want %q", got, path)
+		}
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { appendLinePathHook = nil })
+	if err := (JSONL{}).AppendLine(path, []byte(`{"id":"must-not-append"}`)); err == nil {
+		t.Fatal("append followed a same-byte symlink replacement")
+	}
+	after, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, original) {
+		t.Fatalf("external target changed: %q", after)
+	}
+}
+
+func TestJSONLAppendRejectsSymlinkCreatedAfterAbsentCheck(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "history.jsonl")
+	external := filepath.Join(dir, "external-history.jsonl")
+	original := []byte(`{"id":"external"}` + "\n")
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	appendLinePathHook = func(got string) error {
+		if got != path {
+			t.Fatalf("hook path = %q, want %q", got, path)
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { appendLinePathHook = nil })
+	if err := (JSONL{}).AppendLine(path, []byte(`{"id":"must-not-create"}`)); err == nil {
+		t.Fatal("append followed a symlink created after the absent check")
+	}
+	after, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, original) {
+		t.Fatalf("external target changed: %q", after)
+	}
+}
