@@ -1283,8 +1283,16 @@ hai reader bằng `os.ReadFile`, và chỉ PASS mutation nếu assertion swap th
 thất bại. Đây là guard path identity cục bộ, không chứng minh crash/power-loss,
 filesystem phân tán, multi-host hay các runtime store khác.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi bốn
-lệnh mutation M10/M11, backup source identity và recovery-journal path identity
+**Cập nhật M07 tool-result stable reader (2026-09-12):** adapter chỉ resolve
+`tool_result_id` qua path sidecar do chính adapter tính từ trace ID. Reader nay
+dùng `readStableRegularFile`; regression thay file sau open bằng symlink ngoài
+cùng bytes và phải reject trước grounding. CI mutation thay reader bằng
+`os.ReadFile` rồi đòi assertion thật thất bại. Portable proposal input, backup
+validation breadth, crash/power-loss, multi-host và selected-source evidence
+vẫn ngoài phạm vi.
+
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi năm
+lệnh mutation M10/M11, backup source identity, recovery-journal và M07 tool-result path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
 làm audit fail. Audit này chỉ xác minh text
