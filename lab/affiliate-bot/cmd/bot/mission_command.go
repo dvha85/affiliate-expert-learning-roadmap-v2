@@ -297,7 +297,8 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 	if err != nil {
 		return entry, "", err
 	}
-	f, err := os.OpenFile(m10ArtifactRegistryPath(dir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	path := m10ArtifactRegistryPath(dir)
+	f, opened, err := openStableRegularFileForAppend(path)
 	if err != nil {
 		return entry, "", err
 	}
@@ -309,7 +310,10 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 		err = closeErr
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(m10ArtifactRegistryPath(dir)))
+		err = verifyStableRegularFileName(path, opened)
+	}
+	if err == nil {
+		err = syncDirectory(filepath.Dir(path))
 	}
 	if err != nil {
 		return entry, "", err

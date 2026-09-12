@@ -64,6 +64,13 @@ var backupStagingWriteFault func(phase, path string) error
 // copy path.
 var stableRegularFileReadHook func(path string) error
 
+// stableRegularFileAppendHook is the write-side equivalent of the reader
+// hook. It is test-only: production callers cannot select an append target or
+// influence the moment between the name check and open. Keeping this seam at
+// the shared primitive lets the M10 and M11 registries prove that a name swap
+// cannot turn their append into a write to an external file.
+var stableRegularFileAppendHook func(path string) error
+
 func backupStagingFailure(phase, path string) error {
 	if backupStagingWriteFault == nil {
 		return nil
@@ -214,6 +221,75 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		return nil, nil, fmt.Errorf("%s changed while reading stable regular file", path)
 	}
 	return data, opened, nil
+}
+
+// openStableRegularFileForAppend opens path for an append only when it remains
+// the same regular file from the name check through open. A new file is
+// published with O_EXCL, so a name created between the absent check and open
+// cannot be followed. The caller owns the returned descriptor and must sync,
+// close, then call verifyStableRegularFileName before it reports success.
+//
+// This guards local canonical registries from symlink/name replacement. It is
+// intentionally not a multi-file transaction or a multi-host lock.
+func openStableRegularFileForAppend(path string) (*os.File, fs.FileInfo, error) {
+	before, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		if stableRegularFileAppendHook != nil {
+			if err := stableRegularFileAppendHook(path); err != nil {
+				return nil, nil, err
+			}
+		}
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return nil, nil, err
+		}
+		opened, statErr := f.Stat()
+		if statErr != nil || !opened.Mode().IsRegular() {
+			_ = f.Close()
+			if statErr != nil {
+				return nil, nil, statErr
+			}
+			return nil, nil, fmt.Errorf("%s is not a regular file", path)
+		}
+		return f, opened, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if !before.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("%s is not a regular file", path)
+	}
+	if stableRegularFileAppendHook != nil {
+		if err := stableRegularFileAppendHook(path); err != nil {
+			return nil, nil, err
+		}
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	opened, statErr := f.Stat()
+	if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
+		_ = f.Close()
+		if statErr != nil {
+			return nil, nil, statErr
+		}
+		return nil, nil, fmt.Errorf("%s changed while opening stable regular file for append", path)
+	}
+	return f, opened, nil
+}
+
+// verifyStableRegularFileName confirms that a successful append remains named
+// by the same canonical regular file before its caller acknowledges success.
+func verifyStableRegularFileName(path string, opened fs.FileInfo) error {
+	after, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !after.Mode().IsRegular() || !os.SameFile(opened, after) {
+		return fmt.Errorf("%s changed while appending stable regular file", path)
+	}
+	return nil
 }
 
 func fileDigest(path string) (string, error) {

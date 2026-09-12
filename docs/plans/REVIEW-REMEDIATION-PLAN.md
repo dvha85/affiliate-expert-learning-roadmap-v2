@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-12 -->
-<!-- readiness-main-baseline: 8f84be2e8b8f0d30e2fe3401232df1c2bd375466 -->
+<!-- readiness-main-baseline: 74b27e85201001d4f0ef31b6f470c4bade558fe8 -->
 
 > Reconcile 12/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1452,6 +1452,14 @@ registry loader của CLI và mutation proof thay decoder bằng `json.Unmarshal
 case policy độc hại phải làm regression fail. Đây là hardening cho policy
 offline, không phải bằng chứng về selected source, provider, execution hay
 business outcome.
+
+**Cập nhật M10/M11 stable registry append (2026-09-12):** append-only
+registries không chỉ đọc qua stable regular-file guard: đường append giữ cùng
+regular-file identity từ `Lstat` qua open và kiểm lại sau sync, trước ACK. Hai
+regression gọi trực tiếp M10 và M11 registry, thay registry đã kiểm bằng
+symlink cùng byte trỏ ra file ngoài ngay trước append, rồi xác nhận append bị
+reject và file ngoài không đổi. Đây chỉ là guard filesystem cục bộ; không là
+transaction đa-file, recovery power-loss, multi-host lock hay proof executor.
 
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.

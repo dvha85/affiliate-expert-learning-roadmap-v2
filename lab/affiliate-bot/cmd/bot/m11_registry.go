@@ -102,7 +102,8 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 	if err != nil {
 		return entry, "", err
 	}
-	f, err := os.OpenFile(m11ArtifactRegistryPath(dir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	path := m11ArtifactRegistryPath(dir)
+	f, opened, err := openStableRegularFileForAppend(path)
 	if err != nil {
 		return entry, "", err
 	}
@@ -119,7 +120,10 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 		err = closeErr
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(m11ArtifactRegistryPath(dir)))
+		err = verifyStableRegularFileName(path, opened)
+	}
+	if err == nil {
+		err = syncDirectory(filepath.Dir(path))
 	}
 	if faultErr == nil {
 		// This fault now follows both file and directory sync, exercising the
