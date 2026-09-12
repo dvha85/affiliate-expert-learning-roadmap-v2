@@ -795,7 +795,10 @@ type learnerIntentRequest struct {
 }
 
 func resolveM07Proposal(record HistoryRecord, proposalPath string) (corem07.RegisteredAgentProposal, corem07.AgentOutput, error) {
-	raw, err := os.ReadFile(proposalPath)
+	// An agent intent is allowed to bind only the immutable proposal emitted by
+	// the M07 boundary. Keep its path identity stable while reading it so a
+	// same-byte symlink replacement cannot redirect M08's canonical resolver.
+	raw, _, err := readStableRegularFile(proposalPath)
 	if err != nil {
 		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
 	}

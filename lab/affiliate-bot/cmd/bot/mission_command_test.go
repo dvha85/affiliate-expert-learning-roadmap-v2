@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
@@ -183,6 +184,84 @@ func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 	defer release()
 	if code, response := missionCall(t, "m08-intent", history, request, filepath.Join(dir, "intent.json")); code == 0 || response["status"] != "BUSY" {
 		t.Fatalf("M08 intent did not fail closed during history write: code=%d response=%+v", code, response)
+	}
+}
+
+// The persisted M07 proposal is an immutable canonical input for an agent
+// intent. A replacement after open must fail before M08 can write the intent.
+func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	fixture := watchFixture()
+	watchRun(t, history, filepath.Join(dir, "fixture.json"), fixture, appendAdded)
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("canonical history setup failed: %v %+v", err, records)
+	}
+	ctx, err := m07EvidenceContext(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var evidence corem07.Evidence
+	for _, candidate := range ctx.Evidence {
+		if candidate.FieldOrClaim == "price" {
+			evidence = candidate
+			break
+		}
+	}
+	if evidence.EvidenceID == "" {
+		t.Fatal("canonical price evidence is missing")
+	}
+	claim := corem07.Claim{FieldOrClaim: evidence.FieldOrClaim, Value: json.RawMessage(`100`), EvidenceIDs: []string{evidence.EvidenceID}}
+	claim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{claim})
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: claim.Text, EvidenceIDs: []string{evidence.EvidenceID}, Claims: []corem07.Claim{claim}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":1}`)}}
+	modelRaw, err := json.Marshal(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := corem07.RegisterAgentProposal(modelRaw, ctx.Evidence, nil, records[0].RecordID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposalPath, err := m07ArtifactPath(history, "proposals", proposal.ProposalID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeNewJSON(proposalPath, proposal); err != nil {
+		t.Fatal(err)
+	}
+	proposalBytes, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(dir, "same-byte-external-proposal.json")
+	if err := os.WriteFile(external, proposalBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	request := learnerIntentRequest{IntentID: "m08-proposal-stable-reader", DecisionID: records[0].RecordID, EvidenceIDs: []string{evidence.EvidenceID}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"id": 1}, ProposedBy: "agent", ProposalRef: proposal.ProposalID, CreatedAt: "2026-09-03T00:01:00Z", ExpiresAt: "2099-09-03T00:05:00Z", CorrelationID: "m08-proposal-stable-reader-c", IdempotencyKey: "m08-proposal-stable-reader-k"}
+	requestPath := filepath.Join(dir, "intent-request.json")
+	writeMissionTestJSON(t, requestPath, request)
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(proposalPath) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(proposalPath); err != nil {
+			return err
+		}
+		return os.Symlink(external, proposalPath)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	outputPath := filepath.Join(dir, "intent.json")
+	if code, response := missionCall(t, "m08-intent", history, requestPath, proposalPath, outputPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("M08 intent accepted a same-byte M07 proposal symlink swap: code=%d response=%+v", code, response)
+	}
+	if !swapped {
+		t.Fatal("M08 intent did not reach M07 proposal stable-reader swap seam")
+	}
+	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("M08 intent wrote output after M07 proposal swap: %v", err)
 	}
 }
 
