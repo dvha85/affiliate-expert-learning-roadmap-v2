@@ -1291,8 +1291,15 @@ cùng bytes và phải reject trước grounding. CI mutation thay reader bằng
 validation breadth, crash/power-loss, multi-host và selected-source evidence
 vẫn ngoài phạm vi.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi năm
-lệnh mutation M10/M11, backup source identity, recovery-journal và M07 tool-result path identity
+**Cập nhật M07 backup-sidecar stable reader (2026-09-12):** trước khi backup
+được chấp nhận, graph validator đọc cả tool-result và proposal sidecar bằng
+stable reader, không chỉ tin `WalkDir` trước đó. Regression đổi canonical
+tool-result sau open thành symlink cùng bytes; validation reject. Mutation CI
+bỏ riêng tool-result guard và đòi assertion thật fail. Đây không chứng minh mọi
+sidecar mutation, crash/power-loss, multi-host hay backup operated.
+
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi sáu
+lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result và backup-sidecar path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
 làm audit fail. Audit này chỉ xác minh text
