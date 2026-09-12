@@ -387,6 +387,15 @@ func renderClaim(claim Claim) string {
 // are never copied into the answer automatically: every cited ID and every
 // claim must be present in the model output and resolve in the supplied store.
 func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (AgentOutput, error) {
+	// Decode the complete untrusted model payload through the same strict
+	// boundary used by durable M07 artifacts. In particular, do this before
+	// inspecting individual fields: encoding/json otherwise accepts duplicate
+	// keys, case-insensitive field names, and unknown fields that a model can
+	// use to make the reviewed representation differ from the supplied JSON.
+	var output AgentOutput
+	if err := contracts.DecodeStrict(raw, &output); err != nil {
+		return AgentOutput{}, fmt.Errorf("agent output schema: %w", err)
+	}
 	var shape map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &shape); err != nil {
 		return AgentOutput{}, fmt.Errorf("agent output is not JSON: %w", err)
@@ -398,10 +407,6 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 	}
 	if string(bytes.TrimSpace(shape["write_permission"])) != "false" {
 		return AgentOutput{}, fmt.Errorf("write_permission must be the literal false")
-	}
-	var output AgentOutput
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return output, fmt.Errorf("agent output is not JSON: %w", err)
 	}
 	if output.State != "HUMAN_REVIEW" && output.State != "ABSTAIN" {
 		return output, fmt.Errorf("unsupported agent state")
