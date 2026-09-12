@@ -54,10 +54,12 @@ một giây, rồi bị xóa cùng runtime. Nó không đọc credential n8n loc
 python3 scripts/run_n8n_m06_schedule_regression.py --n8n-cli /path/to/n8n
 ```
 
-Ca success bắt buộc có execution `mode=trigger`, report ACK/read-only, một record
-canonical và replay `MATCH`. Ca adapter không khả dụng phải dừng ở handoff, không
-có ACK/report hay history. Đây là coverage CI synthetic/read-only, không thay
-cho bằng chứng deployment hoặc source được chọn.
+Ca success bắt buộc có execution `mode=trigger` đầu `APPENDED`, tick tiếp theo
+`EXACT_DUPLICATE` cùng record, rồi một tick `EXACT_DUPLICATE` nữa sau khi restart
+cả n8n và adapter; history vẫn chỉ có một record và replay `MATCH`. Ca adapter
+không khả dụng phải dừng ở handoff, không có ACK/report hay history. Đây là
+coverage CI synthetic/read-only, không thay cho bằng chứng deployment hoặc source
+được chọn.
 
 `PASS` chỉ chứng minh một M06 synthetic/read-only path trong n8n engine. Nó không
 chứng minh nguồn được chọn, seller/business truth, business outcome hay quyền thực

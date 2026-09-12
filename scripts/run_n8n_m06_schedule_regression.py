@@ -120,7 +120,7 @@ def stop_n8n(process: subprocess.Popen[str], log: Path) -> None:
         raise AssertionError(f"disposable n8n server exited {process.returncode}:\n{log.read_text(encoding='utf-8')[-8000:]}")
 
 
-def wait_for_execution(database: Path, workflow_id: str, status: str, server: subprocess.Popen[str], log: Path, *, timeout: float = 35) -> tuple[int, dict]:
+def wait_for_execution(database: Path, workflow_id: str, status: str, server: subprocess.Popen[str], log: Path, *, after_id: int = 0, timeout: float = 35) -> tuple[int, dict]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if server.poll() is not None:
@@ -129,8 +129,8 @@ def wait_for_execution(database: Path, workflow_id: str, status: str, server: su
             connection = sqlite3.connect(database, timeout=0.2)
             finished_clause = "AND finished = 1" if status == "success" else ""
             row = connection.execute(
-                f"SELECT id FROM execution_entity WHERE workflowId = ? AND mode = 'trigger' AND status = ? {finished_clause} ORDER BY id DESC LIMIT 1",
-                (workflow_id, status),
+                f"SELECT id FROM execution_entity WHERE workflowId = ? AND mode = 'trigger' AND status = ? {finished_clause} AND id > ? ORDER BY id ASC LIMIT 1",
+                (workflow_id, status, after_id),
             ).fetchone()
             connection.close()
             if row is not None:
@@ -181,17 +181,18 @@ def decode_flatted_execution(raw: str) -> dict:
     return decoded
 
 
-def assert_success(execution_id: int, execution: dict, history: Path) -> None:
+def assert_success(execution_id: int, execution: dict, history: Path, *, expected_result: str) -> str:
     result = execution.get("resultData", execution.get("data", {}).get("resultData", {}))
     wrapped = {"status": "success", "finished": True, "data": {"resultData": result}}
-    record_id = validate_success(wrapped, history, expected_result="APPENDED")
+    record_id = validate_success(wrapped, history, expected_result=expected_result)
     report = node_json(wrapped, "Report Canonical M06 Result")
     if report.get("execution_permitted") is not False or report.get("canonical_history_handoff") != "ACK":
         raise AssertionError("scheduled M06 report crossed its read-only boundary")
     records = [line for line in history.read_text(encoding="utf-8").splitlines() if line.strip()]
     if len(records) != 1:
         raise AssertionError("scheduled M06 fixture did not produce exactly one idempotent canonical record")
-    print(f"M06 SCHEDULE SUCCESS: trigger execution={execution_id} canonical_record={record_id}")
+    print(f"M06 SCHEDULE {expected_result}: trigger execution={execution_id} canonical_record={record_id}")
+    return record_id
 
 
 def assert_adapter_failure(execution: dict, history: Path) -> None:
@@ -230,10 +231,25 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
         expected_status = "success" if available_adapter else "error"
         execution_id, execution = wait_for_execution(database, workflow_id, expected_status, server, log)
         if available_adapter:
-            assert_success(execution_id, execution, history)
+            record_id = assert_success(execution_id, execution, history, expected_result="APPENDED")
+            duplicate_id, duplicate = wait_for_execution(database, workflow_id, "success", server, log, after_id=execution_id)
+            if assert_success(duplicate_id, duplicate, history, expected_result="EXACT_DUPLICATE") != record_id:
+                raise AssertionError("second scheduled execution did not resolve the original canonical record")
+            # Restart both runtime processes.  A third scheduled tick must still
+            # resolve the same record, rather than treating the persisted history
+            # as a fresh observation after n8n re-registers the schedule.
+            stop_n8n(server, log)
+            server = None
+            stop_adapter(adapter)
+            adapter = None
+            adapter = start_adapter(bot, history, adapter_port, env)
+            server, log = start_n8n(prefix, env, choose_port(), runtime)
+            replay_id, replay_execution = wait_for_execution(database, workflow_id, "success", server, log, after_id=duplicate_id)
+            if assert_success(replay_id, replay_execution, history, expected_result="EXACT_DUPLICATE") != record_id:
+                raise AssertionError("restarted Schedule Trigger did not resolve the original canonical record")
             replay = run([str(bot), "history", "replay", str(history)], env=env)
             if "replay=MATCH" not in replay.stdout:
-                raise AssertionError("scheduled canonical history did not replay after n8n start")
+                raise AssertionError("scheduled canonical history did not replay after n8n/adapter restart")
         else:
             assert_adapter_failure(execution, history)
             print(f"M06 SCHEDULE REJECTION: trigger execution={execution_id} adapter failure stopped before ACK/report")
@@ -264,7 +280,7 @@ def main() -> None:
         raise SystemExit(f"n8n CLI entrypoint is unavailable: {prefix[1]}")
     run_case(prefix, args, available_adapter=True)
     run_case(prefix, args, available_adapter=False)
-    print("N8N M06 SCHEDULE REGRESSION PASS: real Schedule Trigger admitted a synthetic read-only canonical handoff and failed closed when its loopback adapter was unavailable")
+    print("N8N M06 SCHEDULE REGRESSION PASS: real Schedule Trigger appended once, retried idempotently before and after n8n/adapter restart, and failed closed when its loopback adapter was unavailable")
 
 
 if __name__ == "__main__":
