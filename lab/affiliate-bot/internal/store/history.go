@@ -27,6 +27,11 @@ var appendLineFault func(phase string) error
 // an append target or interfere with the write boundary in production.
 var appendLinePathHook func(path string) error
 
+// openPathHook is a test-only seam for replacing a history name after the
+// reader has inspected it but before os.Open. Production callers cannot use
+// it to select or mutate a source path.
+var openPathHook func(path string) error
+
 func appendLineFailure(phase string) error {
 	if appendLineFault == nil {
 		return nil
@@ -38,7 +43,33 @@ func appendLineFailure(phase string) error {
 // Reader and writer share this bound; rejection occurs before opening a file.
 const MaxHistoryRecordBytes = 1 << 20
 
-func (JSONL) Open(path string) (io.ReadCloser, error) { return os.Open(path) }
+func (JSONL) Open(path string) (io.ReadCloser, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("history path is not a regular file")
+	}
+	if openPathHook != nil {
+		if err := openPathHook(path); err != nil {
+			return nil, err
+		}
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := f.Stat()
+	if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
+		_ = f.Close()
+		if statErr != nil {
+			return nil, statErr
+		}
+		return nil, fmt.Errorf("history path changed while opening")
+	}
+	return f, nil
+}
 
 func (JSONL) AppendLine(path string, record []byte) error {
 	if len(record) > MaxHistoryRecordBytes {
