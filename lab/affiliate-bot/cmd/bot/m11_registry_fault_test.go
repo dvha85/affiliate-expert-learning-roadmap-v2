@@ -42,6 +42,37 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	}
 }
 
+func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T) {
+	dir := t.TempDir()
+	approval := corem11.ProductionLeaseApproval{
+		ApprovalID: "orphan-approval", LeaseID: "missing-lease", LeaseVersion: "v1",
+		LeaseHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		PromotionReviewRef: "fixture-review", SourceCanaryGrantID: "fixture-grant",
+		SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"},
+		ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z",
+		Decision: "APPROVE_PRODUCTION_LEASE",
+	}
+	raw, err := json.Marshal(approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLeaseApproval, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(dir), append(line, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(dir); err == nil || !strings.Contains(err.Error(), "orphaned") {
+		t.Fatalf("schema-valid orphan approval reached runtime loader: %v", err)
+	}
+}
+
 func TestM11JournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink permissions are not portable on Windows")

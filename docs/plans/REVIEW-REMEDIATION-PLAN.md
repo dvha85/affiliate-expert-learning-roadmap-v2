@@ -130,6 +130,13 @@ writer có lock mới replay exact transition; UNKNOWN vẫn giữ STOP. Đây l
 path-integrity/restart guard offline, không phải proof power-loss, atomic
 multi-file commit hay multi-host recovery.
 
+**Cập nhật M11 runtime-loader orphan guard (2026-09-12):** registry loader
+được regression bằng một `PRODUCTION_LEASE_APPROVAL` schema-valid, integrity
+valid nhưng không có immutable lease cha. `loadM11ArtifactRegistry` phải gọi
+canonical graph validator và reject orphan trước khi runtime có thể dùng entry.
+Case này kiểm đường learner/restore thực, không chỉ gọi core validator trực
+tiếp; vẫn không bao phủ mọi tổ hợp orphan, crash/power-loss hay multi-host.
+
 **Cập nhật M10 execution-journal path guard (2026-09-11):** M10 dùng cùng
 `Lstat` regular-file boundary trước khi status/resolver đọc pending journal,
 và trước writer/backup recovery parse replay record. Regression tạo symlink tới
