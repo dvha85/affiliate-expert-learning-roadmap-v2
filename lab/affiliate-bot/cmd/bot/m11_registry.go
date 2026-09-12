@@ -35,7 +35,7 @@ func m11AppendFault(phase string, entry corem11.ArtifactEntry) error {
 // gate and is reported as GRAPH_FAILED rather than masquerading as a manifest
 // verification problem.
 func readM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
-	raw, err := os.ReadFile(m11ArtifactRegistryPath(dir))
+	raw, _, err := readStableRegularFile(m11ArtifactRegistryPath(dir))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -386,7 +386,7 @@ func recoverM11DurableStop(dir string) error {
 	// Read only the versioned bytes here, then immediately repair STOP before
 	// any normal state consumer is allowed to proceed.
 	var state LearnerMissionState
-	if err := readJSON(missionStatePath(dir), &state); err != nil {
+	if err := readCanonicalRuntimeJSON(missionStatePath(dir), &state); err != nil {
 		return err
 	}
 	if state.Version != missionStateVersion {

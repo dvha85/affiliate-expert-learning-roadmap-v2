@@ -160,10 +160,10 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 }
 
 // readStableRegularFile reads a file only if the name stayed bound to the same
-// regular inode from pre-open through the read. It prevents a backup from
-// following a symlink or silently copying a replacement between inventory and
-// snapshot copy. This is a local path-race guard, not a multi-host snapshot
-// transaction.
+// regular inode from pre-open through the read. Canonical runtime stores and
+// backup/restore copies share this local path-race guard, so neither follows a
+// symlink or silently accepts a replacement during the read. It is not a
+// multi-host snapshot transaction.
 func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 	before, err := os.Lstat(path)
 	if err != nil {

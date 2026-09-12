@@ -16,6 +16,7 @@ CI_REQUIRED = {
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
     "scripts/run_n8n_m06_schedule_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
