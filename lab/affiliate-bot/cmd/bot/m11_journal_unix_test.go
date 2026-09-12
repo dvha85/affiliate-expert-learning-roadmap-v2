@@ -36,3 +36,23 @@ func TestM11JournalFIFOFailsClosedBeforeRuntimeRead(t *testing.T) {
 		})
 	}
 }
+
+func TestM10ExecutionJournalFIFOFailsClosedBeforeRuntimeRead(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	path := m10ExecutionJournalPath(dir)
+	if err := syscall.Mkfifo(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := m10ExecutionJournalRecoveryRequired(dir); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Fatalf("FIFO M10 journal was not rejected before recovery: %v", err)
+	}
+	if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("status did not fail closed for M10 FIFO: code=%d response=%+v", code, response)
+	}
+	if _, err := readM10ExecutionJournal(filepath.Clean(path)); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Fatalf("FIFO M10 journal reached reader: %v", err)
+	}
+}
