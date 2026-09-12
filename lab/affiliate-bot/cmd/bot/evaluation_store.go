@@ -97,7 +97,7 @@ func buildEvaluation(c evaluationConfig, history []HistoryRecord, actions []m03.
 	return e, nil
 }
 
-func loadEvaluations(path string, history []HistoryRecord, actions []m03.HumanActionRecord, outcomes []m03.OutcomeRecord) ([]m05.EvaluationRecord, error) {
+func loadEvaluations(path string, history []HistoryRecord, actions []m03.HumanActionRecord, outcomes []m03.OutcomeRecord) (result []m05.EvaluationRecord, err error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,12 @@ func loadEvaluations(path string, history []HistoryRecord, actions []m03.HumanAc
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			result = nil
+			err = closeErr
+		}
+	}()
 	scanner := bufio.NewScanner(f)
 	scanner.Split(func(data []byte, atEOF bool) (int, []byte, error) {
 		if atEOF && len(data) > 0 && data[len(data)-1] != '\n' {
@@ -118,7 +123,7 @@ func loadEvaluations(path string, history []HistoryRecord, actions []m03.HumanAc
 		return bufio.ScanLines(data, atEOF)
 	})
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
-	result := []m05.EvaluationRecord{}
+	result = []m05.EvaluationRecord{}
 	seen := map[string]bool{}
 	for scanner.Scan() {
 		raw := scanner.Bytes()

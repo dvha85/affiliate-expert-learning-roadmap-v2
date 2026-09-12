@@ -94,7 +94,7 @@ func linkedReview(raw []byte, proposals []m05.ImprovementProposal, evaluations [
 }
 
 // Single-writer JSONL, matching BR-12b ownership and framing; no repair/reset.
-func loadImprovementRecords[T any](path string, decode func([]byte) (T, error), id func(T) string) ([]T, error) {
+func loadImprovementRecords[T any](path string, decode func([]byte) (T, error), id func(T) string) (values []T, err error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,12 @@ func loadImprovementRecords[T any](path string, decode func([]byte) (T, error), 
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			values = nil
+			err = closeErr
+		}
+	}()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	scanner.Split(func(data []byte, atEOF bool) (int, []byte, error) {
@@ -115,7 +120,7 @@ func loadImprovementRecords[T any](path string, decode func([]byte) (T, error), 
 		}
 		return bufio.ScanLines(data, atEOF)
 	})
-	values := []T{}
+	values = []T{}
 	seen := map[string]bool{}
 	for scanner.Scan() {
 		if len(scanner.Bytes()) > store.MaxHistoryRecordBytes {

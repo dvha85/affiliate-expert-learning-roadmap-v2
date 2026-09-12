@@ -29,15 +29,20 @@ func resolveActionDecision(records []HistoryRecord, id string) error {
 	return nil
 }
 
-func loadActions(path string, records []HistoryRecord) ([]m03.HumanActionRecord, error) {
+func loadActions(path string, records []HistoryRecord) (actions []m03.HumanActionRecord, err error) {
 	f, err := (store.JSONL{}).Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			actions = nil
+			err = closeErr
+		}
+	}()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
-	actions := []m03.HumanActionRecord{}
+	actions = []m03.HumanActionRecord{}
 	seen := map[string]bool{}
 	for scanner.Scan() {
 		if len(scanner.Bytes()) > store.MaxHistoryRecordBytes {

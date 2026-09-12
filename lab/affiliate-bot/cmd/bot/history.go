@@ -282,17 +282,21 @@ func LoadHistory(path string) ([]HistoryRecord, error) {
 	return loadHistoryWith(store.JSONL{}, path)
 }
 
-func loadHistoryWith(storage store.History, path string) ([]HistoryRecord, error) {
+func loadHistoryWith(storage store.History, path string) (records []HistoryRecord, err error) {
 	file, err := storage.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); err == nil && closeErr != nil {
+			records = nil
+			err = closeErr
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	// Allow the full payload plus CRLF framing, with an explicit payload check.
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
-	var records []HistoryRecord
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
