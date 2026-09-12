@@ -1252,11 +1252,22 @@ không liên quan fail closed. Proof này chỉ kiểm immutable graph ID M10, k
 chứng minh ledger mutable, crash/power-loss, multi-host, executor hay outcome
 business thật.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi hai
-lệnh mutation M10/M11 là required regression của `curriculum-ci.yml`; negative
-fixture xoá lệnh M10 khỏi workflow phải làm audit fail. Audit này chỉ xác minh
-text workflow đang khai báo lệnh, không thay bằng chứng GitHub Actions ở head
-hay mở rộng mutation coverage ra ngoài các ID immutable.
+**Cập nhật backup source-identity mutation (2026-09-12):** cùng job chạy
+`scripts/mutate_backup_source_guard.py`. Script tạo một copy riêng của learner
+Bot, rồi đồng thời bỏ ba bước `Lstat → open/fstat → Lstat` trong
+`readStableRegularFile`. Regression thực tế đổi `mission-state.json` sau
+inventory thành symlink đến một file ngoài có **cùng bytes**; bản mutation chỉ
+PASS nếu test thật fail tại assertion source-symlink-swap riêng. Vì bytes và
+metadata file vẫn khớp inventory, đây chứng minh guard identity path thay vì chỉ
+digest mismatch. Đây là proof hẹp cho guard local này; không chứng minh mọi race,
+crash/power-loss, filesystem, multi-host hay backup operated.
+
+**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi ba
+lệnh mutation M10/M11 và backup source identity là required regression của
+`curriculum-ci.yml`, đồng thời đòi script hiện diện; negative fixture xoá lệnh
+M10 hoặc backup khỏi workflow phải làm audit fail. Audit này chỉ xác minh text
+workflow đang khai báo lệnh, không thay bằng chứng GitHub Actions ở head hay mở
+rộng mutation coverage ra ngoài các guard đã nêu.
 
 **Cập nhật walkthrough giữ artifact (2026-09-10):** BR-16a nhận
 `--workspace` chỉ với thư mục trống, không xóa workspace caller-owned và ghi

@@ -15,6 +15,7 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/run_n8n_engine_regression.py": ".github/workflows/mission-agent-path-ci.yml",
     "scripts/run_n8n_m06_schedule_regression.py": ".github/workflows/mission-agent-path-ci.yml",
 }
@@ -228,6 +229,8 @@ def audit(root):
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():
+        if not (root / script).is_file():
+            fail(f"required regression script is missing: {script}")
         if script not in (root / workflow).read_text(encoding="utf-8"):
             fail(f"required regression is not wired to CI: {script}")
     for line_number, line in enumerate(plan_text.splitlines(), start=1):
