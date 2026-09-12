@@ -1444,6 +1444,15 @@ duplicate/unknown thực sự làm test fail. CI yêu cầu proof này; đây ch
 contract offline của output model, không phải bằng chứng selected source,
 provider, execution hay business outcome.
 
+**Cập nhật M07 strict registry decoder (2026-09-12):** learner Bot giờ
+strict-decode registry policy trước `ValidateRegistry`; duplicate key,
+case-variant/unknown field và trailing JSON đều bị chặn trước khi host/method/
+redirect policy được dùng cho tool result hoặc proposal. Regression gọi đúng
+registry loader của CLI và mutation proof thay decoder bằng `json.Unmarshal`;
+case policy độc hại phải làm regression fail. Đây là hardening cho policy
+offline, không phải bằng chứng về selected source, provider, execution hay
+business outcome.
+
 - Matrix mở rộng tiêu chí theo từng gap và phân loại `implementation_gaps`, `test_gaps`, `external_evidence_gaps`; implementation/test/evidence refs có scope/version/commit và trạng thái rõ. Migrate version của schema/audit cùng lúc.
 - Tự sinh hoặc kiểm bảng BR từ matrix. Audit phát hiện thiếu R01–R16 mapping, ref hỏng, thiếu evidence của claim đã đóng, status mâu thuẫn và prose đang tuyên bố cao hơn trạng thái được chấp nhận.
 - Có negative fixtures của chính audit: empty refs, stale/incorrect commit, implemented nhưng thiếu regression, plan cao hơn matrix, toàn offline nhưng claim production. Không cố định một câu output rồi gọi là readiness computation.

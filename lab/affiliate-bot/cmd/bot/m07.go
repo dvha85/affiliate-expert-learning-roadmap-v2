@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
@@ -70,7 +71,10 @@ func loadM07Registry(path string) ([]corem07.ToolSpec, error) {
 		return nil, err
 	}
 	var registry []corem07.ToolSpec
-	if err := json.Unmarshal(raw, &registry); err != nil {
+	// The registry is executable policy, not permissive configuration. Reject
+	// duplicate, aliased, unknown, or trailing fields before ValidateRegistry
+	// decides whether the requested host and method are allowed.
+	if err := contracts.DecodeStrict(raw, &registry); err != nil {
 		return nil, err
 	}
 	if err := corem07.ValidateRegistry(registry); err != nil {
