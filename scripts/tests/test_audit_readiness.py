@@ -98,6 +98,14 @@ class ReadinessAuditTests(unittest.TestCase):
         graph_path.write_text(json.dumps(graph), encoding="utf-8")
         self.assertIn("evidence partition", self.run_audit(False))
 
+    def test_verified_operated_claim_without_fixture_boundaries_is_rejected(self):
+        graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        claim = next(item for item in graph["criteria"][0]["claims"] if item["kind"] == "operated")
+        claim["scope"] = "Operated run completed."
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        self.assertIn("operated scope must retain", self.run_audit(False))
+
     def test_missing_review_finding_mapping_is_rejected(self):
         matrix_path = self.root / "docs/plans/READINESS-MATRIX.json"
         matrix = json.loads(matrix_path.read_text(encoding="utf-8"))

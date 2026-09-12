@@ -8,7 +8,8 @@
       "claims": [
         {"id": "BR-13-implementation", "kind": "implementation", "status": "PARTIAL", "matrix_field": "implementation_refs", "scope": "Fixed synthetic offer-fixture profile only; a governed selected-source profile is not implemented.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-04 M06 shared fixture path"}]},
         {"id": "BR-13-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Fixture handoff and the M06 n8n node chain run against a disposable local runtime.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}], "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "Mở rộng M06 engine regression"}]},
-        {"id": "BR-13-operated", "kind": "operated", "status": "MISSING", "scope": "No operated n8n run against a selected source is recorded.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
+        {"id": "BR-13-operated-local-synthetic", "kind": "operated", "status": "VERIFIED_OFFLINE", "scope": "A local synthetic/read-only M06 n8n run persisted and replayed canonical history through the loopback adapter; it is not a selected-source run.", "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M06 operated re-verification"}]},
+        {"id": "BR-13-external", "kind": "external", "status": "MISSING", "scope": "No operated n8n run against a selected source is recorded.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
     {
@@ -16,7 +17,8 @@
       "claims": [
         {"id": "BR-14-implementation", "kind": "implementation", "status": "PARTIAL", "matrix_field": "implementation_refs", "scope": "The inactive blueprint delegates only the fixed synthetic fixture to the shared adapter.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-04 M06 shared fixture path"}]},
         {"id": "BR-14-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Disposable n8n covers fixture success, conflict/source rejection, replay and unavailable adapter; schedule admission is excluded.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}], "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "Mở rộng M06 engine regression"}]},
-        {"id": "BR-14-operated", "kind": "operated", "status": "MISSING", "scope": "No independently operated import/execution is recorded on the selected supported deployment.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
+        {"id": "BR-14-operated-local-synthetic", "kind": "operated", "status": "VERIFIED_OFFLINE", "scope": "A local synthetic/read-only M06 n8n execution capture passed the operated verifier, rejected an unsupported fixture source before report, and replayed after restart; it is not a selected deployment run.", "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M06 operated re-verification"}]},
+        {"id": "BR-14-external", "kind": "external", "status": "MISSING", "scope": "No independently operated import/execution is recorded on the selected supported deployment.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
     {
@@ -24,6 +26,7 @@
       "claims": [
         {"id": "BR-15-implementation", "kind": "implementation", "status": "IMPLEMENTED_OFFLINE", "matrix_field": "implementation_refs", "scope": "Read-only registry, tool trace, grounding validation and proposal persistence are deterministic offline boundaries.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-05 foundation"}]},
         {"id": "BR-15-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Disposable n8n executes policy rejects and Agent success via a loopback OpenAI-compatible stub; adapter test receives a controlled 302 without following or persisting it, while a live redirect source is excluded.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}], "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M07 received-redirect transport regression"}]},
+        {"id": "BR-15-operated-local-synthetic", "kind": "operated", "status": "VERIFIED_OFFLINE", "scope": "A local synthetic/read-only M07 n8n run through Cockpit completed grounding and proposal persistence, rejected POST before the Agent, and replayed after restart; it does not provide execution authority or selected-source proof.", "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "Cockpit re-verification"}]},
         {"id": "BR-15-external", "kind": "external", "status": "MISSING", "scope": "Provider diversity, received-redirect transport and a governed selected-source run are not evidenced.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     },
