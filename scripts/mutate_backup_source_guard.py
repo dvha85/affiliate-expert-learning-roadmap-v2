@@ -14,8 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARD_PATH = Path("lab/affiliate-bot/cmd/bot/backup_command.go")
-TEST_NAME = "TestBackupRejectsSourceSymlinkSwapAfterInventory"
-TEST_ASSERTION = "backup followed source symlink swapped after inventory"
+TEST_PATTERN = "Test(BackupRejectsSourceSymlinkSwapAfterInventory|RestoreRejectsBackupSourceSymlinkSwapAfterVerification)"
+TEST_ASSERTIONS = (
+    "backup followed source symlink swapped after inventory",
+    "restore followed backup source symlink swapped after verification",
+)
 MUTATIONS = (
     (
         "pre-open regular-file check",
@@ -56,7 +59,7 @@ def main():
         environment = os.environ.copy()
         environment["GOWORK"] = "off"
         result = subprocess.run(
-            ["go", "test", "./cmd/bot", "-run", TEST_NAME, "-count=1"],
+            ["go", "test", "./cmd/bot", "-run", TEST_PATTERN, "-count=1"],
             cwd=temp_root / "lab/affiliate-bot",
             env=environment,
             text=True,
@@ -65,9 +68,10 @@ def main():
         output = result.stdout + result.stderr
         if result.returncode == 0:
             fail("mutated backup source identity guards unexpectedly passed the real source-swap test")
-        if TEST_ASSERTION not in output:
-            fail(f"backup source-identity mutation caused an unrelated test failure:\n{output}")
-    print("backup source identity composite mutation detected by the real Bot regression")
+        missing = [assertion for assertion in TEST_ASSERTIONS if assertion not in output]
+        if missing:
+            fail(f"backup source-identity mutation caused an unrelated test failure; missing {missing}:\n{output}")
+    print("backup and restore source identity composite mutations detected by real Bot regressions")
 
 
 if __name__ == "__main__":

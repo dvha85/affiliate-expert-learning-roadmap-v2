@@ -47,6 +47,11 @@ type backupManifest struct {
 // publication happens only after staging has a complete, verified manifest.
 var backupCopyFault func(relativePath string) error
 
+// restoreCopyFault is a test-only seam for a backup source replacement after
+// verification but before staging copy. It cannot be set through command-line
+// arguments or environment.
+var restoreCopyFault func(relativePath string) error
+
 // backupStagingWriteFault is a test-only seam for the file/directory sync
 // boundary while a backup or restore is still private staging. It cannot be set
 // through the command line or environment.
@@ -1566,9 +1571,17 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if pathErr != nil {
 			return emit("VERIFY_FAILED", nil, pathErr, 1)
 		}
-		b, readErr := os.ReadFile(filepath.Join(args[1], clean))
+		if restoreCopyFault != nil {
+			if e = restoreCopyFault(name); e != nil {
+				return emit("STORE_ERROR", nil, e, 1)
+			}
+		}
+		b, sourceMetadata, readErr := backupFileDataAndMetadata(filepath.Join(args[1], clean), name)
 		if readErr != nil {
 			return emit("VERIFY_FAILED", nil, readErr, 1)
+		}
+		if sourceMetadata != m.Files[name] {
+			return emit("VERIFY_FAILED", nil, fmt.Errorf("backup source changed while restoring %s", name), 1)
 		}
 		target := filepath.Join(staging, clean)
 		if e = os.MkdirAll(filepath.Dir(target), 0700); e != nil {
