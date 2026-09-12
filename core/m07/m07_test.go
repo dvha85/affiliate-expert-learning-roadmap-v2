@@ -77,6 +77,29 @@ func TestValidateAgentOutputRequiresLiteralFalseWritePermission(t *testing.T) {
 	}
 }
 
+func TestValidateAgentOutputRejectsNonCanonicalJSONShape(t *testing.T) {
+	valid := `{"state":"ABSTAIN","answer":"insufficient","evidence_ids":[],"claims":[],"tool_calls":[],"authority":"A2-RO","write_permission":false}`
+	claim := `{"text":"price=100 [evidence:e1]","field_or_claim":"price","value":100,"evidence_ids":["e1"]}`
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{"duplicate top-level write permission", `{"state":"ABSTAIN","answer":"insufficient","evidence_ids":[],"claims":[],"tool_calls":[],"authority":"A2-RO","write_permission":true,"write_permission":false}`},
+		{"duplicate nested claim field", `{"state":"HUMAN_REVIEW","answer":"price=100 [evidence:e1]","evidence_ids":["e1"],"claims":[{"text":"price=100 [evidence:e1]","field_or_claim":"price","field_or_claim":"other","value":100,"evidence_ids":["e1"]}],"tool_calls":[],"authority":"A2-RO","write_permission":false}`},
+		{"case-variant unknown field", valid[:len(valid)-1] + `,"Write_Permission":false}`},
+		{"unknown top-level field", valid[:len(valid)-1] + `,"unreviewed_instruction":"write now"}`},
+		{"trailing JSON", valid + ` {}`},
+		{"unknown nested claim field", `{"state":"HUMAN_REVIEW","answer":"price=100 [evidence:e1]","evidence_ids":["e1"],"claims":[` + claim[:len(claim)-1] + `,"unreviewed_instruction":"write now"}],"tool_calls":[],"authority":"A2-RO","write_permission":false}`},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := ValidateAgentOutput([]byte(test.raw), []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry()); err == nil {
+				t.Fatalf("non-canonical model JSON was accepted: %s", test.raw)
+			}
+		})
+	}
+}
+
 func TestValidateAgentOutputRejectsForgedProseAndUnregisteredToolCall(t *testing.T) {
 	base := AgentOutput{State: "HUMAN_REVIEW", Answer: "guaranteed profit", Claims: []Claim{{FieldOrClaim: "price", Value: json.RawMessage("100"), EvidenceIDs: []string{"e1"}}}, EvidenceIDs: []string{"e1"}, Authority: "A2-RO", WritePermission: false}
 	base.Claims[0].Text = renderClaim(base.Claims[0])
