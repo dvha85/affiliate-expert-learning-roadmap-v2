@@ -38,6 +38,26 @@ MUTATIONS = (
 )
 
 
+def mutate_reader_guards(source):
+    """Disable only the reader's guards, not similarly named append guards.
+
+    `openStableRegularFileForAppend` deliberately reuses part of the reader's
+    vocabulary.  Keeping this mutation scoped to `readStableRegularFile`
+    makes the proof fail only when the backup/restore source-read boundary is
+    removed, rather than depending on a global source-string count.
+    """
+    start = source.find("func readStableRegularFile(")
+    end = source.find("\n// openStableRegularFileForAppend", start)
+    if start < 0 or end < 0:
+        fail("readStableRegularFile function boundary is missing or ambiguous")
+    reader = source[start:end]
+    for name, guard, disabled_guard in MUTATIONS:
+        if reader.count(guard) != 1:
+            fail(f"backup {name} guard anchor is missing or ambiguous")
+        reader = reader.replace(guard, disabled_guard, 1)
+    return source[:start] + reader + source[end:]
+
+
 def fail(message):
     raise AssertionError(message)
 
@@ -50,11 +70,7 @@ def main():
 
         target = temp_root / GUARD_PATH
         source = target.read_text(encoding="utf-8")
-        for name, guard, disabled_guard in MUTATIONS:
-            if source.count(guard) != 1:
-                fail(f"backup {name} guard anchor is missing or ambiguous")
-            source = source.replace(guard, disabled_guard, 1)
-        target.write_text(source, encoding="utf-8")
+        target.write_text(mutate_reader_guards(source), encoding="utf-8")
 
         environment = os.environ.copy()
         environment["GOWORK"] = "off"
