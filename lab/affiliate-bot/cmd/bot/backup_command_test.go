@@ -84,7 +84,10 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 		}
 		return nil
 	}
-	t.Cleanup(func() { backupStagingWriteFault = nil })
+	t.Cleanup(func() {
+		backupStagingWriteFault = nil
+		backupPublishFault = nil
+	})
 	if code, response := backupCall(t, "create", runtime, backup); code == 0 || response["status"] != "STORE_ERROR" {
 		t.Fatalf("post-file-sync backup staging failure was published: code=%d response=%+v", code, response)
 	}
@@ -143,6 +146,39 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 	backupStagingWriteFault = nil
 	if code, response := backupCall(t, "restore", backupAfterWrite, restoreAfterDirectory); code != 0 || response["status"] != "RESTORED" {
 		t.Fatalf("restore retry after directory sync failure failed: code=%d response=%+v", code, response)
+	}
+	publishedBackup, publishedRestore := filepath.Join(root, "published-unsynced-backup"), filepath.Join(root, "published-unsynced-restored")
+	backupPublishFault = func(phase, path string) error {
+		if phase == "after_rename_before_parent_sync" && filepath.Clean(path) == filepath.Clean(publishedBackup) {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	if code, response := backupCall(t, "create", runtime, publishedBackup); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("post-rename backup sync failure hid a visible target: code=%d response=%+v", code, response)
+	}
+	if _, err := verifyBackup(publishedBackup); err != nil {
+		t.Fatalf("post-rename backup target was not a valid visible snapshot: %v", err)
+	}
+	backupPublishFault = nil
+	if code, response := backupCall(t, "create", runtime, publishedBackup); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+		t.Fatalf("visible backup target was offered as a retry: code=%d response=%+v", code, response)
+	}
+	backupPublishFault = func(phase, path string) error {
+		if phase == "after_rename_before_parent_sync" && filepath.Clean(path) == filepath.Clean(publishedRestore) {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	if code, response := backupCall(t, "restore", backupAfterWrite, publishedRestore); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("post-rename restore sync failure hid a visible runtime: code=%d response=%+v", code, response)
+	}
+	if _, err := loadMissionState(publishedRestore); err != nil {
+		t.Fatalf("post-rename restored target was not a valid visible runtime: %v", err)
+	}
+	backupPublishFault = nil
+	if code, response := backupCall(t, "restore", backupAfterWrite, publishedRestore); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+		t.Fatalf("visible restored target was offered as a retry: code=%d response=%+v", code, response)
 	}
 }
 

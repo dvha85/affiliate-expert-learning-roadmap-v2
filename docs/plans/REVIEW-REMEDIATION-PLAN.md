@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: f47d90e0e47e79c3c0f2008f5a5faf932609b998 -->
+<!-- readiness-main-baseline: 5cd9ba05e582c065c06c1dfa9e0c19de719f2dc7 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -308,6 +308,16 @@ target không bị chiếm và retry publish/restore thành công. Reader snapsh
 thành symlink sau inventory phải reject trước copy/publish, không đọc hay đổi
 external target. Đây không chứng minh crash/power-loss durability sau rename hay
 transaction multi-host, nên vẫn `PARTIAL`.
+
+**Cập nhật publish recovery status (2026-09-14):** sau khi final `rename`
+thành công, staging không còn riêng tư. Nếu sync directory cha sau đó lỗi,
+`backup create` hoặc `restore` trả `PUBLISHED_RECOVERY_REQUIRED` với manifest
+thay vì giả vờ target chưa publish hoặc mời retry ghi đè. Regression inject lỗi
+đúng giữa rename và parent sync cho cả backup/restore: target đã visible vẫn
+verify/load được, còn lần gọi lại cùng target bị `TARGET_NOT_EMPTY`. Thành công
+chỉ trả `BACKED_UP`/`RESTORED` sau parent sync. Đây là báo cáo fail-closed của
+trạng thái syscall cục bộ, không chứng minh durability qua crash/power-loss,
+không tự sửa target unsynced và không là transaction đa host.
 
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery
