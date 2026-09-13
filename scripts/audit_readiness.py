@@ -260,6 +260,14 @@ def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
         scope = " ".join(criteria_by_id["BR-15"]["missing_evidence"])
         if "selected campaign sanitized fixture" not in scope or "commission_rate:0.9" not in scope:
             fail("BR-15 does not disclose selected-source forged-commission grounding coverage")
+    beginner_plan = root / "docs/plans/BEGINNER-READINESS-PLAN.md"
+    if beginner_plan.is_file() and "AccesstradeShopeeSmartlinkURL" in (root / "core/m06/accesstrade_shopee.go").read_text(encoding="utf-8"):
+        beginner_text = beginner_plan.read_text(encoding="utf-8")
+        required = ("ACCESSTRADE Shopee Smartlink", "sanitized/read-only", "operated selected-source")
+        if any(marker not in beginner_text for marker in required):
+            fail("beginner plan does not disclose the selected-source offline boundary")
+        if "Provider diversity và selected source còn mở" in beginner_text:
+            fail("beginner plan incorrectly treats the selected-source contract as absent")
 
 
 def audit(root):
