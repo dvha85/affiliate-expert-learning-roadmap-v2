@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,20 +19,16 @@ const campaignManifest = "deepseek-fixture-campaign/v1\nmax_attempts=100\nmax_mi
 // separately reviewed. This is not a claim about current provider pricing.
 const campaignReservation = 500000
 
-// Trusted local directory; reject existing special files before opening them.
-// This does not defend against a hostile process swapping paths concurrently.
+// Read a bounded portable or campaign-owned file through the shared stable
+// regular-file boundary. Callers may provide paths to fixture/config/capture
+// inputs, so a pre-open Lstat alone must not turn a same-byte external symlink
+// swap into accepted evidence or configuration.
 func readCampaignFile(path string, limit int64) ([]byte, error) {
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > limit {
+	if limit < 0 {
 		return nil, errors.New("campaign file type or size invalid")
 	}
-	f, err := os.Open(path)
+	raw, _, err := readStableRegularFileLimit(path, limit)
 	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	raw, err := io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil || int64(len(raw)) > limit {
 		return nil, errors.New("campaign file read invalid")
 	}
 	return raw, nil

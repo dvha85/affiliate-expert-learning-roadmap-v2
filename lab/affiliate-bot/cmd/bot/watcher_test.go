@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -183,6 +184,53 @@ func TestSelectedAccesstradeCampaignCLIImportsOnlySanitizedMetadata(t *testing.T
 	}
 	if code := runWatcher([]string{"accesstrade-shopee-campaign-import", history, capture}, &out, &diag); code != 0 || !strings.Contains(out.String(), appendDuplicate) {
 		t.Fatalf("selected-source CLI retry was not exact duplicate: %d %s", code, out.String())
+	}
+}
+
+// The selected-source capture remains a portable, untrusted input until its
+// canonical history append ACK. A same-byte swap after open must therefore be
+// rejected before its contents can be interpreted as a capture or persisted.
+func TestSelectedAccesstradeCampaignCLIRejectsCaptureSymlinkSwapAfterOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	capture := filepath.Join(dir, "sanitized-capture.json")
+	contents := []byte(accesstradeShopeeCapture())
+	if err := os.WriteFile(capture, contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-capture.json")
+	if err := os.WriteFile(external, contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(capture) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(capture); err != nil {
+			return err
+		}
+		return os.Symlink(external, capture)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	var out, diag bytes.Buffer
+	code := runWatcher([]string{"accesstrade-shopee-campaign-import", history, capture}, &out, &diag)
+	var response map[string]any
+	if err := json.Unmarshal(out.Bytes(), &response); err != nil || code == 0 || response["status"] != "INPUT_ERROR" || response["persisted"] != false {
+		t.Fatalf("selected-source import accepted post-open capture swap: code=%d response=%v diagnostic=%s err=%v", code, response, diag.String(), err)
+	}
+	if !swapped {
+		t.Fatal("selected-source import did not use the stable portable-input reader")
+	}
+	if _, err := os.Lstat(history); !os.IsNotExist(err) {
+		t.Fatalf("selected-source import wrote history after capture swap: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, contents) {
+		t.Fatalf("capture swap rejection changed external bytes: %q err=%v", got, err)
 	}
 }
 
