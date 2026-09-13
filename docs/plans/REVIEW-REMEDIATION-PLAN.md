@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: a40a8a7354a2ea8f99adc3eb213a3a44b1ffc2c4 -->
+<!-- readiness-main-baseline: 1649b2678dda3fa7f57e43b14852fce2dbc735d8 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -318,6 +318,14 @@ Bot mới không cho `status`/`m10-resolve` đọc half-commit, còn writer có 
 `backup create` replay đúng grant rồi retry `ACK`. Đây chỉ là recovery local của
 grant registry/state, không chứng minh transaction toàn runtime, power-loss,
 multi-host locking, executor hay production authority.
+
+**Cập nhật atomic JSONL write-path guard (2026-09-13):** ACCESSTRADE outcome/
+receipt và M10 cost-bound index đọc JSONL cũ qua stable regular-file reader,
+reject target symlink hoặc name replacement sau read. Với target chưa tồn tại,
+temporary snapshot publish qua non-overwriting hard-link thay vì rename đè một
+tên vừa xuất hiện. Regression giữ external bytes không đổi cho symlink ban đầu
+và symlink thay sau read. Đây chỉ là local path/publish boundary; TOCTOU rộng,
+power-loss, multi-host và dữ liệu ACCESSTRADE thật vẫn ngoài phạm vi.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
 strict `approval-record` decode (schema, unknown/duplicate field rejection)

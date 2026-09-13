@@ -253,15 +253,17 @@ func decodeAccesstradeOutcomes(report []byte, manifest AccesstradeReportManifest
 // directory, matching the existing append-store boundary.
 func appendJSONLLinesAtomically(path string, records [][]byte) error {
 	directory := filepath.Dir(path)
-	info, err := os.Stat(directory)
-	if err != nil || !info.IsDir() {
+	info, err := os.Lstat(directory)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("outcome parent is not a directory")
+		return fmt.Errorf("outcome parent must be a non-symlink directory")
 	}
-	previous, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	previous, opened, err := readStableRegularFile(path)
+	if os.IsNotExist(err) {
+		previous, opened = nil, nil
+	} else if err != nil {
 		return err
 	}
 	if len(previous) > 0 && previous[len(previous)-1] != '\n' {
@@ -294,8 +296,20 @@ func appendJSONLLinesAtomically(path string, records [][]byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return err
+	if opened == nil {
+		// Do not let a name that appeared after the absent check be overwritten.
+		// Link publishes only a new path, so a symlink planted at that name cannot
+		// be replaced or used as an implicit source of canonical JSONL bytes.
+		if err := os.Link(temporaryPath, path); err != nil {
+			return err
+		}
+	} else {
+		if err := verifyStableRegularFileName(path, opened); err != nil {
+			return err
+		}
+		if err := os.Rename(temporaryPath, path); err != nil {
+			return err
+		}
 	}
 	directoryHandle, err := os.Open(directory)
 	if err != nil {
