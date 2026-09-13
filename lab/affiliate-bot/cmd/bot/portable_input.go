@@ -1,6 +1,10 @@
 package main
 
-const maxGeneralPortableInputBytes int64 = 1 << 20
+// M03/M04 fixture imports deliberately exercise their own 1 MiB semantic
+// store limit (including an over-limit STORE_ERROR). Keep the transport guard
+// above that contract while still bounding every generic CLI read; selected
+// report imports use this same 16 MiB ceiling explicitly.
+const maxGeneralPortableInputBytes int64 = 16 << 20
 
 // readGeneralPortableInput is the common boundary for caller-supplied files
 // outside M07 and the M08-M11 mission commands. A valid JSON/CSV payload does

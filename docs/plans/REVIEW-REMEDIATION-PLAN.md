@@ -1402,7 +1402,7 @@ atomic transaction đa-file, crash/power-loss hay multi-host.
 decision context, advisor config, M06 history handoff và fixture observations.
 Report/manifest ACCESSTRADE fixture và M11 recovery handoff cũng giữ stable
 identity trước decode; report vẫn giới hạn 16 MiB và manifest/general input là
-1 MiB. Receipt derivation đọc canonical outcomes qua stable reader. Regression
+16 MiB. Receipt derivation đọc canonical outcomes qua stable reader. Regression
 gọi M03 `action record` thật, thay JSON action sau open bằng symlink ngoài cùng
 bytes, và phải `IO_ERROR` trước append. Mutation CI thay shared wrapper bằng
 `os.ReadFile` trong checkout tạm và đòi assertion thực fail. Đây là local
