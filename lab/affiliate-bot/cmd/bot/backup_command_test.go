@@ -111,6 +111,39 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
 		t.Fatalf("restore retry after staging sync failure failed: code=%d response=%+v", code, response)
 	}
+	backupAfterWrite, restoreAfterDirectory := filepath.Join(root, "after-write-backup"), filepath.Join(root, "after-directory-restored")
+	backupStagingWriteFault = func(phase, path string) error {
+		if phase == "after_write" && filepath.Base(path) == "mission-state.json" {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	if code, response := backupCall(t, "create", runtime, backupAfterWrite); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("post-write backup staging failure was published: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(backupAfterWrite); !os.IsNotExist(err) {
+		t.Fatalf("post-write backup failure occupied target: %v", err)
+	}
+	backupStagingWriteFault = nil
+	if code, response := backupCall(t, "create", runtime, backupAfterWrite); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup retry after write failure failed: code=%d response=%+v", code, response)
+	}
+	backupStagingWriteFault = func(phase, path string) error {
+		if phase == "after_directory_sync" && filepath.Base(path) == "mission-state.json" {
+			return os.ErrClosed
+		}
+		return nil
+	}
+	if code, response := backupCall(t, "restore", backupAfterWrite, restoreAfterDirectory); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("post-directory-sync restore staging failure was published: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(restoreAfterDirectory); !os.IsNotExist(err) {
+		t.Fatalf("post-directory-sync restore failure occupied target: %v", err)
+	}
+	backupStagingWriteFault = nil
+	if code, response := backupCall(t, "restore", backupAfterWrite, restoreAfterDirectory); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("restore retry after directory sync failure failed: code=%d response=%+v", code, response)
+	}
 }
 
 func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {

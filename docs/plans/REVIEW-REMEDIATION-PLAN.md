@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 1614112c231e7f5588c8ddb9482d566f9dc697b9 -->
+<!-- readiness-main-baseline: f47d90e0e47e79c3c0f2008f5a5faf932609b998 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -302,8 +302,8 @@ power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
 copy/verify toàn bộ snapshot trong sibling staging, rồi publish qua rename tới
 target rỗng dưới target gate. Mỗi copied file mới phải `fsync`; mọi directory edge
 từ file tới staging root cũng sync trước graph verify/publish. Regression inject
-lỗi sau file-sync và trước directory-sync: staging bị dọn, target không bị chiếm
-và retry publish/restore thành công. Reader snapshot cũng kiểm
+lỗi sau write, sau file-sync, trước và sau directory-sync: staging bị dọn,
+target không bị chiếm và retry publish/restore thành công. Reader snapshot cũng kiểm
 `Lstat → open/fstat → Lstat` của regular file; regression swap `mission-state`
 thành symlink sau inventory phải reject trước copy/publish, không đọc hay đổi
 external target. Đây không chứng minh crash/power-loss durability sau rename hay
