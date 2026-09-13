@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 27ee505e81ef83ad8538c52ac12b44b0e77994a6 -->
+<!-- readiness-main-baseline: b6b61ae7efec70be82f62027d8c53e7f99eda925 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1434,6 +1434,15 @@ same-correlation content conflict, unsupported source và changed event. Hai ca
 reject phải dừng ở adapter trước ACK/report và không được thay đổi bytes history;
 changed event mới phải persist record riêng và replay `MATCH`. Phạm vi vẫn là
 fixture synthetic; selected-source profile không được suy ra là đã nghiệm thu.
+
+**M06 selected-source engine CI (2026-09-13):** cùng runner disposable import
+blueprint M06 ACCESSTRADE Shopee Smartlink ở dạng inactive/manual, thay trigger
+chỉ trong bản copy test và truyền metadata fixture đã làm sạch. Nó phải append
+một observation, trả `EXACT_DUPLICATE` cho retry, chặn field `commission_rate`
+ngoài allowlist tại adapter trước ACK/report mà không đổi history, append khi
+page fingerprint đổi, rồi replay mọi record `MATCH`. Không có request tới
+ACCESSTRADE, capture thật, credential, Smartlink, price/commission fact hay
+business outcome; đây chỉ là engine evidence cho contract offline.
 
 **M06 Schedule Trigger CI (2026-09-12):** runner riêng khởi động `n8n start`
 trên SQLite disposable và active một copy M06 có Schedule Trigger thật cadence
