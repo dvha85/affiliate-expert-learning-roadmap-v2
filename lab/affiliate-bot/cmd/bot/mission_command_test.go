@@ -818,6 +818,46 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReservationCommitFaultDoesNotConsumeCap(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "commit-fault-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	missionStateWriteFault = func(phase string) error {
+		if phase == "before_rename" {
+			return errors.New("injected reservation state commit failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "failed-reservation"); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("reservation commit fault was not surfaced: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = nil
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+	if temporary, err := filepath.Glob(filepath.Join(runtimeDir, ".mission-state-*")); err != nil || len(temporary) != 0 {
+		t.Fatalf("failed reservation leaked state temporary files: files=%v err=%v", temporary, err)
+	}
+	// A new production-shaped Bot process must see the unchanged cap and use it
+	// exactly once, rather than treating the failed writer as a consumed or
+	// silently refunded unknown reservation.
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve-authorization", runtimeDir, authorizationPath, "fresh-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("fresh Bot did not reserve the cap left by the failed commit: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve-authorization", runtimeDir, authorizationPath, "second-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("fresh Bot opened a second reservation after cap=1 commit: code=%d response=%+v", code, response)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 || len(state.Reservations) != 1 || state.Reservations[0].ReservationID != "fresh-reservation" {
+		t.Fatalf("persisted cap does not match the one fresh reservation: state=%+v err=%v", state, err)
+	}
+}
+
 func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
 		t.Run(expiring, func(t *testing.T) {

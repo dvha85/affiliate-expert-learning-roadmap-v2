@@ -123,6 +123,16 @@ def audit_runtime_acceptance(root, matrix):
     source = root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
     if not source.is_file() or "TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses" not in source.read_text(encoding="utf-8"):
         fail("R10 process-barrier regression is missing from the learner Bot test path")
+    commit_fault = updates.get("RP-03-m10-reservation-commit-fault")
+    if not isinstance(commit_fault, dict):
+        fail("matrix lacks the R10 reservation commit-fault acceptance record")
+    if "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in commit_fault.get("test_refs", []):
+        fail("R10 reservation commit-fault record lacks its real Bot regression")
+    fault_scope = commit_fault.get("scope")
+    if not isinstance(fault_scope, str) or "STORE_ERROR" not in fault_scope or "cap=1" not in fault_scope:
+        fail("R10 reservation commit-fault record lacks a bounded cap disclosure")
+    if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source.read_text(encoding="utf-8"):
+        fail("R10 reservation commit-fault regression is missing from the learner Bot test path")
 
 
 def audit_evidence_graph(root, criteria_by_id):
