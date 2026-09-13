@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -43,5 +44,23 @@ func TestWriteJSONAtomicFailurePreservesPriorStateAndRetry(t *testing.T) {
 	}
 	if err != nil || committed["state"] != "new" {
 		t.Fatalf("retry did not commit new state: %q err=%v", got, err)
+	}
+}
+
+func TestMissionInitRejectsSymlinkRuntimeDirectoryWithoutExternalMutation(t *testing.T) {
+	outside := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "runtime-alias")
+	if err := os.Symlink(outside, alias); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := runMissionCommand([]string{"init", alias}, &stdout, &stderr); code == 0 {
+		t.Fatalf("mission init accepted symlink runtime directory: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if _, err := os.Lstat(filepath.Join(outside, "mission-state.json")); !os.IsNotExist(err) {
+		t.Fatalf("mission init created external state through symlink runtime: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(outside, ".mission.lock")); !os.IsNotExist(err) {
+		t.Fatalf("mission init created external lock through symlink runtime: %v", err)
 	}
 }

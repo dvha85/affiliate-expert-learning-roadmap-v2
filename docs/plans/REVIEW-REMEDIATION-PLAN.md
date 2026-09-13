@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 739327a94a7314e946d8df7e0674a5aa8b0ec807 -->
+<!-- readiness-main-baseline: 5a5ee0a9fc7cd999b7c5e9567d1ace62dfcf7107 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -335,6 +335,14 @@ symlink có bytes giống artifact mong đợi và replacement sang external sym
 sau khi descriptor đã mở; external bytes không đổi. Đây là local output-path
 guard cho immutable artifacts, không phải snapshot atomic trước uncooperative
 writer, transaction đa-file, power-loss hay guarantee multi-host.
+
+**Cập nhật mutable runtime-root path guard (2026-09-13):** trước mọi learner
+mission command có thể mutate state, runtime root phải là direct non-symlink
+directory trước khi lock, recovery journal hay `mission-state` có thể được tạo.
+Regression chạy CLI `mission init` với runtime symlink và kiểm cả external
+`mission-state` lẫn `.mission.lock` không được tạo. Đây chỉ là guard local cho
+mutable command root; input/read roots, ancestor-path TOCTOU, crash/power-loss
+và multi-host vẫn ngoài phạm vi.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
 strict `approval-record` decode (schema, unknown/duplicate field rejection)
