@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -215,6 +215,11 @@ class ReadinessAuditTests(unittest.TestCase):
         br15["missing_evidence"][0] = "tests: selected campaign metadata reaches M07"
         matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
         self.assertIn("does not disclose selected-source forged-commission", self.run_audit(False))
+
+    def test_beginner_plan_selected_source_boundary_is_required(self):
+        plan = self.root / "docs/plans/BEGINNER-READINESS-PLAN.md"
+        plan.write_text(plan.read_text(encoding="utf-8").replace("sanitized/read-only", "unscoped", 1), encoding="utf-8")
+        self.assertIn("beginner plan does not disclose the selected-source offline boundary", self.run_audit(False))
 
 
 if __name__ == "__main__":
