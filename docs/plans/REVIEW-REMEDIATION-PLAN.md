@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 578ebc948a4b07d938b86caaed95864883223f57 -->
+<!-- readiness-main-baseline: a40a8a7354a2ea8f99adc3eb213a3a44b1ffc2c4 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -310,6 +310,14 @@ mới trả `RECOVERY_REQUIRED` trước khi lộ transition một nửa. Writer
 lock hoặc `backup create` replay đúng bound theo scope/time quan sát, rồi retry
 trả `EXACT_DUPLICATE`. Đây là recovery bounded cho đúng hai files M10, không
 phải transaction toàn runtime, mô phỏng power-loss hay guarantee multi-host.
+
+**Cập nhật M10 canary registry/state journal (2026-09-13):** canary grant
+giờ journal trước immutable `CANARY_GRANT` registry và mutable `mission-state`
+binding/counters. Fault trước artifact, sau artifact hoặc sau state giữ journal;
+Bot mới không cho `status`/`m10-resolve` đọc half-commit, còn writer có lock và
+`backup create` replay đúng grant rồi retry `ACK`. Đây chỉ là recovery local của
+grant registry/state, không chứng minh transaction toàn runtime, power-loss,
+multi-host locking, executor hay production authority.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
 strict `approval-record` decode (schema, unknown/duplicate field rejection)
