@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 7f4feec2fa4d29c7cf2bd4035a829d399a10fcf5 -->
+<!-- readiness-main-baseline: 35b04b917731226b3fc800512663fe7b34a971e3 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1259,6 +1259,15 @@ runtime hay authority. Đúng một lệnh trả `RESERVED`; mọi process khác
 chạy `status` để replay state đã persist. Điều này thay claim cũ sai rằng smoke
 BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting, không
 chứng minh distributed lock, kill/power-loss hoặc transaction đa-file.
+
+**Cập nhật M10 reservation commit-fault cap continuity (2026-09-14):** test
+in-process inject lỗi ngay trước `writeJSONAtomic` rename của một governed
+reservation cap=1. Lệnh trả `STORE_ERROR`, state canonical giữ byte-identical
+và không còn temporary state file. Sau khi bỏ seam, binary Bot mới chạy bằng
+wall clock bình thường reserve được đúng một lần từ cap chưa tiêu; attempt thứ
+hai bị `REJECTED`, counters và reservation persisted vẫn khớp ACK này. Đây là
+failure seam local tại một rename boundary, không phải kill/power-loss proof,
+không cover mọi write/sync syscall, transaction đa-file hay distributed lock.
 
 **Cập nhật fault seam (2026-09-08):** registry M11 có hook nội bộ chỉ dùng trong
 test (không nhận từ CLI/env). Test inject lỗi sau `write` nhưng trước khi caller
