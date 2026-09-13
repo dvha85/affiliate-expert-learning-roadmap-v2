@@ -23,6 +23,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+from n8n_cli_preflight import command_prefix, validate_n8n_command
 from validate_n8n_m06_operated_execution import validate_rejection as validate_m06_operated_rejection
 from validate_n8n_m06_operated_execution import validate_success as validate_m06_operated_success
 
@@ -123,16 +124,6 @@ def stop_m07_model_stub(server: http.server.ThreadingHTTPServer, thread: threadi
     thread.join(timeout=10)
     if thread.is_alive():
         raise AssertionError("M07 model stub did not stop")
-
-
-def command_prefix(args: argparse.Namespace) -> list[str]:
-    if args.n8n_node:
-        if not args.n8n_cli:
-            raise AssertionError("--n8n-node requires --n8n-cli")
-        return [args.n8n_node, args.n8n_cli]
-    if args.n8n_cli:
-        return [args.n8n_cli]
-    return ["n8n"]
 
 
 def choose_port() -> int:
@@ -358,11 +349,8 @@ def main() -> None:
     parser.add_argument("--n8n-node", help="Node executable when --n8n-cli is a JavaScript entrypoint")
     parser.add_argument("--keep-runtime", action="store_true", help="preserve the disposable runtime after a successful run too")
     args = parser.parse_args()
-    prefix = command_prefix(args)
-    if shutil.which(prefix[0]) is None and not Path(prefix[0]).is_file():
-        raise SystemExit(f"n8n command is unavailable: {prefix[0]}")
-    if len(prefix) == 2 and not Path(prefix[1]).is_file():
-        raise SystemExit(f"n8n CLI entrypoint is unavailable: {prefix[1]}")
+    prefix = command_prefix(args.n8n_cli, args.n8n_node)
+    validate_n8n_command(prefix, args.n8n_cli, args.n8n_node)
 
     runtime = Path(tempfile.mkdtemp(prefix="affiliate-n8n-engine-"))
     keep = args.keep_runtime
