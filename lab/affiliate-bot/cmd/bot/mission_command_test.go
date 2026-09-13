@@ -863,6 +863,41 @@ func TestMissionM10ReservationCommitFaultDoesNotConsumeCap(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReservationPostRenameSyncFaultRequiresRecoveryInsteadOfRetry(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "post-rename-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			return errors.New("injected parent directory sync fault")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "post-rename-reservation"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("post-rename state fault hid a visible reservation: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = nil
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 || len(state.Reservations) != 1 || state.Reservations[0].ReservationID != "post-rename-reservation" {
+		t.Fatalf("post-rename reservation was not visible in canonical state: state=%+v err=%v", state, err)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "post-rename-reservation"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("visible reservation was not safely idempotent: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "second-post-rename-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("post-rename recovery opened a second reservation: code=%d response=%+v", code, response)
+	}
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code != 0 || response["status"] != "VALID" {
+		t.Fatalf("fresh Bot could not replay visible post-rename state: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
 		t.Run(expiring, func(t *testing.T) {

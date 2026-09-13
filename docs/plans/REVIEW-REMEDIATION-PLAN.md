@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 5cd9ba05e582c065c06c1dfa9e0c19de719f2dc7 -->
+<!-- readiness-main-baseline: ded89edafd0ce03f14f6ea29c065eb9cef46f6f3 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -318,6 +318,16 @@ verify/load được, còn lần gọi lại cùng target bị `TARGET_NOT_EMPTY
 chỉ trả `BACKED_UP`/`RESTORED` sau parent sync. Đây là báo cáo fail-closed của
 trạng thái syscall cục bộ, không chứng minh durability qua crash/power-loss,
 không tự sửa target unsynced và không là transaction đa host.
+
+**Cập nhật mission-state publish recovery status (2026-09-14):** `writeJSONAtomic`
+phân biệt lỗi trước rename với lỗi parent-directory sync sau rename của
+`mission-state.json`. Lỗi sau rename trả typed error, và entrypoint mission
+map thành `PUBLISHED_RECOVERY_REQUIRED` thay vì `STORE_ERROR` retryable.
+Regression M10 cap=1 inject seam ngay sau rename: reservation đã visible trong
+canonical state, retry cùng ID là `EXACT_DUPLICATE`, ID mới vẫn bị từ chối và
+Bot process mới replay `VALID`. Đây chỉ là trạng thái an toàn cho mission-state
+local; journals/STOP/store khác, crash/power-loss và transaction nhiều file
+vẫn còn phạm vi mở.
 
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery

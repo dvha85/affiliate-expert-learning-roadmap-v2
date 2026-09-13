@@ -134,6 +134,16 @@ def audit_runtime_acceptance(root, matrix):
     source_text = source.read_text(encoding="utf-8")
     if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source_text or '"after_temp_sync", "before_rename"' not in source_text:
         fail("R10 reservation commit-fault regression is missing from the learner Bot test path")
+    publish_fault = updates.get("RP-03-mission-state-publish-recovery-status")
+    if not isinstance(publish_fault, dict):
+        fail("matrix lacks the mission-state post-rename acceptance record")
+    if "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in publish_fault.get("test_refs", []):
+        fail("mission-state post-rename record lacks its real Bot regression")
+    publish_scope = publish_fault.get("scope")
+    if not isinstance(publish_scope, str) or "PUBLISHED_RECOVERY_REQUIRED" not in publish_scope or "EXACT_DUPLICATE" not in publish_scope:
+        fail("mission-state post-rename record lacks recovery status disclosure")
+    if "TestMissionM10ReservationPostRenameSyncFaultRequiresRecoveryInsteadOfRetry" not in source_text or '"after_rename_before_parent_sync"' not in source_text:
+        fail("mission-state post-rename regression is missing from the learner Bot test path")
 
 
 def audit_evidence_graph(root, criteria_by_id):
