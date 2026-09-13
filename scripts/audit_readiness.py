@@ -19,6 +19,7 @@ CI_REQUIRED = {
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_recovery_journal_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m07_tool_artifact_path_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m07_portable_input_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m07_backup_sidecar_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m08_m07_proposal_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_mission_portable_input_guard.py": ".github/workflows/curriculum-ci.yml",
