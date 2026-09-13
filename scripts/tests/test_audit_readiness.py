@@ -147,6 +147,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ReservationPostRenameSyncFaultRequiresRecoveryInsteadOfRetry", "MissingPostRenameRegression", 1), encoding="utf-8")
         self.assertIn("mission-state post-rename regression is missing", self.run_audit(False))
 
+    def test_missing_durable_stop_post_rename_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionStopPostRenameSyncFaultKeepsDurableStop", "MissingStopPostRenameRegression", 1), encoding="utf-8")
+        self.assertIn("durable STOP post-rename regression is missing", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")

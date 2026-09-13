@@ -144,6 +144,10 @@ def audit_runtime_acceptance(root, matrix):
         fail("mission-state post-rename record lacks recovery status disclosure")
     if "TestMissionM10ReservationPostRenameSyncFaultRequiresRecoveryInsteadOfRetry" not in source_text or '"after_rename_before_parent_sync"' not in source_text:
         fail("mission-state post-rename regression is missing from the learner Bot test path")
+    stop_source = root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
+    stop_text = stop_source.read_text(encoding="utf-8") if stop_source.is_file() else ""
+    if "TestMissionStopPostRenameSyncFaultKeepsDurableStop" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text:
+        fail("durable STOP post-rename regression is missing from the learner Bot test path")
 
 
 def audit_evidence_graph(root, criteria_by_id):

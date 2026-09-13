@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: ded89edafd0ce03f14f6ea29c065eb9cef46f6f3 -->
+<!-- readiness-main-baseline: d2c387101beeba7d3d667a7f27412f88db573c67 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -326,8 +326,9 @@ map thành `PUBLISHED_RECOVERY_REQUIRED` thay vì `STORE_ERROR` retryable.
 Regression M10 cap=1 inject seam ngay sau rename: reservation đã visible trong
 canonical state, retry cùng ID là `EXACT_DUPLICATE`, ID mới vẫn bị từ chối và
 Bot process mới replay `VALID`. Đây chỉ là trạng thái an toàn cho mission-state
-local; journals/STOP/store khác, crash/power-loss và transaction nhiều file
-vẫn còn phạm vi mở.
+local. Cùng primitive cũng giữ `STOP` visible khi lỗi ở parent sync sau rename:
+fresh Bot vẫn `STOPPED` trước khi đọc input; journals/store khác,
+crash/power-loss và transaction nhiều file vẫn còn phạm vi mở.
 
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery
