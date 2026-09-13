@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 )
@@ -31,7 +30,7 @@ func validateHistoryJSON(raw []byte) error {
 }
 
 func loadHistoryObservations(path string) ([]Observation, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readGeneralPortableInput(path)
 	if err != nil {
 		return nil, err
 	}

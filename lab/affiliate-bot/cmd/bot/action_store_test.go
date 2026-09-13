@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -107,6 +108,67 @@ func TestActionStoreLifecycle(t *testing.T) {
 		t.Fatal("corrupt store overwritten")
 	}
 	call([]string{"record"}, 2, "USAGE_ERROR")
+}
+
+// M03 action records arrive via a caller-owned pathname. A same-byte external
+// replacement after descriptor open must fail before the action store appends
+// an artifact linked to canonical history.
+func TestActionStoreRejectsPortableSymlinkSwapAfterOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	actions := filepath.Join(dir, "actions.jsonl")
+	input := filepath.Join(dir, "action.json")
+	record, err := NewHistoryRecord("action-portable-swap", "2026-09-03T00:00:00Z", "2026-09-03T00:00:00Z", []Observation{historyObservation("action-portable-swap-o1", "product", "Product", 100, .1, "2026-09-03T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(history, record); err != nil {
+		t.Fatal(err)
+	}
+	action := m03.HumanActionRecord{ActionID: "action-portable-swap", DecisionID: record.RecordID, ActionType: "synthetic_manual_post", Target: "fixture:portable", PerformedBy: "human", PerformedAt: "2026-09-04T00:00:00Z", MeasurementWindowEnd: "2026-09-05T00:00:00Z", ComplianceReviewed: true}
+	inputBytes, err := json.Marshal(action)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(input, inputBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-action.json")
+	if err := os.WriteFile(external, inputBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(input) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(input); err != nil {
+			return err
+		}
+		return os.Symlink(external, input)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	var out, diagnostic bytes.Buffer
+	if code := runActionStore([]string{"record", history, actions, input}, &out, &diagnostic); code == 0 {
+		t.Fatalf("action store accepted a post-open input swap: response=%s diagnostic=%s", out.String(), diagnostic.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "IO_ERROR" {
+		t.Fatalf("action store did not reject portable swap as input error: response=%s err=%v diagnostic=%s", out.String(), err, diagnostic.String())
+	}
+	if !swapped {
+		t.Fatal("action store did not use the shared portable-input reader")
+	}
+	if _, err := os.Stat(actions); !os.IsNotExist(err) {
+		t.Fatalf("action store persisted after portable input swap: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, inputBytes) {
+		t.Fatalf("swap rejection changed external action bytes: %q err=%v", got, err)
+	}
 }
 
 func TestActionDecisionRequiresUniqueReplay(t *testing.T) {

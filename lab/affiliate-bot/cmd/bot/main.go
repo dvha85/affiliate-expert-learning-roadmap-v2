@@ -167,7 +167,7 @@ func evaluate(records []Observation) Result {
 }
 
 func loadObservations(path string) ([]Observation, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readGeneralPortableInput(path)
 	if err != nil {
 		return nil, err
 	}

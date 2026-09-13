@@ -163,7 +163,7 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "list" {
 		return emit("VALID", outcomes, nil, 0)
 	}
-	raw, err := os.ReadFile(args[4])
+	raw, err := readGeneralPortableInput(args[4])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)
 	}
