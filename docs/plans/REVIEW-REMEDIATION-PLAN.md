@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: b6b61ae7efec70be82f62027d8c53e7f99eda925 -->
+<!-- readiness-main-baseline: 8ebe04d8a3d783a98565899d65199eba95225dcb -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1459,6 +1459,15 @@ nodes của blueprint. Stub phải nhận canonical context và tool evidence; o
 được validate, persist, rồi revalidate sau restart adapter. Điều này không đưa
 secret/provider vào CI và không là bằng chứng received-redirect hoặc provider
 diversity.
+
+**M07 selected-source engine grounding CI (2026-09-13):** sau khi metadata
+Shopee Smartlink fixture đã làm sạch được M06 n8n append, cùng runner truyền
+record đó vào Agent M07 thật với model OpenAI-compatible loopback. Case hợp lệ
+chỉ restate `price:null` cùng evidence ID canonical và phải persist draft
+read-only. Case model bịa `commission_rate:0.9` dưới evidence ID commission
+canonical phải dừng tại grounding adapter trước proposal/report, không được
+tạo artifact mới. Không gọi ACCESSTRADE, không dùng provider credential thật,
+không biến metadata campaign thành fact commission hay business outcome.
 
 **M07 received-redirect regression (2026-09-09):** transport helper có seam
 `RoundTripper` chỉ dùng test; wrapper production vẫn tạo transport guard của

@@ -35,7 +35,7 @@ M06_SELECTED_SOURCE_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-accesstrade-shopee-r
 M07_BLUEPRINT = ROOT / "lab" / "n8n" / "M07-readonly-evidence-agent.blueprint.json"
 
 
-def m07_model_output_from_prompt(payload: dict) -> dict:
+def m07_model_output_from_prompt(payload: dict, mode: str = "valid") -> dict:
     messages = payload.get("messages")
     if not isinstance(messages, list):
         raise ValueError("model stub received no messages")
@@ -56,16 +56,17 @@ def m07_model_output_from_prompt(payload: dict) -> dict:
     evidence = context.get("evidence")
     if not isinstance(evidence, list):
         raise ValueError("model stub received invalid canonical evidence")
-    scalar = next((item for item in evidence if isinstance(item, dict) and item.get("field_or_claim") == "price" and isinstance(item.get("evidence_id"), str)), None)
+    field = "price" if mode == "valid" else "commission_rate"
+    scalar = next((item for item in evidence if isinstance(item, dict) and item.get("field_or_claim") == field and isinstance(item.get("evidence_id"), str)), None)
     if scalar is None:
-        raise ValueError("model stub could not find canonical price evidence")
-    value = scalar.get("value")
+        raise ValueError(f"model stub could not find canonical {field} evidence")
+    value = 0.9 if mode == "forged-commission" else scalar.get("value")
     value_json = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    claim_text = f"price={value_json} [evidence:{scalar['evidence_id']}]"
+    claim_text = f"{field}={value_json} [evidence:{scalar['evidence_id']}]"
     return {
         "state": "HUMAN_REVIEW",
         "answer": claim_text,
-        "claims": [{"text": claim_text, "field_or_claim": "price", "value": value, "evidence_ids": [scalar["evidence_id"]]}],
+        "claims": [{"text": claim_text, "field_or_claim": field, "value": value, "evidence_ids": [scalar["evidence_id"]]}],
         "evidence_ids": [scalar["evidence_id"]],
         "tool_calls": [],
         "authority": "A2-RO",
@@ -101,7 +102,7 @@ class m07ModelStubHandler(http.server.BaseHTTPRequestHandler):
             if content_length <= 0 or content_length > 1 << 20:
                 raise ValueError("invalid model-stub body length")
             request = json.loads(self.rfile.read(content_length))
-            output = m07_model_output_from_prompt(request)
+            output = m07_model_output_from_prompt(request, self.server.mode)  # type: ignore[attr-defined]
         except (ValueError, json.JSONDecodeError) as error:
             self.server.stub_error = str(error)  # type: ignore[attr-defined]
             self._write_json(400, {"error": {"message": "invalid model-stub request"}})
@@ -114,6 +115,7 @@ def start_m07_model_stub(port: int) -> tuple[http.server.ThreadingHTTPServer, th
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), m07ModelStubHandler)
     server.request_count = 0  # type: ignore[attr-defined]
     server.stub_error = ""  # type: ignore[attr-defined]
+    server.mode = "valid"  # type: ignore[attr-defined]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
@@ -229,16 +231,16 @@ def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, wor
                     assignment["value"] = '{"tool_name":"public_http","method":"POST","target":"https://example.com/br13/offer"}'
                 if m07_case in {"get", "redirect-registry"} and assignment["name"] == "tool_request_json":
                     assignment["value"] = '{"tool_name":"public_http","method":"GET","target":"https://example.com/br13/offer"}'
-                if m07_case == "model-success" and assignment["name"] == "tool_request_json":
+                if m07_case in {"model-success", "model-forged-commission"} and assignment["name"] == "tool_request_json":
                     if m07_record_id is None:
                         raise AssertionError("M07 model-success requires a canonical record")
                     assignment["value"] = json.dumps({"record_id": m07_record_id, "tool_call": {"tool_name": "public_http", "method": "GET", "target": "https://example.com/br13/offer"}, "status_code": 200, "received_at": "2026-09-09T00:00:00Z", "redirected": False, "body": {"notice": "synthetic CI fixture; untrusted data"}}, separators=(",", ":"))
                 if m07_case == "redirect-registry" and assignment["name"] == "tool_registry_json":
                     assignment["value"] = '[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":10000,"follow_redirects":true}]'
-        if m07_case == "model-success" and node["name"] == "Fetch and Register Tool Adapter":
+        if m07_case in {"model-success", "model-forged-commission"} and node["name"] == "Fetch and Register Tool Adapter":
             node["parameters"]["url"] = "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-tool-result' }}"
             node["parameters"]["jsonBody"] = "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_result:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)} }}"
-        if m07_case == "model-success" and node["name"] == "OpenAI Chat Model - configure credential locally":
+        if m07_case in {"model-success", "model-forged-commission"} and node["name"] == "OpenAI Chat Model - configure credential locally":
             if m07_model_stub_port is None:
                 raise AssertionError("M07 model-success requires a loopback model stub")
             node["credentials"] = {"openAiApi": {"id": "rp08-m07-model-stub", "name": "M07 CI Loopback Model Stub"}}
@@ -344,6 +346,18 @@ def require_m07_model_success(execution: dict, expected_record_id: str) -> tuple
     if not isinstance(proposal_id, str) or not proposal_id.startswith("sha256:"):
         raise AssertionError("M07 model-success did not return a canonical proposal ID")
     return proposal_id, tool_result_id
+
+
+def require_m07_grounding_rejection(execution: dict, proposal_store: Path, proposal_paths_before: set[Path]) -> None:
+    result = execution.get("data", {}).get("resultData", {})
+    if execution.get("status") != "error" or result.get("lastNodeExecuted") != "Validate Grounding Adapter":
+        raise AssertionError("ungrounded M07 output did not stop at the grounding adapter")
+    for forbidden in ("Persist Agent Proposal Adapter", "Report Persisted M07 Proposal"):
+        if forbidden in result.get("runData", {}):
+            raise AssertionError(f"ungrounded M07 output reached {forbidden}")
+    proposal_paths_after = set(proposal_store.glob("*.json")) if proposal_store.exists() else set()
+    if proposal_paths_after != proposal_paths_before:
+        raise AssertionError("ungrounded M07 output persisted a proposal")
 
 
 def post_json(url: str, payload: dict) -> tuple[int, dict]:
@@ -523,6 +537,21 @@ def main() -> None:
                 status, validated = post_json(f"http://127.0.0.1:{port}/v1/m07/validate", {"record_id": record_id, "registry": [{"name": "public_http", "read_only": True, "allowed_methods": ["GET"], "allowed_hosts": ["example.com"], "timeout_ms": 10000, "follow_redirects": False}], "model_output_text": json.dumps(proposal["raw_output"], separators=(",", ":")), "tool_result_id": tool_result_id})
                 if status != 200 or validated.get("status") != "VALID" or validated.get("execution_permitted") is not False:
                     raise AssertionError("M07 persisted proposal did not revalidate after adapter restart")
+                import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-selected-source", port, m07_case="model-success", m07_record_id=selected_record_id, m07_model_stub_port=model_stub_port)
+                selected_proposal_id, _ = require_m07_model_success(execute(prefix, env, "rp08-m07-selected-source"), selected_record_id)
+                selected_proposal_path = history.with_name(history.name + ".m07") / "proposals" / (selected_proposal_id.removeprefix("sha256:") + ".json")
+                selected_proposal = json.loads(selected_proposal_path.read_text(encoding="utf-8"))
+                selected_output = selected_proposal.get("raw_output", {})
+                selected_claims = selected_output.get("claims") if isinstance(selected_output, dict) else None
+                if not isinstance(selected_output, dict) or not isinstance(selected_claims, list) or len(selected_claims) != 1:
+                    raise AssertionError("selected-source M07 did not persist one grounded canonical claim")
+                selected_claim = selected_claims[0]
+                if not isinstance(selected_claim, dict) or selected_claim.get("field_or_claim") != "price" or selected_claim.get("value") is not None or selected_claim.get("evidence_ids") != selected_output.get("evidence_ids") or selected_output.get("answer") != selected_claim.get("text"):
+                    raise AssertionError("selected-source M07 did not preserve the canonical unknown price as null")
+                proposal_paths_before_forgery = set(proposal_store.glob("*.json")) if proposal_store.exists() else set()
+                model_stub.mode = "forged-commission"  # type: ignore[attr-defined]
+                import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-selected-source-forged-commission", port, m07_case="model-forged-commission", m07_record_id=selected_record_id, m07_model_stub_port=model_stub_port)
+                require_m07_grounding_rejection(execute(prefix, env, "rp08-m07-selected-source-forged-commission", expected=1), proposal_store, proposal_paths_before_forgery)
             finally:
                 stop_m07_model_stub(model_stub, model_stub_thread)
         finally:
@@ -536,7 +565,7 @@ def main() -> None:
             print(f"N8N engine regression runtime retained at {runtime}", file=sys.stderr)
         else:
             shutil.rmtree(runtime)
-    print("N8N ENGINE REGRESSION PASS: synthetic M06 and sanitized selected-source metadata persisted/replayed via n8n with exact retries and fail-closed rejects; M07 policy rejections failed closed and the real Agent completed grounding/proposal persistence against a loopback OpenAI-compatible model stub")
+    print("N8N ENGINE REGRESSION PASS: synthetic M06 and sanitized selected-source metadata persisted/replayed via n8n with exact retries and fail-closed rejects; M07 policy and selected-source forged-commission rejections failed closed while the real Agent persisted only canonical grounded output against a loopback OpenAI-compatible model stub")
 
 
 if __name__ == "__main__":
