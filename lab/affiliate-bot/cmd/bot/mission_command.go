@@ -104,8 +104,48 @@ type LearnerReservation struct {
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
+func m10CanaryJournalPath(dir string) string    { return filepath.Join(dir, "m10-canary-journal.json") }
 func m10CostBoundJournalPath(dir string) string {
 	return filepath.Join(dir, "m10-cost-bound-journal.json")
+}
+
+// m10CanaryJournal binds the immutable grant artifact to the mutable canary
+// state that owns its usage counters. Neither side can be admitted on its own
+// after an interrupted writer.
+type m10CanaryJournal struct {
+	Version        string              `json:"version"`
+	Grant          corem10.CanaryGrant `json:"grant"`
+	Status         string              `json:"status"`
+	ExecutionsUsed int                 `json:"executions_used"`
+	CostUsedMinor  int64               `json:"cost_used_minor"`
+}
+
+var m10CanaryAppendFault func(phase string) error
+
+func m10CanaryFault(phase string) error {
+	if m10CanaryAppendFault == nil {
+		return nil
+	}
+	return m10CanaryAppendFault(phase)
+}
+
+func m10CanaryJournalRecoveryRequired(dir string) error {
+	info, err := os.Lstat(m10CanaryJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("M10 canary journal path is not a regular file")
+	}
+	return fmt.Errorf("M10 canary journal requires a locked writer recovery")
+}
+
+func readM10CanaryJournal(path string) ([]byte, error) {
+	raw, _, err := readStableRegularFile(path)
+	return raw, err
 }
 func m10ExecutionJournalPath(dir string) string {
 	return filepath.Join(dir, "m10-execution-journal.json")
@@ -431,6 +471,69 @@ func trustedCostBoundRegistryStatus(bounds []corem10.TrustedCostBound, bound cor
 		return false, fmt.Errorf("cost_bound_id reused with different content")
 	}
 	return false, nil
+}
+
+// recoverM10CanaryJournal converges the immutable grant envelope and mutable
+// canary binding. It validates at the grant's own valid_from time: recovery is
+// replay of an already reviewed transition, not a fresh delegation that may
+// use today's clock to reopen an expired grant.
+func recoverM10CanaryJournal(dir string) error {
+	raw, err := readM10CanaryJournal(m10CanaryJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m10CanaryJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m10-canary-journal/v1" {
+		return fmt.Errorf("M10 canary journal is invalid")
+	}
+	grantRaw, err := json.Marshal(journal.Grant)
+	if err != nil {
+		return err
+	}
+	grant, status := corem10.DecodeCanaryGrant(grantRaw)
+	if status != "VALID" || journal.Status != "ACTIVE" || journal.ExecutionsUsed < 0 || journal.CostUsedMinor < 0 {
+		return fmt.Errorf("M10 canary journal canary is invalid")
+	}
+	state, err := loadMissionState(dir)
+	if err != nil || state.Stop || state.Intent == nil || state.Policy == nil || state.Approval == nil {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("M10 canary journal has no active binding scope")
+	}
+	validFrom, err := time.Parse(time.RFC3339, grant.ValidFrom)
+	if err != nil || corem10.ValidCanaryGrantFor(grant, state.Intent.IntentID, state.Intent.IntentHash, state.Policy.PolicyVersion, state.Approval.ApprovalID, state.Approval.ApproverID, state.Intent.CorrelationID, state.Policy.RiskClass, state.Intent.ActionType, state.Intent.Target, validFrom) != "VALID" {
+		return fmt.Errorf("M10 canary journal grant no longer matches mission scope")
+	}
+	candidate := LearnerCanary{CanaryGrant: grant, Status: journal.Status, ExecutionsUsed: journal.ExecutionsUsed, CostUsedMinor: journal.CostUsedMinor}
+	if state.Canary != nil && !reflect.DeepEqual(*state.Canary, candidate) {
+		return fmt.Errorf("M10 canary journal conflicts with current canary binding")
+	}
+	if err := m10CanaryFault("before_artifact"); err != nil {
+		return err
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+		return fmt.Errorf("M10 canary journal artifact recovery failed: %w", err)
+	}
+	if err := m10CanaryFault("after_artifact"); err != nil {
+		return err
+	}
+	if state.Canary == nil {
+		state.Canary = &candidate
+		if err := saveMissionState(dir, state); err != nil {
+			return err
+		}
+	}
+	if err := m10CanaryFault("after_state"); err != nil {
+		return err
+	}
+	if err := os.Remove(m10CanaryJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return syncDirectory(dir)
 }
 
 // recoverM10CostBoundJournal makes the M10 artifact envelope and its compact
@@ -1774,6 +1877,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		defer os.Remove(lockPath)
+		if err := recoverM10CanaryJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := recoverM10CostBoundJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -2004,12 +2110,19 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGrant, grantRaw); err != nil {
+		if s.Canary != nil && resolveM10Artifact(args[1], corem10.ArtifactKindCanaryGrant, grantRaw) {
+			return emit("ACK", c, nil, 0)
+		}
+		journal := m10CanaryJournal{Version: "m10-canary-journal/v1", Grant: c.CanaryGrant, Status: c.Status, ExecutionsUsed: c.ExecutionsUsed, CostUsedMinor: c.CostUsedMinor}
+		journalStatus, err := writeNewJSON(m10CanaryJournalPath(args[1]), journal)
+		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		s.Canary = &c
-		if err = saveMissionState(args[1], s); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		if journalStatus != appendAdded && journalStatus != appendDuplicate {
+			return emit("STORE_ERROR", nil, fmt.Errorf("M10 canary journal was not published"), 1)
+		}
+		if err := recoverM10CanaryJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		return emit("ACK", c, nil, 0)
 	case "m10-cost-register":
@@ -2385,6 +2498,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
+		if err := m10CanaryJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := m10CostBoundJournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -2713,6 +2829,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
+		if err := m10CanaryJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := m10CostBoundJournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}

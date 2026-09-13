@@ -522,6 +522,10 @@ func missionExpirySubprocessCall(t *testing.T, clock time.Time, args ...string) 
 // path. The unexported mission clock is a test-only runtime seam; command
 // arguments never select it.
 func authorityExpiryFixture(t *testing.T, expiring string) (string, string, string, time.Time) {
+	return authorityExpiryFixtureWithCanary(t, expiring, true)
+}
+
+func authorityExpiryFixtureWithCanary(t *testing.T, expiring string, setupCanary bool) (string, string, string, time.Time) {
 	t.Helper()
 	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
 	far := base.Add(2 * time.Hour).Format(time.RFC3339)
@@ -584,6 +588,9 @@ func authorityExpiryFixture(t *testing.T, expiring string) (string, string, stri
 	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
 	grantPath := filepath.Join(dir, "grant.json")
 	writeMissionTestJSON(t, grantPath, grant)
+	if !setupCanary {
+		return runtimeDir, grantPath, "", boundary
+	}
 	if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
 		t.Fatalf("grant setup failed: code=%d response=%+v", code, response)
 	}
@@ -775,6 +782,62 @@ func TestMissionM10CostBoundJournalRecoversTwoStoreTransition(t *testing.T) {
 			indexed, statusErr := trustedCostBoundRegistryStatus(bounds, bound)
 			if err != nil || statusErr != nil || !indexed {
 				t.Fatalf("recovered bound is missing from compact registry: bounds=%+v err=%v statusErr=%v", bounds, err, statusErr)
+			}
+		})
+	}
+}
+
+func TestMissionM10CanaryJournalRecoversRegistryStateTransition(t *testing.T) {
+	for _, phase := range []string{"before_artifact", "after_artifact", "after_state"} {
+		faultPhase := phase
+		t.Run(faultPhase, func(t *testing.T) {
+			runtimeDir, grantPath, _, _ := authorityExpiryFixtureWithCanary(t, "intent", false)
+			grantRaw, err := os.ReadFile(grantPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			grant, status := corem10.DecodeCanaryGrant(grantRaw)
+			if status != "VALID" {
+				t.Fatalf("fixture grant is invalid: %s", status)
+			}
+			m10CanaryAppendFault = func(current string) error {
+				if current == faultPhase {
+					return errors.New("injected M10 canary registry/state fault")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m10CanaryAppendFault = nil })
+			if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("canary fault was not surfaced: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); err != nil {
+				t.Fatalf("canary journal was removed before recovery: %v", err)
+			}
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh status did not fail closed on canary journal: code=%d response=%+v", code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGrant, grant.GrantID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh resolver exposed a partial canary transition: code=%d response=%+v", code, response)
+			}
+
+			m10CanaryAppendFault = nil
+			backupDir := filepath.Join(filepath.Dir(runtimeDir), "canary-journal-backup-"+faultPhase)
+			if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+				t.Fatalf("backup did not recover canary journal: code=%d response=%+v", code, response)
+			}
+			if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+				t.Fatalf("locked retry did not recover exact canary: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); !os.IsNotExist(err) {
+				t.Fatalf("canary journal remains after recovery: %v", err)
+			}
+			if !resolveM10Artifact(runtimeDir, corem10.ArtifactKindCanaryGrant, grantRaw) {
+				t.Fatal("recovered grant is missing from M10 registry")
+			}
+			state, err := loadMissionState(runtimeDir)
+			if err != nil || state.Canary == nil || state.Canary.GrantID != grant.GrantID || state.Canary.GrantHash != grant.GrantHash {
+				t.Fatalf("recovered grant is missing from mission state: state=%+v err=%v", state, err)
 			}
 		})
 	}
