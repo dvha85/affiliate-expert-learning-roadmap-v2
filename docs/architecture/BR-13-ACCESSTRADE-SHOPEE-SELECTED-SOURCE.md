@@ -83,6 +83,11 @@ Vì vậy output muốn khẳng định commission hay earnings sẽ bị ground
 từ chối. Một output chỉ có thể abstain hoặc trích nguyên evidence hợp lệ dưới
 `HUMAN_REVIEW`; không cấp approval hay execution.
 
+Regression n8n disposable chạy một Agent thật qua model stub loopback với
+record metadata này: chỉ `price:null` có evidence đúng được persist; output
+bịa `commission_rate:0.9` bị từ chối tại grounding adapter trước proposal
+persistence. Đây không phải model/provider hay campaign page chạy thật.
+
 Chỉ khi một operated run độc lập được ghi nhận, với capture được kiểm tra và
 quyền/approval đúng, mới có thể thêm external evidence. Kể cả khi đó, nó vẫn
 không tự chứng minh outcome kinh doanh, payout hay cho phép tạo link.
