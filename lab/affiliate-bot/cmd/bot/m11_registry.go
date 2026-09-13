@@ -1050,7 +1050,7 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	if state.Stop {
 		return corem11.ArtifactEntry{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
 	}
-	providedRaw, err := os.ReadFile(handoffPath)
+	providedRaw, err := readMissionPortableInput(handoffPath)
 	if err != nil {
 		return corem11.ArtifactEntry{}, "", err
 	}

@@ -141,7 +141,7 @@ func runActionStore(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "list" {
 		return emit("VALID", actions, nil, 0)
 	}
-	raw, err := os.ReadFile(args[3])
+	raw, err := readGeneralPortableInput(args[3])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)
 	}

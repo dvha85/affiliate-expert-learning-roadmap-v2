@@ -786,7 +786,7 @@ func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
 	if err := distinctActionPaths(args...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
 	}
-	raw, err := os.ReadFile(args[1])
+	raw, err := readGeneralPortableInput(args[1])
 	if err != nil {
 		return emit("INPUT_ERROR", nil, err, 1)
 	}

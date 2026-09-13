@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
@@ -114,7 +113,7 @@ func exportHistoryDecision(w io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	raw, err := os.ReadFile(args[2])
+	raw, err := readGeneralPortableInput(args[2])
 	if err != nil {
 		return err
 	}

@@ -369,18 +369,14 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("RECEIPT_STORE_ERROR", nil, err, 1)
 	}
-	reportInfo, err := os.Stat(args[4])
+	report, _, err := readStableRegularFileLimit(args[4], maxAccesstradeReportBytes)
 	if err != nil {
+		if strings.Contains(err.Error(), "exceeds stable regular file limit") {
+			return emit("REPORT_TOO_LARGE", nil, fmt.Errorf("report exceeds %d bytes", maxAccesstradeReportBytes), 1)
+		}
 		return emit("IO_ERROR", nil, err, 1)
 	}
-	if reportInfo.Size() > maxAccesstradeReportBytes {
-		return emit("REPORT_TOO_LARGE", nil, fmt.Errorf("report exceeds %d bytes", maxAccesstradeReportBytes), 1)
-	}
-	report, err := os.ReadFile(args[4])
-	if err != nil {
-		return emit("IO_ERROR", nil, err, 1)
-	}
-	rawManifest, err := os.ReadFile(args[5])
+	rawManifest, err := readGeneralPortableInput(args[5])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)
 	}

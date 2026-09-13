@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 62c9be28e7f6ca6c4f800ccb9bf4ac60024fff1f -->
+<!-- readiness-main-baseline: 59afeb0bd7f61ea11a4916c0ec82fd2f1193a590 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1397,6 +1397,18 @@ M07 bằng `os.ReadFile` trong checkout tạm và đòi assertion regression th�
 fail. Đây chỉ là guard pathname local; không chứng minh provider, source live,
 atomic transaction đa-file, crash/power-loss hay multi-host.
 
+**Cập nhật general CLI portable-input stable reader (2026-09-13):** bỏ các
+`os.ReadFile` trực tiếp còn lại trong `cmd/bot` cho action/outcome imports,
+decision context, advisor config, M06 history handoff và fixture observations.
+Report/manifest ACCESSTRADE fixture và M11 recovery handoff cũng giữ stable
+identity trước decode; report vẫn giới hạn 16 MiB và manifest/general input là
+1 MiB. Receipt derivation đọc canonical outcomes qua stable reader. Regression
+gọi M03 `action record` thật, thay JSON action sau open bằng symlink ngoài cùng
+bytes, và phải `IO_ERROR` trước append. Mutation CI thay shared wrapper bằng
+`os.ReadFile` trong checkout tạm và đòi assertion thực fail. Đây là local
+pathname hardening, không chứng minh capture/report thật, provider, executor,
+atomic transaction đa-file, crash/power-loss hay multi-host.
+
 **Cập nhật M07 backup-sidecar stable reader (2026-09-12):** trước khi backup
 được chấp nhận, graph validator đọc cả tool-result và proposal sidecar bằng
 stable reader, không chỉ tin `WalkDir` trước đó. Regression đổi canonical
@@ -1414,7 +1426,8 @@ ngoài phạm vi.
 
 **Cập nhật audit CI mutation wiring (2026-09-13):** readiness audit coi các
 lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result,
-M07 CLI portable input, backup-sidecar và M08 M07-proposal path identity
+M07 CLI portable input, general CLI portable input, backup-sidecar và M08
+M07-proposal path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
 làm audit fail. Audit này chỉ xác minh text

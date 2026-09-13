@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -183,7 +182,7 @@ func runAdvisor(args []string, stdout, stderr io.Writer) int {
 		return emit("BUSY", nil, err, 1)
 	}
 	defer release()
-	raw, err := os.ReadFile(args[4])
+	raw, err := readGeneralPortableInput(args[4])
 	if err != nil {
 		return emit("IO_ERROR", nil, err, 1)
 	}

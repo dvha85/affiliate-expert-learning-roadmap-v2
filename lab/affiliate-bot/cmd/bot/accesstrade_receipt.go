@@ -234,7 +234,7 @@ func accesstradeBackupReceiptRequired(dir string) (bool, error) {
 	if err := regularFile(outcomesPath); err != nil {
 		return false, err
 	}
-	raw, err := os.ReadFile(outcomesPath)
+	raw, _, err := readStableRegularFile(outcomesPath)
 	if err != nil {
 		return false, err
 	}
