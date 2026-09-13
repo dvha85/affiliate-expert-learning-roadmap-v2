@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 150619aabf06ea35d3237923045d72ee41b575b9 -->
+<!-- readiness-as-of: 2026-09-14 -->
+<!-- readiness-main-baseline: 7f4feec2fa4d29c7cf2bd4035a829d399a10fcf5 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1247,6 +1247,18 @@ cùng `m11-reserve-authorization` với cùng authorization và timestamps khác
 Chỉ một process được `APPENDED`; process còn lại `BUSY` hoặc `REJECTED`, và retry
 sau `BUSY` bị reject. Đây kiểm lock + canonical registry guard; không thay CAS
 hoặc transaction đa-file.
+
+**Cập nhật M10 24-process reservation barrier (2026-09-14):** regression mới
+khởi tạo một fixture authority thực còn hiệu lực, cap execution/cost bằng 1,
+rồi dùng barrier test-owned để giải phóng đồng thời 24 process chạy binary Bot
+đã build riêng vào `m10-reserve-authorization`. Chính binary vận hành đọc wall
+clock thông thường; barrier chỉ nằm trong test wrapper, không phải override
+runtime hay authority. Đúng một lệnh trả `RESERVED`; mọi process khác trả
+`BUSY` hoặc `BUDGET_DENIED`. Sau đó loader kiểm `ExecutionsUsed=1`,
+`CostUsedMinor=1` và đúng một governed reservation, rồi một process Bot mới
+chạy `status` để replay state đã persist. Điều này thay claim cũ sai rằng smoke
+BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting, không
+chứng minh distributed lock, kill/power-loss hoặc transaction đa-file.
 
 **Cập nhật fault seam (2026-09-08):** registry M11 có hook nội bộ chỉ dùng trong
 test (không nhận từ CLI/env). Test inject lỗi sau `write` nhưng trước khi caller
