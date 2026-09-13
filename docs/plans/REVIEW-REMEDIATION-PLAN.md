@@ -516,12 +516,14 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   smoke BR-16a từ chối. Registry chưa có reservation-to-attempt link, execution
   result/outcome/EffectRef, migration/restore graph hoặc fault injection đầy
   đủ, vì vậy không đóng RP-03/RP-06/RP-07.
-- **RP-04 foundation:** thay đổi sau mốc head ở trên thêm một learner resolver
-  read-only dùng chung cho M07 context và M08 intent: record phải resolve đúng
-  một lần từ history và replay `MATCH`. M06 watcher handoff và HTTP GET cũng
-  resolve lại record từ store sau append trước khi ACK/return artifact. Chưa
-  có core M06 builder chung, chưa đổi n8n blueprint/HTTP adapter, và chưa có
-  proposal resolver; RP-04 vẫn mở.
+- **RP-04 foundation (historical, superseded by the M06/M07 updates below):**
+  thay đổi sau mốc head ở trên đã thêm learner resolver read-only dùng chung
+  cho M07 context và M08 intent: record phải resolve đúng một lần từ history
+  và replay `MATCH`. M06 watcher handoff và HTTP GET cũng resolve lại record
+  từ store sau append trước khi ACK/return artifact. Các giới hạn cũ về core
+  builder, n8n adapter và proposal resolver đã được các cập nhật tiếp theo
+  triển khai; RP-04 vẫn PARTIAL chỉ vì generic source/deployment evidence và
+  coverage rộng hơn còn mở.
 - **RP-04 M06 shared fixture path:** `core/m06` nay owns strict
   `br13-offer-fixture/v1` decoding, timestamp/identity/provenance normalization
   và M00 packet construction. Learner CLI local/pinned fetch cùng n8n endpoint
