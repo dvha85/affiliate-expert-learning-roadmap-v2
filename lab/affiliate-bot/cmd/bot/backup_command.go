@@ -57,6 +57,12 @@ var restoreCopyFault func(relativePath string) error
 // through the command line or environment.
 var backupStagingWriteFault func(phase, path string) error
 
+// backupPublishFault is a test-only seam immediately after the final staging
+// rename. At that point a target can already be visible, so callers must never
+// describe a subsequent parent-directory sync error as an unpublished retry.
+// It cannot be selected through the command line or environment.
+var backupPublishFault func(phase, path string) error
+
 // stableRegularFileReadHook is a test-only seam for a same-byte replacement
 // after the stable reader has opened its file. It is never configurable from
 // the CLI or environment. Recovery journals use the same reader as backups,
@@ -82,6 +88,31 @@ func backupStagingFailure(phase, path string) error {
 		return nil
 	}
 	return backupStagingWriteFault(phase, path)
+}
+
+func backupPublishFailure(phase, path string) error {
+	if backupPublishFault == nil {
+		return nil
+	}
+	return backupPublishFault(phase, path)
+}
+
+// publishBackupStaging makes a complete, verified staging tree visible at its
+// final name and then syncs the parent directory. Once Rename succeeds the
+// target is no longer private staging: even when the parent sync fails the
+// caller must preserve that fact for recovery rather than offering a retry
+// that could conflict with an already-visible snapshot.
+func publishBackupStaging(staging, target, parent string) (published bool, err error) {
+	if err = os.Rename(staging, target); err != nil {
+		return false, err
+	}
+	if err = backupPublishFailure("after_rename_before_parent_sync", target); err != nil {
+		return true, err
+	}
+	if err = syncDirectory(parent); err != nil {
+		return true, err
+	}
+	return true, nil
 }
 
 // syncStagingDirectories persists every directory edge from a copied file back
@@ -1659,22 +1690,13 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		} else if !os.IsNotExist(targetErr) {
 			return emit("TARGET_ERROR", nil, targetErr, 1)
 		}
-		if e = os.Rename(staging, args[2]); e != nil {
+		published, e = publishBackupStaging(staging, args[2], parent)
+		if e != nil {
+			if published {
+				return emit("PUBLISHED_RECOVERY_REQUIRED", m, fmt.Errorf("backup snapshot is visible but parent-directory durability is unconfirmed: %w", e), 1)
+			}
 			return emit("STORE_ERROR", nil, fmt.Errorf("publish backup snapshot: %w", e), 1)
 		}
-		parentFile, parentErr := os.Open(parent)
-		if parentErr != nil {
-			return emit("STORE_ERROR", nil, parentErr, 1)
-		}
-		syncErr := parentFile.Sync()
-		closeErr := parentFile.Close()
-		if syncErr != nil {
-			return emit("STORE_ERROR", nil, syncErr, 1)
-		}
-		if closeErr != nil {
-			return emit("STORE_ERROR", nil, closeErr, 1)
-		}
-		published = true
 		return emit("BACKED_UP", m, nil, 0)
 	}
 	m, e := verifyBackup(args[1])
@@ -1789,9 +1811,12 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	} else if !os.IsNotExist(statErr) {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
-	if e = os.Rename(staging, args[2]); e != nil {
+	published, e = publishBackupStaging(staging, args[2], parent)
+	if e != nil {
+		if published {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", m, fmt.Errorf("restored runtime is visible but parent-directory durability is unconfirmed: %w", e), 1)
+		}
 		return emit("STORE_ERROR", nil, fmt.Errorf("publish restored runtime: %w", e), 1)
 	}
-	published = true
 	return emit("RESTORED", m, nil, 0)
 }
