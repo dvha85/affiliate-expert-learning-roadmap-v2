@@ -132,6 +132,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m07_registry_strict_decoder.py", "python scripts/removed.py"), encoding="utf-8")
         self.assertIn("unresolved CI evidence", self.run_audit(False))
 
+    def test_missing_r10_process_barrier_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses", "MissingProcessBarrierRegression", 1), encoding="utf-8")
+        self.assertIn("R10 process-barrier regression is missing", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")

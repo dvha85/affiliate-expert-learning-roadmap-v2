@@ -109,6 +109,22 @@ def audit_review_findings(matrix, criteria_by_id, plan_text):
         fail(f"review finding mapping is incomplete: {sorted(seen)}")
 
 
+def audit_runtime_acceptance(root, matrix):
+    """Prevent a summary row from claiming a process-barrier proof it cannot point to."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    barrier = updates.get("RP-03-concurrent-reservation-barrier")
+    if not isinstance(barrier, dict):
+        fail("matrix lacks the R10 process-barrier acceptance record")
+    if "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in barrier.get("test_refs", []):
+        fail("R10 process-barrier record lacks its real Bot regression")
+    scope = barrier.get("scope")
+    if not isinstance(scope, str) or "24-process" not in scope or "cap=1" not in scope:
+        fail("R10 process-barrier record lacks a bounded cap=1 disclosure")
+    source = root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+    if not source.is_file() or "TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses" not in source.read_text(encoding="utf-8"):
+        fail("R10 process-barrier regression is missing from the learner Bot test path")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -261,6 +277,7 @@ def audit(root):
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
+    audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():

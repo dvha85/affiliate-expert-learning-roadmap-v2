@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -513,6 +515,77 @@ func missionBinaryCall(t *testing.T, binary string, args ...string) (int, map[st
 	return code, response
 }
 
+// TestMissionReserveProcessBarrierHelper is deliberately test-binary-only. It
+// waits until the parent has started every contender, then delegates to the
+// separately built Bot binary. Production never reads these variables, so the
+// barrier cannot change authority or clock behavior outside this regression.
+func TestMissionReserveProcessBarrierHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_M10_RESERVE_BARRIER") != "1" {
+		return
+	}
+	readyDir, startPath := os.Getenv("GO_M10_RESERVE_READY_DIR"), os.Getenv("GO_M10_RESERVE_START_PATH")
+	if readyDir == "" || startPath == "" {
+		os.Exit(2)
+	}
+	if err := os.WriteFile(filepath.Join(readyDir, strconv.Itoa(os.Getpid())), []byte("ready"), 0600); err != nil {
+		os.Exit(2)
+	}
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		if _, err := os.Stat(startPath); err == nil {
+			break
+		} else if !os.IsNotExist(err) || time.Now().After(deadline) {
+			os.Exit(2)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	separator := -1
+	for index, value := range os.Args {
+		if value == "--" {
+			separator = index
+			break
+		}
+	}
+	if separator == -1 || separator+2 >= len(os.Args) {
+		os.Exit(2)
+	}
+	command := exec.Command(os.Args[separator+1], os.Args[separator+2:]...)
+	command.Stdout, command.Stderr = os.Stdout, os.Stderr
+	if err := command.Run(); err != nil {
+		if exited, ok := err.(*exec.ExitError); ok {
+			os.Exit(exited.ExitCode())
+		}
+		os.Exit(2)
+	}
+	os.Exit(0)
+}
+
+type missionProcessResult struct {
+	id     string
+	code   int
+	stdout string
+	stderr string
+	err    error
+}
+
+func waitForReservationContenders(t *testing.T, readyDir string, count int) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		entries, err := os.ReadDir(readyDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) == count {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d/%d reservation processes reached the barrier", len(entries), count)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // TestMissionAuthorityExpirySubprocessHelper is a test-binary-only clock seam.
 // The production Bot neither reads this environment variable nor accepts a
 // caller-controlled clock. It lets the combined backup/restore regression run
@@ -573,6 +646,18 @@ func authorityExpiryFixture(t *testing.T, expiring string) (string, string, stri
 func authorityExpiryFixtureWithCanary(t *testing.T, expiring string, setupCanary bool) (string, string, string, time.Time) {
 	t.Helper()
 	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	return authorityFixtureAt(t, base, expiring, setupCanary, 2)
+}
+
+// authorityFixtureAt keeps the regular expiry regressions deterministic while
+// also allowing a fresh Bot binary to exercise an authority window that is
+// valid at the real wall clock. The caller never supplies this clock to the
+// production command; this function only writes fixture artifacts in tests.
+func authorityFixtureAt(t *testing.T, base time.Time, expiring string, setupCanary bool, maxExecutions int) (string, string, string, time.Time) {
+	t.Helper()
+	if maxExecutions < 1 {
+		t.Fatal("fixture needs a positive execution cap")
+	}
 	far := base.Add(2 * time.Hour).Format(time.RFC3339)
 	boundary := base.Add(time.Minute)
 	expires := map[string]string{"intent": far, "approval": far, "grant": far, "cost": far}
@@ -629,7 +714,7 @@ func authorityExpiryFixtureWithCanary(t *testing.T, expiring string, setupCanary
 	if code, response := missionCall(t, "m09-approval", runtimeDir, approvalPath); code != 0 || response["status"] != "ACK" {
 		t.Fatalf("approval setup failed: code=%d response=%+v", code, response)
 	}
-	grant := corem10.CanaryGrant{GrantID: "expiry-grant", GrantVersion: "v1", PolicyVersion: policy.PolicyVersion, ApprovalRef: "expiry-approval", ApprovedBy: "human", ApproverID: "expiry-reviewer", ApprovedAt: base.Format(time.RFC3339), ValidFrom: base.Format(time.RFC3339), ExpiresAt: expires["grant"], AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 2, MaxExecutionsPerWindow: 2, WindowSeconds: 60, MaxCostMinorTotal: 10, Currency: "USD", MaxPendingOutcomes: 1, KillSwitchRequired: true, CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
+	grant := corem10.CanaryGrant{GrantID: "expiry-grant", GrantVersion: "v1", PolicyVersion: policy.PolicyVersion, ApprovalRef: "expiry-approval", ApprovedBy: "human", ApproverID: "expiry-reviewer", ApprovedAt: base.Format(time.RFC3339), ValidFrom: base.Format(time.RFC3339), ExpiresAt: expires["grant"], AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: maxExecutions, MaxExecutionsPerWindow: maxExecutions, WindowSeconds: 60, MaxCostMinorTotal: int64(maxExecutions), Currency: "USD", MaxPendingOutcomes: maxExecutions, KillSwitchRequired: true, CorrelationID: intent.CorrelationID, HashVersion: "go-json-v1"}
 	grant.GrantHash = corem10.ComputeCanaryGrantHash(grant)
 	grantPath := filepath.Join(dir, "grant.json")
 	writeMissionTestJSON(t, grantPath, grant)
@@ -651,6 +736,86 @@ func authorityExpiryFixtureWithCanary(t *testing.T, expiring string, setupCanary
 		t.Fatalf("pre-expiry gate failed: code=%d response=%+v", code, response)
 	}
 	return runtimeDir, boundPath, gatePath, boundary
+}
+
+func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
+	// Use a short real-time-valid fixture window: each contender invokes the
+	// compiled learner Bot, so unlike a unit clock seam this proves the normal
+	// command process cannot exceed the persisted cap under contention.
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "concurrent-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	binary := buildMissionBinary(t)
+	const contenders = 24
+	readyDir := filepath.Join(root, "reserve-ready")
+	if err := os.Mkdir(readyDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	startPath := filepath.Join(root, "reserve-start")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := make(chan missionProcessResult, contenders)
+	for index := 0; index < contenders; index++ {
+		reservationID := "concurrent-reservation-" + strconv.Itoa(index)
+		command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMissionReserveProcessBarrierHelper$", "--", binary, "mission", "m10-reserve-authorization", runtimeDir, authorizationPath, reservationID)
+		command.Env = append(os.Environ(), "GO_WANT_M10_RESERVE_BARRIER=1", "GO_M10_RESERVE_READY_DIR="+readyDir, "GO_M10_RESERVE_START_PATH="+startPath)
+		var stdout, stderr bytes.Buffer
+		command.Stdout, command.Stderr = &stdout, &stderr
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		go func(id string, command *exec.Cmd, stdout, stderr *bytes.Buffer) {
+			err := command.Wait()
+			code := 0
+			if exited, ok := err.(*exec.ExitError); ok {
+				code = exited.ExitCode()
+			}
+			results <- missionProcessResult{id: id, code: code, stdout: stdout.String(), stderr: stderr.String(), err: err}
+		}(reservationID, command, &stdout, &stderr)
+	}
+	waitForReservationContenders(t, readyDir, contenders)
+	if err := os.WriteFile(startPath, []byte("start"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	reserved := 0
+	for index := 0; index < contenders; index++ {
+		result := <-results
+		var response map[string]any
+		if err := json.Unmarshal([]byte(result.stdout), &response); err != nil {
+			t.Fatalf("contender %s emitted invalid response %q: %v (stderr: %s, command error: %v)", result.id, result.stdout, err, result.stderr, result.err)
+		}
+		status, _ := response["status"].(string)
+		switch status {
+		case "RESERVED":
+			if result.code != 0 {
+				t.Fatalf("successful contender %s returned exit %d: %s", result.id, result.code, result.stderr)
+			}
+			reserved++
+		case "BUSY", "BUDGET_DENIED":
+			if result.code == 0 {
+				t.Fatalf("rejected contender %s returned success: %+v", result.id, response)
+			}
+		default:
+			t.Fatalf("contender %s returned unexpected status %q: response=%+v stderr=%s command error=%v", result.id, status, response, result.stderr, result.err)
+		}
+	}
+	if reserved != 1 {
+		t.Fatalf("cap=1 admitted %d reservations across %d Bot processes", reserved, contenders)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil {
+		t.Fatalf("reload persisted budget state: state=%+v err=%v", state, err)
+	}
+	if state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 || len(state.Reservations) != 1 || state.Reservations[0].ReservationMode != "GOVERNED_AUTHORIZATION" {
+		t.Fatalf("cap=1 budget ledger does not match its one acknowledgement: canary=%+v reservations=%+v", state.Canary, state.Reservations)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code != 0 || response["status"] != "VALID" {
+		t.Fatalf("fresh Bot could not replay the persisted cap=1 ledger: code=%d response=%+v", code, response)
+	}
 }
 
 func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
