@@ -338,6 +338,12 @@ marker dù caller gửi reason khác. Regression lưu bytes hai artifact sau STO
 đầu tiên, thử overwrite reason rồi yêu cầu cả hai byte-identical. Đây chỉ khóa
 local reason và không giải quyết recovery multi-file/power-loss.
 
+**Cập nhật sticky STOP mutation proof (2026-09-14):** CI tạo checkout Bot
+disposable, bỏ đúng existing-STOP guard rồi chạy lại byte-identity regression.
+Job chỉ pass khi regression thực sự fail tại assertion dedicated; vì vậy test
+không thể xanh nếu guard bị bỏ vô tình. Đây là mutation proof local, không mở
+rộng guarantee crash/power-loss hay locking đa host.
+
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery
 regression mở rộng fault từ trước/sau write sang sau file và directory sync;
