@@ -54,6 +54,18 @@ một giây, rồi bị xóa cùng runtime. Nó không đọc credential n8n loc
 python3 scripts/run_n8n_m06_schedule_regression.py --n8n-cli /path/to/n8n
 ```
 
+Nếu `/path/to/n8n` là JavaScript entrypoint (bản cài Node), truyền Node rõ
+ràng thay vì dựa vào `PATH` của shell:
+
+```bash
+python3 scripts/run_n8n_m06_schedule_regression.py \
+  --n8n-cli /path/to/n8n/bin/n8n \
+  --n8n-node /path/to/node/bin/node
+```
+
+Engine regression M06/M07 nhận cùng hai option. Nó fail-fast trước khi tạo
+runtime tạm nếu JavaScript entrypoint không có Node khả dụng.
+
 Ca success bắt buộc có execution `mode=trigger` đầu `APPENDED`, tick tiếp theo
 `EXACT_DUPLICATE` cùng record, rồi một tick `EXACT_DUPLICATE` nữa sau khi restart
 cả n8n và adapter; history vẫn chỉ có một record và replay `MATCH`. Ca adapter

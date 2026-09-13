@@ -25,12 +25,12 @@ from run_n8n_engine_regression import (
     M06_BLUEPRINT,
     ROOT,
     choose_port,
-    command_prefix,
     node_json,
     run,
     start_adapter,
     stop_adapter,
 )
+from n8n_cli_preflight import command_prefix, validate_n8n_command
 from validate_n8n_m06_operated_execution import validate_success
 
 
@@ -273,11 +273,8 @@ def main() -> None:
     parser.add_argument("--n8n-node", help="Node executable when --n8n-cli is a JavaScript entrypoint")
     parser.add_argument("--keep-runtime", action="store_true", help="preserve disposable runtime")
     args = parser.parse_args()
-    prefix = command_prefix(args)
-    if shutil.which(prefix[0]) is None and not Path(prefix[0]).is_file():
-        raise SystemExit(f"n8n command is unavailable: {prefix[0]}")
-    if len(prefix) == 2 and not Path(prefix[1]).is_file():
-        raise SystemExit(f"n8n CLI entrypoint is unavailable: {prefix[1]}")
+    prefix = command_prefix(args.n8n_cli, args.n8n_node)
+    validate_n8n_command(prefix, args.n8n_cli, args.n8n_node)
     run_case(prefix, args, available_adapter=True)
     run_case(prefix, args, available_adapter=False)
     print("N8N M06 SCHEDULE REGRESSION PASS: real Schedule Trigger appended once, retried idempotently before and after n8n/adapter restart, and failed closed when its loopback adapter was unavailable")
