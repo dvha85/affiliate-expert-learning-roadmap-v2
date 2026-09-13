@@ -92,7 +92,7 @@ func BuildAccesstradeShopeeCampaign(raw []byte, profile AccesstradeShopeeCampaig
 		return fail("normalization rejected")
 	}
 	metadata := "campaign_metadata=" + string(semantic) + "; source_page_sha256=" + capture.SourcePageSHA256
-	limitation := "Observed authenticated ACCESSTRADE campaign metadata, not independent business truth. Campaign/operator claims are volatile seller claims; commission, EPC/CVR, eligibility, approval and earnings are unknown here. No affiliate link, publisher action, execution authority, PII or business outcome is present. " + metadata
+	limitation := "Unverified sanitized transcription of ACCESSTRADE campaign metadata, not independent business truth or operated evidence. Campaign/operator claims are volatile seller claims; commission, EPC/CVR, eligibility, approval and earnings are unknown here. No affiliate link, publisher action, execution authority, PII or business outcome is present. " + metadata
 	fields := make([]map[string]any, 0, 2)
 	for _, field := range []string{"price", "commission_rate"} {
 		fields = append(fields, map[string]any{
@@ -101,7 +101,7 @@ func BuildAccesstradeShopeeCampaign(raw []byte, profile AccesstradeShopeeCampaig
 			"source_url":               profile.SourceURL,
 			"observed_at":              normalized.ObservedAt,
 			"access_method":            "GET",
-			"evidence_kind":            "real",
+			"evidence_kind":            "synthetic",
 			"field_or_claim":           field,
 			"claim_kind":               "unknown",
 			"value":                    nil,

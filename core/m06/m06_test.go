@@ -179,7 +179,7 @@ func TestAccesstradeShopeeCampaignIsASeparateReadOnlyMetadataProfile(t *testing.
 		t.Fatalf("invalid selected packet: %v %s", err, built.Packet)
 	}
 	for _, field := range packet.Products[0].Fields {
-		if field.Value != nil || field.Kind != "real" || field.Claim != "unknown" || field.State != "missing" || !strings.Contains(field.Limitation, "not independent business truth") {
+		if field.Value != nil || field.Kind != "synthetic" || field.Claim != "unknown" || field.State != "missing" || !strings.Contains(field.Limitation, "not independent business truth") {
 			t.Fatalf("selected campaign invented a business field: %+v", field)
 		}
 	}

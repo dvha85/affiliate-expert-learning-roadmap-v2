@@ -46,6 +46,10 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
+          # This repository has several independent Go modules and no root
+          # go.mod. Disable setup-go's root cache discovery; each test command
+          # still uses Go's normal local build cache.
+          cache: false
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...

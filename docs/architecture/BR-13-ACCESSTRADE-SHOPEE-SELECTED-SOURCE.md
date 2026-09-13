@@ -41,6 +41,11 @@ redirect, đúng title/merchant/category và SHA-256 lowercase được nhận. 
 field, extra field, commission/EPC/CVR hay bất kỳ raw content nào đều bị reject
 trước canonical history.
 
+Bot luôn gắn `evidence_kind: synthetic` cho capture này: schema/provenance
+không thể tự chứng minh một JSON đã được chép từ page thật. Chỉ operated
+evidence được review độc lập mới có thể thay đổi trạng thái chứng cứ trong tài
+liệu; không có input field nào cho người dùng tự nâng trust label.
+
 ## Chạy local, chỉ sau khi đã có sanitized capture
 
 Khởi động adapter với history mới trong một thư mục riêng:

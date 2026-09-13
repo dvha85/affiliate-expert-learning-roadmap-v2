@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: cefb387eb863723f4cc217aa4c28fe6cc04048e6 -->
+<!-- readiness-main-baseline: 95cfb82243fd18d8af03182d7c215eb5315accfd -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -540,6 +540,8 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   title, merchant, category, status/period label, time, correlation ID và hash
   provenance. Nó reject extra/raw HTML, credential, report, URL thay thế và
   claim số commission/EPC/CVR. Builder vẫn dùng M00/History canonical chung;
+  mọi capture input được gắn `evidence_kind:synthetic` vì runtime không thể
+  độc lập chứng minh transcript là page thật;
   price/commission được ghi `unknown`/`missing`, nên result là
   `GET_MORE_DATA` thay vì ranking. CLI/loopback endpoint và blueprint n8n
   inactive/manual đều handoff capture tới adapter; test thực reject claim
