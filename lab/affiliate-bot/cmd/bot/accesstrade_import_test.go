@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -137,6 +138,55 @@ func TestAccesstradeManifestRequiresBoundedSourceRef(t *testing.T) {
 	_, err := decodeAccesstradeManifest([]byte(`{"snapshot_id":"snapshot","observed_at":"2026-09-08T00:00:00Z","source_ref":"fixture:unbound","currency":"VND","mappings":[{"order_id":"order-1","outcome_id":"outcome-1","action_id":"action-1"}]}`))
 	if err == nil {
 		t.Fatal("accepted an unbound source_ref for the ACCESSTRADE importer")
+	}
+}
+
+func TestAppendJSONLLinesAtomicallyRejectsExternalSymlinkAndPostReadSwap(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "outcomes.jsonl")
+	external := filepath.Join(t.TempDir(), "external.jsonl")
+	if err := os.WriteFile(external, []byte("outside\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	externalBefore, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendJSONLLinesAtomically(path, [][]byte{[]byte(`{"outcome_id":"new"}`)}); err == nil {
+		t.Fatal("symlinked JSONL target was accepted")
+	}
+	externalAfter, err := os.ReadFile(external)
+	if err != nil || !bytes.Equal(externalBefore, externalAfter) {
+		t.Fatalf("external symlink target changed: before=%q after=%q err=%v", externalBefore, externalAfter, err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("canonical\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stableRegularFileContentHook = func(openedPath string) error {
+		if openedPath != path {
+			return nil
+		}
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { stableRegularFileContentHook = nil })
+	if err := appendJSONLLinesAtomically(path, [][]byte{[]byte(`{"outcome_id":"new"}`)}); err == nil {
+		t.Fatal("post-read JSONL symlink replacement was accepted")
+	}
+	externalAfter, err = os.ReadFile(external)
+	if err != nil || !bytes.Equal(externalBefore, externalAfter) {
+		t.Fatalf("external target changed after post-read swap: before=%q after=%q err=%v", externalBefore, externalAfter, err)
 	}
 }
 
