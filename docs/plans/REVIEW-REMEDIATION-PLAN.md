@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 35b04b917731226b3fc800512663fe7b34a971e3 -->
+<!-- readiness-main-baseline: 1614112c231e7f5588c8ddb9482d566f9dc697b9 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1261,7 +1261,8 @@ BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting
 chứng minh distributed lock, kill/power-loss hoặc transaction đa-file.
 
 **Cập nhật M10 reservation commit-fault cap continuity (2026-09-14):** test
-in-process inject lỗi ngay trước `writeJSONAtomic` rename của một governed
+in-process inject lỗi sau temporary-file `fsync` và ngay trước `writeJSONAtomic`
+rename của một governed
 reservation cap=1. Lệnh trả `STORE_ERROR`, state canonical giữ byte-identical
 và không còn temporary state file. Sau khi bỏ seam, binary Bot mới chạy bằng
 wall clock bình thường reserve được đúng một lần từ cap chưa tiêu; attempt thứ

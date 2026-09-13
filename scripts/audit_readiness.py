@@ -129,9 +129,10 @@ def audit_runtime_acceptance(root, matrix):
     if "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in commit_fault.get("test_refs", []):
         fail("R10 reservation commit-fault record lacks its real Bot regression")
     fault_scope = commit_fault.get("scope")
-    if not isinstance(fault_scope, str) or "STORE_ERROR" not in fault_scope or "cap=1" not in fault_scope:
+    if not isinstance(fault_scope, str) or "STORE_ERROR" not in fault_scope or "cap=1" not in fault_scope or "after temporary-file sync" not in fault_scope:
         fail("R10 reservation commit-fault record lacks a bounded cap disclosure")
-    if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source.read_text(encoding="utf-8"):
+    source_text = source.read_text(encoding="utf-8")
+    if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source_text or '"after_temp_sync", "before_rename"' not in source_text:
         fail("R10 reservation commit-fault regression is missing from the learner Bot test path")
 
 
