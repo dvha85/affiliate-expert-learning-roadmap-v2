@@ -721,6 +721,65 @@ func TestMissionM10CostRegisterCanonicalizesPrettyJSONIntoOneSyncedLine(t *testi
 	}
 }
 
+func TestMissionM10CostBoundJournalRecoversTwoStoreTransition(t *testing.T) {
+	for _, phase := range []string{"before_artifact", "after_artifact", "after_index"} {
+		faultPhase := phase
+		t.Run(faultPhase, func(t *testing.T) {
+			runtimeDir, _, _, _ := authorityExpiryFixture(t, "intent")
+			state, err := loadMissionState(runtimeDir)
+			if err != nil || state.Intent == nil {
+				t.Fatalf("load M10 fixture state: state=%+v err=%v", state, err)
+			}
+			bound := corem10.TrustedCostBound{CostBoundID: "journal-cost-" + faultPhase, IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, MaxCostMinor: 1, Currency: "USD", SourceRef: "fixture:journal", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
+			bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+			boundPath := filepath.Join(filepath.Dir(runtimeDir), "journal-cost-"+faultPhase+".json")
+			writeMissionTestJSON(t, boundPath, bound)
+
+			m10CostBoundAppendFault = func(current string) error {
+				if current == faultPhase {
+					return errors.New("injected M10 cost-bound two-store fault")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m10CostBoundAppendFault = nil })
+			if code, response := missionCall(t, "m10-cost-register", runtimeDir, boundPath); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("cost-bound fault was not surfaced: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); err != nil {
+				t.Fatalf("cost-bound journal was removed before recovery: %v", err)
+			}
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh status did not fail closed on cost-bound journal: code=%d response=%+v", code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", runtimeDir, corem10.ArtifactKindTrustedCostBound, bound.CostBoundID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh resolver exposed a partial cost-bound transition: code=%d response=%+v", code, response)
+			}
+
+			m10CostBoundAppendFault = nil
+			backupDir := filepath.Join(filepath.Dir(runtimeDir), "cost-bound-journal-backup-"+faultPhase)
+			if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+				t.Fatalf("backup did not recover cost-bound journal: code=%d response=%+v", code, response)
+			}
+			if code, response := missionCall(t, "m10-cost-register", runtimeDir, boundPath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+				t.Fatalf("locked retry did not recover exact cost bound: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); !os.IsNotExist(err) {
+				t.Fatalf("cost-bound journal remains after recovery: %v", err)
+			}
+			boundRaw, err := json.Marshal(bound)
+			if err != nil || !resolveM10Artifact(runtimeDir, corem10.ArtifactKindTrustedCostBound, boundRaw) {
+				t.Fatalf("recovered bound is missing from M10 registry: err=%v", err)
+			}
+			bounds, err := loadTrustedCostBounds(runtimeDir)
+			indexed, statusErr := trustedCostBoundRegistryStatus(bounds, bound)
+			if err != nil || statusErr != nil || !indexed {
+				t.Fatalf("recovered bound is missing from compact registry: bounds=%+v err=%v statusErr=%v", bounds, err, statusErr)
+			}
+		})
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

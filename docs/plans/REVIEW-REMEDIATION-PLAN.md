@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 4e254968943af92e3c3dae774b1d91fb2f840b88 -->
+<!-- readiness-main-baseline: 578ebc948a4b07d938b86caaed95864883223f57 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -10,7 +10,8 @@
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
-- Baseline: `ece6a32619e5b9a05d0599b87f50023f38931cb9`.
+- Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
+  `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã
   merge; không criterion nào được coi production-ready hoặc pilot-complete.
 - Cơ sở: [sổ phát hiện và bằng chứng baseline](evidence/REVIEW-ECE6A32.md).
@@ -102,9 +103,9 @@ và regression tương ứng.
 
 Luồng ưu tiên: RP-01 → RP-02 → RP-03; RP-04 có thể làm song song trên file độc lập. RP-06 chỉ merge sau RP-03/RP-04/RP-05 để kiểm proposal đã persist và execution chain thật. RP-06 nghiệm thu inventory M00–M10; RP-07a bổ sung artifact M11 và phải mở rộng manifest/loader/restore tests trong cùng gói, rồi RP-07b mới nghiệm thu toàn chuỗi. Không thêm dependency RP-07 ngược vào RP-06 gây vòng lặp. RP-08 đưa test vào từng PR, không đợi cuối dự án mới bật gate. Không đặt ngày production trước khi chốt điều kiện RP-10.
 
-### Runtime gap được chọn tiếp theo — RP-07 canonical M11 identity integrity
+### Runtime gap đã nghiệm thu cục bộ — RP-07 canonical M11 identity integrity
 
-Phạm vi tiếp theo là chuyển công thức ID deterministic của M11 từ learner vào
+Phạm vi đã chuyển công thức ID deterministic của M11 từ learner vào
 `core/m11`, rồi bắt canonical graph tự tính lại ID sau khi resolve parents.
 Trước đó, learner đã tạo gate/authorization/execution theo công thức cố định,
 nhưng backup/harness caller trực tiếp vẫn có thể nhận các ID schema-valid giả
@@ -300,6 +301,15 @@ state commit, sau đó khởi động Bot binary mới. Process mới trả
 dở dang trước locked recovery. Backup vẫn là con đường recovery có kiểm; ca này
 không chứng minh kill/power-loss tại filesystem boundary, transaction đa-file
 hay recovery multi-host.
+
+**Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
+trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
+artifact registry và compact cost-bound index. Lỗi injected trước artifact,
+sau artifact, hoặc sau index giữ journal; `status` và `m10-resolve` của Bot
+mới trả `RECOVERY_REQUIRED` trước khi lộ transition một nửa. Writer có local
+lock hoặc `backup create` replay đúng bound theo scope/time quan sát, rồi retry
+trả `EXACT_DUPLICATE`. Đây là recovery bounded cho đúng hai files M10, không
+phải transaction toàn runtime, mô phỏng power-loss hay guarantee multi-host.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
 strict `approval-record` decode (schema, unknown/duplicate field rejection)

@@ -1474,6 +1474,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, lockErr, 1)
 		}
 		defer release()
+		if e := recoverM10CostBoundJournal(args[1]); e != nil {
+			return emit("RECOVERY_REQUIRED", nil, e, 1)
+		}
 		if e := recoverM10ExecutionJournal(args[1]); e != nil {
 			return emit("RECOVERY_REQUIRED", nil, e, 1)
 		}

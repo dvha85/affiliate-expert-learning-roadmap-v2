@@ -104,8 +104,50 @@ type LearnerReservation struct {
 func trustedCostBoundsPath(dir string) string   { return filepath.Join(dir, "trusted-cost-bounds.jsonl") }
 func m10ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m10-artifacts.jsonl") }
 func m10OutcomeStorePath(dir string) string     { return filepath.Join(dir, "m10-outcomes.jsonl") }
+func m10CostBoundJournalPath(dir string) string {
+	return filepath.Join(dir, "m10-cost-bound-journal.json")
+}
 func m10ExecutionJournalPath(dir string) string {
 	return filepath.Join(dir, "m10-execution-journal.json")
+}
+
+// m10CostBoundJournal binds the two canonical views of a trusted cost bound.
+// An accepted bound must resolve in both the immutable M10 registry and the
+// compact lookup registry; a crash between those writes must therefore block
+// use until the exact, locally locked journal can replay it.
+type m10CostBoundJournal struct {
+	Version string                   `json:"version"`
+	Bound   corem10.TrustedCostBound `json:"bound"`
+}
+
+// m10CostBoundAppendFault is test-only. It is deliberately not configurable
+// through process input, so it cannot become an operator recovery bypass.
+var m10CostBoundAppendFault func(phase string) error
+
+func m10CostBoundFault(phase string) error {
+	if m10CostBoundAppendFault == nil {
+		return nil
+	}
+	return m10CostBoundAppendFault(phase)
+}
+
+func m10CostBoundJournalRecoveryRequired(dir string) error {
+	info, err := os.Lstat(m10CostBoundJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("M10 cost-bound journal path is not a regular file")
+	}
+	return fmt.Errorf("M10 cost-bound journal requires a locked writer recovery")
+}
+
+func readM10CostBoundJournal(path string) ([]byte, error) {
+	raw, _, err := readStableRegularFile(path)
+	return raw, err
 }
 
 // m10ExecutionJournalRecoveryRequired treats a pending journal as an
@@ -376,6 +418,90 @@ func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
 		bounds = append(bounds, bound)
 	}
 	return bounds, nil
+}
+
+func trustedCostBoundRegistryStatus(bounds []corem10.TrustedCostBound, bound corem10.TrustedCostBound) (bool, error) {
+	for _, registered := range bounds {
+		if registered.CostBoundID != bound.CostBoundID {
+			continue
+		}
+		if registered.CostBoundHash == bound.CostBoundHash {
+			return true, nil
+		}
+		return false, fmt.Errorf("cost_bound_id reused with different content")
+	}
+	return false, nil
+}
+
+// recoverM10CostBoundJournal makes the M10 artifact envelope and its compact
+// cost-bound index converge on one already-validated bound. It intentionally
+// validates against the bound's observation time rather than the wall clock:
+// recovery never creates new authority, and an interrupted historical bound
+// may have expired by the time a fresh process performs this exact replay.
+func recoverM10CostBoundJournal(dir string) error {
+	raw, err := readM10CostBoundJournal(m10CostBoundJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m10CostBoundJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m10-cost-bound-journal/v1" {
+		return fmt.Errorf("M10 cost-bound journal is invalid")
+	}
+	boundRaw, err := json.Marshal(journal.Bound)
+	if err != nil {
+		return err
+	}
+	bound, status := corem10.DecodeTrustedCostBound(boundRaw)
+	if status != "VALID" {
+		return fmt.Errorf("M10 cost-bound journal bound is invalid: %s", status)
+	}
+	state, err := loadMissionState(dir)
+	if err != nil || state.Intent == nil || state.Canary == nil {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("M10 cost-bound journal has no active bound scope")
+	}
+	observedAt, err := time.Parse(time.RFC3339, bound.ObservedAt)
+	if err != nil || corem10.ValidFor(bound, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, state.Canary.Currency, observedAt) != "VALID" {
+		return fmt.Errorf("M10 cost-bound journal bound no longer matches mission scope")
+	}
+	if err := m10CostBoundFault("before_artifact"); err != nil {
+		return err
+	}
+	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindTrustedCostBound, boundRaw); err != nil {
+		return fmt.Errorf("M10 cost-bound journal artifact recovery failed: %w", err)
+	}
+	if err := m10CostBoundFault("after_artifact"); err != nil {
+		return err
+	}
+	bounds, err := loadTrustedCostBounds(dir)
+	if err != nil {
+		return err
+	}
+	alreadyIndexed, err := trustedCostBoundRegistryStatus(bounds, bound)
+	if err != nil {
+		return err
+	}
+	if !alreadyIndexed {
+		persisted, err := json.Marshal(bound)
+		if err != nil {
+			return err
+		}
+		if err := appendJSONLLinesAtomically(trustedCostBoundsPath(dir), [][]byte{persisted}); err != nil {
+			return fmt.Errorf("M10 cost-bound journal index recovery failed: %w", err)
+		}
+	}
+	if err := m10CostBoundFault("after_index"); err != nil {
+		return err
+	}
+	if err := os.Remove(m10CostBoundJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return syncDirectory(dir)
 }
 
 func resolveTrustedCostBound(dir string, bound corem10.TrustedCostBound) bool {
@@ -1648,6 +1774,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		defer os.Remove(lockPath)
+		if err := recoverM10CostBoundJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := recoverM10ExecutionJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -1909,31 +2038,23 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		boundAlreadyRegistered := false
-		for _, old := range bounds {
-			if old.CostBoundID == bound.CostBoundID {
-				if old.CostBoundHash == bound.CostBoundHash {
-					boundAlreadyRegistered = true
-					break
-				}
-				return emit("CONFLICT", nil, fmt.Errorf("cost_bound_id reused with different content"), 1)
-			}
-		}
-		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindTrustedCostBound, raw); err != nil {
+		indexed, err := trustedCostBoundRegistryStatus(bounds, bound)
+		if err != nil {
 			return emit("CONFLICT", nil, err, 1)
 		}
-		if boundAlreadyRegistered {
+		if indexed && resolveM10Artifact(args[1], corem10.ArtifactKindTrustedCostBound, raw) {
 			return emit("EXACT_DUPLICATE", bound, nil, 0)
 		}
-		// Persist a canonical single-line representation rather than caller raw
-		// JSON. Pretty-printed valid input must not split the append-only JSONL
-		// registry, and JSONL owns file plus directory sync before ACK.
-		persisted, err := json.Marshal(bound)
+		journal := m10CostBoundJournal{Version: "m10-cost-bound-journal/v1", Bound: bound}
+		journalStatus, err := writeNewJSON(m10CostBoundJournalPath(args[1]), journal)
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		if err := (store.JSONL{}).AppendLine(trustedCostBoundsPath(args[1]), persisted); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		if journalStatus != appendAdded && journalStatus != appendDuplicate {
+			return emit("STORE_ERROR", nil, fmt.Errorf("M10 cost-bound journal was not published"), 1)
+		}
+		if err := recoverM10CostBoundJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		return emit("APPENDED", bound, nil, 0)
 	case "m10-gate":
@@ -2264,6 +2385,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
+		if err := m10CostBoundJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := m10ExecutionJournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -2589,6 +2713,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
+		if err := m10CostBoundJournalRecoveryRequired(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := m10ExecutionJournalRecoveryRequired(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
