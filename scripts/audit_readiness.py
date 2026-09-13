@@ -146,7 +146,7 @@ def audit_runtime_acceptance(root, matrix):
         fail("mission-state post-rename regression is missing from the learner Bot test path")
     stop_source = root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
     stop_text = stop_source.read_text(encoding="utf-8") if stop_source.is_file() else ""
-    if "TestMissionStopPostRenameSyncFaultKeepsDurableStop" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text:
+    if "TestMissionStopPostRenameSyncFaultKeepsDurableStop" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text or '"state", "mission-state.json", 1, false' not in stop_text or '"marker", "STOP", 2, true' not in stop_text:
         fail("durable STOP post-rename regression is missing from the learner Bot test path")
 
 
