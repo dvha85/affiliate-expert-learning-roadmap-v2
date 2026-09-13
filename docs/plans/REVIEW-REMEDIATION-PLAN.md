@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 1649b2678dda3fa7f57e43b14852fce2dbc735d8 -->
+<!-- readiness-main-baseline: 739327a94a7314e946d8df7e0674a5aa8b0ec807 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -326,6 +326,15 @@ temporary snapshot publish qua non-overwriting hard-link thay vì rename đè m�
 tên vừa xuất hiện. Regression giữ external bytes không đổi cho symlink ban đầu
 và symlink thay sau read. Đây chỉ là local path/publish boundary; TOCTOU rộng,
 power-loss, multi-host và dữ liệu ACCESSTRADE thật vẫn ngoài phạm vi.
+
+**Cập nhật immutable artifact publisher path guard (2026-09-13):** retry của
+`writeNewJSON` nay đọc output tồn tại qua shared stable regular-file reader,
+không còn dùng `os.ReadFile` sau một `Lstat`. Publisher cũng từ chối immediate
+parent là symlink trước khi tạo temporary file. Regression dùng đúng publisher, chặn cả
+symlink có bytes giống artifact mong đợi và replacement sang external symlink
+sau khi descriptor đã mở; external bytes không đổi. Đây là local output-path
+guard cho immutable artifacts, không phải snapshot atomic trước uncooperative
+writer, transaction đa-file, power-loss hay guarantee multi-host.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
 strict `approval-record` decode (schema, unknown/duplicate field rejection)
