@@ -27,13 +27,13 @@ MUTATIONS = (
     ),
     (
         "open identity check",
-        "if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {",
-        "if (!opened.Mode().IsRegular() || !os.SameFile(before, opened)) && false { // MUTATION: open identity check removed for regression proof.",
+        "if !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Size() != before.Size() || (limit >= 0 && opened.Size() > limit) {",
+        "if (!opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Size() != before.Size() || (limit >= 0 && opened.Size() > limit)) && false { // MUTATION: open identity check removed for regression proof.",
     ),
     (
         "post-read identity check",
-        "if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) {",
-        "if (err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after)) && false { // MUTATION: post-read identity check removed for regression proof.",
+        "if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) || after.Size() != opened.Size() || (limit >= 0 && after.Size() > limit) {",
+        "if (err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) || after.Size() != opened.Size() || (limit >= 0 && after.Size() > limit)) && false { // MUTATION: post-read identity check removed for regression proof.",
     ),
 )
 
@@ -46,10 +46,10 @@ def mutate_reader_guards(source):
     makes the proof fail only when the backup/restore source-read boundary is
     removed, rather than depending on a global source-string count.
     """
-    start = source.find("func readStableRegularFile(")
+    start = source.find("func readStableRegularFileLimit(")
     end = source.find("\n// openStableRegularFileForAppend", start)
     if start < 0 or end < 0:
-        fail("readStableRegularFile function boundary is missing or ambiguous")
+        fail("readStableRegularFileLimit function boundary is missing or ambiguous")
     reader = source[start:end]
     for name, guard, disabled_guard in MUTATIONS:
         if reader.count(guard) != 1:

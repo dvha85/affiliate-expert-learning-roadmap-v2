@@ -185,12 +185,27 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 // also rejected. Canonical runtime stores and backup/restore copies share this
 // local path-race guard. It is not an atomic multi-host snapshot transaction.
 func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
+	return readStableRegularFileLimit(path, -1)
+}
+
+// readStableRegularFileLimit applies the same stable-name and descriptor
+// checks to a bounded portable input. The size limit is enforced before open,
+// on the opened descriptor, while reading, and after the final pathname check,
+// so a file cannot become an unbounded read by growing after its first stat.
+// The caller still owns semantic decoding and authorization.
+func readStableRegularFileLimit(path string, limit int64) ([]byte, fs.FileInfo, error) {
+	if limit < -1 {
+		return nil, nil, fmt.Errorf("invalid stable regular file limit")
+	}
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !before.Mode().IsRegular() {
 		return nil, nil, fmt.Errorf("%s is not a regular file", path)
+	}
+	if limit >= 0 && before.Size() > limit {
+		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -201,7 +216,7 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		_ = f.Close()
 		return nil, nil, statErr
 	}
-	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
+	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Size() != before.Size() || (limit >= 0 && opened.Size() > limit) {
 		_ = f.Close()
 		return nil, nil, fmt.Errorf("%s changed while opening stable regular file", path)
 	}
@@ -211,10 +226,18 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 			return nil, nil, err
 		}
 	}
-	data, readErr := io.ReadAll(f)
+	reader := io.Reader(f)
+	if limit >= 0 {
+		reader = io.LimitReader(f, limit+1)
+	}
+	data, readErr := io.ReadAll(reader)
 	if readErr != nil {
 		_ = f.Close()
 		return nil, nil, readErr
+	}
+	if limit >= 0 && int64(len(data)) > limit {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
 	}
 	if stableRegularFileContentHook != nil {
 		if err := stableRegularFileContentHook(path); err != nil {
@@ -226,10 +249,18 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		_ = f.Close()
 		return nil, nil, err
 	}
-	current, readErr := io.ReadAll(f)
+	reader = f
+	if limit >= 0 {
+		reader = io.LimitReader(f, limit+1)
+	}
+	current, readErr := io.ReadAll(reader)
 	if readErr != nil {
 		_ = f.Close()
 		return nil, nil, readErr
+	}
+	if limit >= 0 && int64(len(current)) > limit {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
 	}
 	contentChanged := sha256.Sum256(data) != sha256.Sum256(current)
 	closeErr := f.Close()
@@ -240,7 +271,7 @@ func readStableRegularFile(path string) ([]byte, fs.FileInfo, error) {
 		return nil, nil, closeErr
 	}
 	after, err := os.Lstat(path)
-	if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) {
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) || after.Size() != opened.Size() || (limit >= 0 && after.Size() > limit) {
 		if err != nil {
 			return nil, nil, err
 		}

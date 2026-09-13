@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 95cfb82243fd18d8af03182d7c215eb5315accfd -->
+<!-- readiness-main-baseline: fe6a69027ffac4911dc8bfc4e4e6410034dd396d -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -167,6 +167,16 @@ hoặc authority artifact; external target không đổi. CI mutation đồng th
 các guard trong checkout tạm và đòi mọi assertion runtime-store thật fail. Đây
 chỉ là guard path local cho các store nêu tên, không bao phủ mọi JSONL runtime,
 TOCTOU ngoài primitive này, crash/power-loss, multi-host hay executor.
+
+**Cập nhật portable-input stable reader (2026-09-13):** reader có giới hạn
+cho file campaign cục bộ và input CLI (fixture/config/capture) nay dùng cùng
+ranh giới `Lstat → open/fstat → đọc descriptor hai lần → Lstat` với kiểm giới
+hạn kích thước trước/trong/sau khi đọc. Regression gọi đúng
+`watcher accesstrade-shopee-campaign-import`, thay sanitized capture sau open
+bằng symlink tới file ngoài có cùng bytes, và đòi `INPUT_ERROR` trước khi có
+history ACK; external file giữ nguyên. Đây là hardening local cho một shared
+portable reader, chưa bao phủ mọi entrypoint portable, writer không hợp tác,
+crash/power-loss, multi-host hay operated evidence.
 
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
