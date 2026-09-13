@@ -42,6 +42,10 @@ var openPathHook func(path string) error
 // parse and check Close.
 var readPathHook func(path string) error
 
+// portableInputReadHook is an in-package test seam for the generic portable
+// reader. Production callers cannot select a post-open mutation point.
+var portableInputReadHook func(path string) error
+
 func appendLineFailure(phase string) error {
 	if appendLineFault == nil {
 		return nil
@@ -52,6 +56,95 @@ func appendLineFailure(phase string) error {
 // MaxHistoryRecordBytes is the JSON payload limit, excluding LF/CRLF framing.
 // Reader and writer share this bound; rejection occurs before opening a file.
 const MaxHistoryRecordBytes = 1 << 20
+
+// MaxPortableInputBytes bounds caller-supplied learner files while preserving
+// the M03/M04 semantic one-MiB store contract, which intentionally tests an
+// over-limit record after it has been decoded.
+const MaxPortableInputBytes int64 = 16 << 20
+
+// ReadPortableInput reads a caller-supplied file only while its pathname stays
+// bound to one regular inode. It also rereads the opened descriptor before
+// acknowledgement, so same-inode rewrites cannot silently change the bytes a
+// CLI validates. This is a local filesystem guard, not a multi-host snapshot.
+func ReadPortableInput(path string) ([]byte, error) {
+	return ReadStableRegularFileLimit(path, MaxPortableInputBytes)
+}
+
+// ReadStableRegularFileLimit is the bounded byte-oriented counterpart of the
+// JSONL reader. It is for portable input rather than canonical history; the
+// caller owns semantic decoding and status mapping.
+func ReadStableRegularFileLimit(path string, limit int64) ([]byte, error) {
+	if limit < -1 {
+		return nil, fmt.Errorf("invalid stable regular file limit")
+	}
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !before.Mode().IsRegular() || limit >= 0 && before.Size() > limit {
+		return nil, fmt.Errorf("portable input is not an allowed regular file")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := f.Stat()
+	if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Size() != before.Size() || limit >= 0 && opened.Size() > limit {
+		_ = f.Close()
+		if statErr != nil {
+			return nil, statErr
+		}
+		return nil, fmt.Errorf("portable input changed while opening")
+	}
+	if portableInputReadHook != nil {
+		if err := portableInputReadHook(path); err != nil {
+			_ = f.Close()
+			return nil, err
+		}
+	}
+	read := func() ([]byte, error) {
+		reader := io.Reader(f)
+		if limit >= 0 {
+			reader = io.LimitReader(f, limit+1)
+		}
+		value, err := io.ReadAll(reader)
+		if err != nil || limit >= 0 && int64(len(value)) > limit {
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("portable input exceeds stable regular file limit")
+		}
+		return value, nil
+	}
+	first, err := read()
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	second, err := read()
+	closeErr := f.Close()
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(first, second) {
+		return nil, fmt.Errorf("portable input content changed while reading")
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	after, err := os.Lstat(path)
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(opened, after) || after.Size() != opened.Size() || limit >= 0 && after.Size() > limit {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("portable input changed while reading")
+	}
+	return first, nil
+}
 
 type stableJSONLReader struct {
 	file       *os.File

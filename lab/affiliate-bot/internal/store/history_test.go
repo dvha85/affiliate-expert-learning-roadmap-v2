@@ -97,6 +97,40 @@ func TestJSONLOpenRejectsSameByteSymlinkReplacement(t *testing.T) {
 	}
 }
 
+func TestReadPortableInputRejectsSameByteSymlinkSwapAfterOpen(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "input.json")
+	external := filepath.Join(dir, "external-input.json")
+	original := []byte(`{"fixture":"same-byte"}`)
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(external, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	portableInputReadHook = func(got string) error {
+		if got != path || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		return os.Symlink(external, path)
+	}
+	t.Cleanup(func() { portableInputReadHook = nil })
+	if _, err := ReadPortableInput(path); err == nil {
+		t.Fatal("portable reader accepted a post-open same-byte symlink swap")
+	}
+	if !swapped {
+		t.Fatal("portable reader did not reach the post-open swap seam")
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, original) {
+		t.Fatalf("portable reader changed external bytes: %q err=%v", got, err)
+	}
+}
+
 func TestJSONLReaderReportsSameByteReplacementAfterOpen(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "history.jsonl")

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 	"io"
-	"os"
 )
 
 // RunEvidence imports into an output artifact only; persistence remains an
@@ -26,7 +26,7 @@ func RunEvidence(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Cách dùng: bot evidence import PACKET.json")
 		return emit("USAGE_ERROR", nil, 2)
 	}
-	raw, err := os.ReadFile(args[1])
+	raw, err := store.ReadPortableInput(args[1])
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return emit("IO_ERROR", nil, 1)

@@ -3,10 +3,10 @@ package learning
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 type Report struct {
@@ -27,7 +27,7 @@ func NormalizeStatus(value string) (string, error) {
 
 func ReadReport(path string) (Report, error) {
 	var report Report
-	raw, err := os.ReadFile(path)
+	raw, err := store.ReadPortableInput(path)
 	if err != nil {
 		return report, fmt.Errorf("read report: %w", err)
 	}
