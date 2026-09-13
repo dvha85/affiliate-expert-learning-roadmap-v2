@@ -696,7 +696,11 @@ func existingNewJSONStatus(path string, expected []byte) (string, error) {
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return "", fmt.Errorf("artifact output must be a new regular file")
 		}
-		existing, err := os.ReadFile(path)
+		// An immutable-artifact retry is an acknowledgement boundary, not a
+		// portable-input read.  Do not follow a name that is replaced after the
+		// initial Lstat: returning EXACT_DUPLICATE for identical external bytes
+		// would let an attacker turn an arbitrary file into an accepted artifact.
+		existing, _, err := readStableRegularFile(path)
 		if err != nil {
 			return "", err
 		}
@@ -710,6 +714,25 @@ func existingNewJSONStatus(path string, expected []byte) (string, error) {
 	return "", nil
 }
 
+// artifactOutputDirectory makes the publisher's immediate parent boundary
+// explicit. MkdirAll may create an owned missing directory, but a pre-existing
+// symlink directory is never a valid place to publish an immutable command
+// artifact.
+func artifactOutputDirectory(path string) (string, error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", err
+	}
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("artifact output parent must be a non-symlink directory")
+	}
+	return dir, nil
+}
+
 // writeNewJSON creates an immutable command artifact. The bytes are written
 // and synced in a sibling temporary file, then published with a hard link
 // whose destination must not exist. A reader sees either no artifact or the
@@ -720,13 +743,13 @@ func writeNewJSON(path string, value any) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	dir, err := artifactOutputDirectory(path)
+	if err != nil {
+		return "", err
+	}
 	if status, err := existingNewJSONStatus(path, b); err != nil || status != "" {
 		return status, err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return "", err
-	}
-	dir := filepath.Dir(path)
 	f, err := os.CreateTemp(dir, ".artifact-")
 	if err != nil {
 		return "", err
