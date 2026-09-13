@@ -148,6 +148,8 @@ def audit_runtime_acceptance(root, matrix):
     stop_text = stop_source.read_text(encoding="utf-8") if stop_source.is_file() else ""
     if "TestMissionStopPostRenameSyncFaultKeepsDurableStop" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text or '"state", "mission-state.json", 1, false' not in stop_text or '"marker", "STOP", 2, true' not in stop_text:
         fail("durable STOP post-rename regression is missing from the learner Bot test path")
+    if "TestMissionStopCannotOverwriteDurableReason" not in stop_text or '"replacement-stop"' not in stop_text or "!bytes.Equal(stateBefore, stateAfter)" not in stop_text or "!bytes.Equal(markerBefore, markerAfter)" not in stop_text:
+        fail("durable STOP immutability regression is missing from the learner Bot test path")
 
 
 def audit_evidence_graph(root, criteria_by_id):

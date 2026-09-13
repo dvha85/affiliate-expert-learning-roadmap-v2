@@ -92,6 +92,35 @@ func TestMissionStopPostRenameSyncFaultKeepsDurableStop(t *testing.T) {
 	}
 }
 
+func TestMissionStopCannotOverwriteDurableReason(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize stop fixture: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-stop", dir, "original-stop"); code != 0 || response["status"] != "STOPPED" {
+		t.Fatalf("initial stop failed: code=%d response=%+v", code, response)
+	}
+	stateBefore, err := os.ReadFile(missionStatePath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	markerBefore, err := os.ReadFile(filepath.Join(dir, "STOP"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-stop", dir, "replacement-stop"); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("second stop did not fail closed: code=%d response=%+v", code, response)
+	}
+	stateAfter, err := os.ReadFile(missionStatePath(dir))
+	if err != nil || !bytes.Equal(stateBefore, stateAfter) {
+		t.Fatalf("second stop rewrote canonical state: before=%s after=%s err=%v", stateBefore, stateAfter, err)
+	}
+	markerAfter, err := os.ReadFile(filepath.Join(dir, "STOP"))
+	if err != nil || !bytes.Equal(markerBefore, markerAfter) {
+		t.Fatalf("second stop rewrote durable marker: before=%s after=%s err=%v", markerBefore, markerAfter, err)
+	}
+}
+
 func TestMissionInitRejectsSymlinkRuntimeDirectoryWithoutExternalMutation(t *testing.T) {
 	outside := t.TempDir()
 	alias := filepath.Join(t.TempDir(), "runtime-alias")
