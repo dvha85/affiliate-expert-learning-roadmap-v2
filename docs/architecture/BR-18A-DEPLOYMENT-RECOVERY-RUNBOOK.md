@@ -40,6 +40,40 @@ cho tới khi có state/lease mới do người review tạo. Với n8n, import 
 ở `lab/n8n/`, đặt canonical adapter ở `canonical_store_url`, đặt timeout và
 redirect policy theo blueprint, rồi lưu execution ID cùng ACK của adapter.
 
+### Khởi động n8n local cùng adapter
+
+Với cài đặt n8n dạng Node, `N8N_USER_FOLDER` là **thư mục cha** chứa `.n8n`,
+không phải chính thư mục `.n8n`. n8n sẽ tự đọc database ở
+`$N8N_USER_FOLDER/.n8n/database.sqlite`. Đồng thời JS Task Runner tự gọi
+`node` từ `PATH`; chỉ gọi n8n bằng đường dẫn tuyệt đối nhưng bỏ Node khỏi
+`PATH` sẽ làm runner lặp crash ngay sau khi server mở cổng.
+
+Ví dụ đã kiểm chứng cho n8n `2.38.1` và Node `24` (đổi các đường dẫn theo máy):
+
+```bash
+export N8N_USER_FOLDER=/Users/you/.n8n
+export PATH=/path/to/node-v24/bin:$PATH
+
+# Kiểm tra trước khi start để không đè một instance đang chạy.
+if curl --fail --max-time 2 http://127.0.0.1:5678/healthz; then
+  echo "n8n is already listening on 127.0.0.1:5678" >&2
+  exit 1
+fi
+
+nohup /path/to/node-v24/bin/node /path/to/n8n/bin/n8n start \
+  >/tmp/affiliate-runtime/n8n.log 2>&1 &
+echo $! >/tmp/affiliate-runtime/n8n.pid
+
+curl --fail --retry 10 --retry-connrefused http://127.0.0.1:5678/healthz
+tail -n 50 /tmp/affiliate-runtime/n8n.log
+```
+
+Expected log có `n8n ready`, `n8n Task Broker ready` và `Registered runner
+"JS Task Runner"`. Lỗi Python internal runner chỉ liên quan Code node Python;
+không phải lý do bỏ qua M06/M07 JavaScript workflow. Tuy vậy trước deployment
+thật phải cấu hình external runner phù hợp nếu workflow dùng Python. Lệnh trên
+chỉ là local synthetic/read-only profile, không phải cấu hình production.
+
 ## Backup, restore và kiểm tra sau restart
 
 ```bash
