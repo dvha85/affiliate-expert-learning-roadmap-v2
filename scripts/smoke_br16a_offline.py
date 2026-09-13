@@ -642,7 +642,11 @@ def main(argv=None):
         assert invoke(bot, "mission", "m11-activate", restored, recovery_lease["lease_id"], "2026-09-08T00:00:04Z", expected=1)["status"] == "STOPPED"
         restored_handoff = invoke(bot, "mission", "m11-recovery-export", restored, "br16-recovery-resolution", reviewed_ledger_id, work / "restored-recovery-handoff.json")
         assert restored_handoff["status"] == "APPENDED" and restored_handoff["artifact"]["execution_permitted"] is False
-        assert invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill")["status"] == "STOPPED"
+        # Repeating STOP must be fail-closed and must preserve the first
+        # reconciliation reason; it is not a second mutable stop event.
+        repeat_stop = invoke(bot, "mission", "m11-stop", state, "br16a-restart-drill", expected=1)
+        assert repeat_stop["status"] == "STOPPED"
+        assert repeat_stop["artifact"]["stop_reason"] == "RECONCILIATION_REQUIRED"
         # New process, same workspace: replay and durable stop must survive.
         assert "replay=MATCH" in run([bot, "history", "replay", history]).stdout
         status = invoke(bot, "mission", "status", state)

@@ -2903,6 +2903,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
+		if s.Stop {
+			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
+		}
 		s.Stop = true
 		s.StopReason = args[2]
 		if err = saveMissionState(args[1], s); err != nil {

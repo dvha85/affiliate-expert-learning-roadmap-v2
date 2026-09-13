@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 76a470a666a5f45fb0ff8406ec6da7a1eceff520 -->
+<!-- readiness-main-baseline: 9343555c1c5175ad9ccc2934a9651e86f3be3a76 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -331,6 +331,12 @@ hoặc marker: nếu state đã rename nhưng marker chưa tồn tại, state ca
 chặn Bot mới trước khi đọc input; nếu marker đã rename, cả hai đều visible.
 Journals/store khác,
 crash/power-loss và transaction nhiều file vẫn còn phạm vi mở.
+
+**Cập nhật sticky STOP reason (2026-09-14):** khi `mission-state.json`
+đã stopped, `m11-stop` fail-closed với `STOPPED` và không ghi lại state hoặc
+marker dù caller gửi reason khác. Regression lưu bytes hai artifact sau STOP
+đầu tiên, thử overwrite reason rồi yêu cầu cả hai byte-identical. Đây chỉ khóa
+local reason và không giải quyết recovery multi-file/power-loss.
 
 **Cập nhật artifact-registry sync boundary (2026-09-11):** M10/M11 registry
 append giờ sync parent directory trước khi return success. M11 journal recovery
