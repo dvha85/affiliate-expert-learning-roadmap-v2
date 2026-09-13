@@ -827,20 +827,25 @@ func TestMissionM10ReservationCommitFaultDoesNotConsumeCap(t *testing.T) {
 		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
 	}
 	before := missionRuntimeSnapshot(t, runtimeDir)
-	missionStateWriteFault = func(phase string) error {
-		if phase == "before_rename" {
-			return errors.New("injected reservation state commit failure")
-		}
-		return nil
-	}
 	t.Cleanup(func() { missionStateWriteFault = nil })
-	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "failed-reservation"); code == 0 || response["status"] != "STORE_ERROR" {
-		t.Fatalf("reservation commit fault was not surfaced: code=%d response=%+v", code, response)
-	}
-	missionStateWriteFault = nil
-	assertMissionRuntimeUnchanged(t, before, runtimeDir)
-	if temporary, err := filepath.Glob(filepath.Join(runtimeDir, ".mission-state-*")); err != nil || len(temporary) != 0 {
-		t.Fatalf("failed reservation leaked state temporary files: files=%v err=%v", temporary, err)
+	for _, faultPhase := range []string{"after_temp_sync", "before_rename"} {
+		faultPhase := faultPhase
+		t.Run(faultPhase, func(t *testing.T) {
+			missionStateWriteFault = func(phase string) error {
+				if phase == faultPhase {
+					return errors.New("injected reservation state commit failure")
+				}
+				return nil
+			}
+			if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "failed-reservation-"+faultPhase); code == 0 || response["status"] != "STORE_ERROR" {
+				t.Fatalf("reservation commit fault was not surfaced: code=%d response=%+v", code, response)
+			}
+			missionStateWriteFault = nil
+			assertMissionRuntimeUnchanged(t, before, runtimeDir)
+			if temporary, err := filepath.Glob(filepath.Join(runtimeDir, ".mission-state-*")); err != nil || len(temporary) != 0 {
+				t.Fatalf("failed reservation leaked state temporary files: files=%v err=%v", temporary, err)
+			}
+		})
 	}
 	// A new production-shaped Bot process must see the unchanged cap and use it
 	// exactly once, rather than treating the failed writer as a consumed or
