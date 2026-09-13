@@ -265,6 +265,51 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	}
 }
 
+// An authorization supplied back to the learner is portable input until the
+// runtime resolves its immutable registry entry. Replacing its name with an
+// external same-byte file after open must fail before budget reservation.
+func TestMissionM10ReserveAuthorizationRejectsPortableSymlinkSwapAfterOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	authorizationPath := filepath.Join(filepath.Dir(runtimeDir), "portable-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization fixture setup failed: code=%d response=%+v", code, response)
+	}
+	authorizationBytes, err := os.ReadFile(authorizationPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-authorization.json")
+	if err := os.WriteFile(external, authorizationBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(authorizationPath) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(authorizationPath); err != nil {
+			return err
+		}
+		return os.Symlink(external, authorizationPath)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "portable-swap-reservation"); code == 0 || response["status"] != "INPUT_ERROR" {
+		t.Fatalf("M10 reserve accepted a post-open authorization swap: code=%d response=%+v", code, response)
+	}
+	if !swapped {
+		t.Fatal("M10 reserve did not use the stable portable-input reader")
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, authorizationBytes) {
+		t.Fatalf("authorization swap rejection changed external bytes: %q err=%v", got, err)
+	}
+}
+
 func TestMissionM08AgentPolicyFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 	dir, history, _ := missionFixture(t)
 	records, err := LoadHistory(history)
