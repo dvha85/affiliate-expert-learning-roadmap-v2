@@ -31,6 +31,7 @@ from validate_n8n_m06_operated_execution import validate_success as validate_m06
 ROOT = Path(__file__).resolve().parents[1]
 BOT_DIR = ROOT / "lab" / "affiliate-bot"
 M06_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-readonly-watcher.blueprint.json"
+M06_SELECTED_SOURCE_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-accesstrade-shopee-readonly.blueprint.json"
 M07_BLUEPRINT = ROOT / "lab" / "n8n" / "M07-readonly-evidence-agent.blueprint.json"
 
 
@@ -203,23 +204,25 @@ def node_json(execution: dict, node: str) -> dict:
         raise AssertionError(f"n8n node has no JSON output: {node}") from error
 
 
-def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m06_fixture: Optional[dict] = None, m07_case: Optional[str] = None, m07_record_id: Optional[str] = None, m07_model_stub_port: Optional[int] = None) -> None:
+def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, work: Path, workflow_id: str, adapter_port: int, *, m06_fixture: Optional[dict] = None, selected_source_capture: Optional[dict] = None, m07_case: Optional[str] = None, m07_record_id: Optional[str] = None, m07_model_stub_port: Optional[int] = None) -> None:
     data = json.loads(blueprint.read_text(encoding="utf-8"))
     data["id"] = workflow_id
     for node in data["nodes"]:
         # n8n's non-interactive `execute` command starts only at this trigger.
         # The production blueprint keeps its reviewed Schedule/Manual trigger;
         # only this disposable import substitutes the CLI entrypoint.
-        if node["name"] in {"Schedule Trigger", "Manual Trigger"}:
+        if node["name"] in {"Schedule Trigger", "Manual Trigger", "Manual Sanitized Capture Trigger"}:
             node["type"] = "n8n-nodes-base.executeWorkflowTrigger"
             node["typeVersion"] = 1
             node["parameters"] = {}
-        if node["name"] == "M06 Adapter Input" or node["name"] == "M07 Adapter Input":
+        if node["name"] in {"M06 Adapter Input", "Selected Source Capture Input", "M07 Adapter Input"}:
             for assignment in node["parameters"]["assignments"]["assignments"]:
                 if assignment["name"] == "adapter_url":
                     assignment["value"] = f"http://127.0.0.1:{adapter_port}"
                 if m06_fixture is not None and assignment["name"] == "fixture_json":
                     assignment["value"] = json.dumps(m06_fixture, separators=(",", ":"), ensure_ascii=False)
+                if selected_source_capture is not None and assignment["name"] == "sanitized_capture_json":
+                    assignment["value"] = json.dumps(selected_source_capture, separators=(",", ":"), ensure_ascii=False)
                 if m07_record_id is not None and assignment["name"] == "record_id":
                     assignment["value"] = m07_record_id
                 if m07_case == "post" and assignment["name"] == "tool_request_json":
@@ -292,6 +295,38 @@ def require_m06_rejection(execution: dict) -> None:
         raise AssertionError("M06 fixture rejection reached an ACK or persistence report")
 
 
+def require_selected_source_success(execution: dict, history: Path, expected_status: str) -> str:
+    if execution.get("status") != "success" or execution.get("finished") is not True:
+        result = execution.get("data", {}).get("resultData", {})
+        raise AssertionError(f"selected-source n8n execution failed: {result.get('lastNodeExecuted')!r} {result.get('error')!r}")
+    handoff = node_json(execution, "Build and Append Selected Campaign Metadata").get("body", {})
+    ack = node_json(execution, "Require Selected Source Canonical ACK")
+    report = node_json(execution, "Report Selected Source Read-Only Result")
+    if not isinstance(handoff, dict) or handoff.get("status") != expected_status or ack.get("status") != expected_status or report.get("result") != expected_status:
+        raise AssertionError("selected-source canonical status was not preserved through n8n")
+    record_id = report.get("record_id")
+    if not isinstance(record_id, str) or not record_id or handoff.get("record_id") != record_id or ack.get("record_id") != record_id:
+        raise AssertionError("selected-source n8n ACK chain does not bind one canonical record")
+    if ack.get("canonical_history_handoff") != "ACK" or ack.get("execution_permitted") is not False or report.get("execution_permitted") is not False:
+        raise AssertionError("selected-source n8n crossed its read-only canonical boundary")
+    if report.get("classification") != "observed_campaign_metadata_not_business_outcome":
+        raise AssertionError("selected-source n8n lost its business-outcome boundary")
+    records = [json.loads(line) for line in history.read_text(encoding="utf-8").splitlines() if line.strip()]
+    matching = [record for record in records if record.get("record_id") == record_id]
+    if len(matching) != 1 or matching[0].get("recorded_result", {}).get("state") != "GET_MORE_DATA":
+        raise AssertionError("selected-source metadata was not replayable unknown/missing evidence")
+    return record_id
+
+
+def require_selected_source_rejection(execution: dict) -> None:
+    result = execution.get("data", {}).get("resultData", {})
+    if execution.get("status") != "error" or result.get("lastNodeExecuted") != "Build and Append Selected Campaign Metadata":
+        raise AssertionError("selected-source invalid capture did not stop at the canonical adapter")
+    run_data = result.get("runData", {})
+    if "Require Selected Source Canonical ACK" in run_data or "Report Selected Source Read-Only Result" in run_data:
+        raise AssertionError("selected-source invalid capture reached an ACK or report")
+
+
 def require_m07_model_success(execution: dict, expected_record_id: str) -> tuple[str, str]:
     if execution.get("status") != "success" or execution.get("finished") is not True:
         result = execution.get("data", {}).get("resultData", {})
@@ -327,6 +362,24 @@ def m06_fixture(*, correlation_id: str = "event-1", body: str = '{"product_id":"
         "correlation_id": correlation_id,
         "status_code": 200,
         "body": body,
+    }
+
+
+def selected_source_capture(*, correlation_id: str = "selected-source-ci-1", page_hash: str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") -> dict:
+    """Synthetic sanitized metadata for the selected-source contract only."""
+    return {
+        "version": "accesstrade-shopee-campaign-capture/v1",
+        "method": "GET",
+        "observed_at": "2026-09-13T00:00:00Z",
+        "correlation_id": correlation_id,
+        "status_code": 200,
+        "redirected": False,
+        "source_page_sha256": page_hash,
+        "campaign_title": "Shopee Việt Nam Smartlink cho tất cả thiết bị",
+        "merchant_label": "Shopee",
+        "campaign_category": "Thương Mại Điện Tử",
+        "campaign_status_label": "fixture pending review",
+        "campaign_period_label": "fixture period label",
     }
 
 
@@ -412,6 +465,28 @@ def main() -> None:
             replay = run([str(bot), "history", "replay", str(history)], env=env)
             if "replay=MATCH" not in replay.stdout:
                 raise AssertionError("canonical history did not replay after n8n M06 execution")
+            selected = selected_source_capture()
+            import_workflow(prefix, env, M06_SELECTED_SOURCE_BLUEPRINT, runtime, "rp08-m06-selected-source", port, selected_source_capture=selected)
+            selected_record_id = require_selected_source_success(execute(prefix, env, "rp08-m06-selected-source"), history, "APPENDED")
+            if selected_record_id in {record_id, changed_record_id}:
+                raise AssertionError("selected-source metadata reused a synthetic fixture record")
+            import_workflow(prefix, env, M06_SELECTED_SOURCE_BLUEPRINT, runtime, "rp08-m06-selected-source-retry", port, selected_source_capture=selected)
+            if require_selected_source_success(execute(prefix, env, "rp08-m06-selected-source-retry"), history, "EXACT_DUPLICATE") != selected_record_id:
+                raise AssertionError("selected-source retry did not resolve the original canonical record")
+            selected_history_before_reject = history.read_bytes()
+            selected_unsafe = dict(selected)
+            selected_unsafe["commission_rate"] = 0.9
+            import_workflow(prefix, env, M06_SELECTED_SOURCE_BLUEPRINT, runtime, "rp08-m06-selected-source-reject", port, selected_source_capture=selected_unsafe)
+            require_selected_source_rejection(execute(prefix, env, "rp08-m06-selected-source-reject", expected=1))
+            if history.read_bytes() != selected_history_before_reject:
+                raise AssertionError("rejected selected-source capture changed canonical history")
+            selected_changed = selected_source_capture(page_hash="1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+            import_workflow(prefix, env, M06_SELECTED_SOURCE_BLUEPRINT, runtime, "rp08-m06-selected-source-changed", port, selected_source_capture=selected_changed)
+            if require_selected_source_success(execute(prefix, env, "rp08-m06-selected-source-changed"), history, "APPENDED") == selected_record_id:
+                raise AssertionError("changed selected-source page fingerprint did not create a new canonical observation")
+            replay = run([str(bot), "history", "replay", str(history)], env=env)
+            if replay.stdout.count("replay=MATCH") < 4:
+                raise AssertionError("selected-source canonical history did not replay after n8n execution")
             stop_adapter(adapter)
             adapter = None
             require_m06_sink_failure(execute(prefix, env, "rp08-m06", expected=1))
@@ -461,7 +536,7 @@ def main() -> None:
             print(f"N8N engine regression runtime retained at {runtime}", file=sys.stderr)
         else:
             shutil.rmtree(runtime)
-    print("N8N ENGINE REGRESSION PASS: M06 persisted/replayed via n8n with key-order retry, changed-event append, conflict/source rejection and sink failure; M07 policy rejections failed closed and the real Agent completed grounding/proposal persistence against a loopback OpenAI-compatible model stub")
+    print("N8N ENGINE REGRESSION PASS: synthetic M06 and sanitized selected-source metadata persisted/replayed via n8n with exact retries and fail-closed rejects; M07 policy rejections failed closed and the real Agent completed grounding/proposal persistence against a loopback OpenAI-compatible model stub")
 
 
 if __name__ == "__main__":

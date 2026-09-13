@@ -68,6 +68,12 @@ Blueprint
 dùng Manual Trigger, inactive mặc định, và chỉ handoff `sanitized_capture_json`
 tới loopback adapter. Không cấu hình n8n để fetch page đăng nhập trực tiếp.
 
+`scripts/run_n8n_engine_regression.py` nhập một bản sao disposable của
+blueprint vào n8n local và dùng metadata synthetic đã làm sạch. Regression đó
+xác nhận append, retry `EXACT_DUPLICATE`, reject field `commission_rate` ngoài
+allowlist trước ACK/report, append khi fingerprint đổi và history replay
+`MATCH`. Nó không truy cập ACCESSTRADE và không thay operated evidence.
+
 ## M07 và điều chưa được suy ra
 
 M07 nhận context từ canonical history như mọi M06 record khác. Hai field
