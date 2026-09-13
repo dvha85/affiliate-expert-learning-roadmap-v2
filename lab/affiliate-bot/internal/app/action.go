@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 type actionEnvelope struct {
@@ -35,12 +35,12 @@ func RunAction(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Cách dùng: bot action validate ACTION.json OUTCOME.json")
 		return emit("USAGE_ERROR", nil, 2)
 	}
-	a, e := os.ReadFile(args[1])
+	a, e := store.ReadPortableInput(args[1])
 	if e != nil {
 		fmt.Fprintln(stderr, "Không đọc được action:", e)
 		return emit("IO_ERROR", nil, 1)
 	}
-	o, e := os.ReadFile(args[2])
+	o, e := store.ReadPortableInput(args[2])
 	if e != nil {
 		fmt.Fprintln(stderr, "Không đọc được outcome:", e)
 		return emit("IO_ERROR", nil, 1)

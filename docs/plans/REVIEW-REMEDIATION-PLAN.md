@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 59afeb0bd7f61ea11a4916c0ec82fd2f1193a590 -->
+<!-- readiness-main-baseline: 150619aabf06ea35d3237923045d72ee41b575b9 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1409,6 +1409,18 @@ bytes, và phải `IO_ERROR` trước append. Mutation CI thay shared wrapper b�
 pathname hardening, không chứng minh capture/report thật, provider, executor,
 atomic transaction đa-file, crash/power-loss hay multi-host.
 
+**Cập nhật internal learner portable-input stable reader (2026-09-13):**
+mọi đường đọc file production còn lại dưới `lab/affiliate-bot/internal` dùng
+`store.ReadPortableInput`: app action/outcome, evidence import và learning
+report. Reader giữ identity regular-file từ `Lstat` qua `open`/`fstat`, hai lần
+đọc cùng descriptor có giới hạn 16 MiB và kiểm pathname cuối trước khi trả bytes
+cho strict decode. Regression store thay file sau khi descriptor đã mở bằng
+symlink ngoài cùng bytes và phải reject; mutation CI hạ wrapper về `os.ReadFile`
+trong checkout tạm và chỉ PASS khi regression thật fail tại assertion đó. Nhờ
+vậy không còn `os.ReadFile` production trực tiếp trong learner module. Đây vẫn
+chỉ là guard pathname local: không chứng minh crash/power-loss, writer race rồi
+restore bytes, multi-host hay evidence ACCESSTRADE/provider vận hành.
+
 **Cập nhật M07 backup-sidecar stable reader (2026-09-12):** trước khi backup
 được chấp nhận, graph validator đọc cả tool-result và proposal sidecar bằng
 stable reader, không chỉ tin `WalkDir` trước đó. Regression đổi canonical
@@ -1426,7 +1438,8 @@ ngoài phạm vi.
 
 **Cập nhật audit CI mutation wiring (2026-09-13):** readiness audit coi các
 lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result,
-M07 CLI portable input, general CLI portable input, backup-sidecar và M08
+M07 CLI portable input, general CLI portable input, internal learner portable
+input, backup-sidecar và M08
 M07-proposal path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
