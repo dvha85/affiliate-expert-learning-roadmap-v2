@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 261801e74c9681c0d1bff77232c55ddc05262864 -->
+<!-- readiness-main-baseline: 27ee505e81ef83ad8538c52ac12b44b0e77994a6 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -531,6 +531,20 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   reject không mutate history. Đây chỉ là fixed synthetic profile; generic
   source profile, n8n operated execution và full shared HistoryRecord type vẫn
   còn mở, nên RP-04 chưa đóng.
+- **Selected source ACCESSTRADE Shopee Smartlink (2026-09-13):** theo lựa
+  chọn rõ ràng của chủ repo, `core/m06` có profile riêng
+  `accesstrade-shopee-campaign-capture/v1`. Profile fixed host/path campaign
+  Shopee Smartlink, chỉ nhận `GET`/200/no-redirect và sanitized capture gồm
+  title, merchant, category, status/period label, time, correlation ID và hash
+  provenance. Nó reject extra/raw HTML, credential, report, URL thay thế và
+  claim số commission/EPC/CVR. Builder vẫn dùng M00/History canonical chung;
+  price/commission được ghi `unknown`/`missing`, nên result là
+  `GET_MORE_DATA` thay vì ranking. CLI/loopback endpoint và blueprint n8n
+  inactive/manual đều handoff capture tới adapter; test thực reject claim
+  commission bịa qua M07. Đây là implementation/test offline của contract
+  selected-source, không phải fetch authenticated page, n8n operated run,
+  approval campaign, Smartlink, report/outcome hay execution authority. Xem
+  `docs/architecture/BR-13-ACCESSTRADE-SHOPEE-SELECTED-SOURCE.md`.
 - **RP-04 canonical fingerprint + M08 field links:** M06 dùng canonical JSON
   fingerprint cho body có cấu trúc (key order không tạo observation mới), còn
   raw byte hash giữ riêng cho HTTPS fixture pinning. CLI/HTTP adapter retry

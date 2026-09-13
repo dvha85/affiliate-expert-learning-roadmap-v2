@@ -153,3 +153,76 @@ func TestOfferFixtureMarksMissingPriceAndCommissionWithoutInventingValues(t *tes
 		}
 	}
 }
+
+func TestAccesstradeShopeeCampaignIsASeparateReadOnlyMetadataProfile(t *testing.T) {
+	profile := m06.AccesstradeShopeeCampaignProfile{SourceURL: m06.AccesstradeShopeeSmartlinkURL}
+	raw := []byte(`{"version":"accesstrade-shopee-campaign-capture/v1","method":"GET","observed_at":"2026-09-13T07:00:00+07:00","correlation_id":"campaign-metadata-1","status_code":200,"redirected":false,"source_page_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","campaign_title":"Shopee Việt Nam Smartlink cho tất cả thiết bị","merchant_label":"Shopee","campaign_category":"Thương Mại Điện Tử","campaign_status_label":"Chờ duyệt","campaign_period_label":"05/05/2023 - Nay"}`)
+	built, err := m06.BuildAccesstradeShopeeCampaign(raw, profile)
+	if err != nil || !strings.HasPrefix(built.RecordID, "watch-") || built.ObservedAt != "2026-09-13T00:00:00Z" {
+		t.Fatalf("selected source build failed: %+v %v", built, err)
+	}
+	var packet struct {
+		Question string `json:"question"`
+		Products []struct {
+			ProductName string `json:"product_name"`
+			Fields      []struct {
+				Field      string `json:"field_or_claim"`
+				Value      any    `json:"value"`
+				Kind       string `json:"evidence_kind"`
+				Claim      string `json:"claim_kind"`
+				State      string `json:"state"`
+				Limitation string `json:"limitation"`
+			} `json:"fields"`
+		} `json:"products"`
+	}
+	if err := json.Unmarshal(built.Packet, &packet); err != nil || len(packet.Products) != 1 || packet.Products[0].ProductName != "Shopee Việt Nam Smartlink cho tất cả thiết bị" || !strings.Contains(packet.Question, "no ranking") {
+		t.Fatalf("invalid selected packet: %v %s", err, built.Packet)
+	}
+	for _, field := range packet.Products[0].Fields {
+		if field.Value != nil || field.Kind != "real" || field.Claim != "unknown" || field.State != "missing" || !strings.Contains(field.Limitation, "not independent business truth") {
+			t.Fatalf("selected campaign invented a business field: %+v", field)
+		}
+	}
+	// Strict decoding and the reviewed profile reject source substitution,
+	// write/redirect/status paths, mutable quantitative claims and raw extras.
+	for _, bad := range []string{
+		strings.Replace(string(raw), `"method":"GET"`, `"method":"POST"`, 1),
+		strings.Replace(string(raw), `"status_code":200`, `"status_code":201`, 1),
+		strings.Replace(string(raw), `"redirected":false`, `"redirected":true`, 1),
+		strings.Replace(string(raw), `"campaign_title":"Shopee Việt Nam Smartlink cho tất cả thiết bị"`, `"campaign_title":"Other"`, 1),
+		strings.Replace(string(raw), `}`, `,"commission_rate":0.9}`, 1),
+	} {
+		if _, err := m06.BuildAccesstradeShopeeCampaign([]byte(bad), profile); err == nil {
+			t.Fatalf("unsafe selected capture accepted: %s", bad)
+		}
+	}
+	wrongProfile := profile
+	wrongProfile.SourceURL = "https://pub2.accesstrade.vn/campaign/5087153089503673507"
+	if _, err := m06.BuildAccesstradeShopeeCampaign(raw, wrongProfile); err == nil {
+		t.Fatal("alternate selected source URL accepted")
+	}
+}
+
+func TestAccesstradeShopeeCampaignCanonicalizesEquivalentCapture(t *testing.T) {
+	profile := m06.AccesstradeShopeeCampaignProfile{SourceURL: m06.AccesstradeShopeeSmartlinkURL}
+	first := []byte(`{"version":"accesstrade-shopee-campaign-capture/v1","method":"GET","observed_at":"2026-09-13T00:00:00Z","correlation_id":"campaign-metadata-2","status_code":200,"redirected":false,"source_page_sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","campaign_title":"Shopee Việt Nam Smartlink cho tất cả thiết bị","merchant_label":"Shopee","campaign_category":"Thương Mại Điện Tử","campaign_status_label":"Chờ duyệt","campaign_period_label":"05/05/2023 - Nay"}`)
+	second := []byte(`{"campaign_period_label":"05/05/2023 - Nay","campaign_status_label":"Chờ duyệt","campaign_category":"Thương Mại Điện Tử","merchant_label":"Shopee","campaign_title":"Shopee Việt Nam Smartlink cho tất cả thiết bị","source_page_sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","redirected":false,"status_code":200,"correlation_id":"campaign-metadata-2","observed_at":"2026-09-13T07:00:00+07:00","method":"GET","version":"accesstrade-shopee-campaign-capture/v1"}`)
+	a, err := m06.BuildAccesstradeShopeeCampaign(first, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := m06.BuildAccesstradeShopeeCampaign(second, profile)
+	if err != nil || a.RecordID != b.RecordID || string(a.Packet) != string(b.Packet) {
+		t.Fatalf("equivalent capture did not deduplicate: a=%+v b=%+v err=%v", a, b, err)
+	}
+	changed := strings.Replace(string(second), `"campaign_status_label":"Chờ duyệt"`, `"campaign_status_label":"Đã duyệt"`, 1)
+	c, err := m06.BuildAccesstradeShopeeCampaign([]byte(changed), profile)
+	if err != nil || c.RecordID == a.RecordID {
+		t.Fatalf("changed campaign metadata was not a new observation: %+v %v", c, err)
+	}
+	changedPage := strings.Replace(string(second), `"source_page_sha256":"a`, `"source_page_sha256":"b`, 1)
+	d, err := m06.BuildAccesstradeShopeeCampaign([]byte(changedPage), profile)
+	if err != nil || d.RecordID == a.RecordID {
+		t.Fatalf("changed source-page fingerprint was not a new observation: %+v %v", d, err)
+	}
+}

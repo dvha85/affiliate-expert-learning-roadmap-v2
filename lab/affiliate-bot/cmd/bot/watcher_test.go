@@ -25,6 +25,10 @@ func (fn roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, err
 func watchFixture() watcherFixture {
 	return watcherFixture{Version: "br13-offer-fixture/v1", Method: "GET", URL: watcherFixtureURL, ObservedAt: "2026-09-03T00:00:00Z", CorrelationID: "event-1", StatusCode: 200, Body: `{"product_id":"a","product_name":"Fixture A","currency":"USD","price":100,"commission_rate":0.08}`}
 }
+
+func accesstradeShopeeCapture() json.RawMessage {
+	return json.RawMessage(`{"version":"accesstrade-shopee-campaign-capture/v1","method":"GET","observed_at":"2026-09-13T00:00:00Z","correlation_id":"selected-source-1","status_code":200,"redirected":false,"source_page_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","campaign_title":"Shopee Việt Nam Smartlink cho tất cả thiết bị","merchant_label":"Shopee","campaign_category":"Thương Mại Điện Tử","campaign_status_label":"Chờ duyệt","campaign_period_label":"05/05/2023 - Nay"}`)
+}
 func watchRun(t *testing.T, h, input string, f watcherFixture, want string) {
 	t.Helper()
 	raw, err := json.Marshal(f)
@@ -109,6 +113,76 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	records, err = LoadHistory(history)
 	if err != nil || len(records) != 2 || Replay(records[1]).State != replayMatch || records[1].Observations[0].Price != nil || records[1].Observations[0].CommissionRate != nil {
 		t.Fatal("missing-field record did not replay MATCH", err, records)
+	}
+}
+
+func TestSelectedAccesstradeCampaignUsesSharedM06HistoryAndM07Boundary(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	call := func(path string, body any) *httptest.ResponseRecorder {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorder := httptest.NewRecorder()
+		m06AdapterHandler(history).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw)))
+		return recorder
+	}
+	wrongEndpoint := call("/v1/m06/fixture-import", m06AdapterRequest{Capture: accesstradeShopeeCapture()})
+	if wrongEndpoint.Code == http.StatusOK {
+		t.Fatal("selected capture entered fixture endpoint")
+	}
+	first := call("/v1/m06/accesstrade-shopee-campaign", m06AdapterRequest{Capture: accesstradeShopeeCapture()})
+	if first.Code != http.StatusOK || !strings.Contains(first.Body.String(), `"canonical_history_ack":true`) || !strings.Contains(first.Body.String(), `"state":"GET_MORE_DATA"`) {
+		t.Fatalf("selected campaign was not safely persisted: %d %s", first.Code, first.Body.String())
+	}
+	second := call("/v1/m06/accesstrade-shopee-campaign", m06AdapterRequest{Capture: accesstradeShopeeCapture()})
+	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), appendDuplicate) {
+		t.Fatalf("selected campaign retry was not exact duplicate: %d %s", second.Code, second.Body.String())
+	}
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 || records[0].RecordedResult.State != stateGetMoreData {
+		t.Fatal(err, records)
+	}
+	record := records[0]
+	if record.Observations[0].EvidenceKind != "real" || record.Observations[0].Price != nil || record.Observations[0].CommissionRate != nil {
+		t.Fatalf("selected campaign was misclassified/ranked: %+v", record.Observations[0])
+	}
+	ctx, err := m07EvidenceContext(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unknown corem07.Evidence
+	for _, evidence := range ctx.Evidence {
+		if evidence.FieldOrClaim == "commission_rate" {
+			unknown = evidence
+			break
+		}
+	}
+	if unknown.EvidenceID == "" || unknown.ClaimKind != "unknown" || !strings.Contains(unknown.Limitation, "not independent business truth") {
+		t.Fatalf("M07 did not retain selected-source limitation: %+v", unknown)
+	}
+	claim := corem07.Claim{Text: "commission_rate=0.9 [evidence:" + unknown.EvidenceID + "]", FieldOrClaim: "commission_rate", Value: json.RawMessage("0.9"), EvidenceIDs: []string{unknown.EvidenceID}}
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: claim.Text, EvidenceIDs: []string{unknown.EvidenceID}, Claims: []corem07.Claim{claim}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false}
+	if _, err := corem07.ValidateAgentOutput(mustRawJSON(t, model), ctx.Evidence, []corem07.ToolSpec{{Name: "read", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}}}); err == nil {
+		t.Fatal("M07 grounded an invented commission/earnings claim from selected metadata")
+	}
+}
+
+func TestSelectedAccesstradeCampaignCLIImportsOnlySanitizedMetadata(t *testing.T) {
+	dir := t.TempDir()
+	history, capture := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "sanitized-capture.json")
+	if err := os.WriteFile(capture, accesstradeShopeeCapture(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, diag bytes.Buffer
+	code := runWatcher([]string{"accesstrade-shopee-campaign-import", history, capture}, &out, &diag)
+	var response map[string]any
+	if err := json.Unmarshal(out.Bytes(), &response); err != nil || code != 0 || response["status"] != appendAdded || response["execution_permitted"] != false || response["network_fetch_performed"] != false || response["affiliate_link_created"] != false {
+		t.Fatalf("selected-source CLI was not read-only canonical import: code=%d response=%v diagnostic=%s err=%v", code, response, diag.String(), err)
+	}
+	if code := runWatcher([]string{"accesstrade-shopee-campaign-import", history, capture}, &out, &diag); code != 0 || !strings.Contains(out.String(), appendDuplicate) {
+		t.Fatalf("selected-source CLI retry was not exact duplicate: %d %s", code, out.String())
 	}
 }
 

@@ -31,6 +31,29 @@ func watcherRecord(raw []byte) (HistoryRecord, error) {
 	return watcherRecordSource(raw, "")
 }
 
+// watcherAccesstradeShopeeRecord accepts only a sanitized, allowlisted
+// metadata capture for the one reviewed campaign. It deliberately has no URL,
+// credential, affiliate-link, report, or arbitrary-response argument.
+func watcherAccesstradeShopeeRecord(raw []byte) (HistoryRecord, error) {
+	built, err := m06.BuildAccesstradeShopeeCampaign(raw, m06.AccesstradeShopeeCampaignProfile{SourceURL: m06.AccesstradeShopeeSmartlinkURL})
+	if err != nil {
+		return HistoryRecord{}, fmt.Errorf("watcher: %w", err)
+	}
+	converted, err := m00.Convert(built.Packet)
+	if err != nil {
+		return HistoryRecord{}, fmt.Errorf("watcher: invalid selected campaign metadata projection: %w", err)
+	}
+	projection, err := json.Marshal(converted)
+	if err != nil {
+		return HistoryRecord{}, fmt.Errorf("watcher: projection encoding: %w", err)
+	}
+	var observations []Observation
+	if err := json.Unmarshal(projection, &observations); err != nil {
+		return HistoryRecord{}, fmt.Errorf("watcher: projection decoding: %w", err)
+	}
+	return NewHistoryRecord(built.RecordID, built.ObservedAt, built.ObservedAt, observations)
+}
+
 // Remote source is supplied only by the fixed, hash-verified fetch adapter.
 func watcherRecordSource(raw []byte, remote string) (HistoryRecord, error) {
 	profile := m06.OfferFixtureProfile{
@@ -80,6 +103,9 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "fetch-fixture" {
 		return runWatcherFetch(args, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "accesstrade-shopee-campaign-import" {
+		return runAccesstradeShopeeCampaignImport(args[1:], stdout, stderr)
+	}
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
 			fmt.Fprintln(stderr, err)
@@ -123,11 +149,12 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "observation_ids": resolved.RecordedResult.EvidenceIDs}, nil, 0)
 }
 
-// m06AdapterRequest deliberately carries only a local synthetic fixture. The
+// m06AdapterRequest carries exactly one governed M06 profile input. The
 // adapter, rather than n8n JavaScript, builds the M00 input and HistoryRecord
 // from the shared M06 profile before it can append to canonical history.
 type m06AdapterRequest struct {
-	Fixture json.RawMessage `json:"fixture"`
+	Fixture json.RawMessage `json:"fixture,omitempty"`
+	Capture json.RawMessage `json:"capture,omitempty"`
 }
 
 type m07AdapterRequest struct {
@@ -148,10 +175,50 @@ func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
 	if err != nil {
 		return request, err
 	}
-	if err := contracts.DecodeStrict(raw, &request); err != nil || len(request.Fixture) == 0 {
+	if err := contracts.DecodeStrict(raw, &request); err != nil || (len(request.Fixture) == 0 && len(request.Capture) == 0) || (len(request.Fixture) != 0 && len(request.Capture) != 0) {
 		return request, fmt.Errorf("invalid M06 adapter request")
 	}
 	return request, nil
+}
+
+func runAccesstradeShopeeCampaignImport(args []string, stdout, stderr io.Writer) int {
+	emit := func(status string, artifact any, err error, code int) int {
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+		}
+		out := map[string]any{"command": "watcher accesstrade-shopee-campaign-import", "status": status, "execution_permitted": false, "network_fetch_performed": false, "affiliate_link_created": false, "persisted": artifact != nil}
+		if artifact != nil {
+			out["artifact"] = artifact
+		}
+		if err := json.NewEncoder(stdout).Encode(out); err != nil {
+			return 1
+		}
+		return code
+	}
+	if len(args) != 2 {
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot watcher accesstrade-shopee-campaign-import HISTORY SANITIZED_CAPTURE"), 2)
+	}
+	if err := distinctActionPaths(args...); err != nil {
+		return emit("PATH_ERROR", nil, err, 1)
+	}
+	if info, err := os.Lstat(args[0]); err == nil && !info.Mode().IsRegular() {
+		return emit("PATH_ERROR", nil, fmt.Errorf("history must be regular, not symlink"), 1)
+	} else if err != nil && !os.IsNotExist(err) {
+		return emit("HISTORY_ERROR", nil, err, 1)
+	}
+	raw, err := readCampaignFile(args[1], 32<<10)
+	if err != nil {
+		return emit("INPUT_ERROR", nil, err, 1)
+	}
+	record, err := watcherAccesstradeShopeeRecord(raw)
+	if err != nil {
+		return emit("CAPTURE_ERROR", nil, err, 1)
+	}
+	status, resolved, err := appendResolvedHistory(args[0], record)
+	if err != nil {
+		return emit("HANDOFF_ERROR", nil, err, 1)
+	}
+	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "source_url": m06.AccesstradeShopeeSmartlinkURL, "classification": "observed_campaign_metadata_not_business_outcome"}, nil, 0)
 }
 
 func appendResolvedHistory(historyPath string, record HistoryRecord) (string, HistoryRecord, error) {
@@ -222,7 +289,14 @@ func m06AdapterHandler(historyPath string) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_M06_INPUT", "canonical_history_ack": false, "execution_permitted": false})
 			return
 		}
-		record, err := watcherRecord(request.Fixture)
+		var record HistoryRecord
+		if r.URL.Path == "/v1/m06/fixture-import" && len(request.Fixture) != 0 {
+			record, err = watcherRecord(request.Fixture)
+		} else if r.URL.Path == "/v1/m06/accesstrade-shopee-campaign" && len(request.Capture) != 0 {
+			record, err = watcherAccesstradeShopeeRecord(request.Capture)
+		} else {
+			err = fmt.Errorf("unsupported M06 adapter profile")
+		}
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "FIXTURE_ERROR", "canonical_history_ack": false, "execution_permitted": false})
@@ -632,6 +706,7 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/m06/fixture-import", m06AdapterHandler(historyPath))
+	mux.HandleFunc("/v1/m06/accesstrade-shopee-campaign", m06AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/context", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/preflight", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/v1/m07/fetch-and-register", m07AdapterHandler(historyPath))

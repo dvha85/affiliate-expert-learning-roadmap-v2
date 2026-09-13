@@ -1,0 +1,80 @@
+{
+  "name": "M06 ACCESSTRADE Shopee Smartlink Read-Only Metadata",
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Sanitized Capture Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "input",
+      "name": "Selected Source Capture Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [260, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id": "adapter", "name": "adapter_url", "value": "http://127.0.0.1:8787", "type": "string"},
+            {"id": "capture", "name": "sanitized_capture_json", "value": "={{ $json.sanitized_capture_json }}", "type": "string"}
+          ]
+        }
+      },
+      "notes": "Provide a reviewed sanitized capture at execution time. Do not paste HTML, cookies, publisher/report data, tracking links, review text, commission/EPC/CVR figures, or personal data. The canonical adapter owns the fixed ACCESSTRADE URL and rejects anything outside its profile."
+    },
+    {
+      "id": "handoff",
+      "name": "Build and Append Selected Campaign Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Selected Source Capture Input').item.json.adapter_url + '/v1/m06/accesstrade-shopee-campaign' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {capture:JSON.parse($('Selected Source Capture Input').item.json.sanitized_capture_json)} }}",
+        "options": {"response": {"response": {"fullResponse": true, "responseFormat": "json"}}}
+      },
+      "notes": "No HTTP request to ACCESSTRADE is made by n8n. This is only a loopback handoff of a separately reviewed sanitized capture; the adapter builds M00/history and replay-validates before ACK."
+    },
+    {
+      "id": "ack",
+      "name": "Require Selected Source Canonical ACK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 0],
+      "parameters": {
+        "jsCode": "const response=$json.body||$json; if((response.status!=='APPENDED'&&response.status!=='EXACT_DUPLICATE')||response.canonical_history_ack!==true||response.canonical_history_persisted!==true||!response.record_id||response.execution_permitted!==false) throw new Error('SELECTED_SOURCE_CANONICAL_HISTORY_NOT_ACKNOWLEDGED'); return [{json:{...response,canonical_history_handoff:'ACK',selected_source:'ACCESSTRADE_Shopee_Smartlink',execution_permitted:false}}];"
+      }
+    },
+    {
+      "id": "report",
+      "name": "Report Selected Source Read-Only Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1140, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id": "status", "name": "result", "value": "={{ $json.status }}", "type": "string"},
+            {"id": "record", "name": "record_id", "value": "={{ $json.record_id }}", "type": "string"},
+            {"id": "classification", "name": "classification", "value": "observed_campaign_metadata_not_business_outcome", "type": "string"},
+            {"id": "execution", "name": "execution_permitted", "value": "={{ $json.execution_permitted }}", "type": "boolean"}
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Sanitized Capture Trigger": {"main": [[{"node": "Selected Source Capture Input", "type": "main", "index": 0}]]},
+    "Selected Source Capture Input": {"main": [[{"node": "Build and Append Selected Campaign Metadata", "type": "main", "index": 0}]]},
+    "Build and Append Selected Campaign Metadata": {"main": [[{"node": "Require Selected Source Canonical ACK", "type": "main", "index": 0}]]},
+    "Require Selected Source Canonical ACK": {"main": [[{"node": "Report Selected Source Read-Only Result", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {}
+}
