@@ -163,6 +163,19 @@ class ReadinessAuditTests(unittest.TestCase):
         matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
         self.assertIn("review finding mapping is incomplete", self.run_audit(False))
 
+    def test_selected_source_grounding_disclosure_is_required(self):
+        plan_path = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
+        plan_path.write_text(plan_path.read_text(encoding="utf-8").replace("M07 selected-source engine grounding CI", "removed selected-source grounding marker", 1), encoding="utf-8")
+        self.assertIn("selected-source M07 grounding runner lacks a scoped plan marker", self.run_audit(False))
+
+    def test_selected_source_forged_commission_scope_is_required(self):
+        matrix_path = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        br15 = next(item for item in matrix["criteria"] if item["id"] == "BR-15")
+        br15["missing_evidence"][0] = "tests: selected campaign metadata reaches M07"
+        matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
+        self.assertIn("does not disclose selected-source forged-commission", self.run_audit(False))
+
 
 if __name__ == "__main__":
     unittest.main()
