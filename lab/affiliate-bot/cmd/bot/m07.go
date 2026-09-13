@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
@@ -18,6 +17,17 @@ type m07Context struct {
 	EvidenceIDs []string           `json:"evidence_ids"`
 	Evidence    []corem07.Evidence `json:"evidence"`
 	Authority   string             `json:"authority"`
+}
+
+const maxM07PortableInputBytes int64 = 1 << 20
+
+// readM07PortableInput is the boundary for caller-supplied registry, model,
+// and tool-result files. They remain untrusted portable input until the M07
+// validators accept their content, so a post-open pathname swap must fail
+// before a tool evidence artifact or grounded proposal can be persisted.
+func readM07PortableInput(path string) ([]byte, error) {
+	b, _, err := readStableRegularFileLimit(path, maxM07PortableInputBytes)
+	return b, err
 }
 
 func m07EvidenceContext(record HistoryRecord) (m07Context, error) {
@@ -66,7 +76,7 @@ func appendRegisteredToolEvidence(ctx m07Context, raw []byte, registry []corem07
 }
 
 func loadM07Registry(path string) ([]corem07.ToolSpec, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readM07PortableInput(path)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +156,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("REGISTRY_ERROR", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[4])
+		raw, err := readM07PortableInput(args[4])
 		if err != nil {
 			return emit("TOOL_RESULT_ERROR", nil, err, 1)
 		}
@@ -163,7 +173,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		}
 		return emit(status, map[string]any{"registered": registered, "evidence": registered.Evidence()}, nil, 0)
 	case "register-proposal":
-		raw, err := os.ReadFile(args[3])
+		raw, err := readM07PortableInput(args[3])
 		if err != nil {
 			return emit("OUTPUT_ERROR", nil, err, 1)
 		}
@@ -176,7 +186,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 			return emit("REGISTRY_ERROR", nil, err, 1)
 		}
 		if len(args) == 7 {
-			toolRaw, err := os.ReadFile(args[6])
+			toolRaw, err := readM07PortableInput(args[6])
 			if err != nil {
 				return emit("TOOL_RESULT_ERROR", nil, err, 1)
 			}
@@ -195,7 +205,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		}
 		return emit(status, proposal, nil, 0)
 	case "validate":
-		raw, err := os.ReadFile(args[3])
+		raw, err := readM07PortableInput(args[3])
 		if err != nil {
 			return emit("OUTPUT_ERROR", nil, err, 1)
 		}
@@ -210,7 +220,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 			return emit("REGISTRY_ERROR", nil, err, 1)
 		}
 		if len(args) == 6 {
-			toolRaw, err := os.ReadFile(args[5])
+			toolRaw, err := readM07PortableInput(args[5])
 			if err != nil {
 				return emit("TOOL_RESULT_ERROR", nil, err, 1)
 			}

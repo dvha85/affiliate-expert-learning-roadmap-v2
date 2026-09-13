@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 80aed3f9b4dc222722071c66c9a0e708c2b41c5b -->
+<!-- readiness-main-baseline: 62c9be28e7f6ca6c4f800ccb9bf4ac60024fff1f -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1387,6 +1387,16 @@ cùng bytes và phải reject trước grounding. CI mutation thay reader bằng
 validation breadth, crash/power-loss, multi-host và selected-source evidence
 vẫn ngoài phạm vi.
 
+**Cập nhật M07 CLI portable-input stable reader (2026-09-13):** registry
+policy, model output và registered tool result đi vào command M07 qua pathname
+do caller cung cấp đều đọc bounded với identity ổn định trước strict decode,
+grounding hay persistence. Regression gọi `register-tool-result` thật, thay
+tool result sau open bằng symlink ngoài cùng bytes, và phải trả
+`TOOL_RESULT_ERROR` trước khi ghi evidence artifact. Mutation CI thay wrapper
+M07 bằng `os.ReadFile` trong checkout tạm và đòi assertion regression thật
+fail. Đây chỉ là guard pathname local; không chứng minh provider, source live,
+atomic transaction đa-file, crash/power-loss hay multi-host.
+
 **Cập nhật M07 backup-sidecar stable reader (2026-09-12):** trước khi backup
 được chấp nhận, graph validator đọc cả tool-result và proposal sidecar bằng
 stable reader, không chỉ tin `WalkDir` trước đó. Regression đổi canonical
@@ -1402,9 +1412,9 @@ riêng reader đó và đòi assertion thật fail. Đây chỉ là guard identi
 portable input khác, crash/power-loss, multi-host và authority/executor vẫn
 ngoài phạm vi.
 
-**Cập nhật audit CI mutation wiring (2026-09-12):** readiness audit coi bảy
+**Cập nhật audit CI mutation wiring (2026-09-13):** readiness audit coi các
 lệnh mutation M10/M11, backup source identity, recovery-journal, M07 tool-result,
-backup-sidecar và M08 M07-proposal path identity
+M07 CLI portable input, backup-sidecar và M08 M07-proposal path identity
 là required regression của `curriculum-ci.yml`, đồng thời đòi script hiện diện;
 negative fixture xoá lệnh M10, backup hoặc recovery-journal khỏi workflow phải
 làm audit fail. Audit này chỉ xác minh text

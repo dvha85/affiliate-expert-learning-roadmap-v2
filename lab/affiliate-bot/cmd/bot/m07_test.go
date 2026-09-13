@@ -165,6 +165,66 @@ func TestM07RejectsOutputInputAliasesBeforeParsing(t *testing.T) {
 	}
 }
 
+// Registry and tool-result files supplied to the M07 CLI are portable input,
+// not canonical evidence. A same-byte replacement after open must fail before
+// it can register an evidence artifact or publish caller-selected output.
+func TestM07RegisterToolResultRejectsPortableSymlinkSwapAfterOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-portable-swap-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-portable-swap-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(dir, "registry.json")
+	resultPath := filepath.Join(dir, "tool-result.json")
+	outputPath := filepath.Join(dir, "registered.json")
+	writeM07File(t, registryPath, []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}})
+	writeM07File(t, resultPath, corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-01T00:02:00Z", Body: json.RawMessage(`{"price":100}`)})
+	resultBytes, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "same-byte-external-tool-result.json")
+	if err := os.WriteFile(external, resultBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	stableRegularFileReadHook = func(openedPath string) error {
+		if filepath.Clean(openedPath) != filepath.Clean(resultPath) || swapped {
+			return nil
+		}
+		swapped = true
+		if err := os.Remove(resultPath); err != nil {
+			return err
+		}
+		return os.Symlink(external, resultPath)
+	}
+	t.Cleanup(func() { stableRegularFileReadHook = nil })
+	var out, errOut bytes.Buffer
+	if code := runM07([]string{"register-tool-result", historyPath, record.RecordID, registryPath, resultPath, outputPath}, &out, &errOut); code == 0 {
+		t.Fatalf("M07 registered a post-open tool-result swap: response=%s stderr=%s", out.String(), errOut.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "TOOL_RESULT_ERROR" {
+		t.Fatalf("M07 did not reject the portable swap as input error: response=%s err=%v stderr=%s", out.String(), err, errOut.String())
+	}
+	if !swapped {
+		t.Fatal("M07 tool-result input did not use the stable portable-input reader")
+	}
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("M07 persisted evidence after portable input swap: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, resultBytes) {
+		t.Fatalf("swap rejection changed external tool-result bytes: %q err=%v", got, err)
+	}
+}
+
 func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	dir := t.TempDir()
 	historyPath := filepath.Join(dir, "history.jsonl")
