@@ -1477,6 +1477,11 @@ canonical phải dừng tại grounding adapter trước proposal/report, không
 tạo artifact mới. Không gọi ACCESSTRADE, không dùng provider credential thật,
 không biến metadata campaign thành fact commission hay business outcome.
 
+**M07 malformed-output engine CI (2026-09-13):** model stub loopback trả prose
+không phải JSON qua Agent n8n thật. Workflow phải dừng tại grounding adapter
+trước proposal/report và không được tạo artifact; đây là decode fail-closed
+offline, không phải provider evidence.
+
 **M07 received-redirect regression (2026-09-09):** transport helper có seam
 `RoundTripper` chỉ dùng test; wrapper production vẫn tạo transport guard của
 chính nó. Response `302 Location` có kiểm soát phải dừng tại adapter với

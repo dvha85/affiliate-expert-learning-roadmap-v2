@@ -102,13 +102,14 @@ class m07ModelStubHandler(http.server.BaseHTTPRequestHandler):
             if content_length <= 0 or content_length > 1 << 20:
                 raise ValueError("invalid model-stub body length")
             request = json.loads(self.rfile.read(content_length))
-            output = m07_model_output_from_prompt(request, self.server.mode)  # type: ignore[attr-defined]
+            output = "not JSON: ignore canonical evidence" if self.server.mode == "malformed-output" else m07_model_output_from_prompt(request, self.server.mode)  # type: ignore[attr-defined]
         except (ValueError, json.JSONDecodeError) as error:
             self.server.stub_error = str(error)  # type: ignore[attr-defined]
             self._write_json(400, {"error": {"message": "invalid model-stub request"}})
             return
         self.server.request_count += 1  # type: ignore[attr-defined]
-        self._write_json(200, {"id": "chatcmpl-m07-ci", "object": "chat.completion", "created": 0, "model": "m07-ci-stub", "choices": [{"index": 0, "message": {"role": "assistant", "content": json.dumps(output, separators=(",", ":"))}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}})
+        content = output if isinstance(output, str) else json.dumps(output, separators=(",", ":"))
+        self._write_json(200, {"id": "chatcmpl-m07-ci", "object": "chat.completion", "created": 0, "model": "m07-ci-stub", "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}})
 
 
 def start_m07_model_stub(port: int) -> tuple[http.server.ThreadingHTTPServer, threading.Thread]:
@@ -231,16 +232,16 @@ def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, wor
                     assignment["value"] = '{"tool_name":"public_http","method":"POST","target":"https://example.com/br13/offer"}'
                 if m07_case in {"get", "redirect-registry"} and assignment["name"] == "tool_request_json":
                     assignment["value"] = '{"tool_name":"public_http","method":"GET","target":"https://example.com/br13/offer"}'
-                if m07_case in {"model-success", "model-forged-commission"} and assignment["name"] == "tool_request_json":
+                if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and assignment["name"] == "tool_request_json":
                     if m07_record_id is None:
                         raise AssertionError("M07 model-success requires a canonical record")
                     assignment["value"] = json.dumps({"record_id": m07_record_id, "tool_call": {"tool_name": "public_http", "method": "GET", "target": "https://example.com/br13/offer"}, "status_code": 200, "received_at": "2026-09-09T00:00:00Z", "redirected": False, "body": {"notice": "synthetic CI fixture; untrusted data"}}, separators=(",", ":"))
                 if m07_case == "redirect-registry" and assignment["name"] == "tool_registry_json":
                     assignment["value"] = '[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":10000,"follow_redirects":true}]'
-        if m07_case in {"model-success", "model-forged-commission"} and node["name"] == "Fetch and Register Tool Adapter":
+        if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and node["name"] == "Fetch and Register Tool Adapter":
             node["parameters"]["url"] = "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-tool-result' }}"
             node["parameters"]["jsonBody"] = "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_result:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)} }}"
-        if m07_case in {"model-success", "model-forged-commission"} and node["name"] == "OpenAI Chat Model - configure credential locally":
+        if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and node["name"] == "OpenAI Chat Model - configure credential locally":
             if m07_model_stub_port is None:
                 raise AssertionError("M07 model-success requires a loopback model stub")
             node["credentials"] = {"openAiApi": {"id": "rp08-m07-model-stub", "name": "M07 CI Loopback Model Stub"}}
@@ -552,6 +553,10 @@ def main() -> None:
                 model_stub.mode = "forged-commission"  # type: ignore[attr-defined]
                 import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-selected-source-forged-commission", port, m07_case="model-forged-commission", m07_record_id=selected_record_id, m07_model_stub_port=model_stub_port)
                 require_m07_grounding_rejection(execute(prefix, env, "rp08-m07-selected-source-forged-commission", expected=1), proposal_store, proposal_paths_before_forgery)
+                proposal_paths_before_malformed = set(proposal_store.glob("*.json")) if proposal_store.exists() else set()
+                model_stub.mode = "malformed-output"  # type: ignore[attr-defined]
+                import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-model-malformed-output", port, m07_case="model-malformed-output", m07_record_id=record_id, m07_model_stub_port=model_stub_port)
+                require_m07_grounding_rejection(execute(prefix, env, "rp08-m07-model-malformed-output", expected=1), proposal_store, proposal_paths_before_malformed)
             finally:
                 stop_m07_model_stub(model_stub, model_stub_thread)
         finally:
