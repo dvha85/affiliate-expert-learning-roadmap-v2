@@ -145,7 +145,7 @@ func TestSelectedAccesstradeCampaignUsesSharedM06HistoryAndM07Boundary(t *testin
 		t.Fatal(err, records)
 	}
 	record := records[0]
-	if record.Observations[0].EvidenceKind != "real" || record.Observations[0].Price != nil || record.Observations[0].CommissionRate != nil {
+	if record.Observations[0].EvidenceKind != "synthetic" || record.Observations[0].Price != nil || record.Observations[0].CommissionRate != nil {
 		t.Fatalf("selected campaign was misclassified/ranked: %+v", record.Observations[0])
 	}
 	ctx, err := m07EvidenceContext(record)
