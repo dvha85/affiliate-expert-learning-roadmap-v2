@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 5a5ee0a9fc7cd999b7c5e9567d1ace62dfcf7107 -->
+<!-- readiness-main-baseline: 261801e74c9681c0d1bff77232c55ddc05262864 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -341,7 +341,15 @@ mission command có thể mutate state, runtime root phải là direct non-symli
 directory trước khi lock, recovery journal hay `mission-state` có thể được tạo.
 Regression chạy CLI `mission init` với runtime symlink và kiểm cả external
 `mission-state` lẫn `.mission.lock` không được tạo. Đây chỉ là guard local cho
-mutable command root; input/read roots, ancestor-path TOCTOU, crash/power-loss
+mutable command root; portable inputs, ancestor-path TOCTOU, crash/power-loss
+và multi-host vẫn ngoài phạm vi.
+
+**Cập nhật runtime-root read guard (2026-09-13):** các reader `status`,
+`m10-resolve`, `m11-resolve`, `m11-recovery-export` và old source của
+`m11-recovery-admit` nay reject direct state-root symlink trước khi lấy runtime
+gate hay đọc journal/registry. Regression tạo runtime hợp lệ bên ngoài, gọi
+`status` bằng alias symlink, và nhận `STATE_ERROR` thay vì lộ state. Đây vẫn là
+boundary filesystem local; portable input, ancestor-path TOCTOU, crash/power-loss
 và multi-host vẫn ngoài phạm vi.
 
 **Cập nhật shared M09 approval boundary (2026-09-11):** `core/m09` hiện owns
