@@ -47,6 +47,39 @@ func TestWriteJSONAtomicFailurePreservesPriorStateAndRetry(t *testing.T) {
 	}
 }
 
+func TestMissionStopPostRenameSyncFaultKeepsDurableStop(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize stop fixture: code=%d response=%+v", code, response)
+	}
+	writes := 0
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			writes++
+			if writes == 2 { // mission state has committed; STOP marker has renamed.
+				return errors.New("injected STOP parent-directory sync fault")
+			}
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m11-stop", dir, "post-rename-stop"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("post-rename STOP fault hid a visible durable stop: code=%d response=%+v", code, response)
+	}
+	missionStateWriteFault = nil
+	state, err := loadMissionState(dir)
+	if err != nil || !state.Stop || state.StopReason != "post-rename-stop" {
+		t.Fatalf("post-rename STOP was not visible in mission state: state=%+v err=%v", state, err)
+	}
+	if active, err := stopMarkerActive(dir); err != nil || !active {
+		t.Fatalf("post-rename STOP marker was not visible: active=%v err=%v", active, err)
+	}
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-register", dir, "PRODUCTION_LEASE", filepath.Join(t.TempDir(), "unread.json")); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("fresh Bot did not retain durable STOP after post-rename fault: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionInitRejectsSymlinkRuntimeDirectoryWithoutExternalMutation(t *testing.T) {
 	outside := t.TempDir()
 	alias := filepath.Join(t.TempDir(), "runtime-alias")
