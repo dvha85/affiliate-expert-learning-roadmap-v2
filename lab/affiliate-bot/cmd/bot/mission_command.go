@@ -741,6 +741,13 @@ func ensureRuntimeDirectory(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
+	return requireRuntimeDirectory(dir)
+}
+
+// requireRuntimeDirectory is the read-side counterpart of
+// ensureRuntimeDirectory. A state-root symlink is rejected before readers can
+// open a recovery journal or registry through an external runtime.
+func requireRuntimeDirectory(dir string) error {
 	info, err := os.Lstat(dir)
 	if err != nil {
 		return err
@@ -1901,6 +1908,12 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	// single-writer across processes. A stale lock fails closed and requires an
 	// explicit recovery procedure rather than silently risking double reserve.
 	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-record-unknown": true, "m11-reconcile": true, "m11-recovery-admit": true, "m11-outcome": true, "m11-evaluate": true, "m11-close-cycle": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
+	readsState := map[string]bool{"m10-resolve": true, "m11-resolve": true, "m11-recovery-export": true, "status": true, "m11-status": true}[args[0]]
+	if readsState && len(args) >= 2 {
+		if err := requireRuntimeDirectory(args[1]); err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+	}
 	if mutatesState && len(args) >= 2 {
 		if err := ensureRuntimeDirectory(args[1]); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
@@ -2721,18 +2734,21 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[2], args[3], args[4]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
-		// Do not even read the supplied handoff/admission input while the old
-		// lifecycle is mid-recovery. The new runtime must receive no admission
-		// derived from a partial old-runtime transition.
-		if err := m11JournalRecoveryRequired(args[2]); err != nil {
-			return emit("RECOVERY_REQUIRED", nil, err, 1)
-		}
 		state, err := loadMissionState(args[1])
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
 		if state.Stop {
 			return emit("STOPPED", nil, fmt.Errorf("durable STOP: %s", state.StopReason), 1)
+		}
+		// A stopped new runtime must reject before touching any supplied old
+		// source. Once its own STOP gate permits admission, reject an old-root
+		// symlink before journal, registry, handoff or admission reads.
+		if err := requireRuntimeDirectory(args[2]); err != nil {
+			return emit("STATE_ERROR", nil, err, 1)
+		}
+		if err := m11JournalRecoveryRequired(args[2]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
 		raw, err := os.ReadFile(args[4])
 		if err != nil {

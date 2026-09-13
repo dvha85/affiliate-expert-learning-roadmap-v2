@@ -64,3 +64,17 @@ func TestMissionInitRejectsSymlinkRuntimeDirectoryWithoutExternalMutation(t *tes
 		t.Fatalf("mission init created external lock through symlink runtime: %v", err)
 	}
 }
+
+func TestMissionStatusRejectsSymlinkRuntimeDirectoryBeforeRead(t *testing.T) {
+	outside := t.TempDir()
+	if code, response := missionCall(t, "init", outside); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize external fixture: code=%d response=%+v", code, response)
+	}
+	alias := filepath.Join(t.TempDir(), "runtime-alias")
+	if err := os.Symlink(outside, alias); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "status", alias); code == 0 || response["status"] != "STATE_ERROR" {
+		t.Fatalf("status accepted symlink runtime directory: code=%d response=%+v", code, response)
+	}
+}
