@@ -733,6 +733,24 @@ func artifactOutputDirectory(path string) (string, error) {
 	return dir, nil
 }
 
+// ensureRuntimeDirectory is the mutable runtime-root boundary. Command state
+// directories are not portable inputs: following a supplied symlink here
+// would create locks, journals and mission state outside the runtime selected
+// by the operator before any canonical store guard could run.
+func ensureRuntimeDirectory(dir string) error {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("runtime directory must be a non-symlink directory")
+	}
+	return nil
+}
+
 // writeNewJSON creates an immutable command artifact. The bytes are written
 // and synced in a sibling temporary file, then published with a hard link
 // whose destination must not exist. A reader sees either no artifact or the
@@ -1884,7 +1902,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	// explicit recovery procedure rather than silently risking double reserve.
 	mutatesState := map[string]bool{"bind": true, "m09-approval": true, "approval": true, "m10-canary": true, "canary": true, "m10-cost-register": true, "m10-gate": true, "m10-authorize": true, "m10-reserve-authorization": true, "m10-record-failed": true, "m10-cancel": true, "m10-outcome": true, "m10-reserve": true, "reserve": true, "m11-register": true, "m11-activate": true, "m11-ledger-init": true, "m11-gate": true, "m11-authorize": true, "m11-reserve-authorization": true, "m11-record-failed": true, "m11-record-unknown": true, "m11-reconcile": true, "m11-recovery-admit": true, "m11-outcome": true, "m11-evaluate": true, "m11-close-cycle": true, "m11-stop": true, "stop": true, "init": true}[args[0]]
 	if mutatesState && len(args) >= 2 {
-		if err := os.MkdirAll(args[1], 0700); err != nil {
+		if err := ensureRuntimeDirectory(args[1]); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		releaseGate, err := acquireRuntimeGate(args[1])
@@ -2031,7 +2049,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if i.IntentHash != learnerIntentHash(i) || corem08.ValidatePolicyForIntent(corem08.Intent(i), decodedPolicy) != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("intent/policy link or hash invalid"), 1)
 		}
-		if err := os.MkdirAll(args[1], 0700); err != nil {
+		if err := ensureRuntimeDirectory(args[1]); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		s, err := loadMissionState(args[1])
