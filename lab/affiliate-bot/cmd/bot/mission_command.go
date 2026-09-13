@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -978,6 +979,20 @@ func saveMissionState(dir string, s LearnerMissionState) error {
 // preserves the prior state on a failed write.
 var missionStateWriteFault func(phase string) error
 
+// missionStatePublishUncertainError means Rename made a new mission state
+// visible, but the following parent-directory sync could not be confirmed.
+// Retrying a state-changing command is unsafe: the original state transition
+// may already be the current runtime state.
+type missionStatePublishUncertainError struct {
+	err error
+}
+
+func (e *missionStatePublishUncertainError) Error() string {
+	return "mission state is visible but parent-directory durability is unconfirmed: " + e.err.Error()
+}
+
+func (e *missionStatePublishUncertainError) Unwrap() error { return e.err }
+
 func missionWriteFault(phase string) error {
 	if missionStateWriteFault == nil {
 		return nil
@@ -1043,7 +1058,13 @@ func writeJSONAtomic(path string, value any) error {
 	if err := os.Rename(temporary, path); err != nil {
 		return err
 	}
-	return syncDirectory(dir)
+	if err := missionWriteFault("after_rename_before_parent_sync"); err != nil {
+		return &missionStatePublishUncertainError{err: err}
+	}
+	if err := syncDirectory(dir); err != nil {
+		return &missionStatePublishUncertainError{err: err}
+	}
+	return nil
 }
 
 func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
@@ -1902,6 +1923,10 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
+		var uncertain *missionStatePublishUncertainError
+		if status == "STORE_ERROR" && errors.As(err, &uncertain) {
+			status = "PUBLISHED_RECOVERY_REQUIRED"
+		}
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 		}
