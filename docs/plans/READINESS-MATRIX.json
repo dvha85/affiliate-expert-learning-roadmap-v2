@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-13",
-  "main_baseline": "6d09687126cb8639cfcbe1ad8521fe93c060def1",
+  "main_baseline": "4e254968943af92e3c3dae774b1d91fb2f840b88",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
 	{"id":"RP-01-history-stable-io","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/internal/store/history.go","lab/affiliate-bot/cmd/bot/history.go","lab/affiliate-bot/cmd/bot/action_store.go","lab/affiliate-bot/cmd/bot/outcome_store.go","lab/affiliate-bot/cmd/bot/evaluation_store.go","lab/affiliate-bot/cmd/bot/improvement_store.go","lab/affiliate-bot/cmd/bot/accesstrade_receipt.go"],"test_refs":["lab/affiliate-bot/internal/store/history_test.go","lab/affiliate-bot/cmd/bot/history_store_test.go"],"scope":"canonical JSONL reads reject a symlink or same-byte name replacement from Lstat through open/fstat and a second identity check on Close; a fully consumed reader also hashes the opened descriptor and rereads that descriptor on Close, rejecting a same-inode in-place content rewrite before canonical loaders acknowledge a parse. History and derived-store loaders propagate a successful parse's Close error. Appends retain inode identity through sync, close and acknowledgement; a target that appears after an absent append check must be created with O_EXCL. This bounded local check is not an atomic snapshot against an uncooperative writer that races or restores bytes, and excludes crash/power-loss and multi-host transactions"},
