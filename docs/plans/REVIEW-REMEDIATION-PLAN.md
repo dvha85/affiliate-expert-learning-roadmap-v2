@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: 8ebe04d8a3d783a98565899d65199eba95225dcb -->
+<!-- readiness-main-baseline: 31a07c8faaca74a19a64a6519e1366ff5abea562 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -552,8 +552,9 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   `missing` và HistoryRecord vẫn replay `MATCH`. M08 resolve cùng canonical
   record rồi dùng đúng field IDs mà M07 context công bố; ID tự dựng và record
   `DRIFT` đều bị reject. Regression chạy implementation learner thật, không
-  dùng parser Python thay thế. Chưa có generic source profile hoặc n8n engine
-  execution evidence, nên RP-04 vẫn `IN PROGRESS`.
+  dùng parser Python thay thế. Generic source profile và operated deployment
+  evidence vẫn mở; fixture và selected-source sanitized paths đã có n8n engine
+  regression nên không được mô tả lại là “chưa có n8n execution”.
 - **RP-05 foundation:** core/learner M07 nay kiểm output thực: chỉ
   `HUMAN_REVIEW`/`ABSTAIN`, claim/evidence/value và `answer`/`claim.text` phải
   là render deterministic; prose tự do, ID dư/giả, quyền ghi và `tool_calls`
@@ -563,9 +564,10 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   regression M07 và smoke shared workspace tạo/cite trace rồi reject trace giả.
   `m07 register-proposal` persist raw validated output/proposed action với
   canonical digest và record binding; M08 agent intent/policy resolve lại
-  artifact và reject target/parameters đổi ngoài proposal. Chưa có canonical
-  tool-evidence store/transport seam và blueprint n8n chưa gọi adapter; RP-05
-  vẫn mở, R01/R05 chưa đóng toàn phạm vi.
+  artifact và reject target/parameters đổi ngoài proposal. Canonical
+  tool-evidence store/transport seam và blueprint n8n adapter path đã có; RP-05
+  vẫn PARTIAL vì provider/source operated evidence, transport ngoài fixture và
+  broader parity chưa có, không vì thiếu wiring cơ bản.
 - **RP-05 HTTP adapter foundation:** watcher có endpoint loopback
   `/v1/m07/register-tool-result`, `/v1/m07/validate` và
   `/v1/m07/register-proposal`. Chúng resolve history canonical, lưu artifact
@@ -573,21 +575,25 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   validate chỉ resolve tool trace bằng ID đã persist. Test handler cover ACK,
   validate, proposal persistence và trace ID giả. Blueprint n8n đã chuyển flow
   sang preflight/full-response/no-redirect/register/context/validate/proposal
-  endpoints và static validator kiểm wiring, nhưng chưa có n8n instance chạy
-  workflow hay parity execution thật nên chưa là operated evidence.
+  endpoints và static validator kiểm wiring. Disposable n8n engine đã chạy
+  policy reject, registered trace/context, grounding và proposal persistence
+  với loopback model stub; điều đó vẫn không là deployment/provider operated
+  evidence.
 - **RP-05 adapter-owned transport:** watcher thêm `fetch-and-register`; n8n
   không còn gọi remote HTTP trực tiếp. Adapter validate registry trước fetch,
   resolve DNS trước request và mỗi dial, reject non-public/mixed IP, proxy,
   redirect và response vượt 256 KiB; timeout đến từ registry. Unit test cover
-  private/CGNAT/mixed DNS và body quá cỡ; chưa có n8n import/run, controlled
-  public-source integration hoặc sink-failure parity nên không đóng RP-05.
+  private/CGNAT/mixed DNS và body quá cỡ. Disposable n8n import/run và
+  sink-failure fail-closed đã có; controlled public-source integration vẫn bị
+  loại khỏi phạm vi offline nên không đóng RP-05.
 - **RP-05 blueprint persistence boundary:** blueprint M07 dùng adapter URL và
   registry review cố định, không lấy hai policy boundary này từ event input.
   Trace tool, context canonical, grounding `HUMAN_REVIEW` có draft và proposal
   persistence đều phải nhận ACK ở node riêng trước khi node sau chạy. Learner
   HTTP regression kiểm proposal ACK và xác nhận output không grounded không
   thể sửa artifact proposal đã persist. Đây vẫn là fixture/offline evidence:
-  chưa có n8n engine, credential model hay provider integration được vận hành.
+  có n8n engine và credential loopback disposable, nhưng chưa có provider
+  credential hoặc provider integration được vận hành.
 - **BR-16a continuity:** smoke shared workspace nay dùng `M07
   register-proposal → M08 agent intent → M08 policy`, có ca target bị thay đổi
   bị reject. Số `9007199254740993` đi qua proposal/intent/bind/state; `bind`

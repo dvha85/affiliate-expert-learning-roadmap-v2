@@ -194,6 +194,29 @@ def audit_public_readiness_boundary(root, overall):
         fail("curriculum overclaims learner-operable readiness while production remains not ready")
 
 
+def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
+    """Keep selected-source engine coverage scoped when its real runner exists."""
+    runner = root / "scripts/run_n8n_engine_regression.py"
+    if not runner.is_file():
+        return
+    runner_text = runner.read_text(encoding="utf-8")
+    if "M06_SELECTED_SOURCE_BLUEPRINT" in runner_text:
+        marker = "M06 selected-source engine CI"
+        if marker not in plan_text:
+            fail("selected-source M06 engine runner lacks a scoped plan marker")
+        for criterion_id in ("BR-13", "BR-14"):
+            scope = " ".join(criteria_by_id[criterion_id]["missing_evidence"])
+            if "selected-source" not in scope or "n8n" not in scope.casefold():
+                fail(f"{criterion_id} does not disclose selected-source n8n coverage")
+    if "model-forged-commission" in runner_text:
+        marker = "M07 selected-source engine grounding CI"
+        if marker not in plan_text:
+            fail("selected-source M07 grounding runner lacks a scoped plan marker")
+        scope = " ".join(criteria_by_id["BR-15"]["missing_evidence"])
+        if "selected campaign sanitized fixture" not in scope or "commission_rate:0.9" not in scope:
+            fail("BR-15 does not disclose selected-source forged-commission grounding coverage")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -232,6 +255,7 @@ def audit(root):
         criteria_by_id[item_id] = item
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
+    audit_selected_source_disclosure(root, criteria_by_id, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_public_readiness_boundary(root, matrix["overall"])

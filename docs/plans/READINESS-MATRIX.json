@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-13",
-  "main_baseline": "8ebe04d8a3d783a98565899d65199eba95225dcb",
+  "main_baseline": "31a07c8faaca74a19a64a6519e1366ff5abea562",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
 	{"id":"RP-01-runtime-root-read-path-guard","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/mission_command.go"],"test_refs":["lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"],"scope":"mission status, M10/M11 artifact resolvers, M11 recovery export and the old source of recovery admission require a direct non-symlink state root before gate, journal or registry reads. A real status command rejects a symlink alias to an initialized external runtime. Portable inputs, ancestor-path TOCTOU, crash, power-loss and multi-host guarantees remain open"},
