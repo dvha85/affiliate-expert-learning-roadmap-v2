@@ -823,8 +823,21 @@ func writeNewJSON(path string, value any) (string, error) {
 	}
 	return appendAdded, nil
 }
+
+const maxMissionPortableInputBytes int64 = 1 << 20
+
+// readMissionPortableInput is the boundary for command-supplied M08-M11
+// artifacts. They are not canonical runtime stores merely because a command
+// later resolves their IDs: a same-byte pathname replacement after open must
+// be rejected before an intent, approval, bound, authorization or handoff can
+// affect runtime state.
+func readMissionPortableInput(path string) ([]byte, error) {
+	b, _, err := readStableRegularFileLimit(path, maxMissionPortableInputBytes)
+	return b, err
+}
+
 func readJSON(path string, value any) error {
-	b, err := os.ReadFile(path)
+	b, err := readMissionPortableInput(path)
 	if err != nil {
 		return err
 	}
@@ -1105,7 +1118,7 @@ func sameParameters(raw json.RawMessage, parameters map[string]any) bool {
 
 func buildLearnerIntent(historyPath, requestPath, proposalPath string) (LearnerIntent, error) {
 	var req learnerIntentRequest
-	raw, err := os.ReadFile(requestPath)
+	raw, err := readMissionPortableInput(requestPath)
 	if err != nil {
 		return LearnerIntent{}, err
 	}
@@ -1196,7 +1209,7 @@ type learnerPolicyRequest struct {
 
 func evaluateLearnerPolicy(i LearnerIntent, path string, knownProposalIDs []string) (LearnerPolicy, error) {
 	var req learnerPolicyRequest
-	raw, err := os.ReadFile(path)
+	raw, err := readMissionPortableInput(path)
 	if err != nil {
 		return LearnerPolicy{}, err
 	}
@@ -1993,7 +2006,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) == 6 {
 			intentPath, policyPath, outputPath = args[2], args[3], args[5]
 		}
-		raw, err := os.ReadFile(intentPath)
+		raw, err := readMissionPortableInput(intentPath)
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2041,7 +2054,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if len(args) != 4 {
 			return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot mission bind STATE_DIR INTENT POLICY"), 2)
 		}
-		intentRaw, err := os.ReadFile(args[2])
+		intentRaw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2050,7 +2063,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("INPUT_ERROR", nil, fmt.Errorf("invalid canonical M08 intent"), 1)
 		}
 		i := LearnerIntent(decodedIntent)
-		policyRaw, err := os.ReadFile(args[3])
+		policyRaw, err := readMissionPortableInput(args[3])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2100,7 +2113,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2141,7 +2154,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := missionAuthorityActive(s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2190,7 +2203,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop || s.Intent == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent and canary grant required"), 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2241,7 +2254,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2288,7 +2301,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		boundRaw, err := os.ReadFile(args[2])
+		boundRaw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2299,7 +2312,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, missionNowUTC()); status != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
 		}
-		gateRaw, err := os.ReadFile(args[3])
+		gateRaw, err := readMissionPortableInput(args[3])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2359,7 +2372,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
-		authorizationRaw, err := os.ReadFile(args[2])
+		authorizationRaw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2412,7 +2425,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		authorizationRaw, err := os.ReadFile(args[2])
+		authorizationRaw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2458,7 +2471,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		authorizationRaw, err := os.ReadFile(args[2])
+		authorizationRaw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2506,7 +2519,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2594,7 +2607,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		} else if state.Stop && args[2] != corem11.ArtifactKindReconciliation {
 			return emit("STOPPED", nil, fmt.Errorf("durable STOP: %s", state.StopReason), 1)
 		}
-		raw, err := os.ReadFile(args[3])
+		raw, err := readMissionPortableInput(args[3])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2750,7 +2763,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := m11JournalRecoveryRequired(args[2]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[4])
+		raw, err := readMissionPortableInput(args[4])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2766,7 +2779,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[2]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
-		raw, err := os.ReadFile(args[2])
+		raw, err := readMissionPortableInput(args[2])
 		if err != nil {
 			return emit("INPUT_ERROR", nil, err, 1)
 		}
@@ -2813,7 +2826,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)
 		boundID, boundHash := "", ""
 		if parseErr != nil {
-			raw, err := os.ReadFile(args[2])
+			raw, err := readMissionPortableInput(args[2])
 			if err != nil {
 				return emit("INPUT_ERROR", nil, err, 1)
 			}

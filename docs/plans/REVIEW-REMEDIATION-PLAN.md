@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-13 -->
-<!-- readiness-main-baseline: fe6a69027ffac4911dc8bfc4e4e6410034dd396d -->
+<!-- readiness-main-baseline: 80aed3f9b4dc222722071c66c9a0e708c2b41c5b -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -177,6 +177,17 @@ bằng symlink tới file ngoài có cùng bytes, và đòi `INPUT_ERROR` trư�
 history ACK; external file giữ nguyên. Đây là hardening local cho một shared
 portable reader, chưa bao phủ mọi entrypoint portable, writer không hợp tác,
 crash/power-loss, multi-host hay operated evidence.
+
+**Cập nhật M08-M11 portable-input stable reader (2026-09-13):** mọi artifact
+được command mission nhận theo pathname — M08 request/policy/intent, M09
+approval, M10 grant/cost-bound/gate/authorization/outcome, M11 register/
+outcome/recovery-admission và cost-bound legacy compatibility — nay đi qua
+reader bounded có identity ổn định trước khi chúng được decode hoặc bind runtime.
+Regression gọi `m10-reserve-authorization` thật, thay authorization sau open
+bằng symlink ngoài có cùng bytes, và phải `INPUT_ERROR` không thay ledger;
+mutation CI thay shared reader bằng `os.ReadFile` và đòi assertion thực fail.
+Đây là guard pathname local, không chứng minh atomic transaction đa-file,
+crash/power-loss, host phân tán, executor hay business outcome.
 
 **Cập nhật implementation RP-03 — IN PROGRESS (chưa đổi `PARTIAL`):** learner
 Bot hiện dùng clock do runtime sở hữu (seam chỉ nằm trong Go test, không có cờ
