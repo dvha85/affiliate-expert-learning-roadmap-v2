@@ -87,6 +87,17 @@ func runAdvisorFixture(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("PATH_ERROR", "", err, 1)
 	}
+	// This is a caller-selected output boundary.  MkdirTemp follows a symlink
+	// parent, which would otherwise create the offline bundle outside the
+	// location the caller named.  The fixture is intentionally disposable, but
+	// it still must not turn a symlinked output parent into an external write.
+	info, err := os.Lstat(parent)
+	if err != nil {
+		return emit("PATH_ERROR", "", err, 1)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return emit("PATH_ERROR", "", errors.New("fixture output parent must be an existing non-symlink directory"), 1)
+	}
 	dir, err := os.MkdirTemp(parent, "br11-offline-")
 	if err != nil {
 		return emit("IO_ERROR", "", err, 1)
