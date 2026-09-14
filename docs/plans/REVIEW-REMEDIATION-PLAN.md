@@ -401,6 +401,14 @@ CLI thật, khởi động Bot mới để chặn `status`/resolver, rồi exact
 replay một outcome/ledger. Các journal FAILED và UNKNOWN→STOP cần nghiệm thu
 riêng; không suy atomicity đa-file, power-loss hoặc multi-host từ seam này.
 
+**Cập nhật M11 execution-journal publish boundary (2026-09-14):** cùng CLI
+regression giờ cover riêng `m11-record-failed` và `m11-record-unknown` khi
+journal của chúng đã rename-visible nhưng parent sync lỗi. Mỗi lệnh trả
+`PUBLISHED_RECOVERY_REQUIRED` với execution + ledger dự kiến; Bot mới chặn
+status/resolver, sau đó exact retry có lock replay một execution. UNKNOWN chỉ
+chứng minh stopped-ledger/STOP recovery local; không chứng minh external effect
+được xác minh, atomicity đa-file, power-loss hoặc multi-host.
+
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
 artifact registry và compact cost-bound index. Lỗi injected trước artifact,

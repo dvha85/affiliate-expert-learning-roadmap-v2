@@ -1513,6 +1513,63 @@ func TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay(t *
 	}
 }
 
+func TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		command   string
+		journal   func(string) string
+		ledgerKey string
+		statusKey string
+		attempted string
+		reason    string
+	}{
+		{name: "failed", command: "m11-record-failed", journal: m11FailedExecutionJournalPath, ledgerKey: "execution_ledger", statusKey: "FAILED", attempted: "2026-09-08T00:00:02Z", reason: "visible failed journal fixture"},
+		{name: "unknown-stop", command: "m11-record-unknown", journal: m11UnknownStopJournalPath, ledgerKey: "stopped_ledger", statusKey: "RECONCILIATION_REQUIRED", attempted: "2026-09-08T00:00:02Z", reason: "visible unknown journal fixture"},
+	} {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			missionStateWriteFault = func(phase string) error {
+				if phase == "after_rename_before_parent_sync" {
+					return errors.New("injected M11 execution journal parent sync failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { missionStateWriteFault = nil })
+			if code, response := missionCall(t, scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+				t.Fatalf("visible %s journal did not disclose recovery: code=%d response=%+v", scenario.name, code, response)
+			} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["execution"] == nil || artifact[scenario.ledgerKey] == nil {
+				t.Fatalf("visible %s journal omitted deterministic transition: %+v", scenario.name, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); err != nil {
+				t.Fatalf("visible %s journal was missing: %v", scenario.name, err)
+			}
+			missionStateWriteFault = nil
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh status exposed visible %s journal: code=%d response=%+v", scenario.name, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", "m11-resolve", fixture.dir, corem11.ArtifactKindExecution, corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID)); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh resolver exposed visible %s journal: code=%d response=%+v", scenario.name, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+				t.Fatalf("locked retry did not replay visible %s journal exactly: code=%d response=%+v", scenario.name, code, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("%s journal remains after locked replay: %v", scenario.name, err)
+			}
+			entry, err := resolveM11Artifact(fixture.dir, corem11.ArtifactKindExecution, corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID), "")
+			if err != nil {
+				t.Fatalf("locked replay did not retain %s execution: %v", scenario.name, err)
+			}
+			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
+			if status != corem11.Valid || value.(*corem11.ProductionExecutionRecord).Status != scenario.statusKey {
+				t.Fatalf("locked replay retained wrong %s execution: value=%+v status=%s", scenario.name, value, status)
+			}
+		})
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
