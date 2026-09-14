@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: ced5452d4dad95c50f43f45e47fb1c71a479b861 -->
+<!-- readiness-main-baseline: b64db58993c6576d2c935a9839e2a38cdf07521a -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1410,6 +1410,16 @@ trong JSONL, Bot process mới replay trạng thái, rồi backup v3/restore san
 runtime trống vẫn giữ đúng một outcome đó. Đây chứng minh local single-writer
 cardinality trên command/store/restore path; không chứng minh ingestion business
 outcome, crash/power-loss, transaction đa-file hay multi-host.
+
+**Cập nhật M10 visible fixture-outcome append uncertainty (2026-09-14):** nếu
+shared JSONL writer trả lỗi sau khi exact outcome line đã hiện diện, command
+`m10-outcome` re-read bằng canonical loader. Khi line đó hợp lệ và đúng payload,
+nó trả `PUBLISHED_RECOVERY_REQUIRED` thay vì che trạng thái này dưới
+`STORE_ERROR`; exact retry sau đó trả `EXACT_DUPLICATE`, không thể append outcome
+cạnh tranh cho cùng execution. Regression gọi command thật với seam chỉ nằm
+trong test, rồi xác minh store replay được. Đây là acknowledgement/retry boundary
+của một fixture JSONL file; không chứng minh fsync/power-loss, atomic transaction
+nhiều file, business outcome hay multi-host.
 
 **Cập nhật M11 24-process reservation barrier (2026-09-14):** shared smoke
 M00–M11 clone đúng runtime đã có M11 lease/approval/activation/health/cost và

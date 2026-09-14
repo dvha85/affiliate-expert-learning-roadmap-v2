@@ -20,6 +20,7 @@ import (
 	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 func missionCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -1153,6 +1154,65 @@ func TestMissionM10FixtureOutcomeSingleWriterAcrossTwentyFourBotProcesses(t *tes
 	restoredOutcomes, err := loadM10FixtureOutcomes(restored, restoredState)
 	if err != nil || len(restoredOutcomes) != 1 || !reflect.DeepEqual(restoredOutcomes, outcomes) {
 		t.Fatalf("restore did not retain the sole M10 outcome: outcomes=%+v err=%v", restoredOutcomes, err)
+	}
+}
+
+// A post-write failure is not proof that no outcome exists. If the exact
+// canonical JSONL line is visible when acknowledgement is lost, callers must
+// be told to recover/retry that outcome rather than being invited to append a
+// competing outcome for the same execution.
+func TestMissionM10OutcomeDisclosesVisibleAppendUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "outcome-uncertain-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "outcome-uncertain-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "outcome-uncertain-record.json")
+	if code, response := missionCall(t, "m10-cancel", runtimeDir, authorizationPath, recordPath, base.Add(time.Second).Format(time.RFC3339), "fixture cancelled before side effect"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("cancelled execution setup failed: code=%d response=%+v", code, response)
+	}
+	var record corem10.ExecutionRecord
+	if err := readJSON(recordPath, &record); err != nil {
+		t.Fatal(err)
+	}
+	outcome := m03.OutcomeRecord{
+		OutcomeID:  "outcome-uncertain",
+		EffectRef:  m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID},
+		ObservedAt: base.Add(2 * time.Second).Format(time.RFC3339),
+		Status:     "CANCELLED",
+		Metrics:    map[string]float64{},
+		SourceRef:  "fixture:m10-outcome/uncertain",
+	}
+	outcomePath := filepath.Join(root, "outcome-uncertain.json")
+	writeMissionTestJSON(t, outcomePath, outcome)
+	m10OutcomeAppend = func(path string, encoded []byte) error {
+		if err := (store.JSONL{}).AppendLine(path, encoded); err != nil {
+			return err
+		}
+		return errors.New("injected outcome acknowledgement loss after append")
+	}
+	t.Cleanup(func() {
+		m10OutcomeAppend = func(path string, record []byte) error { return (store.JSONL{}).AppendLine(path, record) }
+	})
+	if code, response := missionCall(t, "m10-outcome", runtimeDir, outcomePath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible M10 outcome append uncertainty was hidden: code=%d response=%+v", code, response)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := loadM10FixtureOutcomes(runtimeDir, state)
+	if err != nil || len(persisted) != 1 || !reflect.DeepEqual(persisted[0], outcome) {
+		t.Fatalf("visible M10 outcome was not canonically replayable: outcomes=%+v err=%v", persisted, err)
+	}
+	m10OutcomeAppend = func(path string, record []byte) error { return (store.JSONL{}).AppendLine(path, record) }
+	if code, response := missionCall(t, "m10-outcome", runtimeDir, outcomePath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("exact retry after visible M10 outcome uncertainty failed: code=%d response=%+v", code, response)
 	}
 }
 
