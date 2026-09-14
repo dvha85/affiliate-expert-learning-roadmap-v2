@@ -257,7 +257,7 @@ def audit_runtime_acceptance(root, matrix):
         fail("matrix lacks M10 visible-journal recovery acceptance records")
     if any("PUBLISHED_RECOVERY_REQUIRED" not in item.get("scope", "") for item in visible_journals.values()):
         fail("M10 visible-journal records lack publish-uncertainty disclosure")
-    if "TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay" not in source_text or '"after_publish_before_parent_sync"' not in source_text or '"m10-canary"' not in source_text or '"m10-cost-register"' not in source_text:
+    if "TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay" not in source_text or "TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"after_publish_before_parent_sync"' not in source_text or '"after_rename_before_parent_sync"' not in source_text or '"m10-canary"' not in source_text or '"m10-cost-register"' not in source_text or '"m10-record-failed"' not in source_text:
         fail("M10 visible-journal recovery regression is missing from learner path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):

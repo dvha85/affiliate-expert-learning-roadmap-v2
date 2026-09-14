@@ -1419,6 +1419,57 @@ func TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay(t *testing
 	})
 }
 
+// The execution journal is a separate commit boundary from the canary and
+// cost-bound journals.  Once its atomic rename is visible, a failed parent
+// directory sync must not let a later reader treat the still-unregistered
+// execution as committed, nor let an unlocked retry make a second record.
+func TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "visible-execution-journal-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "visible-execution-journal-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "visible-execution-journal-record.json")
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			return errors.New("injected execution journal parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "visible journal fixture"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible execution journal did not require recovery: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); err != nil {
+		t.Fatalf("visible execution journal was missing: %v", err)
+	}
+	if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
+		t.Fatalf("visible execution journal created a portable record before canonical replay: %v", err)
+	}
+	missionStateWriteFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed a visible but un-replayed execution journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionRecord, "unresolved-visible-execution"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh resolver exposed a visible but un-replayed execution journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "visible journal fixture"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("locked retry did not replay visible execution journal exactly: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); !os.IsNotExist(err) {
+		t.Fatalf("execution journal remains after locked replay: %v", err)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || len(state.Reservations) != 1 || state.Reservations[0].ExecutionID == "" {
+		t.Fatalf("locked replay did not bind execution to reservation: state=%+v err=%v", state, err)
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

@@ -383,6 +383,15 @@ dở dang trước locked recovery. Backup vẫn là con đường recovery có 
 không chứng minh kill/power-loss tại filesystem boundary, transaction đa-file
 hay recovery multi-host.
 
+**Cập nhật M10 execution-journal publish boundary (2026-09-14):** một seam
+khác inject lỗi sau khi `m10-execution-journal.json` đã rename-visible nhưng
+trước parent-directory sync. Command trả `PUBLISHED_RECOVERY_REQUIRED`, không
+tạo portable execution output và Bot process mới trả `RECOVERY_REQUIRED` cho
+`status` lẫn `m10-resolve`. Chỉ exact retry dưới local writer lock mới replay
+journal, đăng ký/bind đúng một execution rồi mới ghi portable output. Đây là
+kiểm local cho một syscall boundary; không chứng minh atomicity đa-file,
+kill/power-loss hoặc phối hợp đa host.
+
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
 artifact registry và compact cost-bound index. Lỗi injected trước artifact,
