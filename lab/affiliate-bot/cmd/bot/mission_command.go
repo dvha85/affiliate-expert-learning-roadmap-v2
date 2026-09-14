@@ -2890,7 +2890,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		cycle, status, err := closeM11FixtureCycle(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(cycle, err), err, 1)
 		}
 		return emit(status, cycle, nil, 0)
 	case "m10-reserve", "reserve":

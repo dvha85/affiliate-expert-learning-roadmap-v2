@@ -1933,6 +1933,56 @@ func TestMissionM11EvaluationDisclosesRegistryPublishUncertainty(t *testing.T) {
 	}
 }
 
+func TestMissionM11CycleDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	observation := historyObservation("cycle-observation", "cycle-product", "Cycle Product", 100, 0.1, "2026-09-08T00:00:00Z")
+	record, err := NewHistoryRecord("cycle-decision", "2026-09-08T00:00:01Z", "2026-09-08T00:00:01Z", []Observation{observation})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := AppendHistory(filepath.Join(dir, "history.jsonl"), record); err != nil || status != appendAdded {
+		t.Fatalf("append cycle history: status=%s err=%v", status, err)
+	}
+	intent := LearnerIntent{IntentID: "cycle-intent", DecisionID: record.RecordID, EvidenceIDs: []string{observation.ObservationID}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "cycle-correlation", IdempotencyKey: "cycle-key", IntentMode: "PROPOSAL_ONLY"}
+	intent.IntentHash = learnerIntentHash(intent)
+	policy := LearnerPolicy{PolicyVersion: "policy-1", IntentID: intent.IntentID, IntentHash: intent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", Reason: "fixture", PolicyMode: "PROPOSAL_ONLY", PolicyCheckedAt: "2026-09-08T00:00:00Z"}
+	if err := saveMissionState(dir, LearnerMissionState{Intent: &intent, Policy: &policy}); err != nil {
+		t.Fatal(err)
+	}
+	journal, _ := setupM11OutcomeJournalFixtureForIntent(t, dir, intent.IntentID, intent.IntentHash, intent.CorrelationID)
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		t.Fatalf("fixture outcome recovery failed: %v", err)
+	}
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "cycle-evaluation", "2026-09-08T00:00:03Z"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("evaluation setup failed: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-close-cycle", dir, "uncertain-cycle", "cycle-evaluation", "2026-09-08T00:00:04Z"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("cycle uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["cycle_id"] != "uncertain-cycle" {
+		t.Fatalf("cycle uncertainty omitted the visible artifact: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindCycle, "uncertain-cycle"); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain cycle was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-close-cycle", dir, "uncertain-cycle", "cycle-evaluation", "2026-09-08T00:00:04Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("cycle exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
