@@ -135,6 +135,8 @@ def audit_runtime_acceptance(root, matrix):
         "24 distinct canonical authorizations",
         "exactly one appends",
         "pending execution",
+        "24-process M11 outcome barrier",
+        "one outcome link",
     )
     if not all(token in scope for token in required_m11_scope):
         fail("R10 M11 process-barrier record lacks bounded canonical-authorization disclosure")
@@ -147,6 +149,11 @@ def audit_runtime_acceptance(root, matrix):
         'sum(response["status"] == "APPENDED" for response in production_race_responses.values()) == 1',
         "production_race_head",
         'expected=1)["status"] == "REJECTED"',
+        "production_outcome_race_responses",
+        '"m11-outcome-barrier"',
+        'sum(response["status"] == "APPENDED" for response in production_outcome_race_responses.values()) == 1',
+        "production_outcome_race_head",
+        '"br16-production-outcome-race"',
     )
     if not all(token in smoke_text for token in required_m11_smoke):
         fail("R10 M11 process-barrier regression is missing from the shared real-Bot smoke path")

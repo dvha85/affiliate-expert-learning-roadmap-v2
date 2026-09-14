@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 526592b3ea81607408fa53a90c44218c5d619a18 -->
+<!-- readiness-main-baseline: 061a846a2d511c306e713d3f23896877a0f971b7 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1411,6 +1411,17 @@ của winner là `EXACT_DUPLICATE`, tất cả loser bị reject sau commit, và
 ledger head phải giữ đúng một pending execution/counter bằng 1. Đây là chứng
 cứ local cross-process cho lifecycle M11 thật, không chứng minh locking đa
 host, kill/power-loss hay transaction nhiều file.
+
+**Cập nhật M11 24-process outcome barrier (2026-09-14):** shared smoke cũng
+clone runtime ngay sau một FAILED fixture execution rồi giải phóng đồng thời 24
+Bot binary cùng mang một outcome immutable và cùng predecessor ledger. Đúng một
+`m11-outcome` được `APPENDED`; các contender khác chỉ có `BUSY` hoặc
+`EXACT_DUPLICATE`. Sau barrier, tất cả exact retry đều trả `EXACT_DUPLICATE`,
+outcome JSONL có đúng một record và ledger head có đúng một `outcome_link`,
+`pending_outcomes=0`. Đây chứng minh command path serialize cặp outcome-store /
+post-ledger trong điều kiện local cross-process bình thường; không chứng minh
+atomicity khi crash/power-loss, transaction đa-host hay durable multi-file
+commit.
 
 **Cập nhật M10 reservation commit-fault cap continuity (2026-09-14):** test
 in-process inject lỗi sau temporary-file `fsync` và ngay trước `writeJSONAtomic`
