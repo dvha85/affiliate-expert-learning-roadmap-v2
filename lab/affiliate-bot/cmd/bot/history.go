@@ -21,6 +21,7 @@ import (
 const (
 	appendAdded        = "APPENDED"
 	appendDuplicate    = "EXACT_DUPLICATE"
+	appendPublished    = "PUBLISHED_RECOVERY_REQUIRED"
 	replayMatch        = "MATCH"
 	replayDrift        = "DRIFT"
 	replayUnreplayable = "UNREPLAYABLE"
@@ -41,6 +42,11 @@ type ReplayReport struct {
 	State    string `json:"state"`
 	Reason   string `json:"reason"`
 }
+
+// canonicalHistoryAppend is private to the command package so tests can force
+// the acknowledgement-lost branch through the real watcher/CLI handoff. The
+// production path always uses appendHistoryWith and the shared JSONL store.
+var canonicalHistoryAppend = appendHistoryWith
 
 func cloneObservation(in Observation) Observation {
 	out := in
@@ -340,7 +346,7 @@ func AppendHistory(path string, record HistoryRecord) (string, error) {
 		return "", err
 	}
 	defer release()
-	return appendHistoryWith(store.JSONL{}, path, record)
+	return canonicalHistoryAppend(store.JSONL{}, path, record)
 }
 
 func appendHistoryWith(storage store.History, path string, record HistoryRecord) (string, error) {
@@ -399,8 +405,20 @@ func appendHistoryWith(storage store.History, path string, record HistoryRecord)
 		}
 	}
 
-	if err := storage.AppendLine(path, encoded); err != nil {
-		return "", err
+	if appendErr := storage.AppendLine(path, encoded); appendErr != nil {
+		// A failing acknowledgement does not prove no canonical history record
+		// exists. Re-read with the same validator before making a retryable
+		// failure claim. This is a one-file boundary only; it does not establish
+		// power-loss durability or a multi-file transaction.
+		persisted, reloadErr := loadHistoryWith(storage, path)
+		if reloadErr == nil {
+			for _, prior := range persisted {
+				if prior.RecordID == record.RecordID && reflect.DeepEqual(prior, record) {
+					return appendPublished, &publishedAppendUncertainty{cause: appendErr}
+				}
+			}
+		}
+		return "", appendErr
 	}
 	return appendAdded, nil
 }

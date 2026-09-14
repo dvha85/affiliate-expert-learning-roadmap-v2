@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 73c18c1db8bdf2c38a927677c2c7f3fe0ff7dc51 -->
+<!-- readiness-main-baseline: f6db2b4f6859302cbe1ca8e9a1ce3e57d2e19301 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -308,6 +308,17 @@ JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Reg
 inject lỗi sau write nhưng trước sync: call phải trả error, không ACK thành
 công; append tiếp theo giữ line framing hợp lệ. Đây không là mô phỏng
 power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
+
+**Cập nhật history handoff visible append uncertainty (2026-09-14):** nếu
+canonical history append báo lỗi sau khi exact `HistoryRecord` đã replay được,
+`AppendHistory` trả `PUBLISHED_RECOVERY_REQUIRED` thay vì ngụ ý append có thể
+retry an toàn. M06 watcher/HTTP handoff canonical-reload record đó nhưng giữ
+`canonical_history_ack=false`, trả non-zero/409 và không cho consumer coi
+handoff là ACK; chỉ retry exact mới trả `EXACT_DUPLICATE` với ACK. Regression
+chạy `watcher history-handoff` thật, inject ACK loss sau append, rồi kiểm record
+canonical và retry. Đây chỉ là boundary acknowledgement một file; không chứng
+minh fsync/power-loss, transaction đa file, provider/selected-source run hay
+multi-host safety.
 
 **Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
 chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`
