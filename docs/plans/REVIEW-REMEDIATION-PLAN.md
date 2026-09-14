@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 9343555c1c5175ad9ccc2934a9651e86f3be3a76 -->
+<!-- readiness-main-baseline: 526592b3ea81607408fa53a90c44218c5d619a18 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -291,6 +291,16 @@ bằng hard-link không overwrite. Regression inject lỗi trước publish: tar
 temporary không được còn lại; retry tạo artifact hoàn chỉnh và exact retry vẫn
 `EXACT_DUPLICATE`. Đây không chứng minh power-loss/filesystem durability hay
 multi-host atomicity, nên các phạm vi đó vẫn `PARTIAL`.
+
+**Cập nhật immutable artifact publish recovery status (2026-09-14):** sau khi
+`Link` đã làm artifact bất biến visible nhưng trước khi sync directory cha,
+`writeNewJSON` phân biệt lỗi đó với lỗi chưa publish bằng typed uncertainty.
+M08 CLI cùng M07 CLI/HTTP adapter trả `PUBLISHED_RECOVERY_REQUIRED`, không mô tả là
+`CONFLICT` hoặc `PERSISTENCE_ERROR` retryable. Regression gọi publisher, M08
+CLI và M07 adapter thật: artifact/tool trace vẫn tồn tại, còn exact retry chỉ
+ACK bytes y hệt. Đây là báo cáo fail-closed về trạng thái syscall local; không
+chứng minh durability sau power-loss, transaction đa file hay filesystem đa
+host.
 
 **Cập nhật JSONL acknowledgement boundary (2026-09-11):** canonical và derived
 JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Regression

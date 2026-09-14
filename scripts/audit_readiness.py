@@ -151,6 +151,28 @@ def audit_runtime_acceptance(root, matrix):
         fail("durable STOP post-rename regression is missing from the learner Bot test path")
     if "TestMissionStopCannotOverwriteDurableReason" not in stop_text or '"replacement-stop"' not in stop_text or "!bytes.Equal(stateBefore, stateAfter)" not in stop_text or "!bytes.Equal(markerBefore, markerAfter)" not in stop_text:
         fail("durable STOP immutability regression is missing from the learner Bot test path")
+    artifact_publish = updates.get("RP-01-atomic-artifact-publish")
+    if not isinstance(artifact_publish, dict):
+        fail("matrix lacks immutable artifact post-publish acceptance record")
+    expected_refs = {
+        "lab/affiliate-bot/cmd/bot/artifact_publish_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/m07_test.go",
+        "lab/affiliate-bot/cmd/bot/watcher_test.go",
+    }
+    if not expected_refs.issubset(set(artifact_publish.get("test_refs", []))):
+        fail("immutable artifact post-publish record lacks real publisher/CLI/adapter regressions")
+    artifact_scope = artifact_publish.get("scope")
+    if not isinstance(artifact_scope, str) or "PUBLISHED_RECOVERY_REQUIRED" not in artifact_scope or "after Link" not in artifact_scope:
+        fail("immutable artifact post-publish record lacks visible-artifact uncertainty disclosure")
+    artifact_source = root / "lab/affiliate-bot/cmd/bot/artifact_publish_test.go"
+    watcher_source = root / "lab/affiliate-bot/cmd/bot/watcher_test.go"
+    artifact_text = artifact_source.read_text(encoding="utf-8") if artifact_source.is_file() else ""
+    watcher_text = watcher_source.read_text(encoding="utf-8") if watcher_source.is_file() else ""
+    m07_source = root / "lab/affiliate-bot/cmd/bot/m07_test.go"
+    m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
+    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text:
+        fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
 
 
 def audit_evidence_graph(root, criteria_by_id):

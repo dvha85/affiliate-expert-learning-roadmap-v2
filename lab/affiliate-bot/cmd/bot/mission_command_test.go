@@ -381,6 +381,35 @@ func TestMissionM08ArtifactOutputHasCreateRetryConflictSemantics(t *testing.T) {
 	}
 }
 
+// A CLI caller must be told that its requested output may already be visible
+// when the immutable publisher cannot confirm the parent directory sync. This
+// exercises the real M08 command path rather than only the writer helper.
+func TestMissionM08IntentReportsUnconfirmedVisibleArtifact(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	output := filepath.Join(dir, "intent-unconfirmed.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m08-intent", history, request, output); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("M08 did not disclose visible-but-unconfirmed artifact: code=%d response=%+v", code, response)
+	}
+	first, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("M08 output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m08-intent", history, request, output); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("M08 exact retry did not resolve output: code=%d response=%+v", code, response)
+	}
+	if current, err := os.ReadFile(output); err != nil || !bytes.Equal(first, current) {
+		t.Fatalf("M08 retry changed visible artifact: %q err=%v", current, err)
+	}
+}
+
 func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.T) {
 	dir, history, request := missionFixture(t)
 	records, err := LoadHistory(history)

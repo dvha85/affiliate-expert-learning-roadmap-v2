@@ -810,17 +810,16 @@ func writeNewJSON(path string, value any) (string, error) {
 		}
 		return "", err
 	}
-	d, err := os.Open(dir)
-	if err != nil {
-		return "", err
+	// Link has already made the complete artifact visible.  A failure after
+	// this point is not an ordinary failed publish: a caller must not assume it
+	// can safely create the artifact again, because an exact retry can observe
+	// the visible immutable bytes.  Keep that fact explicit until the parent
+	// directory sync confirms the name boundary.
+	if err := artifactWriteFailure("after_publish_before_parent_sync"); err != nil {
+		return appendAdded, &immutableArtifactPublishUncertainError{err: err}
 	}
-	err = d.Sync()
-	closeErr := d.Close()
-	if err != nil {
-		return "", err
-	}
-	if closeErr != nil {
-		return "", closeErr
+	if err := syncDirectory(dir); err != nil {
+		return appendAdded, &immutableArtifactPublishUncertainError{err: err}
 	}
 	return appendAdded, nil
 }
@@ -992,6 +991,21 @@ func (e *atomicPublishUncertainError) Error() string {
 }
 
 func (e *atomicPublishUncertainError) Unwrap() error { return e.err }
+
+// immutableArtifactPublishUncertainError means a complete immutable command
+// artifact is already visible after Link, while the following parent-directory
+// sync could not be confirmed. It is unsafe for callers to describe this as a
+// plain conflict or a failed persistence operation: resolve or exact-retry the
+// artifact before attempting a different transition.
+type immutableArtifactPublishUncertainError struct {
+	err error
+}
+
+func (e *immutableArtifactPublishUncertainError) Error() string {
+	return "immutable artifact is visible but parent-directory durability is unconfirmed: " + e.err.Error()
+}
+
+func (e *immutableArtifactPublishUncertainError) Unwrap() error { return e.err }
 
 func missionWriteFault(phase string) error {
 	if missionStateWriteFault == nil {
@@ -1925,6 +1939,10 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		var uncertain *atomicPublishUncertainError
 		if status == "STORE_ERROR" && errors.As(err, &uncertain) {
+			status = "PUBLISHED_RECOVERY_REQUIRED"
+		}
+		var artifactUncertain *immutableArtifactPublishUncertainError
+		if errors.As(err, &artifactUncertain) {
 			status = "PUBLISHED_RECOVERY_REQUIRED"
 		}
 		if err != nil {

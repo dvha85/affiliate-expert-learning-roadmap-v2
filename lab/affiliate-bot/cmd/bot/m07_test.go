@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -361,5 +362,49 @@ func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	errOut.Reset()
 	if code := runM07([]string{"validate", historyPath, record.RecordID, modelPath, registryPath, registeredPath}, &out, &errOut); code == 0 {
 		t.Fatal("forged registered trace was accepted")
+	}
+}
+
+func TestM07CLIDisclosesUnconfirmedVisibleArtifact(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-unconfirmed-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-unconfirmed-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(dir, "registry.json")
+	resultPath := filepath.Join(dir, "tool-result.json")
+	outputPath := filepath.Join(dir, "registered.json")
+	writeM07File(t, registryPath, []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}})
+	writeM07File(t, resultPath, corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-01T00:02:00Z", Body: json.RawMessage(`{"price":100}`)})
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected M07 artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	var out, errOut bytes.Buffer
+	if code := runM07([]string{"register-tool-result", historyPath, record.RecordID, registryPath, resultPath, outputPath}, &out, &errOut); code == 0 {
+		t.Fatalf("M07 accepted unconfirmed artifact as an ACK: %s", out.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("M07 did not disclose visible artifact uncertainty: response=%s err=%v stderr=%s", out.String(), err, errOut.String())
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("M07 output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	out.Reset()
+	errOut.Reset()
+	if code := runM07([]string{"register-tool-result", historyPath, record.RecordID, registryPath, resultPath, outputPath}, &out, &errOut); code != 0 {
+		t.Fatalf("M07 exact retry was not accepted: response=%s stderr=%s", out.String(), errOut.String())
+	}
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate {
+		t.Fatalf("M07 exact retry did not resolve visible artifact: response=%s err=%v", out.String(), err)
 	}
 }

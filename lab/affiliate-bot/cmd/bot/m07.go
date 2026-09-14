@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -93,8 +94,24 @@ func loadM07Registry(path string) ([]corem07.ToolSpec, error) {
 	return registry, nil
 }
 
+// m07PersistenceStatus keeps an adapter/CLI acknowledgement fail-closed when
+// an immutable artifact became visible but its parent directory sync could not
+// be confirmed. A normal persistence error means no ACK; this distinct status
+// also tells a caller to resolve or exact-retry the deterministic artifact
+// rather than assuming it can safely create a different one.
+func m07PersistenceStatus(err error) string {
+	var uncertain *immutableArtifactPublishUncertainError
+	if errors.As(err, &uncertain) {
+		return "PUBLISHED_RECOVERY_REQUIRED"
+	}
+	return "PERSISTENCE_ERROR"
+}
+
 func runM07(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
+		if err != nil && m07PersistenceStatus(err) == "PUBLISHED_RECOVERY_REQUIRED" {
+			status = m07PersistenceStatus(err)
+		}
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 		}

@@ -579,7 +579,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
 				return
 			}
 			evidence := registered.Evidence()
@@ -608,7 +608,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
 				return
 			}
 			evidence := registered.Evidence()
@@ -665,7 +665,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PERSISTENCE_ERROR", "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": proposal.ProposalID, "artifact": proposal, "execution_permitted": false})
