@@ -505,8 +505,9 @@ crash/power-loss và multi-host proof vẫn mở.
 Trước đó cùng gate/executor nhưng thời điểm authorization khác nhau có ID như
 nhau trong khi payload/expiry khác, khiến registry append-only chỉ có thể từ
 chối artifact sau như collision. Core graph và learner lifecycle dùng một
-builder time-bound; regression tạo hai authorization cùng gate/executor khác
-thời điểm và yêu cầu cả hai identity hợp lệ, còn mutation CI bỏ chính guard
+builder time-bound; regression core và compiled-Bot backup smoke tạo hai
+authorization cùng gate/executor khác thời điểm, yêu cầu ID khác nhau và chặn
+reservation còn lại sau khi ledger đã advance; mutation CI bỏ chính guard
 canonical phải làm regression fail. Điều này không cấp thêm reservation hay
 execution authority, và không là proof clock trust, ledger transaction,
 power-loss, multi-host hay business outcome; RP-07 vẫn `PARTIAL`.
