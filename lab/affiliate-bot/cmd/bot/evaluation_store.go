@@ -17,6 +17,10 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
+var evaluationAppend = func(path string, encoded []byte) error {
+	return (store.JSONL{}).AppendLine(path, encoded)
+}
+
 type evaluationConfig struct {
 	EvaluationID string        `json:"evaluation_id"`
 	DecisionID   string        `json:"decision_id"`
@@ -221,7 +225,12 @@ func runEvaluationStore(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("INVALID_SCHEMA", nil, err, 1)
 	}
-	if err := (store.JSONL{}).AppendLine(args[4], encoded); err != nil {
+	if err := appendWithVisibleRecovery(evaluationAppend, args[4], encoded, e, func() ([]m05.EvaluationRecord, error) {
+		return loadEvaluations(args[4], h, a, o)
+	}, func(left, right m05.EvaluationRecord) bool { return reflect.DeepEqual(left, right) }); err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", e, err, 1)
+		}
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	return emit("APPENDED", e, nil, 0)
