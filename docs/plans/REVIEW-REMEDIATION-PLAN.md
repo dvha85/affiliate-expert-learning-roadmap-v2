@@ -1666,6 +1666,9 @@ cầu `>=24.0.0`; native `isolated-vm` phải được build/rebuild bằng đú
 trước import. CI đã pin Node 24. Đây là reproduction có thể tái lập của engine
 fixture path, không thay release admission `UNVERIFIED`, không chứng minh
 provider, selected-source operated run, topology deploy hay business outcome.
+Runner Schedule Trigger thực cũng PASS trong cùng runtime: append một lần,
+`EXACT_DUPLICATE` trước/sau restart n8n/adapter và adapter failure chặn
+ACK/report. Không suy fixture schedule này thành vận hành deployment.
 
 **Mở rộng M06 engine CI (2026-09-09):** runner còn chạy key-order retry,
 same-correlation content conflict, unsupported source và changed event. Hai ca

@@ -72,6 +72,11 @@ hoặc rebuild native dependencies trước import. Đây là reproduction cục
 fixture path, không thay đổi `tested_n8n_version: UNVERIFIED` và không là
 provider, selected-source operated hay deployment evidence.
 
+Cùng runtime đó, `scripts/run_n8n_m06_schedule_regression.py` PASS: Schedule
+Trigger thực append một record, trả `EXACT_DUPLICATE` trước/sau restart n8n và
+adapter, và dừng trước ACK/report khi adapter loopback không khả dụng. Đây vẫn
+là fixture read-only, không phải vận hành Schedule Trigger trên deployment thật.
+
 ## Smoke test bắt buộc
 
 1. Import cả hai blueprint vào một n8n instance sạch/local; kiểm tra node/type version nào bị unknown hoặc tự migrate trước khi lưu.

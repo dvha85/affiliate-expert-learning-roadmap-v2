@@ -72,6 +72,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace('node-version: "24"', 'node-version: "22"', 1), encoding="utf-8")
         self.assertIn("n8n engine CI no longer pins", self.run_audit(False))
 
+    def test_n8n_schedule_engine_regression_removal_is_rejected(self):
+        workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("run_n8n_m06_schedule_regression.py", "removed_n8n_schedule_regression.py", 1), encoding="utf-8")
+        self.assertIn("n8n engine CI no longer pins", self.run_audit(False))
+
     def test_missing_identity_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m10_identity_guard.py", "python scripts/removed.py"), encoding="utf-8")
