@@ -328,6 +328,9 @@ func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return nil, err
+	}
 	entries := []corem10.ArtifactEntry{}
 	seen := map[string]string{}
 	for _, line := range bytes.Split(raw, []byte{'\n'}) {
@@ -444,6 +447,9 @@ func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	var bounds []corem10.TrustedCostBound

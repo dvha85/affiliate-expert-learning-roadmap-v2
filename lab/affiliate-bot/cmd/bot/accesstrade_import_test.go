@@ -134,6 +134,20 @@ func TestAccesstradeImporterDoesNotMapUTM(t *testing.T) {
 	}
 }
 
+func TestAccesstradeBackupRequirementRejectsIncompleteOutcomeJSONL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "outcomes.jsonl")
+	original := []byte(`{}`)
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accesstradeBackupReceiptRequired(path); err == nil {
+		t.Fatal("backup receipt requirement accepted an unterminated outcome record")
+	}
+	if current, err := os.ReadFile(path); err != nil || !bytes.Equal(current, original) {
+		t.Fatalf("framing rejection changed outcome store: %q err=%v", current, err)
+	}
+}
+
 func TestAccesstradeManifestRequiresBoundedSourceRef(t *testing.T) {
 	_, err := decodeAccesstradeManifest([]byte(`{"snapshot_id":"snapshot","observed_at":"2026-09-08T00:00:00Z","source_ref":"fixture:unbound","currency":"VND","mappings":[{"order_id":"order-1","outcome_id":"outcome-1","action_id":"action-1"}]}`))
 	if err == nil {

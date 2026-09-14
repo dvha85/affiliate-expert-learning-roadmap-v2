@@ -179,15 +179,18 @@ def audit_runtime_acceptance(root, matrix):
     required_framing_refs = {
         "lab/affiliate-bot/internal/store/history.go",
         "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go",
         "lab/affiliate-bot/internal/store/history_test.go",
         "lab/affiliate-bot/cmd/bot/action_store_test.go",
         "lab/affiliate-bot/cmd/bot/outcome_store_test.go",
         "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go",
     }
     if not required_framing_refs.issubset(set(framing.get("implementation_refs", [])) | set(framing.get("test_refs", []))):
         fail("canonical JSONL framing record lacks implementation/test refs")
     framing_scope = framing.get("scope")
-    if not isinstance(framing_scope, str) or "without LF" not in framing_scope or "M10/M11" not in framing_scope or "without changing" not in framing_scope:
+    if not isinstance(framing_scope, str) or "without LF" not in framing_scope or "M10 artifact/cost-bound" not in framing_scope or "M11 artifact" not in framing_scope or "without changing" not in framing_scope:
         fail("canonical JSONL framing record lacks bounded scope disclosure")
     store_source = root / "lab/affiliate-bot/internal/store/history.go"
     store_test = root / "lab/affiliate-bot/internal/store/history_test.go"
@@ -197,8 +200,15 @@ def audit_runtime_acceptance(root, matrix):
         fail("canonical JSONL shared framing regression is missing")
     mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
     mission_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
-    if "RequireCompleteJSONLFraming(raw)" not in mission_text or "TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming" not in source_text:
-        fail("M10/M11 fixture outcome framing regression is missing")
+    if mission_text.count("RequireCompleteJSONLFraming(raw)") < 4 or "TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming" not in source_text:
+        fail("M10/M11 canonical registry/outcome framing regression is missing")
+    m11_source = root / "lab/affiliate-bot/cmd/bot/m11_registry.go"
+    m11_text = m11_source.read_text(encoding="utf-8") if m11_source.is_file() else ""
+    receipt_source = root / "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go"
+    receipt_text = receipt_source.read_text(encoding="utf-8") if receipt_source.is_file() else ""
+    receipt_test = root / "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go"
+    if "RequireCompleteJSONLFraming(raw)" not in m11_text or "RequireCompleteJSONLFraming(raw)" not in receipt_text or not receipt_test.is_file() or "TestAccesstradeBackupRequirementRejectsIncompleteOutcomeJSONL" not in receipt_test.read_text(encoding="utf-8"):
+        fail("M11/ACCESSTRADE canonical JSONL framing regression is missing")
     action_test = root / "lab/affiliate-bot/cmd/bot/action_store_test.go"
     outcome_test = root / "lab/affiliate-bot/cmd/bot/outcome_store_test.go"
     if not action_test.is_file() or "unterminated action store was changed" not in action_test.read_text(encoding="utf-8"):

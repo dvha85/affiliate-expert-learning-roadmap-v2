@@ -1776,7 +1776,10 @@ func TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming(t *testing.T) {
 		path string
 		load func() error
 	}{
+		{name: "M10 artifact registry", path: m10ArtifactRegistryPath(dir), load: func() error { _, err := loadM10ArtifactRegistry(dir); return err }},
+		{name: "M10 trusted cost-bound registry", path: trustedCostBoundsPath(dir), load: func() error { _, err := loadTrustedCostBounds(dir); return err }},
 		{name: "M10", path: m10OutcomeStorePath(dir), load: func() error { _, err := loadM10FixtureOutcomes(dir, LearnerMissionState{}); return err }},
+		{name: "M11 artifact registry", path: m11ArtifactRegistryPath(dir), load: func() error { _, err := loadM11ArtifactRegistry(dir); return err }},
 		{name: "M11", path: m11OutcomeStorePath(dir), load: func() error { _, err := loadM11FixtureOutcomes(dir); return err }},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {

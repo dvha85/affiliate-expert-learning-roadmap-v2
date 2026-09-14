@@ -238,6 +238,9 @@ func accesstradeBackupReceiptRequired(dir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return false, err
+	}
 	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {

@@ -13,6 +13,7 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 func m11ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m11-artifacts.jsonl") }
@@ -40,6 +41,9 @@ func readM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	entries := []corem11.ArtifactEntry{}
