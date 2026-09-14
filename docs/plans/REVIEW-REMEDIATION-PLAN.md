@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 061a846a2d511c306e713d3f23896877a0f971b7 -->
+<!-- readiness-main-baseline: d0d02c056e4c9d2d4b6e7deafa348f9a8b9748cb -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1706,6 +1706,16 @@ ngoài allowlist tại adapter trước ACK/report mà không đổi history, ap
 page fingerprint đổi, rồi replay mọi record `MATCH`. Không có request tới
 ACCESSTRADE, capture thật, credential, Smartlink, price/commission fact hay
 business outcome; đây chỉ là engine evidence cho contract offline.
+
+**M06/M07 disposable n8n re-verification (2026-09-14, `main` `d0d02c0`):**
+với n8n `2.38.1` và Node `24.21.0` local, hai runner disposable
+`run_n8n_engine_regression.py` và `run_n8n_m06_schedule_regression.py` đều
+PASS lại qua adapter loopback riêng. M06 Schedule Trigger append đúng một
+record, exact-deduplicate trước/sau restart n8n+adapter, và dừng trước
+ACK/report khi adapter unavailable; engine M06/M07 chỉ persist output grounded
+fixture canonical và reject tool/model invalid. Reverify này không dùng workflow
+hoặc credential local đã lưu, không gọi ACCESSTRADE/Cockpit/provider, không là
+selected-source operated capture, topology deployment hay business evidence.
 
 **M06 Schedule Trigger CI (2026-09-12):** runner riêng khởi động `n8n start`
 trên SQLite disposable và active một copy M06 có Schedule Trigger thật cadence
