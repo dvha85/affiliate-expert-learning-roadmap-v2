@@ -1835,6 +1835,71 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	}
 }
 
+func TestMissionM11LifecycleDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	lease := corem11.ProductionLease{LeaseID: "uncertain-lifecycle-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "uncertain-lifecycle-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "uncertain-lifecycle-correlation", HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	leaseRaw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLease, leaseRaw); err != nil {
+		t.Fatal(err)
+	}
+	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	approvalRaw, err := json.Marshal(approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLeaseApproval, approvalRaw); err != nil {
+		t.Fatal(err)
+	}
+
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	activatedAt := "2026-09-08T00:00:01Z"
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, activatedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("activation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["lease_id"] != lease.LeaseID {
+		t.Fatalf("activation uncertainty omitted the visible record: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain activation was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, activatedAt); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("activation exact retry failed: code=%d response=%+v", code, response)
+	}
+
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	initializedAt := "2026-09-08T00:00:02Z"
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, initializedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("ledger uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["lease_id"] != lease.LeaseID {
+		t.Fatalf("ledger uncertainty omitted the visible ledger: %+v", response)
+	}
+	if _, ledger, err := m11LedgerHead(dir, lease.LeaseID); err != nil || ledger.LeaseID != lease.LeaseID {
+		t.Fatalf("uncertain ledger was not retained as the canonical head: ledger=%+v err=%v", ledger, err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, initializedAt); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("ledger exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

@@ -2733,7 +2733,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, status, err := activateM11Lease(args[1], args[2], args[3])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(record, err), err, 1)
 		}
 		return emit(status, record, nil, 0)
 	case "m11-ledger-init":
@@ -2742,7 +2742,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := initializeM11Ledger(args[1], args[2], args[3])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(ledger, err), err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-gate":
@@ -2751,7 +2751,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		gate, _, err := evaluateM11Gate(args[1], args[2], args[3], args[4], args[5], args[6])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(gate, err), err, 1)
 		}
 		return emit(gate.Decision, gate, nil, 0)
 	case "m11-authorize":
@@ -2760,7 +2760,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		authorization, status, err := authorizeM11Production(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(authorization, err), err, 1)
 		}
 		return emit(status, authorization, nil, 0)
 	case "m11-reserve-authorization":
@@ -2769,7 +2769,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := reserveM11Authorization(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(ledger, err), err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-record-failed":

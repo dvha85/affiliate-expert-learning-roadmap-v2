@@ -517,9 +517,12 @@ line immutable registry đã file-sync và tên file còn đúng nhưng parent-d
 sync không xác nhận được, adapter trả typed publish uncertainty thay vì lỗi
 append thường. `m10-gate` và `m10-authorize` bàn giao
 `PUBLISHED_RECOVERY_REQUIRED` kèm artifact đã resolve được và không ghi
-portable output; M11 registry giữ entry để chỉ exact retry sau khi uncertainty hết. Regression dùng seam sau file sync, trước parent
-sync, và kiểm cả two paths. Đây là disclosure/recovery local có giới hạn, chưa
-chứng minh durability qua power loss, transaction nhiều file, bao phủ mọi M11
+portable output; M11 registry cùng CLI `m11-activate` và `m11-ledger-init`
+bàn giao record/ledger đã visible để resolver hoặc canonical ledger-head kiểm
+tra trước exact retry. Regression dùng seam sau file sync, trước parent sync,
+và kiểm các đường M10, M11 registry, activation và ledger-init. Đây là
+disclosure/recovery local có giới hạn, chưa chứng minh durability qua power
+loss, transaction nhiều file, bao phủ mọi M11
 lifecycle envelope, multi-host, execution hay business outcome; RP-03/RP-07
 vẫn `PARTIAL`.
 
