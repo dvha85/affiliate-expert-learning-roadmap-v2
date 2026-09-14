@@ -113,6 +113,21 @@ def audit_review_findings(matrix, criteria_by_id, plan_text):
 def audit_runtime_acceptance(root, matrix):
     """Prevent a summary row from claiming a process-barrier proof it cannot point to."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    backup_parent = updates.get("RP-01-backup-restore-missing-parent-guard")
+    if not isinstance(backup_parent, dict):
+        fail("matrix lacks backup/restore missing-parent guard acceptance record")
+    backup_parent_refs = set(backup_parent.get("test_refs", []))
+    if {"lab/affiliate-bot/cmd/bot/backup_command_test.go", "scripts/audit_readiness.py", "scripts/tests/test_audit_readiness.py"} - backup_parent_refs:
+        fail("backup/restore missing-parent record lacks CLI and audit regressions")
+    backup_parent_scope = backup_parent.get("scope")
+    if not isinstance(backup_parent_scope, str) or "MkdirAll" not in backup_parent_scope or "external target remains empty" not in backup_parent_scope:
+        fail("backup/restore missing-parent record lacks bounded external-write disclosure")
+    backup_parent_source = root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+    backup_parent_text = backup_parent_source.read_text(encoding="utf-8") if backup_parent_source.is_file() else ""
+    backup_parent_test = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+    backup_parent_test_text = backup_parent_test.read_text(encoding="utf-8") if backup_parent_test.is_file() else ""
+    if "func ensureBackupOutputParent" not in backup_parent_text or "ensureBackupOutputParent(parent)" not in backup_parent_text or "TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate" not in backup_parent_test_text or "backup created external output before rejection" not in backup_parent_test_text or "restore created external output before rejection" not in backup_parent_test_text:
+        fail("backup/restore missing-parent regression is missing from the real CLI path")
     fixture_output = updates.get("RP-01-advisor-fixture-output-parent-guard")
     if not isinstance(fixture_output, dict):
         fail("matrix lacks advisor fixture output-parent guard acceptance record")

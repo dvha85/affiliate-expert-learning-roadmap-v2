@@ -210,6 +210,43 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 	return func() { _ = os.Remove(path) }, nil
 }
 
+// ensureBackupOutputParent rejects a symlink in the missing portion of a
+// caller-selected output path before MkdirAll can follow it. Checking only the
+// direct parent after MkdirAll is too late: a missing child below a symlink can
+// already have been created outside the requested backup/restore destination.
+// This is a bounded preflight, not an ancestor-path TOCTOU or multi-host
+// guarantee.
+func ensureBackupOutputParent(parent string) error {
+	parent = filepath.Clean(parent)
+	for candidate := parent; ; candidate = filepath.Dir(candidate) {
+		info, err := os.Lstat(candidate)
+		if err == nil {
+			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("backup/restore target parent contains a symlink or non-directory")
+			}
+			break
+		}
+		if !os.IsNotExist(err) {
+			return err
+		}
+		next := filepath.Dir(candidate)
+		if next == candidate {
+			return fmt.Errorf("backup/restore target parent has no existing directory ancestor")
+		}
+	}
+	if err := os.MkdirAll(parent, 0700); err != nil {
+		return err
+	}
+	info, err := os.Lstat(parent)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("backup/restore target parent must be a non-symlink directory")
+	}
+	return nil
+}
+
 // readStableRegularFile reads a file only if the name stayed bound to the same
 // regular inode from pre-open through the read. A fully-read descriptor is
 // hashed and reread before acknowledgement, so a same-inode content rewrite is
@@ -1572,12 +1609,8 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("INPUT_ERROR", nil, e, 1)
 		}
 		parent := filepath.Dir(args[2])
-		if e = os.MkdirAll(parent, 0700); e != nil {
-			return emit("STORE_ERROR", nil, e, 1)
-		}
-		parentInfo, statErr := os.Lstat(parent)
-		if statErr != nil || !parentInfo.IsDir() || parentInfo.Mode()&os.ModeSymlink != 0 {
-			return emit("TARGET_ERROR", nil, fmt.Errorf("backup target parent must be a non-symlink directory"), 1)
+		if e = ensureBackupOutputParent(parent); e != nil {
+			return emit("TARGET_ERROR", nil, e, 1)
 		}
 		releaseTargetGate, gateErr := acquireBackupTargetGate(args[2])
 		if gateErr != nil {
@@ -1715,12 +1748,8 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
 	parent := filepath.Dir(args[2])
-	if e = os.MkdirAll(parent, 0700); e != nil {
-		return emit("STORE_ERROR", nil, e, 1)
-	}
-	parentInfo, statErr := os.Lstat(parent)
-	if statErr != nil || !parentInfo.IsDir() || parentInfo.Mode()&os.ModeSymlink != 0 {
-		return emit("TARGET_ERROR", nil, fmt.Errorf("restore target parent must be a non-symlink directory"), 1)
+	if e = ensureBackupOutputParent(parent); e != nil {
+		return emit("TARGET_ERROR", nil, e, 1)
 	}
 	releaseTargetGate, gateErr := acquireRestoreTargetGate(args[2])
 	if gateErr != nil {
