@@ -328,6 +328,9 @@ func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return nil, err
+	}
 	entries := []corem10.ArtifactEntry{}
 	seen := map[string]string{}
 	for _, line := range bytes.Split(raw, []byte{'\n'}) {
@@ -396,7 +399,12 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 		err = verifyStableRegularFileName(path, opened)
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(path))
+		if publishErr := registryPublishFailure(path); publishErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: publishErr}
+		}
+		if syncErr := syncDirectory(filepath.Dir(path)); syncErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: syncErr}
+		}
 	}
 	if err != nil {
 		return entry, "", err
@@ -444,6 +452,9 @@ func loadTrustedCostBounds(dir string) ([]corem10.TrustedCostBound, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	var bounds []corem10.TrustedCostBound
@@ -810,17 +821,16 @@ func writeNewJSON(path string, value any) (string, error) {
 		}
 		return "", err
 	}
-	d, err := os.Open(dir)
-	if err != nil {
-		return "", err
+	// Link has already made the complete artifact visible.  A failure after
+	// this point is not an ordinary failed publish: a caller must not assume it
+	// can safely create the artifact again, because an exact retry can observe
+	// the visible immutable bytes.  Keep that fact explicit until the parent
+	// directory sync confirms the name boundary.
+	if err := artifactWriteFailure("after_publish_before_parent_sync"); err != nil {
+		return appendAdded, &immutableArtifactPublishUncertainError{err: err}
 	}
-	err = d.Sync()
-	closeErr := d.Close()
-	if err != nil {
-		return "", err
-	}
-	if closeErr != nil {
-		return "", closeErr
+	if err := syncDirectory(dir); err != nil {
+		return appendAdded, &immutableArtifactPublishUncertainError{err: err}
 	}
 	return appendAdded, nil
 }
@@ -992,6 +1002,54 @@ func (e *atomicPublishUncertainError) Error() string {
 }
 
 func (e *atomicPublishUncertainError) Unwrap() error { return e.err }
+
+// immutableArtifactPublishUncertainError means a complete immutable command
+// artifact is already visible after Link, while the following parent-directory
+// sync could not be confirmed. It is unsafe for callers to describe this as a
+// plain conflict or a failed persistence operation: resolve or exact-retry the
+// artifact before attempting a different transition.
+type immutableArtifactPublishUncertainError struct {
+	err error
+}
+
+func (e *immutableArtifactPublishUncertainError) Error() string {
+	return "immutable artifact is visible but parent-directory durability is unconfirmed: " + e.err.Error()
+}
+
+func (e *immutableArtifactPublishUncertainError) Unwrap() error { return e.err }
+
+// artifactRegistryPublishFailure is a test-only seam for the boundary after
+// an immutable registry line has been file-synced and its stable pathname has
+// been verified, but before the parent directory can confirm the append name
+// update. Production leaves it nil; it is never controlled by CLI input.
+var artifactRegistryPublishFailure func(path string) error
+
+func registryPublishFailure(path string) error {
+	if artifactRegistryPublishFailure == nil {
+		return nil
+	}
+	return artifactRegistryPublishFailure(path)
+}
+
+func artifactIfRegistryPublishUncertain(artifact any, err error) any {
+	var uncertain *immutableArtifactPublishUncertainError
+	if errors.As(err, &uncertain) {
+		return artifact
+	}
+	return nil
+}
+
+// artifactIfAtomicPublishUncertain exposes only the deterministic transition
+// already held in a visible local journal. It does not imply that the
+// transition reached every canonical store: callers must still surface
+// PUBLISHED_RECOVERY_REQUIRED and require a locked replay.
+func artifactIfAtomicPublishUncertain(artifact any, err error) any {
+	var uncertain *atomicPublishUncertainError
+	if errors.As(err, &uncertain) {
+		return artifact
+	}
+	return nil
+}
 
 func missionWriteFault(phase string) error {
 	if missionStateWriteFault == nil {
@@ -1440,6 +1498,9 @@ func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRec
 	if err != nil {
 		return nil, err
 	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return nil, err
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
@@ -1493,6 +1554,9 @@ func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
@@ -1924,7 +1988,11 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		var uncertain *atomicPublishUncertainError
-		if status == "STORE_ERROR" && errors.As(err, &uncertain) {
+		if errors.As(err, &uncertain) {
+			status = "PUBLISHED_RECOVERY_REQUIRED"
+		}
+		var artifactUncertain *immutableArtifactPublishUncertainError
+		if errors.As(err, &artifactUncertain) {
 			status = "PUBLISHED_RECOVERY_REQUIRED"
 		}
 		if err != nil {
@@ -2017,7 +2085,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(outputPath, i)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(i, err), err, 1)
 		}
 		return emit(status, i, nil, 0)
 	case "m08-policy", "policy":
@@ -2069,7 +2137,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(outputPath, p)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(p, err), err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, p, nil, 0)
@@ -2299,11 +2367,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(gate, err), err, 1)
 		}
 		status, err = writeNewJSON(args[3], gate)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			// The registry append is the canonical commit. A portable artifact can
+			// still be unavailable (for example because its requested path already
+			// exists), so disclose the registered gate instead of incorrectly
+			// presenting the whole operation as an unresolvable conflict.
+			return emit("CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE", gate, err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, gate, nil, 0)
@@ -2367,11 +2439,13 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("REJECTED", nil, err, 1)
 		}
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(authorization, err), err, 1)
 		}
 		status, err = writeNewJSON(args[4], authorization)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			// See m10-gate above: callers need the durable authorization ID to
+			// resolve or publish the exact immutable artifact safely.
+			return emit("CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE", authorization, err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, authorization, nil, 0)
@@ -2638,7 +2712,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		entry, status, err := registerM11Artifact(args[1], args[2], raw)
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit("REJECTED", artifactIfRegistryPublishUncertain(entry.Artifact, err), err, 1)
 		}
 		return emit(status, entry, nil, 0)
 	case "m11-resolve":
@@ -2671,7 +2745,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, status, err := activateM11Lease(args[1], args[2], args[3])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(record, err), err, 1)
 		}
 		return emit(status, record, nil, 0)
 	case "m11-ledger-init":
@@ -2680,7 +2754,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := initializeM11Ledger(args[1], args[2], args[3])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(ledger, err), err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-gate":
@@ -2689,7 +2763,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		gate, _, err := evaluateM11Gate(args[1], args[2], args[3], args[4], args[5], args[6])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(gate, err), err, 1)
 		}
 		return emit(gate.Decision, gate, nil, 0)
 	case "m11-authorize":
@@ -2698,7 +2772,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		authorization, status, err := authorizeM11Production(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(authorization, err), err, 1)
 		}
 		return emit(status, authorization, nil, 0)
 	case "m11-reserve-authorization":
@@ -2707,7 +2781,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		ledger, status, err := reserveM11Authorization(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(ledger, err), err, 1)
 		}
 		return emit(status, ledger, nil, 0)
 	case "m11-record-failed":
@@ -2716,7 +2790,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, executionLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"execution": record, "execution_ledger": executionLedger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "execution_ledger": executionLedger}, nil, 0)
 	case "m11-record-unknown":
@@ -2725,7 +2799,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, stoppedLedger, status, err := recordUnknownM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, nil, 0)
 	case "m11-reconcile":
@@ -2734,7 +2808,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		resolution, ledger, status, err := reconcileM11Execution(args[1], args[2], args[3])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(map[string]any{"resolution": resolution, "stopped_ledger": ledger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"resolution": resolution, "stopped_ledger": ledger}, nil, 0)
 	case "m11-recovery-export":
@@ -2762,7 +2836,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(args[4], handoff)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(handoff, err), err, 1)
 		}
 		return emit(status, handoff, nil, 0)
 	case "m11-recovery-admit":
@@ -2794,7 +2868,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		entry, status, err := admitM11Recovery(args[1], args[2], args[3], raw)
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(entry.Artifact, err), err, 1)
 		}
 		return emit(status, entry, nil, 0)
 	case "m11-outcome":
@@ -2810,7 +2884,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		outcome, ledger, status, err := recordM11FixtureOutcome(args[1], args[3], raw)
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"outcome": outcome, "post_ledger": ledger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"outcome": outcome, "post_ledger": ledger}, nil, 0)
 	case "m11-evaluate":
@@ -2819,7 +2893,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		evaluation, status, err := evaluateM11FixtureOutcome(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(evaluation, err), err, 1)
 		}
 		return emit(status, evaluation, nil, 0)
 	case "m11-close-cycle":
@@ -2828,7 +2902,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		cycle, status, err := closeM11FixtureCycle(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(cycle, err), err, 1)
 		}
 		return emit(status, cycle, nil, 0)
 	case "m10-reserve", "reserve":

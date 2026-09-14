@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -66,6 +66,16 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/smoke_br16a_offline.py", "python scripts/removed.py"), encoding="utf-8")
         self.assertIn("unresolved CI evidence", self.run_audit(False))
+
+    def test_n8n_engine_node_runtime_drift_is_rejected(self):
+        workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace('node-version: "24"', 'node-version: "22"', 1), encoding="utf-8")
+        self.assertIn("n8n engine CI no longer pins", self.run_audit(False))
+
+    def test_n8n_schedule_engine_regression_removal_is_rejected(self):
+        workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("run_n8n_m06_schedule_regression.py", "removed_n8n_schedule_regression.py", 1), encoding="utf-8")
+        self.assertIn("n8n engine CI no longer pins", self.run_audit(False))
 
     def test_missing_identity_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
@@ -161,6 +171,91 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionStopCannotOverwriteDurableReason", "MissingStopImmutabilityRegression", 1), encoding="utf-8")
         self.assertIn("durable STOP immutability regression is missing", self.run_audit(False))
+
+    def test_missing_jsonl_framing_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/internal/store/history_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestJSONLOpenRejectsIncompleteFinalLine", "MissingJSONLFramingRegression", 1), encoding="utf-8")
+        self.assertIn("canonical JSONL shared framing regression is missing", self.run_audit(False))
+
+    def test_missing_m10_canonical_output_disclosure_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts", "MissingCanonicalOutputDisclosureRegression", 1), encoding="utf-8")
+        self.assertIn("M10 canonical-output disclosure regression is missing", self.run_audit(False))
+
+    def test_missing_m10_gate_evaluation_identity_regression_is_rejected(self):
+        source = self.root / "core/m10/cost_bound_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestCanaryGateIdentityIncludesEvaluationTime", "MissingGateEvaluationIdentityRegression", 1), encoding="utf-8")
+        self.assertIn("M10 gate evaluation-identity regression is missing", self.run_audit(False))
+
+    def test_missing_m11_authorization_time_identity_regression_is_rejected(self):
+        source = self.root / "core/m11/artifact_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("distinct authorization times reused an immutable ID", "missing authorization time identity regression", 1), encoding="utf-8")
+        self.assertIn("M11 authorization time-identity regression is missing", self.run_audit(False))
+
+    def test_missing_registry_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10GateDisclosesRegistryPublishUncertainty", "MissingRegistryPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_lifecycle_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11LifecycleDisclosesRegistryPublishUncertainty", "MissingM11LifecycleRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_evaluation_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11EvaluationDisclosesRegistryPublishUncertainty", "MissingM11EvaluationRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_cycle_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11CycleDisclosesRegistryPublishUncertainty", "MissingM11CycleRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_gate_authorization_reservation_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11GateAuthorizationAndReservationDiscloseRegistryPublishUncertainty", "MissingM11GateAuthorizationReservationRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_reconciliation_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11ReconcileDisclosesRegistryPublishUncertainty", "MissingM11ReconcileRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m11_recovery_admission_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("recovery admission uncertainty was not disclosed", "missing recovery admission uncertainty regression", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
+    def test_missing_m08_policy_visible_artifact_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM08PolicyReportsUnconfirmedVisibleArtifact", "MissingM08PolicyVisibleArtifactRegression", 1), encoding="utf-8")
+        self.assertIn("immutable artifact post-publish regression is missing", self.run_audit(False))
+
+    def test_missing_m11_recovery_export_visible_artifact_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("recovery handoff uncertainty was not disclosed", "missing recovery handoff uncertainty regression", 1), encoding="utf-8")
+        self.assertIn("immutable artifact post-publish regression is missing", self.run_audit(False))
+
+    def test_missing_m10_visible_journal_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay", "MissingM10VisibleJournalPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M10 visible-journal recovery regression is missing", self.run_audit(False))
+
+    def test_missing_m10_execution_journal_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay", "MissingM10ExecutionJournalPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M10 visible-journal recovery regression is missing", self.run_audit(False))
+
+    def test_missing_m11_outcome_journal_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay", "MissingM11OutcomeJournalPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M11 outcome visible-journal recovery regression is missing", self.run_audit(False))
+
+    def test_missing_m11_execution_journal_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay", "MissingM11ExecutionJournalPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M11 execution visible-journal recovery regression is missing", self.run_audit(False))
 
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"

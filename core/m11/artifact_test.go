@@ -33,7 +33,7 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	activation := ProductionActivationRecord{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ActivatedAt: "2026-09-08T00:00:00Z"}
 	gate := ProductionGateDecision{LedgerArtifactID: ledgerEntry.ArtifactID, LedgerContentHash: ledgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
 	gate.GateID = ComputeProductionGateID(lease, gate.IntentID, gate.IntentHash, health, cost, ledgerEntry, gate.EvaluatedAt)
-	authorization := ProductionExecutionAuthorization{AuthorizationID: ComputeProductionAuthorizationID(gate.GateID, "fixture_stub"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "key-1", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	authorization := ProductionExecutionAuthorization{AuthorizationID: ComputeProductionAuthorizationID(gate.GateID, "fixture_stub", "2026-09-08T00:00:00Z"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "key-1", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
 	execution := ProductionExecutionRecord{ExecutionID: ComputeProductionExecutionID(authorization.AuthorizationID), AuthorizationID: authorization.AuthorizationID, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, IntentID: cost.IntentID, IntentHash: cost.IntentHash, ExecutorID: authorization.ExecutorID, IdempotencyKey: authorization.IdempotencyKey, AttemptedAt: "2026-09-08T00:00:01Z", Status: "FAILED", SideEffectState: "NOT_PERFORMED", CorrelationID: cost.CorrelationID}
 	reservationLedger := ledger
 	reservationLedger.ExecutionsTotal, reservationLedger.ExecutionsInWindow, reservationLedger.CostMinorTotal, reservationLedger.PendingOutcomes = 1, 1, 10, 1
@@ -45,11 +45,25 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	laterAuthorization := authorization
+	laterAuthorization.AuthorizedAt = "2026-09-08T00:00:00.500Z"
+	laterAuthorization.AuthorizationID = ComputeProductionAuthorizationID(gate.GateID, laterAuthorization.ExecutorID, laterAuthorization.AuthorizedAt)
+	if laterAuthorization.AuthorizationID == authorization.AuthorizationID {
+		t.Fatalf("distinct authorization times reused an immutable ID: first=%+v second=%+v", authorization, laterAuthorization)
+	}
+	// A second authorization for the exact same gate/executor can be recorded
+	// for audit only when it has a distinct time-bound identity. It is not an
+	// additional reservation or execution authority.
+	withLaterAuthorization := append([]ArtifactEntry(nil), entries...)
+	withLaterAuthorization = append(withLaterAuthorization, m11Entry(t, ArtifactKindAuthorization, laterAuthorization))
+	if err := ValidateArtifactGraph(withLaterAuthorization); err != nil {
+		t.Fatalf("graph rejected a distinct later authorization identity: %v", err)
+	}
 	forgedGate := gate
 	forgedGate.GateID = "forged-production-gate"
 	forgedGateAuthorization := authorization
 	forgedGateAuthorization.ProductionGateID = forgedGate.GateID
-	forgedGateAuthorization.AuthorizationID = ComputeProductionAuthorizationID(forgedGate.GateID, forgedGateAuthorization.ExecutorID)
+	forgedGateAuthorization.AuthorizationID = ComputeProductionAuthorizationID(forgedGate.GateID, forgedGateAuthorization.ExecutorID, forgedGateAuthorization.AuthorizedAt)
 	forgedGateEntries := append([]ArtifactEntry(nil), entries[:8]...)
 	forgedGateEntries[6] = m11Entry(t, ArtifactKindGate, forgedGate)
 	forgedGateEntries[7] = m11Entry(t, ArtifactKindAuthorization, forgedGateAuthorization)

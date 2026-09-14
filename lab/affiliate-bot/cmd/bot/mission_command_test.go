@@ -381,6 +381,73 @@ func TestMissionM08ArtifactOutputHasCreateRetryConflictSemantics(t *testing.T) {
 	}
 }
 
+// A CLI caller must be told that its requested output may already be visible
+// when the immutable publisher cannot confirm the parent directory sync. This
+// exercises the real M08 command path rather than only the writer helper.
+func TestMissionM08IntentReportsUnconfirmedVisibleArtifact(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	output := filepath.Join(dir, "intent-unconfirmed.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m08-intent", history, request, output); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("M08 did not disclose visible-but-unconfirmed artifact: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["intent_id"] == "" {
+		t.Fatalf("M08 unconfirmed publish omitted its visible intent: %+v", response)
+	}
+	first, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("M08 output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m08-intent", history, request, output); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("M08 exact retry did not resolve output: code=%d response=%+v", code, response)
+	}
+	if current, err := os.ReadFile(output); err != nil || !bytes.Equal(first, current) {
+		t.Fatalf("M08 retry changed visible artifact: %q err=%v", current, err)
+	}
+}
+
+func TestMissionM08PolicyReportsUnconfirmedVisibleArtifact(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	intent := filepath.Join(dir, "intent.json")
+	if code, response := missionCall(t, "m08-intent", history, request, intent); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("intent setup failed: code=%d response=%+v", code, response)
+	}
+	policyInput := filepath.Join(dir, "policy-input.json")
+	if err := os.WriteFile(policyInput, []byte(`{"policy_version":"unconfirmed-policy","now":"2026-09-07T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "policy-unconfirmed.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m08-policy", intent, policyInput, output); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("M08 policy did not disclose visible-but-unconfirmed artifact: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["policy_version"] != "unconfirmed-policy" {
+		t.Fatalf("M08 policy unconfirmed publish omitted its visible policy: %+v", response)
+	}
+	first, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("M08 policy output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m08-policy", intent, policyInput, output); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("M08 policy exact retry did not resolve output: code=%d response=%+v", code, response)
+	}
+	if current, err := os.ReadFile(output); err != nil || !bytes.Equal(first, current) {
+		t.Fatalf("M08 policy retry changed visible artifact: %q err=%v", current, err)
+	}
+}
+
 func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.T) {
 	dir, history, request := missionFixture(t)
 	records, err := LoadHistory(history)
@@ -736,6 +803,157 @@ func authorityFixtureAt(t *testing.T, base time.Time, expiring string, setupCana
 		t.Fatalf("pre-expiry gate failed: code=%d response=%+v", code, response)
 	}
 	return runtimeDir, boundPath, gatePath, boundary
+}
+
+func TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+
+	gateOutput := filepath.Join(root, "conflicting-gate-output.json")
+	gateSentinel := []byte(`{"portable":"gate sentinel"}`)
+	if err := os.WriteFile(gateOutput, gateSentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, base.Format(time.RFC3339)); code == 0 || response["status"] != "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" {
+		t.Fatalf("gate output collision did not disclose canonical artifact: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok || artifact["gate_id"] == "" {
+			t.Fatalf("gate output collision omitted canonical gate: %+v", response)
+		}
+		gateID, ok := artifact["gate_id"].(string)
+		if !ok {
+			t.Fatalf("gate output collision returned invalid gate ID: %+v", artifact)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gateID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("disclosed gate did not resolve from canonical registry: code=%d response=%+v", code, resolved)
+		}
+	}
+	if got, err := os.ReadFile(gateOutput); err != nil || !bytes.Equal(got, gateSentinel) {
+		t.Fatalf("gate output collision changed existing bytes: %v", err)
+	}
+
+	authorizationOutput := filepath.Join(root, "conflicting-authorization-output.json")
+	authorizationSentinel := []byte(`{"portable":"authorization sentinel"}`)
+	if err := os.WriteFile(authorizationOutput, authorizationSentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code == 0 || response["status"] != "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" {
+		t.Fatalf("authorization output collision did not disclose canonical artifact: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok || artifact["authorization_id"] == "" {
+			t.Fatalf("authorization output collision omitted canonical authorization: %+v", response)
+		}
+		authorizationID, ok := artifact["authorization_id"].(string)
+		if !ok {
+			t.Fatalf("authorization output collision returned invalid authorization ID: %+v", artifact)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionAuthorization, authorizationID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("disclosed authorization did not resolve from canonical registry: code=%d response=%+v", code, resolved)
+		}
+	}
+	if got, err := os.ReadFile(authorizationOutput); err != nil || !bytes.Equal(got, authorizationSentinel) {
+		t.Fatalf("authorization output collision changed existing bytes: %v", err)
+	}
+
+	portableAuthorization := filepath.Join(root, "portable-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, portableAuthorization, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("exact canonical authorization retry did not publish clean portable artifact: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, firstGatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	secondGatePath := filepath.Join(filepath.Dir(runtimeDir), "second-gate.json")
+	secondAt := base.Add(time.Second).Format(time.RFC3339)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, secondGatePath, secondAt); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("second valid evaluation could not register a distinct gate: code=%d response=%+v", code, response)
+	}
+	var first, second corem10.CanaryGateDecision
+	if err := readJSON(firstGatePath, &first); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(secondGatePath, &second); err != nil {
+		t.Fatal(err)
+	}
+	if first.EvaluatedAt == second.EvaluatedAt || first.GateID == second.GateID {
+		t.Fatalf("distinct evaluations did not receive distinct immutable IDs: first=%+v second=%+v", first, second)
+	}
+	for _, gate := range []corem10.CanaryGateDecision{first, second} {
+		if code, response := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gate.GateID); code != 0 || response["status"] != "RESOLVED" {
+			t.Fatalf("registered gate did not resolve: code=%d response=%+v", code, response)
+		}
+	}
+}
+
+func TestMissionM10GateDisclosesRegistryPublishUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+	gateOutput := filepath.Join(root, "uncertain-registry-gate.json")
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m10ArtifactRegistryPath(runtimeDir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	evaluatedAt := base.Add(time.Second).Format(time.RFC3339)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible canonical registry artifact was not disclosed as uncertain: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		gateID, okID := artifact["gate_id"].(string)
+		if !ok || !okID || gateID == "" {
+			t.Fatalf("registry publish uncertainty omitted the durable gate: %+v", response)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gateID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("uncertain registry gate was not resolvable: code=%d response=%+v", code, resolved)
+		}
+	}
+	if _, err := os.Stat(gateOutput); !os.IsNotExist(err) {
+		t.Fatalf("portable output was published after registry uncertainty: %v", err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("exact registry retry did not publish portable gate: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM10AuthorizationDisclosesRegistryPublishUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+	authorizationOutput := filepath.Join(root, "uncertain-registry-authorization.json")
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m10ArtifactRegistryPath(runtimeDir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible canonical registry authorization was not disclosed as uncertain: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		authorizationID, okID := artifact["authorization_id"].(string)
+		if !ok || !okID || authorizationID == "" {
+			t.Fatalf("registry publish uncertainty omitted the durable authorization: %+v", response)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionAuthorization, authorizationID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("uncertain registry authorization was not resolvable: code=%d response=%+v", code, resolved)
+		}
+	}
+	if _, err := os.Stat(authorizationOutput); !os.IsNotExist(err) {
+		t.Fatalf("portable authorization was published after registry uncertainty: %v", err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("exact registry retry did not publish portable authorization: code=%d response=%+v", code, response)
+	}
 }
 
 func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
@@ -1128,6 +1346,225 @@ func TestMissionM10CanaryJournalRecoversRegistryStateTransition(t *testing.T) {
 			state, err := loadMissionState(runtimeDir)
 			if err != nil || state.Canary == nil || state.Canary.GrantID != grant.GrantID || state.Canary.GrantHash != grant.GrantHash {
 				t.Fatalf("recovered grant is missing from mission state: state=%+v err=%v", state, err)
+			}
+		})
+	}
+}
+
+func TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay(t *testing.T) {
+	t.Run("canary", func(t *testing.T) {
+		runtimeDir, grantPath, _, _ := authorityExpiryFixtureWithCanary(t, "intent", false)
+		artifactWriteFault = func(phase string) error {
+			if phase == "after_publish_before_parent_sync" {
+				return errors.New("injected canary journal parent sync failure")
+			}
+			return nil
+		}
+		t.Cleanup(func() { artifactWriteFault = nil })
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+			t.Fatalf("visible canary journal did not require recovery: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); err != nil {
+			t.Fatalf("visible canary journal was missing: %v", err)
+		}
+		if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("status exposed a visible but un-replayed canary transition: code=%d response=%+v", code, response)
+		}
+		artifactWriteFault = nil
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+			t.Fatalf("locked canary retry did not replay visible journal: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("canary journal remains after locked replay: %v", err)
+		}
+	})
+	t.Run("cost-bound", func(t *testing.T) {
+		base := time.Now().UTC().Truncate(time.Second)
+		runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+		var bound corem10.TrustedCostBound
+		if err := readJSON(boundPath, &bound); err != nil {
+			t.Fatal(err)
+		}
+		bound.CostBoundID = "visible-journal-cost"
+		bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+		secondBound := filepath.Join(filepath.Dir(boundPath), "visible-journal-cost.json")
+		writeMissionTestJSON(t, secondBound, bound)
+		artifactWriteFault = func(phase string) error {
+			if phase == "after_publish_before_parent_sync" {
+				return errors.New("injected cost journal parent sync failure")
+			}
+			return nil
+		}
+		t.Cleanup(func() { artifactWriteFault = nil })
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+			t.Fatalf("visible cost-bound journal did not require recovery: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); err != nil {
+			t.Fatalf("visible cost-bound journal was missing: %v", err)
+		}
+		if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("status exposed a visible but un-replayed cost transition: code=%d response=%+v", code, response)
+		}
+		artifactWriteFault = nil
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code != 0 || response["status"] != appendDuplicate {
+			t.Fatalf("locked cost-bound retry did not replay visible journal: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("cost-bound journal remains after locked replay: %v", err)
+		}
+		boundRaw, err := json.Marshal(bound)
+		if err != nil || !resolveM10Artifact(runtimeDir, corem10.ArtifactKindTrustedCostBound, boundRaw) {
+			t.Fatalf("locked replay did not retain canonical cost-bound: err=%v", err)
+		}
+	})
+}
+
+// The execution journal is a separate commit boundary from the canary and
+// cost-bound journals.  Once its atomic rename is visible, a failed parent
+// directory sync must not let a later reader treat the still-unregistered
+// execution as committed, nor let an unlocked retry make a second record.
+func TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "visible-execution-journal-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "visible-execution-journal-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "visible-execution-journal-record.json")
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			return errors.New("injected execution journal parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "visible journal fixture"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible execution journal did not require recovery: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); err != nil {
+		t.Fatalf("visible execution journal was missing: %v", err)
+	}
+	if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
+		t.Fatalf("visible execution journal created a portable record before canonical replay: %v", err)
+	}
+	missionStateWriteFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed a visible but un-replayed execution journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionRecord, "unresolved-visible-execution"); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh resolver exposed a visible but un-replayed execution journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "visible journal fixture"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("locked retry did not replay visible execution journal exactly: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); !os.IsNotExist(err) {
+		t.Fatalf("execution journal remains after locked replay: %v", err)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || len(state.Reservations) != 1 || state.Reservations[0].ExecutionID == "" {
+		t.Fatalf("locked replay did not bind execution to reservation: state=%+v err=%v", state, err)
+	}
+}
+
+func TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "visible-m11-outcome.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			return errors.New("injected M11 outcome journal parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible M11 outcome journal did not disclose recovery: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["outcome"] == nil || artifact["post_ledger"] == nil {
+		t.Fatalf("visible M11 outcome journal omitted deterministic transition: %+v", response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("visible M11 outcome journal was missing: %v", err)
+	}
+	missionStateWriteFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed a visible but unreplayed M11 outcome journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-resolve", dir, corem11.ArtifactKindLedger, predecessor.ArtifactID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh resolver exposed a visible but unreplayed M11 outcome journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked retry did not replay visible M11 outcome journal exactly: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("M11 outcome journal remains after locked replay: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || outcomes[0].OutcomeID != journal.Outcome.OutcomeID {
+		t.Fatalf("locked replay did not retain exactly one M11 outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
+func TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		command   string
+		journal   func(string) string
+		ledgerKey string
+		statusKey string
+		attempted string
+		reason    string
+	}{
+		{name: "failed", command: "m11-record-failed", journal: m11FailedExecutionJournalPath, ledgerKey: "execution_ledger", statusKey: "FAILED", attempted: "2026-09-08T00:00:02Z", reason: "visible failed journal fixture"},
+		{name: "unknown-stop", command: "m11-record-unknown", journal: m11UnknownStopJournalPath, ledgerKey: "stopped_ledger", statusKey: "RECONCILIATION_REQUIRED", attempted: "2026-09-08T00:00:02Z", reason: "visible unknown journal fixture"},
+	} {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			missionStateWriteFault = func(phase string) error {
+				if phase == "after_rename_before_parent_sync" {
+					return errors.New("injected M11 execution journal parent sync failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { missionStateWriteFault = nil })
+			if code, response := missionCall(t, scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+				t.Fatalf("visible %s journal did not disclose recovery: code=%d response=%+v", scenario.name, code, response)
+			} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["execution"] == nil || artifact[scenario.ledgerKey] == nil {
+				t.Fatalf("visible %s journal omitted deterministic transition: %+v", scenario.name, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); err != nil {
+				t.Fatalf("visible %s journal was missing: %v", scenario.name, err)
+			}
+			missionStateWriteFault = nil
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh status exposed visible %s journal: code=%d response=%+v", scenario.name, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", "m11-resolve", fixture.dir, corem11.ArtifactKindExecution, corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID)); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh resolver exposed visible %s journal: code=%d response=%+v", scenario.name, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+				t.Fatalf("locked retry did not replay visible %s journal exactly: code=%d response=%+v", scenario.name, code, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("%s journal remains after locked replay: %v", scenario.name, err)
+			}
+			entry, err := resolveM11Artifact(fixture.dir, corem11.ArtifactKindExecution, corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID), "")
+			if err != nil {
+				t.Fatalf("locked replay did not retain %s execution: %v", scenario.name, err)
+			}
+			value, status := corem11.DecodeArtifact("execution", entry.Artifact)
+			if status != corem11.Valid || value.(*corem11.ProductionExecutionRecord).Status != scenario.statusKey {
+				t.Fatalf("locked replay retained wrong %s execution: value=%+v status=%s", scenario.name, value, status)
 			}
 		})
 	}
@@ -1655,6 +2092,273 @@ func TestMissionM11RegistryUsesCanonicalCoreDecoder(t *testing.T) {
 	}
 }
 
+func TestMissionM11LifecycleDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	lease := corem11.ProductionLease{LeaseID: "uncertain-lifecycle-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "uncertain-lifecycle-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "uncertain-lifecycle-correlation", HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	leaseRaw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLease, leaseRaw); err != nil {
+		t.Fatal(err)
+	}
+	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	approvalRaw, err := json.Marshal(approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(dir, corem11.ArtifactKindLeaseApproval, approvalRaw); err != nil {
+		t.Fatal(err)
+	}
+
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	activatedAt := "2026-09-08T00:00:01Z"
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, activatedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("activation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["lease_id"] != lease.LeaseID {
+		t.Fatalf("activation uncertainty omitted the visible record: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain activation was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-activate", dir, lease.LeaseID, activatedAt); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("activation exact retry failed: code=%d response=%+v", code, response)
+	}
+
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	initializedAt := "2026-09-08T00:00:02Z"
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, initializedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("ledger uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["lease_id"] != lease.LeaseID {
+		t.Fatalf("ledger uncertainty omitted the visible ledger: %+v", response)
+	}
+	if _, ledger, err := m11LedgerHead(dir, lease.LeaseID); err != nil || ledger.LeaseID != lease.LeaseID {
+		t.Fatalf("uncertain ledger was not retained as the canonical head: ledger=%+v err=%v", ledger, err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-ledger-init", dir, lease.LeaseID, initializedAt); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("ledger exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM11EvaluationDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	journal, _ := setupM11OutcomeJournalFixture(t, dir)
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		t.Fatalf("fixture outcome recovery failed: %v", err)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "uncertain-evaluation", "2026-09-08T00:00:03Z"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("evaluation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["evaluation_id"] != "uncertain-evaluation" {
+		t.Fatalf("evaluation uncertainty omitted the visible artifact: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindEvaluation, "uncertain-evaluation"); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain evaluation was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "uncertain-evaluation", "2026-09-08T00:00:03Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("evaluation exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM11GateAuthorizationAndReservationDiscloseRegistryPublishUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Policy == nil || state.Approval == nil || state.Canary == nil {
+		t.Fatalf("load M11 authority fixture state: state=%+v err=%v", state, err)
+	}
+	var cost corem10.TrustedCostBound
+	if err := readJSON(boundPath, &cost); err != nil {
+		t.Fatal(err)
+	}
+	lease := corem11.ProductionLease{LeaseID: "uncertain-gate-lease", LeaseVersion: "v1", PolicyVersion: state.Policy.PolicyVersion, ApprovalRef: "uncertain-gate-approval", ReviewedBy: "human", ReviewerID: "uncertain-reviewer", ReviewedAt: base.Format(time.RFC3339), PromotionReviewRef: "fixture:uncertain-promotion-review", SourceCanaryGrantID: state.Canary.GrantID, SourceCanaryGrantVersion: state.Canary.GrantVersion, SourceCanaryGrantHash: state.Canary.GrantHash, ValidFrom: base.Format(time.RFC3339), ExpiresAt: base.Add(time.Hour).Format(time.RFC3339), AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	health := corem11.ProductionHealthSnapshot{SnapshotID: "uncertain-gate-health", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ObservedAt: base.Format(time.RFC3339), SourceRefs: []string{"fixture:health"}, DependencyState: "HEALTHY", TelemetryComplete: true, HashVersion: "go-json-v1"}
+	health.SnapshotHash = corem11.ComputeProductionHealthHash(health)
+	for _, artifact := range []struct {
+		kind  string
+		value any
+	}{{corem11.ArtifactKindLease, lease}, {corem11.ArtifactKindLeaseApproval, approval}, {corem11.ArtifactKindHealth, health}, {corem11.ArtifactKindCostBound, cost}} {
+		registerM11TestArtifact(t, runtimeDir, artifact.kind, artifact.value)
+	}
+	if code, response := missionCall(t, "m11-activate", runtimeDir, lease.LeaseID, base.Format(time.RFC3339)); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("activate M11 fixture: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-ledger-init", runtimeDir, lease.LeaseID, base.Format(time.RFC3339)); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("initialize M11 ledger: code=%d response=%+v", code, response)
+	}
+	registryPath := m11ArtifactRegistryPath(runtimeDir)
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(registryPath) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	ledgerID := lease.LeaseID + "/" + base.Format(time.RFC3339)
+	if code, response := missionCall(t, "m11-gate", runtimeDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, base.Format(time.RFC3339)); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("gate uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok || artifact["gate_id"] == "" {
+			t.Fatalf("gate uncertainty omitted visible artifact: %+v", response)
+		}
+	}
+	entries, err := loadM11ArtifactRegistry(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gateID string
+	for _, entry := range entries {
+		if entry.ArtifactKind == corem11.ArtifactKindGate {
+			gateID = entry.ArtifactID
+		}
+	}
+	if gateID == "" {
+		t.Fatal("uncertain gate was not retained in the canonical registry")
+	}
+	if code, response := missionCall(t, "m11-resolve", runtimeDir, corem11.ArtifactKindGate, gateID); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain gate was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-gate", runtimeDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, base.Format(time.RFC3339)); code != 0 || response["status"] != "ALLOW_PRODUCTION" {
+		t.Fatalf("gate exact retry failed: code=%d response=%+v", code, response)
+	}
+
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(registryPath) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	if code, response := missionCall(t, "m11-authorize", runtimeDir, lease.LeaseID, gateID, "fixture_stub", base.Format(time.RFC3339)); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("authorization uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["authorization_id"] == "" {
+		t.Fatalf("authorization uncertainty omitted visible artifact: %+v", response)
+	}
+	entries, err = loadM11ArtifactRegistry(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var authorizationID string
+	for _, entry := range entries {
+		if entry.ArtifactKind == corem11.ArtifactKindAuthorization {
+			authorizationID = entry.ArtifactID
+		}
+	}
+	if authorizationID == "" {
+		t.Fatal("uncertain authorization was not retained in the canonical registry")
+	}
+	if code, response := missionCall(t, "m11-resolve", runtimeDir, corem11.ArtifactKindAuthorization, authorizationID); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain authorization was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-authorize", runtimeDir, lease.LeaseID, gateID, "fixture_stub", base.Format(time.RFC3339)); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("authorization exact retry failed: code=%d response=%+v", code, response)
+	}
+
+	reservedAt := base.Add(time.Second).Format(time.RFC3339)
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(registryPath) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	if code, response := missionCall(t, "m11-reserve-authorization", runtimeDir, authorizationID, ledgerID, reservedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("reservation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["pending_outcomes"] != float64(1) {
+		t.Fatalf("reservation uncertainty omitted visible ledger: %+v", response)
+	}
+	if _, ledger, err := m11LedgerHead(runtimeDir, lease.LeaseID); err != nil || ledger.PendingOutcomes != 1 {
+		t.Fatalf("uncertain reservation was not retained as canonical ledger head: ledger=%+v err=%v", ledger, err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-reserve-authorization", runtimeDir, authorizationID, ledgerID, reservedAt); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("reservation exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM11CycleDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	observation := historyObservation("cycle-observation", "cycle-product", "Cycle Product", 100, 0.1, "2026-09-08T00:00:00Z")
+	record, err := NewHistoryRecord("cycle-decision", "2026-09-08T00:00:01Z", "2026-09-08T00:00:01Z", []Observation{observation})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := AppendHistory(filepath.Join(dir, "history.jsonl"), record); err != nil || status != appendAdded {
+		t.Fatalf("append cycle history: status=%s err=%v", status, err)
+	}
+	intent := LearnerIntent{IntentID: "cycle-intent", DecisionID: record.RecordID, EvidenceIDs: []string{observation.ObservationID}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "cycle-correlation", IdempotencyKey: "cycle-key", IntentMode: "PROPOSAL_ONLY"}
+	intent.IntentHash = learnerIntentHash(intent)
+	policy := LearnerPolicy{PolicyVersion: "policy-1", IntentID: intent.IntentID, IntentHash: intent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", Reason: "fixture", PolicyMode: "PROPOSAL_ONLY", PolicyCheckedAt: "2026-09-08T00:00:00Z"}
+	if err := saveMissionState(dir, LearnerMissionState{Intent: &intent, Policy: &policy}); err != nil {
+		t.Fatal(err)
+	}
+	journal, _ := setupM11OutcomeJournalFixtureForIntent(t, dir, intent.IntentID, intent.IntentHash, intent.CorrelationID)
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		t.Fatalf("fixture outcome recovery failed: %v", err)
+	}
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "cycle-evaluation", "2026-09-08T00:00:03Z"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("evaluation setup failed: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-close-cycle", dir, "uncertain-cycle", "cycle-evaluation", "2026-09-08T00:00:04Z"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("cycle uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["cycle_id"] != "uncertain-cycle" {
+		t.Fatalf("cycle uncertainty omitted the visible artifact: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindCycle, "uncertain-cycle"); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain cycle was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-close-cycle", dir, "uncertain-cycle", "cycle-evaluation", "2026-09-08T00:00:04Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("cycle exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
@@ -1737,5 +2441,33 @@ func TestMissionInitDoesNotOverwriteExistingState(t *testing.T) {
 	code := runMissionCommand([]string{"init", dir}, os.Stdout, os.Stderr)
 	if code == 0 {
 		t.Fatal("mission init overwrote an existing state")
+	}
+}
+
+func TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming(t *testing.T) {
+	dir := t.TempDir()
+	for _, fixture := range []struct {
+		name string
+		path string
+		load func() error
+	}{
+		{name: "M10 artifact registry", path: m10ArtifactRegistryPath(dir), load: func() error { _, err := loadM10ArtifactRegistry(dir); return err }},
+		{name: "M10 trusted cost-bound registry", path: trustedCostBoundsPath(dir), load: func() error { _, err := loadTrustedCostBounds(dir); return err }},
+		{name: "M10", path: m10OutcomeStorePath(dir), load: func() error { _, err := loadM10FixtureOutcomes(dir, LearnerMissionState{}); return err }},
+		{name: "M11 artifact registry", path: m11ArtifactRegistryPath(dir), load: func() error { _, err := loadM11ArtifactRegistry(dir); return err }},
+		{name: "M11", path: m11OutcomeStorePath(dir), load: func() error { _, err := loadM11FixtureOutcomes(dir); return err }},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			original := []byte(`{}`)
+			if err := os.WriteFile(fixture.path, original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := fixture.load(); err == nil {
+				t.Fatal("unterminated fixture outcome store was accepted")
+			}
+			if current, err := os.ReadFile(fixture.path); err != nil || !bytes.Equal(current, original) {
+				t.Fatalf("framing rejection changed fixture outcome store: %q err=%v", current, err)
+			}
+		})
 	}
 }

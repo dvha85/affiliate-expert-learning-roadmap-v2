@@ -276,9 +276,15 @@ def main():
         stale_gate_two = invoke(bot, "mission", "m11-gate", stale_gate_runtime, "br18-production-lease", "br18-production-health", "br18-cost", "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:01Z", env=env)
         stale_auth_one = invoke(bot, "mission", "m11-authorize", stale_gate_runtime, "br18-production-lease", stale_gate_one["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:00Z", env=env)
         stale_auth_two = invoke(bot, "mission", "m11-authorize", stale_gate_runtime, "br18-production-lease", stale_gate_two["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:01Z", env=env)
+        # The same immutable gate/executor may be reviewed at a later time.
+        # That second capability must have its own identity; it still cannot
+        # reserve after the first gate's ledger has advanced.
+        same_gate_later_auth = invoke(bot, "mission", "m11-authorize", stale_gate_runtime, "br18-production-lease", stale_gate_one["artifact"]["gate_id"], "fixture_stub", "2026-09-08T00:00:01Z", env=env)
+        assert same_gate_later_auth["status"] == "APPENDED" and same_gate_later_auth["artifact"]["authorization_id"] != stale_auth_one["artifact"]["authorization_id"]
         stale_reservation = invoke(bot, "mission", "m11-reserve-authorization", stale_gate_runtime, stale_auth_one["artifact"]["authorization_id"], "br18-production-lease/2026-09-08T00:00:00Z", "2026-09-08T00:00:02Z", env=env)
         stale_ledger_id = stale_reservation["artifact"]["lease_id"] + "/" + stale_reservation["artifact"]["updated_at"]
         assert invoke(bot, "mission", "m11-reserve-authorization", stale_gate_runtime, stale_auth_two["artifact"]["authorization_id"], stale_ledger_id, "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
+        assert invoke(bot, "mission", "m11-reserve-authorization", stale_gate_runtime, same_gate_later_auth["artifact"]["authorization_id"], stale_ledger_id, "2026-09-08T00:00:03Z", expected=1, env=env)["status"] == "REJECTED"
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE", production_lease, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-register", runtime, "PRODUCTION_LEASE_APPROVAL", production_approval, env=env)["status"] == "APPENDED"
         assert invoke(bot, "mission", "m11-activate", runtime, "br18-production-lease", "2026-09-08T00:00:00Z", env=env)["status"] == "APPENDED"

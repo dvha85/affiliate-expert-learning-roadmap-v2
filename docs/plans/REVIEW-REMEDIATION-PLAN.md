@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 9343555c1c5175ad9ccc2934a9651e86f3be3a76 -->
+<!-- readiness-main-baseline: 526592b3ea81607408fa53a90c44218c5d619a18 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -292,11 +292,36 @@ temporary không được còn lại; retry tạo artifact hoàn chỉnh và exa
 `EXACT_DUPLICATE`. Đây không chứng minh power-loss/filesystem durability hay
 multi-host atomicity, nên các phạm vi đó vẫn `PARTIAL`.
 
+**Cập nhật immutable artifact publish recovery status (2026-09-14):** sau khi
+`Link` đã làm artifact bất biến visible nhưng trước khi sync directory cha,
+`writeNewJSON` phân biệt lỗi đó với lỗi chưa publish bằng typed uncertainty.
+M08 intent/policy CLI, M07 CLI/HTTP adapter và M11 `recovery-export` trả
+`PUBLISHED_RECOVERY_REQUIRED` kèm artifact visible, không mô tả là `CONFLICT`
+hoặc `PERSISTENCE_ERROR` retryable. Handoff M11 vẫn non-authorizing. Regression
+gọi publisher, M08 CLI, M07 adapter và reviewed M11 handoff thật: artifact/tool
+trace vẫn tồn tại, còn exact retry chỉ ACK bytes y hệt. Đây là báo cáo
+fail-closed về trạng thái syscall local; không chứng minh durability sau
+power-loss, transaction đa file hay filesystem đa host.
+
 **Cập nhật JSONL acknowledgement boundary (2026-09-11):** canonical và derived
 JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Regression
 inject lỗi sau write nhưng trước sync: call phải trả error, không ACK thành
 công; append tiếp theo giữ line framing hợp lệ. Đây không là mô phỏng
 power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
+
+**Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
+chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`
+chỉ ACK một record đã có LF sau sync, final line không có LF được xem là append
+có thể bị gián đoạn, không phải JSON hợp lệ để history/M03 action/M04 outcome,
+M05 evaluation/proposal/review hoặc receipt ACCESSTRADE tiếp tục dùng. M10
+artifact/cost-bound registry, M11 artifact registry, M10/M11 fixture outcome
+loader và backup receipt requirement ACCESSTRADE vốn split một stable byte
+snapshot cũng gọi cùng rule trước parse. Regression chạy real action/outcome
+command với store bị cắt LF, đòi `STORE_ERROR` và bytes không đổi; shared store
+regression cùng direct M10/M11 registry/outcome và backup-receipt loader
+coverage chặn framing trước semantic decode. Đây là integrity guard filesystem
+local, không chứng minh recovery sau crash/power-loss, atomic multi-file hay
+transaction multi-host; RP-03 vẫn `PARTIAL`.
 
 **Cập nhật atomic backup publish (2026-09-12):** `backup create` và `restore`
 copy/verify toàn bộ snapshot trong sibling staging, rồi publish qua rename tới
@@ -358,22 +383,52 @@ dở dang trước locked recovery. Backup vẫn là con đường recovery có 
 không chứng minh kill/power-loss tại filesystem boundary, transaction đa-file
 hay recovery multi-host.
 
+**Cập nhật M10 execution-journal publish boundary (2026-09-14):** một seam
+khác inject lỗi sau khi `m10-execution-journal.json` đã rename-visible nhưng
+trước parent-directory sync. Command trả `PUBLISHED_RECOVERY_REQUIRED`, không
+tạo portable execution output và Bot process mới trả `RECOVERY_REQUIRED` cho
+`status` lẫn `m10-resolve`. Chỉ exact retry dưới local writer lock mới replay
+journal, đăng ký/bind đúng một execution rồi mới ghi portable output. Đây là
+kiểm local cho một syscall boundary; không chứng minh atomicity đa-file,
+kill/power-loss hoặc phối hợp đa host.
+
+**Cập nhật M11 outcome-journal publish boundary (2026-09-14):** `m11-outcome`
+trước đây trả `REJECTED` nếu `m11-outcome-journal.json` đã rename-visible nhưng
+directory sync chưa được xác nhận. Emit nay nhận mọi `atomicPublishUncertain`
+và trả `PUBLISHED_RECOVERY_REQUIRED`; riêng command trả outcome/post-ledger
+xác định từ journal, không tuyên bố outcome đã vào mọi store. Regression chạy
+CLI thật, khởi động Bot mới để chặn `status`/resolver, rồi exact retry có lock
+replay một outcome/ledger. Các journal FAILED và UNKNOWN→STOP cần nghiệm thu
+riêng; không suy atomicity đa-file, power-loss hoặc multi-host từ seam này.
+
+**Cập nhật M11 execution-journal publish boundary (2026-09-14):** cùng CLI
+regression giờ cover riêng `m11-record-failed` và `m11-record-unknown` khi
+journal của chúng đã rename-visible nhưng parent sync lỗi. Mỗi lệnh trả
+`PUBLISHED_RECOVERY_REQUIRED` với execution + ledger dự kiến; Bot mới chặn
+status/resolver, sau đó exact retry có lock replay một execution. UNKNOWN chỉ
+chứng minh stopped-ledger/STOP recovery local; không chứng minh external effect
+được xác minh, atomicity đa-file, power-loss hoặc multi-host.
+
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
 artifact registry và compact cost-bound index. Lỗi injected trước artifact,
-sau artifact, hoặc sau index giữ journal; `status` và `m10-resolve` của Bot
-mới trả `RECOVERY_REQUIRED` trước khi lộ transition một nửa. Writer có local
-lock hoặc `backup create` replay đúng bound theo scope/time quan sát, rồi retry
-trả `EXACT_DUPLICATE`. Đây là recovery bounded cho đúng hai files M10, không
-phải transaction toàn runtime, mô phỏng power-loss hay guarantee multi-host.
+sau artifact, sau index, hoặc sau khi journal visible nhưng trước directory
+sync giữ journal; `status` và `m10-resolve` của Bot mới trả
+`RECOVERY_REQUIRED` trước khi lộ transition một nửa. Seam visible-journal trả
+`PUBLISHED_RECOVERY_REQUIRED`, rồi chỉ writer có local lock hoặc `backup create`
+replay đúng bound theo scope/time quan sát; retry trả `EXACT_DUPLICATE`. Đây là
+recovery bounded cho đúng hai files M10, không phải transaction toàn runtime,
+mô phỏng power-loss hay guarantee multi-host.
 
 **Cập nhật M10 canary registry/state journal (2026-09-13):** canary grant
 giờ journal trước immutable `CANARY_GRANT` registry và mutable `mission-state`
-binding/counters. Fault trước artifact, sau artifact hoặc sau state giữ journal;
-Bot mới không cho `status`/`m10-resolve` đọc half-commit, còn writer có lock và
-`backup create` replay đúng grant rồi retry `ACK`. Đây chỉ là recovery local của
-grant registry/state, không chứng minh transaction toàn runtime, power-loss,
-multi-host locking, executor hay production authority.
+binding/counters. Fault trước artifact, sau artifact, sau state, hoặc sau khi
+journal visible nhưng trước directory sync giữ journal; Bot mới không cho
+`status`/`m10-resolve` đọc half-commit. Seam visible-journal trả
+`PUBLISHED_RECOVERY_REQUIRED`, còn writer có lock và `backup create` replay đúng
+grant rồi retry `ACK`. Đây chỉ là recovery local của grant registry/state,
+không chứng minh transaction toàn runtime, power-loss, multi-host locking,
+executor hay production authority.
 
 **Cập nhật atomic JSONL write-path guard (2026-09-13):** ACCESSTRADE outcome/
 receipt và M10 cost-bound index đọc JSONL cũ qua stable regular-file reader,
@@ -476,6 +531,37 @@ schema-valid/với link downstream đã rewrite và cả ba bị chặn. Đây c
 immutable graph guard offline; ledger transaction, executor, multi-file
 crash/power-loss và multi-host proof vẫn mở.
 
+**Cập nhật M11 authorization time identity (2026-09-14):** production
+`AuthorizationID` nay digest `gate_id`, `executor_id` và `authorized_at`.
+Trước đó cùng gate/executor nhưng thời điểm authorization khác nhau có ID như
+nhau trong khi payload/expiry khác, khiến registry append-only chỉ có thể từ
+chối artifact sau như collision. Core graph và learner lifecycle dùng một
+builder time-bound; regression core và compiled-Bot backup smoke tạo hai
+authorization cùng gate/executor khác thời điểm, yêu cầu ID khác nhau và chặn
+reservation còn lại sau khi ledger đã advance; mutation CI bỏ chính guard
+canonical phải làm regression fail. Điều này không cấp thêm reservation hay
+execution authority, và không là proof clock trust, ledger transaction,
+power-loss, multi-host hay business outcome; RP-07 vẫn `PARTIAL`.
+
+**Cập nhật M10/M11 registry publish uncertainty (2026-09-14):** sau khi một
+line immutable registry đã file-sync và tên file còn đúng nhưng parent-directory
+sync không xác nhận được, adapter trả typed publish uncertainty thay vì lỗi
+append thường. `m10-gate` và `m10-authorize` bàn giao
+`PUBLISHED_RECOVERY_REQUIRED` kèm artifact đã resolve được và không ghi
+portable output; M11 registry cùng CLI `m11-activate`, `m11-ledger-init`,
+M11 gate, authorization, reservation, offline `m11-evaluate`,
+`m11-close-cycle`, reviewed `m11-reconcile` và non-authorizing
+`m11-recovery-admit` bàn giao record/ledger/evaluation/cycle, transition
+reconciliation hoặc admission đã visible để resolver hoặc canonical ledger-head
+kiểm tra trước exact retry. Regression dùng seam sau file sync, trước parent
+sync, và kiểm các đường M10, M11 registry, activation, ledger-init, gate,
+authorization, reservation, evaluation, cycle, reconciliation và cross-runtime
+admission. Đây là
+disclosure/recovery local có giới hạn, chưa chứng minh durability qua power
+loss, transaction nhiều file, bao phủ mọi M11
+lifecycle envelope, multi-host, execution hay business outcome; RP-03/RP-07
+vẫn `PARTIAL`.
+
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không
 thể tách thành nhiều line registry; append dùng chung file+directory sync trước
@@ -563,6 +649,26 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   canonical, state đã bind exact execution, rồi retry sang path mới thành công.
   Không coi portable output là commit boundary, không chứng minh transaction
   registry/state khi crash và không cấp execution authority.
+- **RP-03 M10 canonical output disclosure (2026-09-14):** `m10-gate` và
+  `m10-authorize` vẫn append/validate canonical registry trước portable output
+  để output path không là commit boundary. Nếu output immutable đã tồn tại với
+  bytes khác, CLI trả non-zero
+  `CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE` kèm chính gate hoặc
+  authorization durable; caller có thể dùng ID đó với `m10-resolve` hoặc xuất
+  exact artifact sang path sạch. Regression gọi Bot thật cho cả hai loại,
+  resolve ID trả về và chứng minh bytes của output cũ không đổi; retry
+  authorization sang path sạch thành công. Lỗi sync parent sau publish vẫn là
+  `PUBLISHED_RECOVERY_REQUIRED`. Đây chỉ là disclosure/recovery envelope local,
+  không chứng minh atomicity nhiều file, power-loss, executor hay business
+  outcome; RP-03 vẫn `PARTIAL`.
+- **RP-03 M10 gate evaluation identity (2026-09-14):** `GateID` canonical
+  nay hash cả `evaluated_at`. Trước đó hai đánh giá hợp lệ khác thời điểm nhưng
+  cùng grant/cost/intent/policy/ledger có cùng ID và bytes khác nhau, nên
+  registry append-only chỉ có thể từ chối lần đánh giá sau như conflict.
+  Core graph recompute cùng time-bound identity; regression core và learner Bot
+  tạo hai gate cùng snapshot cách nhau một giây, yêu cầu ID khác nhau và cả hai
+  resolve trong registry/graph. Không suy điều này thành clock trust, execution authority, transaction
+  nhiều file, power-loss hay business outcome; RP-03 vẫn `PARTIAL`.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation
@@ -1552,6 +1658,17 @@ và M07 `POST`, registry bật `follow_redirects`, hoặc adapter không khả d
 dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal persistence.
 Không cài credential, không gọi affiliate/provider và không coi đó là M07
 model-success hoặc received-redirect transport coverage/evidence business.
+
+**Re-run n8n engine cục bộ (2026-09-14):** workflow fixture M06/M07 được chạy
+lại qua n8n `2.38.1` trên macOS arm64, Node `24.21.0`, SQLite disposable và
+loopback adapters/model stub. Node 22 bị n8n hiện hành từ chối vì package yêu
+cầu `>=24.0.0`; native `isolated-vm` phải được build/rebuild bằng đúng Node 24
+trước import. CI đã pin Node 24. Đây là reproduction có thể tái lập của engine
+fixture path, không thay release admission `UNVERIFIED`, không chứng minh
+provider, selected-source operated run, topology deploy hay business outcome.
+Runner Schedule Trigger thực cũng PASS trong cùng runtime: append một lần,
+`EXACT_DUPLICATE` trước/sau restart n8n/adapter và adapter failure chặn
+ACK/report. Không suy fixture schedule này thành vận hành deployment.
 
 **Mở rộng M06 engine CI (2026-09-09):** runner còn chạy key-order retry,
 same-correlation content conflict, unsupported source và changed event. Hai ca

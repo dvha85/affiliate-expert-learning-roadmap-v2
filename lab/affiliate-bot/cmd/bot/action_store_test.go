@@ -107,6 +107,14 @@ func TestActionStoreLifecycle(t *testing.T) {
 	if string(now) != "corrupt\n" {
 		t.Fatal("corrupt store overwritten")
 	}
+	if err := os.WriteFile(actions, saved[:len(saved)-1], 0600); err != nil {
+		t.Fatal(err)
+	}
+	call(args, 1, "STORE_ERROR")
+	now, _ = os.ReadFile(actions)
+	if !bytes.Equal(now, saved[:len(saved)-1]) {
+		t.Fatal("unterminated action store was changed")
+	}
 	call([]string{"record"}, 2, "USAGE_ERROR")
 }
 

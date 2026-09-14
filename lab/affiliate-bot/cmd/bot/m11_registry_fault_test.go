@@ -40,6 +40,36 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, raw); err != nil || status != appendDuplicate {
 		t.Fatalf("retry must be exact duplicate: status=%s err=%v", status, err)
 	}
+
+	second := lease
+	second.LeaseID, second.ApprovalRef, second.CorrelationID = "uncertain-lease", "uncertain-approval", "uncertain-correlation"
+	second.LeaseHash = corem11.ComputeProductionLeaseHash(second)
+	secondRaw, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	if entry, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, secondRaw); err == nil || status != appendAdded {
+		t.Fatalf("registry publication uncertainty was not surfaced: entry=%+v status=%s err=%v", entry, status, err)
+	} else {
+		var uncertain *immutableArtifactPublishUncertainError
+		if !errors.As(err, &uncertain) || entry.ArtifactID != second.LeaseID {
+			t.Fatalf("registry publication did not retain resolvable immutable entry: entry=%+v err=%v", entry, err)
+		}
+	}
+	entries, err = loadM11ArtifactRegistry(dir)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("uncertain M11 registry append was not retained: entries=%d err=%v", len(entries), err)
+	}
+	artifactRegistryPublishFailure = nil
+	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, secondRaw); err != nil || status != appendDuplicate {
+		t.Fatalf("uncertain M11 registry append did not exact-retry: status=%s err=%v", status, err)
+	}
 }
 
 func TestM11RegistryAppendRejectsSameByteNameReplacement(t *testing.T) {
@@ -352,7 +382,7 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 	activation := corem11.ProductionActivationRecord{LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ActivatedAt: "2026-09-08T00:00:00Z"}
 	gate := corem11.ProductionGateDecision{LedgerArtifactID: gateLedgerEntry.ArtifactID, LedgerContentHash: gateLedgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, RiskClass: "RISK0", HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "ALLOW_PRODUCTION", Reason: "fixture", EvaluatedAt: "2026-09-08T00:00:00Z"}
 	gate.GateID = corem11.ComputeProductionGateID(lease, gate.IntentID, gate.IntentHash, health, cost, gateLedgerEntry, gate.EvaluatedAt)
-	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, "fixture_stub"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "unknown-journal-key", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, "fixture_stub", "2026-09-08T00:00:00Z"), IntentID: cost.IntentID, IntentHash: cost.IntentHash, PolicyVersion: lease.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: "fixture_stub", AuthorizedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T00:01:00Z", IdempotencyKey: "unknown-journal-key", CorrelationID: cost.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
 	executionID = corem11.ComputeProductionExecutionID(authorization.AuthorizationID)
 	ledger.PendingExecutionIDs = []string{executionID}
 	ledgerRaw, err = json.Marshal(ledger)
@@ -556,6 +586,151 @@ func TestM11ReconcileRejectsSecondResolutionForSameUnknownExecution(t *testing.T
 	_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
 	if err != nil || len(head.ReconciliationResolutionIDs) != 1 || head.ReconciliationResolutionIDs[0] != first.ResolutionID || head.UpdatedAt != first.ResolvedAt {
 		t.Fatalf("rejected reconciliation changed the current ledger head: ledger=%+v err=%v", head, err)
+	}
+}
+
+func TestMissionM11ReconcileDisclosesRegistryPublishUncertainty(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	execution, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fixture timeout")
+	if err != nil || status != appendAdded {
+		t.Fatalf("create stopped UNKNOWN fixture: execution=%+v status=%s err=%v", execution, status, err)
+	}
+	stoppedEntry, _, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve stopped ledger: %v", err)
+	}
+	resolution := corem11.ProductionReconciliationResolution{ResolutionID: "uncertain-reconciliation", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:03Z", EffectState: "NOT_PERFORMED", Reason: "human reviewed fixture timeout"}
+	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindReconciliation, resolution)
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(fixture.dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-reconcile", fixture.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("reconciliation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok {
+			t.Fatalf("reconciliation uncertainty omitted visible transition: %+v", response)
+		}
+		returnedResolution, hasResolution := artifact["resolution"].(map[string]any)
+		returnedLedger, hasLedger := artifact["stopped_ledger"].(map[string]any)
+		if !hasResolution || !hasLedger || returnedResolution["resolution_id"] != resolution.ResolutionID || returnedLedger["reconciliation_required"] != false {
+			t.Fatalf("reconciliation uncertainty did not disclose the canonical transition: %+v", artifact)
+		}
+	}
+	if _, ledger, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID); err != nil || len(ledger.ReconciliationResolutionIDs) != 1 || ledger.ReconciliationResolutionIDs[0] != resolution.ResolutionID {
+		t.Fatalf("uncertain reconciliation ledger was not retained as head: ledger=%+v err=%v", ledger, err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-reconcile", fixture.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("reconciliation exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
+func TestMissionM11RecoveryAdmissionDisclosesRegistryPublishUncertainty(t *testing.T) {
+	oldRuntime := newM11UnknownStopFixture(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	execution, _, status, err := recordUnknownM11Execution(oldRuntime.dir, oldRuntime.authorization.AuthorizationID, oldRuntime.ledgerEntry.ArtifactID, attemptedAt, "fixture timeout")
+	if err != nil || status != appendAdded {
+		t.Fatalf("create stopped UNKNOWN fixture: execution=%+v status=%s err=%v", execution, status, err)
+	}
+	stoppedEntry, _, err := m11LedgerHead(oldRuntime.dir, oldRuntime.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve stopped ledger: %v", err)
+	}
+	resolution := corem11.ProductionReconciliationResolution{ResolutionID: "admission-uncertain-resolution", LeaseID: oldRuntime.lease.LeaseID, LeaseVersion: oldRuntime.lease.LeaseVersion, LeaseHash: oldRuntime.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:03Z", EffectState: "NOT_PERFORMED", Reason: "human reviewed fixture timeout"}
+	registerM11TestArtifact(t, oldRuntime.dir, corem11.ArtifactKindReconciliation, resolution)
+	if _, _, status, err := reconcileM11Execution(oldRuntime.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); err != nil || status != appendAdded {
+		t.Fatalf("reconcile old runtime: status=%s err=%v", status, err)
+	}
+	_, reviewedLedger, err := m11LedgerHead(oldRuntime.dir, oldRuntime.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve reviewed stopped ledger: %v", err)
+	}
+	reviewedRaw, err := json.Marshal(reviewedLedger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewedEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, reviewedRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoffPath := filepath.Join(t.TempDir(), "recovery-handoff.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected handoff parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m11-recovery-export", oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID, handoffPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("recovery handoff uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["resolution_id"] != resolution.ResolutionID || artifact["execution_permitted"] != false {
+		t.Fatalf("recovery handoff uncertainty omitted visible non-authorizing handoff: %+v", response)
+	}
+	if _, err := os.Stat(handoffPath); err != nil {
+		t.Fatalf("recovery handoff was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m11-recovery-export", oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID, handoffPath); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("recovery handoff exact retry failed: code=%d response=%+v", code, response)
+	}
+
+	newRuntime := t.TempDir()
+	if code, response := missionCall(t, "init", newRuntime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init new runtime: code=%d response=%+v", code, response)
+	}
+	newLease := oldRuntime.lease
+	newLease.LeaseID = "admission-uncertain-new-lease"
+	newLease.ApprovalRef = "admission-uncertain-new-approval"
+	newLease.ReviewedAt = "2026-09-08T00:00:04Z"
+	newLease.ValidFrom = "2026-09-08T00:00:04Z"
+	newLease.CorrelationID = "admission-uncertain-new-correlation"
+	newLease.LeaseHash = corem11.ComputeProductionLeaseHash(newLease)
+	newApproval := corem11.ProductionLeaseApproval{ApprovalID: newLease.ApprovalRef, LeaseID: newLease.LeaseID, LeaseVersion: newLease.LeaseVersion, LeaseHash: newLease.LeaseHash, PromotionReviewRef: newLease.PromotionReviewRef, SourceCanaryGrantID: newLease.SourceCanaryGrantID, SourceCanaryGrantVersion: newLease.SourceCanaryGrantVersion, SourceCanaryGrantHash: newLease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: newLease.ReviewerID, ReviewedAt: newLease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	registerM11TestArtifact(t, newRuntime, corem11.ArtifactKindLease, newLease)
+	registerM11TestArtifact(t, newRuntime, corem11.ArtifactKindLeaseApproval, newApproval)
+	if code, response := missionCall(t, "m11-activate", newRuntime, newLease.LeaseID, "2026-09-08T00:00:05Z"); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("activate new runtime: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-ledger-init", newRuntime, newLease.LeaseID, "2026-09-08T00:00:05Z"); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("initialize new runtime ledger: code=%d response=%+v", code, response)
+	}
+	oldAbs, newAbs, err := m11DistinctRuntimeDirs(oldRuntime.dir, newRuntime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := corem11.ProductionRecoveryAdmission{RecoveryAdmissionID: "uncertain-recovery-admission", PriorRuntimeDir: oldAbs, PriorLeaseID: oldRuntime.lease.LeaseID, PriorLeaseVersion: oldRuntime.lease.LeaseVersion, PriorLeaseHash: oldRuntime.lease.LeaseHash, PriorApprovalID: oldRuntime.lease.ApprovalRef, ResolutionID: resolution.ResolutionID, NewRuntimeID: "admission-uncertain-runtime", NewRuntimeDir: newAbs, NewLeaseID: newLease.LeaseID, NewLeaseVersion: newLease.LeaseVersion, NewLeaseHash: newLease.LeaseHash, NewApprovalID: newApproval.ApprovalID, ReviewedBy: "human", ReviewerID: "reviewer-2", ReviewedAt: "2026-09-08T00:00:06Z", ExecutionPermitted: false}
+	admissionRaw, err := json.Marshal(admission)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admissionPath := filepath.Join(t.TempDir(), "recovery-admission.json")
+	if err := writeJSONAtomic(admissionPath, json.RawMessage(admissionRaw)); err != nil {
+		t.Fatal(err)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(newRuntime)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("recovery admission uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["recovery_admission_id"] != admission.RecoveryAdmissionID || artifact["execution_permitted"] != false {
+		t.Fatalf("recovery admission uncertainty omitted the visible non-authorizing artifact: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", newRuntime, corem11.ArtifactKindRecoveryAdmission, admission.RecoveryAdmissionID); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain recovery admission was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("recovery admission exact retry failed: code=%d response=%+v", code, response)
 	}
 }
 

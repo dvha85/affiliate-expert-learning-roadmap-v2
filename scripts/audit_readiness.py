@@ -133,6 +133,11 @@ def audit_runtime_acceptance(root, matrix):
     if not isinstance(fault_scope, str) or "STORE_ERROR" not in fault_scope or "cap=1" not in fault_scope or "after temporary-file sync" not in fault_scope:
         fail("R10 reservation commit-fault record lacks a bounded cap disclosure")
     source_text = source.read_text(encoding="utf-8")
+    # Keep implementation and command-path assertions separate: a test name by
+    # itself must not satisfy an acceptance rule when the uncertain-publish
+    # payload boundary was removed from the Bot.
+    mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    mission_source_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
     if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source_text or '"after_temp_sync", "before_rename"' not in source_text:
         fail("R10 reservation commit-fault regression is missing from the learner Bot test path")
     publish_fault = updates.get("RP-03-mission-state-publish-recovery-status")
@@ -151,6 +156,166 @@ def audit_runtime_acceptance(root, matrix):
         fail("durable STOP post-rename regression is missing from the learner Bot test path")
     if "TestMissionStopCannotOverwriteDurableReason" not in stop_text or '"replacement-stop"' not in stop_text or "!bytes.Equal(stateBefore, stateAfter)" not in stop_text or "!bytes.Equal(markerBefore, markerAfter)" not in stop_text:
         fail("durable STOP immutability regression is missing from the learner Bot test path")
+    artifact_publish = updates.get("RP-01-atomic-artifact-publish")
+    if not isinstance(artifact_publish, dict):
+        fail("matrix lacks immutable artifact post-publish acceptance record")
+    expected_refs = {
+        "lab/affiliate-bot/cmd/bot/artifact_publish_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/m07_test.go",
+        "lab/affiliate-bot/cmd/bot/watcher_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+    }
+    if not expected_refs.issubset(set(artifact_publish.get("test_refs", []))):
+        fail("immutable artifact post-publish record lacks real publisher/CLI/adapter regressions")
+    artifact_scope = artifact_publish.get("scope")
+    if not isinstance(artifact_scope, str) or "PUBLISHED_RECOVERY_REQUIRED" not in artifact_scope or "after Link" not in artifact_scope:
+        fail("immutable artifact post-publish record lacks visible-artifact uncertainty disclosure")
+    artifact_source = root / "lab/affiliate-bot/cmd/bot/artifact_publish_test.go"
+    watcher_source = root / "lab/affiliate-bot/cmd/bot/watcher_test.go"
+    artifact_text = artifact_source.read_text(encoding="utf-8") if artifact_source.is_file() else ""
+    watcher_text = watcher_source.read_text(encoding="utf-8") if watcher_source.is_file() else ""
+    m07_source = root / "lab/affiliate-bot/cmd/bot/m07_test.go"
+    m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
+    m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
+    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestMissionM08PolicyReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text or "recovery handoff uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-export"' not in m11_fault_text:
+        fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
+    canonical_output = updates.get("RP-03-m10-canonical-output-disclosure")
+    if not isinstance(canonical_output, dict):
+        fail("matrix lacks M10 canonical-output disclosure acceptance record")
+    if "lab/affiliate-bot/cmd/bot/mission_command.go" not in canonical_output.get("implementation_refs", []) or "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in canonical_output.get("test_refs", []):
+        fail("M10 canonical-output disclosure record lacks implementation/test refs")
+    canonical_output_scope = canonical_output.get("scope")
+    if not isinstance(canonical_output_scope, str) or "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" not in canonical_output_scope or "PUBLISHED_RECOVERY_REQUIRED" not in canonical_output_scope or "m10-resolve" not in canonical_output_scope:
+        fail("M10 canonical-output disclosure record lacks bounded recovery disclosure")
+    if "TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts" not in source_text or "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" not in source_text or '"m10-resolve"' not in source_text:
+        fail("M10 canonical-output disclosure regression is missing from learner Bot path")
+    gate_identity = updates.get("RP-03-m10-gate-evaluation-identity")
+    if not isinstance(gate_identity, dict):
+        fail("matrix lacks M10 gate evaluation-identity acceptance record")
+    required_gate_identity_refs = {
+        "core/m10/canary_gate.go",
+        "core/m10/artifact_registry.go",
+        "core/m10/cost_bound_test.go",
+    }
+    if not required_gate_identity_refs.issubset(set(gate_identity.get("implementation_refs", [])) | set(gate_identity.get("test_refs", []))):
+        fail("M10 gate evaluation-identity record lacks implementation/test refs")
+    gate_identity_scope = gate_identity.get("scope")
+    if not isinstance(gate_identity_scope, str) or "evaluation time" not in gate_identity_scope or "distinct immutable IDs" not in gate_identity_scope:
+        fail("M10 gate evaluation-identity record lacks bounded identity disclosure")
+    gate_source = root / "core/m10/canary_gate.go"
+    gate_registry_source = root / "core/m10/artifact_registry.go"
+    gate_test = root / "core/m10/cost_bound_test.go"
+    gate_source_text = gate_source.read_text(encoding="utf-8") if gate_source.is_file() else ""
+    gate_registry_text = gate_registry_source.read_text(encoding="utf-8") if gate_registry_source.is_file() else ""
+    gate_test_text = gate_test.read_text(encoding="utf-8") if gate_test.is_file() else ""
+    if "in.Now, in.Ledger" not in gate_source_text or "Now: gate.EvaluatedAt" not in gate_registry_text or "TestCanaryGateIdentityIncludesEvaluationTime" not in gate_test_text or "TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes" not in source_text:
+        fail("M10 gate evaluation-identity regression is missing from canonical path")
+    m11_authorization_identity = updates.get("RP-07-m11-authorization-time-identity")
+    if not isinstance(m11_authorization_identity, dict):
+        fail("matrix lacks M11 authorization time-identity acceptance record")
+    required_m11_authorization_refs = {
+        "core/m11/artifact.go",
+        "core/m11/artifact_registry.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "core/m11/artifact_test.go",
+        "scripts/smoke_br18b_backup_restore.py",
+        "scripts/mutate_m11_identity_guard.py",
+    }
+    if not required_m11_authorization_refs.issubset(set(m11_authorization_identity.get("implementation_refs", [])) | set(m11_authorization_identity.get("test_refs", []))):
+        fail("M11 authorization time-identity record lacks implementation/test refs")
+    m11_authorization_scope = m11_authorization_identity.get("scope")
+    if not isinstance(m11_authorization_scope, str) or "authorized_at" not in m11_authorization_scope or "distinct IDs" not in m11_authorization_scope:
+        fail("M11 authorization time-identity record lacks bounded identity disclosure")
+    m11_artifact_source = root / "core/m11/artifact.go"
+    m11_registry_source = root / "core/m11/artifact_registry.go"
+    m11_artifact_test = root / "core/m11/artifact_test.go"
+    m11_smoke = root / "scripts/smoke_br18b_backup_restore.py"
+    m11_artifact_text = m11_artifact_source.read_text(encoding="utf-8") if m11_artifact_source.is_file() else ""
+    m11_registry_text = m11_registry_source.read_text(encoding="utf-8") if m11_registry_source.is_file() else ""
+    m11_test_text = m11_artifact_test.read_text(encoding="utf-8") if m11_artifact_test.is_file() else ""
+    m11_smoke_text = m11_smoke.read_text(encoding="utf-8") if m11_smoke.is_file() else ""
+    if "gateID, executorID, authorizedAt string" not in m11_artifact_text or "gate.GateID, x.ExecutorID, x.AuthorizedAt" not in m11_registry_text or "distinct authorization times reused an immutable ID" not in m11_test_text or "same_gate_later_auth" not in m11_smoke_text:
+        fail("M11 authorization time-identity regression is missing from canonical path")
+    registry_publish = updates.get("RP-03-07-registry-publish-uncertainty")
+    if not isinstance(registry_publish, dict):
+        fail("matrix lacks M10/M11 registry publish-uncertainty acceptance record")
+    required_registry_publish_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+    }
+    if not required_registry_publish_refs.issubset(set(registry_publish.get("implementation_refs", [])) | set(registry_publish.get("test_refs", []))):
+        fail("M10/M11 registry publish-uncertainty record lacks implementation/test refs")
+    registry_publish_scope = registry_publish.get("scope")
+    if not isinstance(registry_publish_scope, str) or "PUBLISHED_RECOVERY_REQUIRED" not in registry_publish_scope or "exact-retries" not in registry_publish_scope:
+        fail("M10/M11 registry publish-uncertainty record lacks bounded recovery disclosure")
+    m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
+    if "artifactRegistryPublishFailure" not in source_text or "TestMissionM10GateDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM10AuthorizationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11LifecycleDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11GateAuthorizationAndReservationDiscloseRegistryPublishUncertainty" not in source_text or "TestMissionM11EvaluationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11CycleDisclosesRegistryPublishUncertainty" not in source_text or '"m11-activate"' not in source_text or '"m11-ledger-init"' not in source_text or '"m11-gate"' not in source_text or '"m11-authorize"' not in source_text or '"m11-reserve-authorization"' not in source_text or '"m11-evaluate"' not in source_text or '"m11-close-cycle"' not in source_text or "uncertain M11 registry append was not retained" not in m11_fault_text or "TestMissionM11ReconcileDisclosesRegistryPublishUncertainty" not in m11_fault_text or '"m11-reconcile"' not in m11_fault_text or "recovery admission uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-admit"' not in m11_fault_text:
+        fail("M10/M11 registry publish-uncertainty regression is missing from learner paths")
+    visible_journal_ids = {"RP-03-m10-cost-bound-two-store-journal", "RP-03-m10-canary-registry-state-journal"}
+    visible_journals = {item_id: updates.get(item_id) for item_id in visible_journal_ids}
+    if any(not isinstance(item, dict) for item in visible_journals.values()):
+        fail("matrix lacks M10 visible-journal recovery acceptance records")
+    if any("PUBLISHED_RECOVERY_REQUIRED" not in item.get("scope", "") for item in visible_journals.values()):
+        fail("M10 visible-journal records lack publish-uncertainty disclosure")
+    if "TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay" not in source_text or "TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"after_publish_before_parent_sync"' not in source_text or '"after_rename_before_parent_sync"' not in source_text or '"m10-canary"' not in source_text or '"m10-cost-register"' not in source_text or '"m10-record-failed"' not in source_text:
+        fail("M10 visible-journal recovery regression is missing from learner path")
+    m11_outcome_journal = updates.get("RP-07-m11-outcome-visible-journal")
+    if not isinstance(m11_outcome_journal, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_outcome_journal.get("scope", ""):
+        fail("matrix lacks M11 outcome visible-journal recovery acceptance")
+    if "TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"m11-outcome"' not in source_text or "artifactIfAtomicPublishUncertain" not in mission_source_text:
+        fail("M11 outcome visible-journal recovery regression is missing from learner path")
+    m11_execution_journals = updates.get("RP-07-m11-execution-visible-journals")
+    if not isinstance(m11_execution_journals, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_execution_journals.get("scope", ""):
+        fail("matrix lacks M11 execution visible-journal recovery acceptance")
+    if "TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"m11-record-failed"' not in source_text or '"m11-record-unknown"' not in source_text or "artifactIfAtomicPublishUncertain" not in mission_source_text:
+        fail("M11 execution visible-journal recovery regression is missing from learner path")
+    framing = updates.get("RP-03-canonical-jsonl-framing")
+    if not isinstance(framing, dict):
+        fail("matrix lacks the canonical JSONL framing acceptance record")
+    required_framing_refs = {
+        "lab/affiliate-bot/internal/store/history.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go",
+        "lab/affiliate-bot/internal/store/history_test.go",
+        "lab/affiliate-bot/cmd/bot/action_store_test.go",
+        "lab/affiliate-bot/cmd/bot/outcome_store_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go",
+    }
+    if not required_framing_refs.issubset(set(framing.get("implementation_refs", [])) | set(framing.get("test_refs", []))):
+        fail("canonical JSONL framing record lacks implementation/test refs")
+    framing_scope = framing.get("scope")
+    if not isinstance(framing_scope, str) or "without LF" not in framing_scope or "M10 artifact/cost-bound" not in framing_scope or "M11 artifact" not in framing_scope or "without changing" not in framing_scope:
+        fail("canonical JSONL framing record lacks bounded scope disclosure")
+    store_source = root / "lab/affiliate-bot/internal/store/history.go"
+    store_test = root / "lab/affiliate-bot/internal/store/history_test.go"
+    framing_source = store_source.read_text(encoding="utf-8") if store_source.is_file() else ""
+    framing_test = store_test.read_text(encoding="utf-8") if store_test.is_file() else ""
+    if "RequireCompleteJSONLFraming" not in framing_source or "incomplete final line framing" not in framing_source or "TestJSONLOpenRejectsIncompleteFinalLine" not in framing_test:
+        fail("canonical JSONL shared framing regression is missing")
+    mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    mission_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
+    if mission_text.count("RequireCompleteJSONLFraming(raw)") < 4 or "TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming" not in source_text:
+        fail("M10/M11 canonical registry/outcome framing regression is missing")
+    m11_source = root / "lab/affiliate-bot/cmd/bot/m11_registry.go"
+    m11_text = m11_source.read_text(encoding="utf-8") if m11_source.is_file() else ""
+    receipt_source = root / "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go"
+    receipt_text = receipt_source.read_text(encoding="utf-8") if receipt_source.is_file() else ""
+    receipt_test = root / "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go"
+    if "RequireCompleteJSONLFraming(raw)" not in m11_text or "RequireCompleteJSONLFraming(raw)" not in receipt_text or not receipt_test.is_file() or "TestAccesstradeBackupRequirementRejectsIncompleteOutcomeJSONL" not in receipt_test.read_text(encoding="utf-8"):
+        fail("M11/ACCESSTRADE canonical JSONL framing regression is missing")
+    action_test = root / "lab/affiliate-bot/cmd/bot/action_store_test.go"
+    outcome_test = root / "lab/affiliate-bot/cmd/bot/outcome_store_test.go"
+    if not action_test.is_file() or "unterminated action store was changed" not in action_test.read_text(encoding="utf-8"):
+        fail("M03 incomplete JSONL no-mutation regression is missing")
+    if not outcome_test.is_file() or "unterminated outcome store was changed" not in outcome_test.read_text(encoding="utf-8"):
+        fail("M04 incomplete JSONL no-mutation regression is missing")
 
 
 def audit_evidence_graph(root, criteria_by_id):
@@ -273,6 +438,24 @@ def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
             fail("beginner plan incorrectly treats the selected-source contract as absent")
 
 
+def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
+    """Keep the checked-in engine evidence tied to the Node major n8n needs."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-n8n-engine-node24-reproduction")
+    if not isinstance(record, dict) or "Node 24.21.0" not in record.get("scope", ""):
+        fail("matrix lacks scoped n8n Node 24 engine reproduction evidence")
+    compatibility = root / "lab/n8n/COMPATIBILITY.md"
+    workflow = root / ".github/workflows/mission-agent-path-ci.yml"
+    runner = root / "scripts/run_n8n_engine_regression.py"
+    compatibility_text = compatibility.read_text(encoding="utf-8") if compatibility.is_file() else ""
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    if "Re-run n8n engine cục bộ (2026-09-14)" not in plan_text or "Node `24.21.0`" not in compatibility_text or "isolated-vm" not in compatibility_text:
+        fail("n8n engine compatibility evidence lacks the Node/native boundary")
+    schedule_runner = root / "scripts/run_n8n_m06_schedule_regression.py"
+    if not runner.is_file() or not schedule_runner.is_file() or 'node-version: "24"' not in workflow_text or "n8n@2.38.1" not in workflow_text or "run_n8n_m06_schedule_regression.py" not in workflow_text:
+        fail("n8n engine CI no longer pins the compatible Node/runtime pair")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -312,6 +495,7 @@ def audit(root):
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
+    audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

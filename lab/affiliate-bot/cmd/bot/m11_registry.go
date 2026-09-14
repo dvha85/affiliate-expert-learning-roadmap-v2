@@ -13,6 +13,7 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 func m11ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m11-artifacts.jsonl") }
@@ -40,6 +41,9 @@ func readM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	entries := []corem11.ArtifactEntry{}
@@ -123,7 +127,12 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 		err = verifyStableRegularFileName(path, opened)
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(path))
+		if publishErr := registryPublishFailure(path); publishErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: publishErr}
+		}
+		if syncErr := syncDirectory(filepath.Dir(path)); syncErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: syncErr}
+		}
 	}
 	if faultErr == nil {
 		// This fault now follows both file and directory sync, exercising the
@@ -612,7 +621,7 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	if !expires.After(now) {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("authorization would already be expired")
 	}
-	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, executorID), IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: executorID, AuthorizedAt: authorizedAt, ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
+	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, executorID, authorizedAt), IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: executorID, AuthorizedAt: authorizedAt, ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
 	raw, err := json.Marshal(authorization)
 	if err != nil {
 		return authorization, "", err

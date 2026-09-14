@@ -44,6 +44,38 @@ func TestWriteNewJSONFailureLeavesNoPartialArtifactAndRetryPublishes(t *testing.
 	}
 }
 
+// The hard-link publish has already made a complete immutable artifact visible
+// when the following parent directory sync fails.  Do not collapse that state
+// into an ordinary failed write, or callers could wrongly initiate a second
+// transition while the first artifact is already observable.
+func TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "artifact.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	status, err := writeNewJSON(path, map[string]string{"state": "new"})
+	var uncertain *immutableArtifactPublishUncertainError
+	if status != appendAdded || !errors.As(err, &uncertain) {
+		t.Fatalf("post-publish failure was not distinguished: status=%s err=%v", status, err)
+	}
+	first, readErr := os.ReadFile(path)
+	if readErr != nil || !bytes.Contains(first, []byte(`"state": "new"`)) {
+		t.Fatalf("visible artifact was not retained after unconfirmed sync: %q err=%v", first, readErr)
+	}
+	artifactWriteFault = nil
+	if status, err := writeNewJSON(path, map[string]string{"state": "new"}); err != nil || status != appendDuplicate {
+		t.Fatalf("exact retry did not resolve the visible artifact: status=%s err=%v", status, err)
+	}
+	if current, err := os.ReadFile(path); err != nil || !bytes.Equal(first, current) {
+		t.Fatalf("visible artifact changed on exact retry: %q err=%v", current, err)
+	}
+}
+
 func TestWriteNewJSONRejectsExternalSymlinkAndPostOpenSwap(t *testing.T) {
 	dir := t.TempDir()
 	external := filepath.Join(t.TempDir(), "external.json")
