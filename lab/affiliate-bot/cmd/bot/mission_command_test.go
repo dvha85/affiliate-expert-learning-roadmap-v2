@@ -885,6 +885,39 @@ func TestMissionM10GateDisclosesRegistryPublishUncertainty(t *testing.T) {
 	}
 }
 
+func TestMissionM10AuthorizationDisclosesRegistryPublishUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+	authorizationOutput := filepath.Join(root, "uncertain-registry-authorization.json")
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m10ArtifactRegistryPath(runtimeDir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible canonical registry authorization was not disclosed as uncertain: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		authorizationID, okID := artifact["authorization_id"].(string)
+		if !ok || !okID || authorizationID == "" {
+			t.Fatalf("registry publish uncertainty omitted the durable authorization: %+v", response)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionAuthorization, authorizationID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("uncertain registry authorization was not resolvable: code=%d response=%+v", code, resolved)
+		}
+	}
+	if _, err := os.Stat(authorizationOutput); !os.IsNotExist(err) {
+		t.Fatalf("portable authorization was published after registry uncertainty: %v", err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("exact registry retry did not publish portable authorization: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	// Use a short real-time-valid fixture window: each contender invokes the
 	// compiled learner Bot, so unlike a unit clock seam this proves the normal

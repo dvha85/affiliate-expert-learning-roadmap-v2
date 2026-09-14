@@ -515,9 +515,9 @@ power-loss, multi-host hay business outcome; RP-07 vẫn `PARTIAL`.
 **Cập nhật M10/M11 registry publish uncertainty (2026-09-14):** sau khi một
 line immutable registry đã file-sync và tên file còn đúng nhưng parent-directory
 sync không xác nhận được, adapter trả typed publish uncertainty thay vì lỗi
-append thường. `m10-gate` bàn giao `PUBLISHED_RECOVERY_REQUIRED` kèm gate đã
-resolve được và không ghi portable output; M11 registry giữ entry để chỉ exact
-retry sau khi uncertainty hết. Regression dùng seam sau file sync, trước parent
+append thường. `m10-gate` và `m10-authorize` bàn giao
+`PUBLISHED_RECOVERY_REQUIRED` kèm artifact đã resolve được và không ghi
+portable output; M11 registry giữ entry để chỉ exact retry sau khi uncertainty hết. Regression dùng seam sau file sync, trước parent
 sync, và kiểm cả two paths. Đây là disclosure/recovery local có giới hạn, chưa
 chứng minh durability qua power loss, transaction nhiều file, bao phủ mọi M11
 lifecycle envelope, multi-host, execution hay business outcome; RP-03/RP-07
