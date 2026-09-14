@@ -110,6 +110,15 @@ func m10CostBoundJournalPath(dir string) string {
 	return filepath.Join(dir, "m10-cost-bound-journal.json")
 }
 
+// m10OutcomeAppend is a command-local test seam for the acknowledgement
+// boundary of the single-file fixture outcome store. The production command
+// always calls the shared JSONL writer; tests can make that writer report an
+// error after it made an exact outcome visible, which must not be collapsed
+// into a retryable "nothing happened" failure.
+var m10OutcomeAppend = func(path string, record []byte) error {
+	return (store.JSONL{}).AppendLine(path, record)
+}
+
 // m10CanaryJournal binds the immutable grant artifact to the mutable canary
 // state that owns its usage counters. Neither side can be admitted on its own
 // after an interrupted writer.
@@ -2646,8 +2655,20 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		if err := (store.JSONL{}).AppendLine(m10OutcomeStorePath(args[1]), encoded); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+		if appendErr := m10OutcomeAppend(m10OutcomeStorePath(args[1]), encoded); appendErr != nil {
+			// A writer can lose acknowledgement after its full line has become
+			// observable. Re-read through the canonical loader before choosing a
+			// response: an exact visible record requires explicit recovery rather
+			// than a misleading retryable STORE_ERROR.
+			persisted, replayErr := loadM10FixtureOutcomes(args[1], s)
+			if replayErr == nil {
+				for _, prior := range persisted {
+					if prior.OutcomeID == outcome.OutcomeID && reflect.DeepEqual(prior, outcome) {
+						return emit("PUBLISHED_RECOVERY_REQUIRED", outcome, appendErr, 1)
+					}
+				}
+			}
+			return emit("STORE_ERROR", nil, appendErr, 1)
 		}
 		return emit("APPENDED", outcome, nil, 0)
 	case "m10-resolve":
