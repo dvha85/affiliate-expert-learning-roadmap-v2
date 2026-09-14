@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: d0d02c056e4c9d2d4b6e7deafa348f9a8b9748cb -->
+<!-- readiness-main-baseline: ced5452d4dad95c50f43f45e47fb1c71a479b861 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1400,6 +1400,16 @@ runtime hay authority. Đúng một lệnh trả `RESERVED`; mọi process khác
 chạy `status` để replay state đã persist. Điều này thay claim cũ sai rằng smoke
 BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting, không
 chứng minh distributed lock, kill/power-loss hoặc transaction đa-file.
+
+**Cập nhật M10 24-process fixture-outcome barrier (2026-09-14):** sau một
+reservation M10 đã được ghi và một execution `CANCELLED`/`NOT_PERFORMED` đã
+canonicalize, barrier test-owned giải phóng 24 binary Bot riêng cùng ghi các
+outcome ID khác nhau nhưng cùng `MACHINE_EXECUTION` effect. Đúng một lệnh trả
+`APPENDED`; phần còn lại chỉ `BUSY` hoặc `CONFLICT`. Loader đọc đúng một outcome
+trong JSONL, Bot process mới replay trạng thái, rồi backup v3/restore sang
+runtime trống vẫn giữ đúng một outcome đó. Đây chứng minh local single-writer
+cardinality trên command/store/restore path; không chứng minh ingestion business
+outcome, crash/power-loss, transaction đa-file hay multi-host.
 
 **Cập nhật M11 24-process reservation barrier (2026-09-14):** shared smoke
 M00–M11 clone đúng runtime đã có M11 lease/approval/activation/health/cost và
