@@ -73,7 +73,7 @@ bảng gói; “Kiểm chứng bắt buộc” không tự chứng minh test đ�
 | R07 / P2 | JSON number bị làm tròn trước hash | RP-02 | `9007199254740993` giữ nguyên qua decode/hash/store/restart hoặc reject tường minh trước ghi |
 | R08 / P1 | Nới/reset budget qua reimport/bind | RP-03 | Grant đã cạn không dùng lại qua tăng cap, đổi currency, bind qua lại hoặc replay approval |
 | R09 / P1 | Approval hết hạn vẫn reserve | RP-03 | Before/at/after expiry, process mới và restore; hết hạn chặn operation |
-| R10 / P1 | Concurrent reserve vượt cap | RP-03 | Barrier đồng bộ 24 process, cap=1: đúng một reservation, ledger khớp ACK; crash injection không làm mở budget |
+| R10 / P1 | Concurrent reserve vượt cap | RP-03 | Barrier đồng bộ 24 process, cap=1: đúng một M10 hoặc M11 reservation, ledger khớp ACK; crash injection không làm mở budget |
 | R11 / P1 | Output ghi đè history đầu vào | RP-01 | Same path, symlink, hardlink, output tồn tại: reject trước ghi; input bytes không đổi |
 | R12 / P1 | Backup bỏ nested artifact | RP-06 + RP-07a | Restore đủ inventory M00–M10 và phần mở rộng M11; layout chưa hỗ trợ bị từ chối, không bỏ artifact |
 | R13 / P1 | RESTORED dù graph bị hỏng | RP-06 + RP-07a | Orphan action/outcome/proposal, cost-bound/gate/authorization/execution và artifact M11 bị từ chối; chỉ đóng toàn phạm vi sau gate restore RP-07a |
@@ -1400,6 +1400,17 @@ runtime hay authority. Đúng một lệnh trả `RESERVED`; mọi process khác
 chạy `status` để replay state đã persist. Điều này thay claim cũ sai rằng smoke
 BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting, không
 chứng minh distributed lock, kill/power-loss hoặc transaction đa-file.
+
+**Cập nhật M11 24-process reservation barrier (2026-09-14):** shared smoke
+M00–M11 clone đúng runtime đã có M11 lease/approval/activation/health/cost và
+ALLOW gate, rồi đăng ký 24 authorization riêng cùng trỏ vào pre-ledger cap=1.
+Barrier test-owned chỉ release sau khi cả 24 Bot binary sẵn sàng. Đúng một
+`m11-reserve-authorization` trả `APPENDED`; các contender còn lại chỉ có thể
+trả `BUSY` hoặc `REJECTED` vì runtime gate/gate snapshot đã stale. Exact retry
+của winner là `EXACT_DUPLICATE`, tất cả loser bị reject sau commit, và M11
+ledger head phải giữ đúng một pending execution/counter bằng 1. Đây là chứng
+cứ local cross-process cho lifecycle M11 thật, không chứng minh locking đa
+host, kill/power-loss hay transaction nhiều file.
 
 **Cập nhật M10 reservation commit-fault cap continuity (2026-09-14):** test
 in-process inject lỗi sau temporary-file `fsync` và ngay trước `writeJSONAtomic`
