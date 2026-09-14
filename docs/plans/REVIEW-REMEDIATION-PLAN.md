@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 84d7db65ff5010a507ff38c15eeb5a02387d340d -->
+<!-- readiness-main-baseline: 609e9f300086b6aabda39fa3703fb4e77d21ca9a -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -247,6 +247,15 @@ giờ reject same path, hardlink và symlink output alias trước khi đọc b�
 history/model/registry/tool input nào. Regression gọi CLI implementation thật
 và kiểm input bytes không đổi. Đây chỉ mở rộng inventory output của M07; các
 writer khác vẫn phải được audit riêng trước khi đổi RP-01 khỏi `PARTIAL`.
+
+**Cập nhật advisor fixture output-parent guard (2026-09-14):** `bot advisor
+fixture-run` kiểm `Lstat` output parent do caller chọn trước `MkdirTemp`; parent
+phải tồn tại, là directory và không phải symlink. Regression gọi đúng CLI với
+symlink đến thư mục ngoài, nhận `PATH_ERROR` và kiểm thư mục ngoài vẫn rỗng.
+Đây chỉ là guard trực tiếp của output parent cho bundle fixture read-only;
+ancestor-path substitution, crash/power-loss, multi-host, provider và business
+outcome vẫn nằm ngoài scope. Inventory các writer khác vẫn mở, nên RP-01 giữ
+`PARTIAL`.
 
 **Cập nhật M07 history read gate (2026-09-11):** CLI M07 và adapter M07 giờ
 giữ cùng local history runtime gate với watcher trước khi resolve canonical

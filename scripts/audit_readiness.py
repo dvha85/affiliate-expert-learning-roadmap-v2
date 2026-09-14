@@ -113,6 +113,21 @@ def audit_review_findings(matrix, criteria_by_id, plan_text):
 def audit_runtime_acceptance(root, matrix):
     """Prevent a summary row from claiming a process-barrier proof it cannot point to."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    fixture_output = updates.get("RP-01-advisor-fixture-output-parent-guard")
+    if not isinstance(fixture_output, dict):
+        fail("matrix lacks advisor fixture output-parent guard acceptance record")
+    fixture_refs = set(fixture_output.get("test_refs", []))
+    if {"lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "scripts/audit_readiness.py", "scripts/tests/test_audit_readiness.py"} - fixture_refs:
+        fail("advisor fixture output-parent record lacks CLI and audit regressions")
+    fixture_scope = fixture_output.get("scope")
+    if not isinstance(fixture_scope, str) or "MkdirTemp" not in fixture_scope or "external target" not in fixture_scope:
+        fail("advisor fixture output-parent record lacks bounded external-write disclosure")
+    fixture_source = root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
+    fixture_text = fixture_source.read_text(encoding="utf-8") if fixture_source.is_file() else ""
+    fixture_test = root / "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go"
+    fixture_test_text = fixture_test.read_text(encoding="utf-8") if fixture_test.is_file() else ""
+    if "os.Lstat(parent)" not in fixture_text or "fixture output parent must be an existing non-symlink directory" not in fixture_text or "TestAdvisorFixtureBundleRejectsSymlinkOutputParent" not in fixture_test_text or "os.ReadDir(outside)" not in fixture_test_text:
+        fail("advisor fixture output-parent regression is missing from the real CLI path")
     barrier = updates.get("RP-03-concurrent-reservation-barrier")
     if not isinstance(barrier, dict):
         fail("matrix lacks the R10 process-barrier acceptance record")
