@@ -494,8 +494,13 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     if "Re-run n8n engine cục bộ (2026-09-14)" not in plan_text or "Node `24.21.0`" not in compatibility_text or "isolated-vm" not in compatibility_text:
         fail("n8n engine compatibility evidence lacks the Node/native boundary")
     schedule_runner = root / "scripts/run_n8n_m06_schedule_regression.py"
-    if not runner.is_file() or not schedule_runner.is_file() or 'node-version: "24"' not in workflow_text or "n8n@2.38.1" not in workflow_text or "run_n8n_m06_schedule_regression.py" not in workflow_text:
+    if not runner.is_file() or not schedule_runner.is_file() or 'node-version: "24"' not in workflow_text or 'N8N_VERSION: "2.38.1"' not in workflow_text or "run_n8n_m06_schedule_regression.py" not in workflow_text:
         fail("n8n engine CI no longer pins the compatible Node/runtime pair")
+    cache_gate = updates.get("RP-08-n8n-engine-cache-gating")
+    if not isinstance(cache_gate, dict) or "full engine coverage remains required" not in cache_gate.get("scope", ""):
+        fail("matrix lacks scoped n8n engine cache/gate acceptance")
+    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@v4" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text:
+        fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 
 def audit(root):

@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 9b8ac7d5c653434d53026e09846f53e83757612e -->
+<!-- readiness-main-baseline: 8946ecc990febdd32d218b7fa2d8e03e744e723c -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1594,6 +1594,14 @@ vào `main`. Đây là regression CI cho shared M00–M11 fixture lineage và M1
 backup/reconciliation/restore; chưa phải bằng chứng GitHub Actions ở head cho
 đến khi remote workflow hoàn tất, và không thay mutation/fault-injection bên
 dưới.
+
+**Cập nhật n8n CI cache và path gate (2026-09-14):** Job bắt buộc
+`n8n-engine-regression` vẫn xuất hiện ở mọi PR, nhưng chỉ bootstrap runtime và
+chạy hai regression engine khi diff chạm blueprint M06/M07, adapter/reader M06–
+M07, runner hoặc chính workflow. Push vào `main` luôn chạy full. `node_modules`
+của n8n `2.38.1`/Node 24 được cache theo OS/Node/version để cache hit không
+phải resolve npm lại. Job skip chỉ nói thay đổi không liên quan, không phải
+evidence n8n; thay đổi có liên quan và `main` vẫn cần engine thật.
 
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và

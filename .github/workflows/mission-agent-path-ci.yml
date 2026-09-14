@@ -77,22 +77,63 @@ jobs:
     name: n8n-engine-regression
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      N8N_VERSION: "2.38.1"
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The PR path gate diffs against the base commit. Keep both parents
+          # of GitHub's synthetic merge commit available without a full clone.
+          fetch-depth: 2
+      - name: Select n8n engine coverage
+        id: n8n-inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=main_push" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
+          if printf '%s\n' "$changed" | grep -Eq '^(lab/n8n/|scripts/run_n8n_(engine|m06_schedule)_regression\.py$|lab/affiliate-bot/cmd/bot/(watcher|history|m07|canonical_resolver|portable_input|main|accesstrade_import|accesstrade_receipt)\.go$|lab/affiliate-bot/internal/(app/evidence|store/history)\.go$|\.github/workflows/mission-agent-path-ci\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=n8n_related_change" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no_n8n_related_change" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-go@v7
+        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           go-version-file: lab/affiliate-bot/go.mod
       - uses: actions/setup-python@v7
+        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           python-version: "3.12"
       - uses: actions/setup-node@v5
+        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           node-version: "24"
+      - name: Restore pinned n8n runtime
+        id: n8n-cache
+        if: steps.n8n-inputs.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/n8n-rp08/node_modules
+          key: n8n-engine-${{ runner.os }}-node24-v${{ env.N8N_VERSION }}
       - name: Install pinned n8n engine for disposable offline runtime
-        run: npm install --prefix "$RUNNER_TEMP/n8n-rp08" --no-audit --no-fund n8n@2.38.1
+        if: steps.n8n-inputs.outputs.run == 'true' && steps.n8n-cache.outputs.cache-hit != 'true'
+        run: npm install --prefix "$RUNNER_TEMP/n8n-rp08" --no-audit --no-fund "n8n@$N8N_VERSION"
       - name: Run M06/M07 engine paths and real M06 Schedule Trigger admission
+        if: steps.n8n-inputs.outputs.run == 'true'
         run: |
           python scripts/run_n8n_engine_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
           python scripts/run_n8n_m06_schedule_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
+      - name: Report scoped engine skip
+        if: steps.n8n-inputs.outputs.run != 'true'
+        run: >-
+          echo "n8n engine regression skipped: ${{ steps.n8n-inputs.outputs.reason }}; full coverage still runs on main pushes."
