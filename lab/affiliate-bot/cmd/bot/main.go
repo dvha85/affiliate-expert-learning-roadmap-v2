@@ -199,6 +199,9 @@ func runHistory(args []string) error {
 		}
 		state, err := AppendHistory(args[2], record)
 		if err != nil {
+			if state == appendPublished && isPublishedAppendUncertainty(err) {
+				fmt.Printf("History append: %s | record_id=%s | input_hash=%s\n", state, record.RecordID, record.InputHash)
+			}
 			return err
 		}
 		fmt.Printf("History append: %s | record_id=%s | input_hash=%s\n", state, record.RecordID, record.InputHash)

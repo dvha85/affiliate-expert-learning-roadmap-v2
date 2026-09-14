@@ -215,10 +215,14 @@ func runAccesstradeShopeeCampaignImport(args []string, stdout, stderr io.Writer)
 		return emit("CAPTURE_ERROR", nil, err, 1)
 	}
 	status, resolved, err := appendResolvedHistory(args[0], record)
-	if err != nil {
+	if err != nil && !isPublishedAppendUncertainty(err) {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "source_url": m06.AccesstradeShopeeSmartlinkURL, "classification": "observed_campaign_metadata_not_business_outcome"}, nil, 0)
+	artifact := map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "source_url": m06.AccesstradeShopeeSmartlinkURL, "classification": "observed_campaign_metadata_not_business_outcome"}
+	if err != nil {
+		return emit(status, artifact, err, 1)
+	}
+	return emit(status, artifact, nil, 0)
 }
 
 func appendResolvedHistory(historyPath string, record HistoryRecord) (string, HistoryRecord, error) {
@@ -230,15 +234,15 @@ func appendResolvedHistory(historyPath string, record HistoryRecord) (string, Hi
 		return "", HistoryRecord{}, err
 	}
 	defer release()
-	status, err := appendHistoryWith(store.JSONL{}, historyPath, record)
-	if err != nil {
-		return "", HistoryRecord{}, err
+	status, appendErr := canonicalHistoryAppend(store.JSONL{}, historyPath, record)
+	if appendErr != nil && !isPublishedAppendUncertainty(appendErr) {
+		return "", HistoryRecord{}, appendErr
 	}
-	resolved, err := resolveCanonicalRecord(historyPath, record.RecordID)
-	if err != nil {
-		return "", HistoryRecord{}, err
+	resolved, resolveErr := resolveCanonicalRecord(historyPath, record.RecordID)
+	if resolveErr != nil {
+		return "", HistoryRecord{}, resolveErr
 	}
-	return status, resolved, nil
+	return status, resolved, appendErr
 }
 
 func historyReadHandler(historyPath string) http.HandlerFunc {
@@ -742,9 +746,14 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			return
 		}
 		status, resolved, err := appendResolvedHistory(historyPath, record)
-		if err != nil {
+		if err != nil && !isPublishedAppendUncertainty(err) {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = io.WriteString(w, `{"status":"HANDOFF_ERROR","canonical_history_ack":false}`+"\n")
+			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": false, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
@@ -798,8 +807,12 @@ func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
 		return emit("INVALID_HISTORY", nil, err, 1)
 	}
 	status, resolved, err := appendResolvedHistory(args[0], record)
-	if err != nil {
+	if err != nil && !isPublishedAppendUncertainty(err) {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved}, nil, 0)
+	artifact := map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved}
+	if err != nil {
+		return emit(status, artifact, err, 1)
+	}
+	return emit(status, artifact, nil, 0)
 }
