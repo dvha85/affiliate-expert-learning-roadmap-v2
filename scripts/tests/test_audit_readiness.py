@@ -262,6 +262,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay", "MissingM11OutcomeJournalPublishUncertaintyRegression", 1), encoding="utf-8")
         self.assertIn("M11 outcome visible-journal recovery regression is missing", self.run_audit(False))
 
+    def test_missing_m11_visible_outcome_append_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty", "MissingM11VisibleOutcomeAppendRegression", 1), encoding="utf-8")
+        self.assertIn("M11 visible outcome-append acknowledgement regression is missing", self.run_audit(False))
+
     def test_missing_m11_execution_journal_publish_uncertainty_regression_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay", "MissingM11ExecutionJournalPublishUncertaintyRegression", 1), encoding="utf-8")
