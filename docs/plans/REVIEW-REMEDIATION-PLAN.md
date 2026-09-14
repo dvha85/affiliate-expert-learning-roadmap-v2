@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 8946ecc990febdd32d218b7fa2d8e03e744e723c -->
+<!-- readiness-main-baseline: 1d1db61145c456736245f35bba87d351a7a73feb -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -438,6 +438,14 @@ mới ở `RECOVERY_REQUIRED`, còn exact retry chỉ dọn journal và trả
 `EXACT_DUPLICATE`. Regression chạy hai command CLI thật với seam trước remove.
 Đây vẫn chỉ là acknowledgement boundary local, không chứng minh fsync,
 power-loss, transaction đa-file, external effect hay multi-host.
+
+**Cập nhật direct M11 STOP journal recovery (2026-09-14):** `m11-stop` ghi
+journal strict chứa reason trước `mission-state.json` và marker `STOP`. Fault
+sau rename ở journal, state hoặc marker giữ journal; Bot mới ở read path trả
+`RECOVERY_REQUIRED`, còn writer có lock hoặc `backup create` replay đúng
+state/marker/reason rồi mới giữ `STOPPED`. Không còn chấp nhận state-only STOP thiếu marker vô thời hạn.
+Đây là replay local cho đúng hai file, không chứng minh atomic transaction,
+kill/power-loss durability hay coordination đa host.
 
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10

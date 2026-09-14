@@ -179,8 +179,18 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_missing_durable_stop_post_rename_regression_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
-        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionStopPostRenameSyncFaultKeepsDurableStop", "MissingStopPostRenameRegression", 1), encoding="utf-8")
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionStopJournalRecoversEveryPostRenameBoundary", "MissingStopPostRenameRegression", 1), encoding="utf-8")
         self.assertIn("durable STOP post-rename regression is missing", self.run_audit(False))
+
+    def test_missing_durable_stop_journal_recovery_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("recoverM11ManualStopJournal", "missingM11ManualStopJournal"), encoding="utf-8")
+        self.assertIn("durable STOP journal recovery is missing", self.run_audit(False))
+
+    def test_missing_durable_stop_journal_backup_recovery_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("recoverM11ManualStopJournal(args[1])", "missingM11ManualStopJournal(args[1])", 1), encoding="utf-8")
+        self.assertIn("durable STOP journal recovery is missing from the backup path", self.run_audit(False))
 
     def test_missing_durable_stop_immutability_regression_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"

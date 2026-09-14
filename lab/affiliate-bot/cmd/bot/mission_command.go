@@ -244,12 +244,16 @@ func m11FailedExecutionJournalPath(dir string) string {
 func m11UnknownStopJournalPath(dir string) string {
 	return filepath.Join(dir, "m11-unknown-stop-journal.json")
 }
+func m11ManualStopJournalPath(dir string) string {
+	return filepath.Join(dir, "m11-manual-stop-journal.json")
+}
 
 func m11JournalRecoveryRequired(dir string) error {
 	for _, item := range []struct {
 		name string
 		path string
 	}{
+		{name: "manual STOP", path: m11ManualStopJournalPath(dir)},
 		{name: "failed execution", path: m11FailedExecutionJournalPath(dir)},
 		{name: "unknown STOP", path: m11UnknownStopJournalPath(dir)},
 		{name: "outcome", path: m11OutcomeJournalPath(dir)},
@@ -340,6 +344,70 @@ type m11UnknownStopJournal struct {
 	PredecessorContentHash string                            `json:"predecessor_content_hash"`
 	Execution              corem11.ProductionExecutionRecord `json:"execution"`
 	StoppedLedger          corem11.ProductionLedger          `json:"stopped_ledger"`
+}
+
+// m11ManualStopJournal makes the direct operator STOP command replayable. The
+// mission state is the authority boundary, but the STOP marker is part of the
+// persisted runtime inventory and must not be silently omitted if a process
+// exits between the two files. This is a bounded local replay, not a claim of
+// multi-file atomicity or power-loss durability.
+type m11ManualStopJournal struct {
+	Version string `json:"version"`
+	Reason  string `json:"reason"`
+}
+
+func removeM11ManualStopJournal(dir string) error {
+	if err := os.Remove(m11ManualStopJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := syncDirectory(dir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func recoverM11ManualStopJournal(dir string) error {
+	raw, err := readM11Journal(m11ManualStopJournalPath(dir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var journal m11ManualStopJournal
+	if err := contracts.DecodeStrict(raw, &journal); err != nil || journal.Version != "m11-manual-stop-journal/v1" || strings.TrimSpace(journal.Reason) == "" {
+		return fmt.Errorf("M11 manual STOP journal is invalid")
+	}
+	state, err := loadMissionState(dir)
+	if err != nil {
+		return err
+	}
+	if state.Stop {
+		if state.StopReason != journal.Reason {
+			return fmt.Errorf("M11 manual STOP journal conflicts with durable STOP reason")
+		}
+	} else {
+		state.Stop = true
+		state.StopReason = journal.Reason
+		if err := saveMissionState(dir, state); err != nil {
+			return err
+		}
+	}
+	var marker struct {
+		Active bool   `json:"active"`
+		Reason string `json:"reason"`
+	}
+	err = readCanonicalRuntimeJSON(filepath.Join(dir, "STOP"), &marker)
+	if os.IsNotExist(err) {
+		if err := writeJSONAtomic(filepath.Join(dir, "STOP"), map[string]any{"active": true, "reason": journal.Reason}); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else if !marker.Active || marker.Reason != journal.Reason {
+		return fmt.Errorf("M11 manual STOP journal conflicts with STOP marker")
+	}
+	return removeM11ManualStopJournal(dir)
 }
 
 // The registry lives beside mission-state.json and is append-only. It owns the
@@ -2130,6 +2198,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := recoverM10ExecutionJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
+		if err := recoverM11ManualStopJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		if err := recoverM11FailedExecutionJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
@@ -3076,14 +3147,15 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop {
 			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
 		}
+		journal := m11ManualStopJournal{Version: "m11-manual-stop-journal/v1", Reason: args[2]}
+		if err = writeJSONAtomic(m11ManualStopJournalPath(args[1]), journal); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
+		if err = recoverM11ManualStopJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", nil, err, 1)
+		}
 		s.Stop = true
 		s.StopReason = args[2]
-		if err = saveMissionState(args[1], s); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
-		}
-		if err = writeJSONAtomic(filepath.Join(args[1], "STOP"), map[string]any{"active": true, "reason": args[2]}); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
-		}
 		return emit("STOPPED", s, nil, 0)
 	case "status", "m11-status":
 		if len(args) != 2 {
