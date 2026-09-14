@@ -1750,6 +1750,52 @@ func TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay(
 	}
 }
 
+func TestMissionM11ExecutionJournalsDisclosePublishedCleanupUncertainty(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		command   string
+		journal   func(string) string
+		ledgerKey string
+		attempted string
+		reason    string
+		phase     string
+	}{
+		{name: "failed", command: "m11-record-failed", journal: m11FailedExecutionJournalPath, ledgerKey: "execution_ledger", attempted: "2026-09-08T00:00:02Z", reason: "published failed cleanup fixture", phase: "failed_before_remove"},
+		{name: "unknown-stop", command: "m11-record-unknown", journal: m11UnknownStopJournalPath, ledgerKey: "stopped_ledger", attempted: "2026-09-08T00:00:02Z", reason: "published unknown cleanup fixture", phase: "unknown_before_remove"},
+	} {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			m11JournalCleanupFault = func(phase string) error {
+				if phase == scenario.phase {
+					return errors.New("injected M11 execution journal cleanup failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m11JournalCleanupFault = nil })
+			if code, response := missionCall(t, scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+				t.Fatalf("published %s cleanup was not disclosed: code=%d response=%+v", scenario.name, code, response)
+			} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["execution"] == nil || artifact[scenario.ledgerKey] == nil {
+				t.Fatalf("published %s cleanup omitted deterministic transition: %+v", scenario.name, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); err != nil {
+				t.Fatalf("published %s cleanup did not retain journal: %v", scenario.name, err)
+			}
+			m11JournalCleanupFault = nil
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh status exposed published %s cleanup: code=%d response=%+v", scenario.name, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, "mission", scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+				t.Fatalf("locked retry did not close published %s cleanup: code=%d response=%+v", scenario.name, code, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("published %s cleanup journal remains after retry: %v", scenario.name, err)
+			}
+		})
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

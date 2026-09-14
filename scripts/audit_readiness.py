@@ -314,7 +314,7 @@ def audit_runtime_acceptance(root, matrix):
     m11_execution_journals = updates.get("RP-07-m11-execution-visible-journals")
     if not isinstance(m11_execution_journals, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_execution_journals.get("scope", ""):
         fail("matrix lacks M11 execution visible-journal recovery acceptance")
-    if "TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"m11-record-failed"' not in source_text or '"m11-record-unknown"' not in source_text or "artifactIfAtomicPublishUncertain" not in mission_source_text:
+    if "TestMissionM11ExecutionJournalsVisiblePublishUncertaintyDefersLockedReplay" not in source_text or "TestMissionM11ExecutionJournalsDisclosePublishedCleanupUncertainty" not in source_text or '"m11-record-failed"' not in source_text or '"m11-record-unknown"' not in source_text or "m11JournalCleanupWriteFault" not in mission_source_text or "cleanup fails" not in m11_execution_journals.get("scope", "") or "artifactIfAtomicPublishUncertain" not in mission_source_text:
         fail("M11 execution visible-journal recovery regression is missing from learner path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
