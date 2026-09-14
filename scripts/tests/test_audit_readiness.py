@@ -172,6 +172,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts", "MissingCanonicalOutputDisclosureRegression", 1), encoding="utf-8")
         self.assertIn("M10 canonical-output disclosure regression is missing", self.run_audit(False))
 
+    def test_missing_m10_gate_evaluation_identity_regression_is_rejected(self):
+        source = self.root / "core/m10/cost_bound_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestCanaryGateIdentityIncludesEvaluationTime", "MissingGateEvaluationIdentityRegression", 1), encoding="utf-8")
+        self.assertIn("M10 gate evaluation-identity regression is missing", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")

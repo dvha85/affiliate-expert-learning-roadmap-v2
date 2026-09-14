@@ -183,6 +183,27 @@ def audit_runtime_acceptance(root, matrix):
         fail("M10 canonical-output disclosure record lacks bounded recovery disclosure")
     if "TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts" not in source_text or "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" not in source_text or '"m10-resolve"' not in source_text:
         fail("M10 canonical-output disclosure regression is missing from learner Bot path")
+    gate_identity = updates.get("RP-03-m10-gate-evaluation-identity")
+    if not isinstance(gate_identity, dict):
+        fail("matrix lacks M10 gate evaluation-identity acceptance record")
+    required_gate_identity_refs = {
+        "core/m10/canary_gate.go",
+        "core/m10/artifact_registry.go",
+        "core/m10/cost_bound_test.go",
+    }
+    if not required_gate_identity_refs.issubset(set(gate_identity.get("implementation_refs", [])) | set(gate_identity.get("test_refs", []))):
+        fail("M10 gate evaluation-identity record lacks implementation/test refs")
+    gate_identity_scope = gate_identity.get("scope")
+    if not isinstance(gate_identity_scope, str) or "evaluation time" not in gate_identity_scope or "distinct immutable IDs" not in gate_identity_scope:
+        fail("M10 gate evaluation-identity record lacks bounded identity disclosure")
+    gate_source = root / "core/m10/canary_gate.go"
+    gate_registry_source = root / "core/m10/artifact_registry.go"
+    gate_test = root / "core/m10/cost_bound_test.go"
+    gate_source_text = gate_source.read_text(encoding="utf-8") if gate_source.is_file() else ""
+    gate_registry_text = gate_registry_source.read_text(encoding="utf-8") if gate_registry_source.is_file() else ""
+    gate_test_text = gate_test.read_text(encoding="utf-8") if gate_test.is_file() else ""
+    if "in.Now, in.Ledger" not in gate_source_text or "Now: gate.EvaluatedAt" not in gate_registry_text or "TestCanaryGateIdentityIncludesEvaluationTime" not in gate_test_text:
+        fail("M10 gate evaluation-identity regression is missing from canonical path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
         fail("matrix lacks the canonical JSONL framing acceptance record")

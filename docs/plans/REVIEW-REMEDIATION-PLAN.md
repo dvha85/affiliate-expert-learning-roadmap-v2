@@ -599,6 +599,14 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   `PUBLISHED_RECOVERY_REQUIRED`. Đây chỉ là disclosure/recovery envelope local,
   không chứng minh atomicity nhiều file, power-loss, executor hay business
   outcome; RP-03 vẫn `PARTIAL`.
+- **RP-03 M10 gate evaluation identity (2026-09-14):** `GateID` canonical
+  nay hash cả `evaluated_at`. Trước đó hai đánh giá hợp lệ khác thời điểm nhưng
+  cùng grant/cost/intent/policy/ledger có cùng ID và bytes khác nhau, nên
+  registry append-only chỉ có thể từ chối lần đánh giá sau như conflict.
+  Core graph recompute cùng time-bound identity; regression tạo hai gate cùng
+  snapshot cách nhau một giây, yêu cầu ID khác nhau và cả hai resolve trong
+  graph. Không suy điều này thành clock trust, execution authority, transaction
+  nhiều file, power-loss hay business outcome; RP-03 vẫn `PARTIAL`.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation

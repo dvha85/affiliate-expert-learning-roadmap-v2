@@ -159,6 +159,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		}
 		expectedGateID := canaryGateID(CanaryGateInput{
 			Grant: grant, CostBound: bound, IntentID: gate.IntentID, IntentHash: gate.IntentHash, PolicyVersion: gate.PolicyVersion,
+			Now: gate.EvaluatedAt,
 			Ledger: CanaryLedgerSnapshot{
 				ExecutionsTotal: gate.ExecutionsTotalBefore, ExecutionsInWindow: gate.ExecutionsInWindowBefore,
 				CostMinorTotal: gate.CostMinorTotalBefore, PendingOutcomes: gate.PendingOutcomesBefore,

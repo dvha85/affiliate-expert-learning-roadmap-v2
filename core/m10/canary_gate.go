@@ -64,7 +64,11 @@ type CanaryGateDecision struct {
 }
 
 func canaryGateID(in CanaryGateInput) string {
-	raw, _ := json.Marshal([]any{in.Grant.GrantID, in.Grant.GrantVersion, in.Grant.GrantHash, in.CostBound.CostBoundID, in.CostBound.CostBoundHash, in.IntentID, in.IntentHash, in.PolicyVersion, in.Ledger})
+	// EvaluatedAt is part of the immutable gate payload. It must also be part
+	// of its identity: otherwise two distinct evaluations with an unchanged
+	// budget snapshot reuse an ID but carry different bytes, which an append-only
+	// registry must (correctly) reject as a conflicting artifact.
+	raw, _ := json.Marshal([]any{in.Grant.GrantID, in.Grant.GrantVersion, in.Grant.GrantHash, in.CostBound.CostBoundID, in.CostBound.CostBoundHash, in.IntentID, in.IntentHash, in.PolicyVersion, in.Now, in.Ledger})
 	sum := sha256.Sum256(raw)
 	return "gate-" + hex.EncodeToString(sum[:])
 }

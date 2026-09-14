@@ -110,6 +110,24 @@ func TestCanaryGateIsNonAuthorizingAndBounded(t *testing.T) {
 	}
 }
 
+func TestCanaryGateIdentityIncludesEvaluationTime(t *testing.T) {
+	grant := CanaryGrant{GrantID: "time-gate", GrantVersion: "v1", PolicyVersion: "p1", ApprovalRef: "approval-1", ApprovedBy: "human", ApproverID: "learner", ApprovedAt: "2026-09-08T00:00:00Z", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T02:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"local_sandbox"}, MaxExecutionsTotal: 2, MaxExecutionsPerWindow: 2, WindowSeconds: 60, MaxCostMinorTotal: 100, Currency: "USD", MaxPendingOutcomes: 2, KillSwitchRequired: true, CorrelationID: "corr", HashVersion: "go-json-v1"}
+	grant.GrantHash = ComputeCanaryGrantHash(grant)
+	bound := TrustedCostBound{CostBoundID: "time-cost", IntentID: "intent", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 1, Currency: "USD", SourceRef: "fixture:cost", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:30:00Z", CorrelationID: "corr", HashVersion: "go-json-v1"}
+	bound.CostBoundHash = ComputeTrustedCostBoundHash(bound)
+	in := CanaryGateInput{Grant: grant, CostBound: bound, IntentID: "intent", IntentHash: bound.IntentHash, PolicyVersion: "p1", PolicyDecision: "ALLOW", RiskClass: "RISK0", ApprovalID: "approval-1", ApproverID: "learner", CorrelationID: "corr", ActionType: "DRAFT", Target: "https://example.com/draft", Now: "2026-09-08T01:00:00Z"}
+	first := EvaluateCanaryGate(in)
+	in.Now = "2026-09-08T01:00:01Z"
+	second := EvaluateCanaryGate(in)
+	if first.GateID == second.GateID || first.EvaluatedAt == second.EvaluatedAt {
+		t.Fatalf("distinct evaluation times reused a gate identity: first=%+v second=%+v", first, second)
+	}
+	entries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, grant), m10Entry(t, ArtifactKindTrustedCostBound, bound), m10Entry(t, ArtifactKindCanaryGate, first), m10Entry(t, ArtifactKindCanaryGate, second)}
+	if err := ValidateArtifactGraph(entries); err != nil {
+		t.Fatalf("canonical graph rejected distinct gates for distinct evaluation times: %v", err)
+	}
+}
+
 func TestCanaryGateRejectsNearInt64CostBoundaryWithoutOverflow(t *testing.T) {
 	const maxInt64 = int64(^uint64(0) >> 1)
 	grant := CanaryGrant{GrantID: "max-cost-g", GrantVersion: "v1", PolicyVersion: "p1", ApprovalRef: "approval-1", ApprovedBy: "human", ApproverID: "learner", ApprovedAt: "2026-09-08T00:00:00Z", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T02:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"local_sandbox"}, MaxExecutionsTotal: 2, MaxExecutionsPerWindow: 2, WindowSeconds: 60, MaxCostMinorTotal: maxInt64, Currency: "USD", MaxPendingOutcomes: 2, KillSwitchRequired: true, CorrelationID: "corr", HashVersion: "go-json-v1"}
