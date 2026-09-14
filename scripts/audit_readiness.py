@@ -126,8 +126,33 @@ def audit_runtime_acceptance(root, matrix):
     backup_parent_text = backup_parent_source.read_text(encoding="utf-8") if backup_parent_source.is_file() else ""
     backup_parent_test = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
     backup_parent_test_text = backup_parent_test.read_text(encoding="utf-8") if backup_parent_test.is_file() else ""
-    if "func ensureBackupOutputParent" not in backup_parent_text or "ensureBackupOutputParent(parent)" not in backup_parent_text or "TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate" not in backup_parent_test_text or "backup created external output before rejection" not in backup_parent_test_text or "restore created external output before rejection" not in backup_parent_test_text:
+    if "func ensureOutputParentBeforeCreate" not in backup_parent_text or "ensureOutputParentBeforeCreate(parent)" not in backup_parent_text or "TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate" not in backup_parent_test_text or "backup created external output before rejection" not in backup_parent_test_text or "restore created external output before rejection" not in backup_parent_test_text:
         fail("backup/restore missing-parent regression is missing from the real CLI path")
+    artifact_parent = updates.get("RP-01-immutable-artifact-missing-parent-guard")
+    if not isinstance(artifact_parent, dict):
+        fail("matrix lacks immutable artifact missing-parent guard acceptance record")
+    artifact_parent_refs = set(artifact_parent.get("test_refs", []))
+    if {"lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "scripts/audit_readiness.py", "scripts/tests/test_audit_readiness.py"} - artifact_parent_refs:
+        fail("immutable artifact missing-parent record lacks publisher and audit regressions")
+    artifact_parent_scope = artifact_parent.get("scope")
+    if not isinstance(artifact_parent_scope, str) or "MkdirAll" not in artifact_parent_scope or "external target remains empty" not in artifact_parent_scope:
+        fail("immutable artifact missing-parent record lacks bounded external-write disclosure")
+    mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    mission_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
+    artifact_test = root / "lab/affiliate-bot/cmd/bot/artifact_publish_test.go"
+    artifact_test_text = artifact_test.read_text(encoding="utf-8") if artifact_test.is_file() else ""
+    if "func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := ensureOutputParentBeforeCreate(dir);" not in mission_text or "TestWriteNewJSONRejectsMissingParentSymlinkBeforeExternalCreate" not in artifact_test_text or "artifact publisher created external output before rejection" not in artifact_test_text:
+        fail("immutable artifact missing-parent regression is missing from the real publisher path")
+    runtime_parent = updates.get("RP-01-runtime-missing-parent-guard")
+    if not isinstance(runtime_parent, dict):
+        fail("matrix lacks runtime missing-parent guard acceptance record")
+    runtime_parent_scope = runtime_parent.get("scope")
+    if not isinstance(runtime_parent_scope, str) or "STORE_ERROR" not in runtime_parent_scope or "empty external target" not in runtime_parent_scope:
+        fail("runtime missing-parent record lacks bounded external-write disclosure")
+    runtime_test = root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+    runtime_test_text = runtime_test.read_text(encoding="utf-8") if runtime_test.is_file() else ""
+    if "func ensureRuntimeDirectory(dir string) error {\n\tif err := ensureOutputParentBeforeCreate(dir);" not in mission_text or "TestMissionInitRejectsMissingParentSymlinkBeforeExternalCreate" not in runtime_test_text or "mission init created external runtime before rejection" not in runtime_test_text:
+        fail("runtime missing-parent regression is missing from the real mission path")
     fixture_output = updates.get("RP-01-advisor-fixture-output-parent-guard")
     if not isinstance(fixture_output, dict):
         fail("matrix lacks advisor fixture output-parent guard acceptance record")

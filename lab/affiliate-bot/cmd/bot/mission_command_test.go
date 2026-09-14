@@ -178,6 +178,24 @@ func TestCanonicalRuntimeStoresRejectExternalSymlinkPaths(t *testing.T) {
 	}
 }
 
+func TestMissionInitRejectsMissingParentSymlinkBeforeExternalCreate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	outside := t.TempDir()
+	parentLink := filepath.Join(t.TempDir(), "runtime-output-parent")
+	if err := os.Symlink(outside, parentLink); err != nil {
+		t.Fatal(err)
+	}
+	runtimeDir := filepath.Join(parentLink, "missing", "runtime")
+	if code, response := missionCall(t, "init", runtimeDir); code == 0 || response["status"] != "STORE_ERROR" {
+		t.Fatalf("mission init created through a missing-parent symlink: code=%d response=%+v", code, response)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("mission init created external runtime before rejection: entries=%+v err=%v", entries, err)
+	}
+}
+
 func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 	dir, history, request := missionFixture(t)
 	release, err := acquireHistoryRuntimeGate(history)

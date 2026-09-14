@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: ade7f9bf3a6d342b718ee18165624ebd3a44f356 -->
+<!-- readiness-main-baseline: 4354f07fe3e0afdbc0b93838a416bff13d46dda5 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -264,6 +264,19 @@ symlink/non-directory. Regression đi đúng CLI bằng đường dẫn `symlink
 cho cả hai lệnh, nhận `TARGET_ERROR` và kiểm thư mục ngoài vẫn rỗng. Đây không
 phải guard cho ancestor có sẵn hay concurrent substitution sau preflight; cũng
 không là proof crash/power-loss, multi-host, provider hay business outcome.
+
+**Cập nhật immutable artifact missing-parent guard (2026-09-14):** `M07`,
+`M08`, `M10` và `M11` portable artifact publisher dùng cùng preflight trước
+`MkdirAll`. Regression gọi `writeNewJSON` qua đường `symlink/missing/artifact`
+và kiểm không có thư mục/file nào xuất hiện ở external target. Đây chỉ khép
+missing component của parent path; ancestor có sẵn, concurrent substitution,
+crash/power-loss, multi-host, provider và business outcome vẫn ngoài scope.
+
+**Cập nhật runtime missing-parent guard (2026-09-14):** trước `mission init`
+và mọi mission writer tạo runtime mới, shared preflight reject
+`symlink/missing/runtime` trước `MkdirAll`. Regression thực nhận `STORE_ERROR`
+và external target rỗng. Pre-existing ancestor alias, concurrent substitution,
+crash/power-loss, multi-host, provider và business outcome vẫn ngoài scope.
 
 **Cập nhật M07 history read gate (2026-09-11):** CLI M07 và adapter M07 giờ
 giữ cùng local history runtime gate với watcher trước khi resolve canonical

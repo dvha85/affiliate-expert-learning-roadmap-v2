@@ -210,13 +210,12 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 	return func() { _ = os.Remove(path) }, nil
 }
 
-// ensureBackupOutputParent rejects a symlink in the missing portion of a
+// ensureOutputParentBeforeCreate rejects a symlink in the missing portion of a
 // caller-selected output path before MkdirAll can follow it. Checking only the
 // direct parent after MkdirAll is too late: a missing child below a symlink can
-// already have been created outside the requested backup/restore destination.
-// This is a bounded preflight, not an ancestor-path TOCTOU or multi-host
-// guarantee.
-func ensureBackupOutputParent(parent string) error {
+// already have been created outside the requested destination. This is a
+// bounded preflight, not an ancestor-path TOCTOU or multi-host guarantee.
+func ensureOutputParentBeforeCreate(parent string) error {
 	parent = filepath.Clean(parent)
 	for candidate := parent; ; candidate = filepath.Dir(candidate) {
 		info, err := os.Lstat(candidate)
@@ -1609,7 +1608,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("INPUT_ERROR", nil, e, 1)
 		}
 		parent := filepath.Dir(args[2])
-		if e = ensureBackupOutputParent(parent); e != nil {
+		if e = ensureOutputParentBeforeCreate(parent); e != nil {
 			return emit("TARGET_ERROR", nil, e, 1)
 		}
 		releaseTargetGate, gateErr := acquireBackupTargetGate(args[2])
@@ -1748,7 +1747,7 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
 	parent := filepath.Dir(args[2])
-	if e = ensureBackupOutputParent(parent); e != nil {
+	if e = ensureOutputParentBeforeCreate(parent); e != nil {
 		return emit("TARGET_ERROR", nil, e, 1)
 	}
 	releaseTargetGate, gateErr := acquireRestoreTargetGate(args[2])
