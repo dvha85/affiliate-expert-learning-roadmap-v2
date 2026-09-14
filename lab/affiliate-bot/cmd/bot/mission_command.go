@@ -1756,19 +1756,31 @@ func recoverM11OutcomeJournal(dir string) error {
 	if _, err := appendM11FixtureOutcome(dir, journal.Outcome); err != nil {
 		return fmt.Errorf("M11 outcome journal outcome recovery failed: %w", err)
 	}
+	// At this point both canonical sides of the transition are replayable: the
+	// ledger head is journal.Ledger and the exact outcome is in its JSONL
+	// store. A cleanup error must therefore not be reported as a normal
+	// rejection that invites an operator to assume nothing was published. Keep
+	// the journal when possible and make the caller fail closed until an exact
+	// retry can finish cleanup.
+	if err := m11OutcomeWriteFault("before_remove"); err != nil {
+		return &visibleAppendUncertainError{err: err}
+	}
 	if err := os.Remove(m11OutcomeJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	parent, err := os.Open(dir)
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	err = parent.Sync()
 	closeErr := parent.Close()
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
-	return closeErr
+	if closeErr != nil {
+		return &visibleAppendUncertainError{err: closeErr}
+	}
+	return nil
 }
 
 func nextM11FailedExecutionLedger(ledger corem11.ProductionLedger, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {

@@ -309,6 +309,8 @@ def audit_runtime_acceptance(root, matrix):
     m11_outcome_text = m11_outcome_source.read_text(encoding="utf-8") if m11_outcome_source.is_file() else ""
     if "visibleAppendUncertainError" not in mission_source_text or "m11OutcomeAppendUncertainty" not in mission_source_text or "TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty" not in m11_outcome_text:
         fail("M11 visible outcome-append acknowledgement regression is missing from learner path")
+    if 'm11OutcomeWriteFault("before_remove")' not in mission_source_text or "TestMissionM11OutcomeDisclosesPublishedJournalCleanupUncertainty" not in m11_outcome_text or "cleanup fails" not in m11_visible_append.get("scope", ""):
+        fail("M11 published outcome journal cleanup regression is missing from learner path")
     m11_execution_journals = updates.get("RP-07-m11-execution-visible-journals")
     if not isinstance(m11_execution_journals, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_execution_journals.get("scope", ""):
         fail("matrix lacks M11 execution visible-journal recovery acceptance")

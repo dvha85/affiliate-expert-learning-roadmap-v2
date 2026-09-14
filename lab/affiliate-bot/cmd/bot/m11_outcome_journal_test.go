@@ -269,6 +269,54 @@ func TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty(t *te
 	}
 }
 
+func TestMissionM11OutcomeDisclosesPublishedJournalCleanupUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "published-m11-outcome-journal.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	m11OutcomeAppendFault = func(phase string) error {
+		if phase == "before_remove" {
+			return errors.New("injected outcome journal cleanup failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { m11OutcomeAppendFault = nil })
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("published outcome journal cleanup was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["outcome"] == nil || artifact["post_ledger"] == nil {
+		t.Fatalf("published journal cleanup omitted deterministic transition: %+v", response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("published journal cleanup did not retain recovery journal: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("published journal cleanup did not persist exactly one record: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("published journal cleanup did not preserve post-outcome ledger: ledger=%+v err=%v", head, err)
+	}
+	m11OutcomeAppendFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed published journal cleanup uncertainty: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked exact retry did not close published cleanup journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("published cleanup journal remains after exact retry: %v", err)
+	}
+	outcomes, err = loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("exact retry duplicated or changed published cleanup outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
 func TestBackupCreateRecoversPendingM11OutcomeJournal(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
