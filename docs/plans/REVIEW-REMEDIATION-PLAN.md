@@ -1659,6 +1659,14 @@ dừng ở `Fetch and Register Tool Adapter` trước Agent/proposal persistence
 Không cài credential, không gọi affiliate/provider và không coi đó là M07
 model-success hoặc received-redirect transport coverage/evidence business.
 
+**Re-run n8n engine cục bộ (2026-09-14):** workflow fixture M06/M07 được chạy
+lại qua n8n `2.38.1` trên macOS arm64, Node `24.21.0`, SQLite disposable và
+loopback adapters/model stub. Node 22 bị n8n hiện hành từ chối vì package yêu
+cầu `>=24.0.0`; native `isolated-vm` phải được build/rebuild bằng đúng Node 24
+trước import. CI đã pin Node 24. Đây là reproduction có thể tái lập của engine
+fixture path, không thay release admission `UNVERIFIED`, không chứng minh
+provider, selected-source operated run, topology deploy hay business outcome.
+
 **Mở rộng M06 engine CI (2026-09-09):** runner còn chạy key-order retry,
 same-correlation content conflict, unsupported source và changed event. Hai ca
 reject phải dừng ở adapter trước ACK/report và không được thay đổi bytes history;

@@ -60,6 +60,18 @@ adapter loopback, và fail closed khi adapter không khả dụng. Điều này 
 minh đường fixture synthetic/read-only; không nâng release admission, không
 chứng minh selected source hoặc deployment topology.
 
+### Re-run engine cục bộ — 2026-09-14
+
+`scripts/run_n8n_engine_regression.py` đã PASS lại trên macOS arm64 với n8n
+`2.38.1`, Node `24.21.0`, SQLite runtime disposable và loopback adapters/model
+stub của chính repo. Node 22 bị n8n từ chối (`>=24.0.0`); khi native
+`isolated-vm` từng được build bằng Node 22 nhưng n8n chạy dưới Node 24, n8n
+không khởi tạo expression engine. Rebuild dependency bằng cùng Node 24 đã khôi
+phục engine. Vì vậy khi tái lập local, dùng cùng major Node với lúc `npm install`
+hoặc rebuild native dependencies trước import. Đây là reproduction cục bộ của CI
+fixture path, không thay đổi `tested_n8n_version: UNVERIFIED` và không là
+provider, selected-source operated hay deployment evidence.
+
 ## Smoke test bắt buộc
 
 1. Import cả hai blueprint vào một n8n instance sạch/local; kiểm tra node/type version nào bị unknown hoặc tự migrate trước khi lưu.

@@ -438,6 +438,23 @@ def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
             fail("beginner plan incorrectly treats the selected-source contract as absent")
 
 
+def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
+    """Keep the checked-in engine evidence tied to the Node major n8n needs."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-n8n-engine-node24-reproduction")
+    if not isinstance(record, dict) or "Node 24.21.0" not in record.get("scope", ""):
+        fail("matrix lacks scoped n8n Node 24 engine reproduction evidence")
+    compatibility = root / "lab/n8n/COMPATIBILITY.md"
+    workflow = root / ".github/workflows/mission-agent-path-ci.yml"
+    runner = root / "scripts/run_n8n_engine_regression.py"
+    compatibility_text = compatibility.read_text(encoding="utf-8") if compatibility.is_file() else ""
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    if "Re-run n8n engine cục bộ (2026-09-14)" not in plan_text or "Node `24.21.0`" not in compatibility_text or "isolated-vm" not in compatibility_text:
+        fail("n8n engine compatibility evidence lacks the Node/native boundary")
+    if not runner.is_file() or 'node-version: "24"' not in workflow_text or "n8n@2.38.1" not in workflow_text:
+        fail("n8n engine CI no longer pins the compatible Node/runtime pair")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -477,6 +494,7 @@ def audit(root):
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
+    audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
