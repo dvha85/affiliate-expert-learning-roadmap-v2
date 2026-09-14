@@ -367,9 +367,15 @@ func ComputeProductionGateID(lease ProductionLease, intentID, intentHash string,
 
 // ComputeProductionAuthorizationID and ComputeProductionExecutionID derive
 // the learner profile's one authorization and one terminal attempt identity
-// from their immutable parent. They are audit identities, never authority.
-func ComputeProductionAuthorizationID(gateID, executorID string) string {
-	return "prod-auth-" + gateID + "-" + executorID
+// from their immutable parent. Authorization time is part of the immutable
+// capability payload, so it must participate in the ID as well; otherwise a
+// later authorization for the same gate/executor conflicts in the append-only
+// registry despite carrying distinct bytes. These are audit identities, never
+// authority.
+func ComputeProductionAuthorizationID(gateID, executorID, authorizedAt string) string {
+	identity := strings.Join([]string{gateID, executorID, authorizedAt}, "\x00")
+	sum := sha256.Sum256([]byte(identity))
+	return "prod-auth-" + hex.EncodeToString(sum[:16])
 }
 
 func ComputeProductionExecutionID(authorizationID string) string {

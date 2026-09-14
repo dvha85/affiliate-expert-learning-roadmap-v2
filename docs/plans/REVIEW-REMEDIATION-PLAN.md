@@ -500,6 +500,17 @@ schema-valid/với link downstream đã rewrite và cả ba bị chặn. Đây c
 immutable graph guard offline; ledger transaction, executor, multi-file
 crash/power-loss và multi-host proof vẫn mở.
 
+**Cập nhật M11 authorization time identity (2026-09-14):** production
+`AuthorizationID` nay digest `gate_id`, `executor_id` và `authorized_at`.
+Trước đó cùng gate/executor nhưng thời điểm authorization khác nhau có ID như
+nhau trong khi payload/expiry khác, khiến registry append-only chỉ có thể từ
+chối artifact sau như collision. Core graph và learner lifecycle dùng một
+builder time-bound; regression tạo hai authorization cùng gate/executor khác
+thời điểm và yêu cầu cả hai identity hợp lệ, còn mutation CI bỏ chính guard
+canonical phải làm regression fail. Điều này không cấp thêm reservation hay
+execution authority, và không là proof clock trust, ledger transaction,
+power-loss, multi-host hay business outcome; RP-07 vẫn `PARTIAL`.
+
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không
 thể tách thành nhiều line registry; append dùng chung file+directory sync trước

@@ -25,7 +25,7 @@ MUTATIONS = (
     ),
     (
         "authorization",
-        """\t\t\tif x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID) {
+        """\t\t\tif x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID, x.AuthorizedAt) {
 \t\t\t\treturn fmt.Errorf(\"production authorization has a non-canonical authorization ID\")
 \t\t\t}
 """,

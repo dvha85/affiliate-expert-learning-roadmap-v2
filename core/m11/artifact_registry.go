@@ -277,7 +277,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			if !leaseOK || !gateOK || !healthOK || !costOK || authorizedErr != nil || authorizationExpiryErr != nil || validFromErr != nil || leaseExpiryErr != nil || gateTimeErr != nil || healthTimeErr != nil || costObservedErr != nil || costExpiryErr != nil || !executorAllowed || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.Decision != "ALLOW_PRODUCTION" || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || authorizedAt.Before(validFrom) || !authorizedAt.Before(leaseExpiresAt) || authorizationExpiresAt.After(leaseExpiresAt) || authorizedAt.Before(costObservedAt) || !authorizedAt.Before(costExpiresAt) || authorizationExpiresAt.After(costExpiresAt) || authorizedAt.Before(gateEvaluatedAt) || authorizedAt.Before(healthObservedAt) || authorizedAt.Sub(healthObservedAt) >= maxHealthAge || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
 				return fmt.Errorf("production authorization has an orphaned or mismatched link")
 			}
-			if x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID) {
+			if x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID, x.AuthorizedAt) {
 				return fmt.Errorf("production authorization has a non-canonical authorization ID")
 			}
 			authorizations[x.AuthorizationID] = *x

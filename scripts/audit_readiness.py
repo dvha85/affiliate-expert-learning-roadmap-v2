@@ -204,6 +204,29 @@ def audit_runtime_acceptance(root, matrix):
     gate_test_text = gate_test.read_text(encoding="utf-8") if gate_test.is_file() else ""
     if "in.Now, in.Ledger" not in gate_source_text or "Now: gate.EvaluatedAt" not in gate_registry_text or "TestCanaryGateIdentityIncludesEvaluationTime" not in gate_test_text or "TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes" not in source_text:
         fail("M10 gate evaluation-identity regression is missing from canonical path")
+    m11_authorization_identity = updates.get("RP-07-m11-authorization-time-identity")
+    if not isinstance(m11_authorization_identity, dict):
+        fail("matrix lacks M11 authorization time-identity acceptance record")
+    required_m11_authorization_refs = {
+        "core/m11/artifact.go",
+        "core/m11/artifact_registry.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "core/m11/artifact_test.go",
+        "scripts/mutate_m11_identity_guard.py",
+    }
+    if not required_m11_authorization_refs.issubset(set(m11_authorization_identity.get("implementation_refs", [])) | set(m11_authorization_identity.get("test_refs", []))):
+        fail("M11 authorization time-identity record lacks implementation/test refs")
+    m11_authorization_scope = m11_authorization_identity.get("scope")
+    if not isinstance(m11_authorization_scope, str) or "authorized_at" not in m11_authorization_scope or "distinct IDs" not in m11_authorization_scope:
+        fail("M11 authorization time-identity record lacks bounded identity disclosure")
+    m11_artifact_source = root / "core/m11/artifact.go"
+    m11_registry_source = root / "core/m11/artifact_registry.go"
+    m11_artifact_test = root / "core/m11/artifact_test.go"
+    m11_artifact_text = m11_artifact_source.read_text(encoding="utf-8") if m11_artifact_source.is_file() else ""
+    m11_registry_text = m11_registry_source.read_text(encoding="utf-8") if m11_registry_source.is_file() else ""
+    m11_test_text = m11_artifact_test.read_text(encoding="utf-8") if m11_artifact_test.is_file() else ""
+    if "gateID, executorID, authorizedAt string" not in m11_artifact_text or "gate.GateID, x.ExecutorID, x.AuthorizedAt" not in m11_registry_text or "distinct authorization times reused an immutable ID" not in m11_test_text:
+        fail("M11 authorization time-identity regression is missing from canonical path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
         fail("matrix lacks the canonical JSONL framing acceptance record")
