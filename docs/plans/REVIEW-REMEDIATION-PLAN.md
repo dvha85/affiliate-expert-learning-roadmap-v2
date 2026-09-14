@@ -392,6 +392,15 @@ journal, đăng ký/bind đúng một execution rồi mới ghi portable output.
 kiểm local cho một syscall boundary; không chứng minh atomicity đa-file,
 kill/power-loss hoặc phối hợp đa host.
 
+**Cập nhật M11 outcome-journal publish boundary (2026-09-14):** `m11-outcome`
+trước đây trả `REJECTED` nếu `m11-outcome-journal.json` đã rename-visible nhưng
+directory sync chưa được xác nhận. Emit nay nhận mọi `atomicPublishUncertain`
+và trả `PUBLISHED_RECOVERY_REQUIRED`; riêng command trả outcome/post-ledger
+xác định từ journal, không tuyên bố outcome đã vào mọi store. Regression chạy
+CLI thật, khởi động Bot mới để chặn `status`/resolver, rồi exact retry có lock
+replay một outcome/ledger. Các journal FAILED và UNKNOWN→STOP cần nghiệm thu
+riêng; không suy atomicity đa-file, power-loss hoặc multi-host từ seam này.
+
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
 artifact registry và compact cost-bound index. Lỗi injected trước artifact,

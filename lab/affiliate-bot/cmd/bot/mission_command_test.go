@@ -1470,6 +1470,49 @@ func TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay(t
 	}
 }
 
+func TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "visible-m11-outcome.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	missionStateWriteFault = func(phase string) error {
+		if phase == "after_rename_before_parent_sync" {
+			return errors.New("injected M11 outcome journal parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { missionStateWriteFault = nil })
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible M11 outcome journal did not disclose recovery: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["outcome"] == nil || artifact["post_ledger"] == nil {
+		t.Fatalf("visible M11 outcome journal omitted deterministic transition: %+v", response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("visible M11 outcome journal was missing: %v", err)
+	}
+	missionStateWriteFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed a visible but unreplayed M11 outcome journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-resolve", dir, corem11.ArtifactKindLedger, predecessor.ArtifactID); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh resolver exposed a visible but unreplayed M11 outcome journal: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked retry did not replay visible M11 outcome journal exactly: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("M11 outcome journal remains after locked replay: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || outcomes[0].OutcomeID != journal.Outcome.OutcomeID {
+		t.Fatalf("locked replay did not retain exactly one M11 outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

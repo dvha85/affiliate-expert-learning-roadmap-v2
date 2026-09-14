@@ -133,6 +133,11 @@ def audit_runtime_acceptance(root, matrix):
     if not isinstance(fault_scope, str) or "STORE_ERROR" not in fault_scope or "cap=1" not in fault_scope or "after temporary-file sync" not in fault_scope:
         fail("R10 reservation commit-fault record lacks a bounded cap disclosure")
     source_text = source.read_text(encoding="utf-8")
+    # Keep implementation and command-path assertions separate: a test name by
+    # itself must not satisfy an acceptance rule when the uncertain-publish
+    # payload boundary was removed from the Bot.
+    mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    mission_source_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
     if "TestMissionM10ReservationCommitFaultDoesNotConsumeCap" not in source_text or '"after_temp_sync", "before_rename"' not in source_text:
         fail("R10 reservation commit-fault regression is missing from the learner Bot test path")
     publish_fault = updates.get("RP-03-mission-state-publish-recovery-status")
@@ -259,6 +264,11 @@ def audit_runtime_acceptance(root, matrix):
         fail("M10 visible-journal records lack publish-uncertainty disclosure")
     if "TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay" not in source_text or "TestMissionM10ExecutionJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"after_publish_before_parent_sync"' not in source_text or '"after_rename_before_parent_sync"' not in source_text or '"m10-canary"' not in source_text or '"m10-cost-register"' not in source_text or '"m10-record-failed"' not in source_text:
         fail("M10 visible-journal recovery regression is missing from learner path")
+    m11_outcome_journal = updates.get("RP-07-m11-outcome-visible-journal")
+    if not isinstance(m11_outcome_journal, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_outcome_journal.get("scope", ""):
+        fail("matrix lacks M11 outcome visible-journal recovery acceptance")
+    if "TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"m11-outcome"' not in source_text or "artifactIfAtomicPublishUncertain" not in mission_source_text:
+        fail("M11 outcome visible-journal recovery regression is missing from learner path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
         fail("matrix lacks the canonical JSONL framing acceptance record")

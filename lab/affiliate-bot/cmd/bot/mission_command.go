@@ -1039,6 +1039,18 @@ func artifactIfRegistryPublishUncertain(artifact any, err error) any {
 	return nil
 }
 
+// artifactIfAtomicPublishUncertain exposes only the deterministic transition
+// already held in a visible local journal. It does not imply that the
+// transition reached every canonical store: callers must still surface
+// PUBLISHED_RECOVERY_REQUIRED and require a locked replay.
+func artifactIfAtomicPublishUncertain(artifact any, err error) any {
+	var uncertain *atomicPublishUncertainError
+	if errors.As(err, &uncertain) {
+		return artifact
+	}
+	return nil
+}
+
 func missionWriteFault(phase string) error {
 	if missionStateWriteFault == nil {
 		return nil
@@ -1976,7 +1988,7 @@ func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecor
 func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		var uncertain *atomicPublishUncertainError
-		if status == "STORE_ERROR" && errors.As(err, &uncertain) {
+		if errors.As(err, &uncertain) {
 			status = "PUBLISHED_RECOVERY_REQUIRED"
 		}
 		var artifactUncertain *immutableArtifactPublishUncertainError
@@ -2778,7 +2790,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, executionLedger, status, err := recordFailedM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"execution": record, "execution_ledger": executionLedger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "execution_ledger": executionLedger}, nil, 0)
 	case "m11-record-unknown":
@@ -2787,7 +2799,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		record, stoppedLedger, status, err := recordUnknownM11Execution(args[1], args[2], args[3], args[4], args[5])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"execution": record, "stopped_ledger": stoppedLedger}, nil, 0)
 	case "m11-reconcile":
@@ -2872,7 +2884,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		outcome, ledger, status, err := recordM11FixtureOutcome(args[1], args[3], raw)
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfAtomicPublishUncertain(map[string]any{"outcome": outcome, "post_ledger": ledger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"outcome": outcome, "post_ledger": ledger}, nil, 0)
 	case "m11-evaluate":
