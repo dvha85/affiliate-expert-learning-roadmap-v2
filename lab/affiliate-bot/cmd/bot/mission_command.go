@@ -289,6 +289,18 @@ func m11OutcomeWriteFault(phase string) error {
 	return m11OutcomeAppendFault(phase)
 }
 
+// m11JournalCleanupFault is test-only. A completed execution/ledger transition
+// must remain visible to the command boundary even if its recovery-journal
+// cleanup acknowledgement fails.
+var m11JournalCleanupFault func(phase string) error
+
+func m11JournalCleanupWriteFault(phase string) error {
+	if m11JournalCleanupFault == nil {
+		return nil
+	}
+	return m11JournalCleanupFault(phase)
+}
+
 type m11OutcomeJournal struct {
 	Version                string                   `json:"version"`
 	PredecessorArtifactID  string                   `json:"predecessor_artifact_id"`
@@ -1878,19 +1890,25 @@ func recoverM11FailedExecutionJournal(dir string) error {
 			return fmt.Errorf("M11 failed execution journal execution differs after ledger")
 		}
 	}
+	if err := m11JournalCleanupWriteFault("failed_before_remove"); err != nil {
+		return &visibleAppendUncertainError{err: err}
+	}
 	if err := os.Remove(m11FailedExecutionJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	parent, err := os.Open(dir)
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	err = parent.Sync()
 	closeErr := parent.Close()
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
-	return closeErr
+	if closeErr != nil {
+		return &visibleAppendUncertainError{err: closeErr}
+	}
+	return nil
 }
 
 func nextM11UnknownStopLedger(ledger corem11.ProductionLedger, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {
@@ -1978,19 +1996,25 @@ func recoverM11UnknownStopJournal(dir string) error {
 	if err := recoverM11DurableStop(dir); err != nil {
 		return fmt.Errorf("M11 unknown STOP journal durable STOP recovery failed: %w", err)
 	}
+	if err := m11JournalCleanupWriteFault("unknown_before_remove"); err != nil {
+		return &visibleAppendUncertainError{err: err}
+	}
 	if err := os.Remove(m11UnknownStopJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	parent, err := os.Open(dir)
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
 	err = parent.Sync()
 	closeErr := parent.Close()
 	if err != nil {
-		return err
+		return &visibleAppendUncertainError{err: err}
 	}
-	return closeErr
+	if closeErr != nil {
+		return &visibleAppendUncertainError{err: closeErr}
+	}
+	return nil
 }
 
 func recordM11FixtureOutcome(dir, ledgerID string, raw []byte) (m03.OutcomeRecord, corem11.ProductionLedger, string, error) {

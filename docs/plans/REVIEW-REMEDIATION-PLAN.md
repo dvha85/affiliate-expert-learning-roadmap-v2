@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 4b6de1b713cad9affdeb9fccb817924be364d210 -->
+<!-- readiness-main-baseline: 9b8ac7d5c653434d53026e09846f53e83757612e -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -429,6 +429,15 @@ journal của chúng đã rename-visible nhưng parent sync lỗi. Mỗi lệnh 
 status/resolver, sau đó exact retry có lock replay một execution. UNKNOWN chỉ
 chứng minh stopped-ledger/STOP recovery local; không chứng minh external effect
 được xác minh, atomicity đa-file, power-loss hoặc multi-host.
+
+**Cập nhật M11 execution-journal cleanup uncertainty (2026-09-14):** Sau khi
+FAILED execution/ledger, hoặc UNKNOWN execution/stopped-ledger/durable STOP,
+đã canonical, lỗi dọn journal không còn bị báo `REJECTED`. Cả hai command trả
+`PUBLISHED_RECOVERY_REQUIRED` cùng transition xác định; journal còn lại giữ Bot
+mới ở `RECOVERY_REQUIRED`, còn exact retry chỉ dọn journal và trả
+`EXACT_DUPLICATE`. Regression chạy hai command CLI thật với seam trước remove.
+Đây vẫn chỉ là acknowledgement boundary local, không chứng minh fsync,
+power-loss, transaction đa-file, external effect hay multi-host.
 
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
