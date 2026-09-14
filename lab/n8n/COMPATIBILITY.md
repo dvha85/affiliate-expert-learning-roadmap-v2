@@ -70,7 +70,7 @@ không khởi tạo expression engine. Rebuild dependency bằng cùng Node 24 �
 phục engine. Vì vậy khi tái lập local, dùng cùng major Node với lúc `npm install`
 hoặc rebuild native dependencies trước import. Đây là reproduction cục bộ của CI
 fixture path, không thay đổi `tested_n8n_version: UNVERIFIED` và không là
-provider, selected-source operated hay deployment evidence.
+bằng chứng từ nhà cung cấp, nguồn đã chọn vận hành hay triển khai.
 
 Cùng runtime đó, `scripts/run_n8n_m06_schedule_regression.py` PASS: Schedule
 Trigger thực append một record, trả `EXACT_DUPLICATE` trước/sau restart n8n và
