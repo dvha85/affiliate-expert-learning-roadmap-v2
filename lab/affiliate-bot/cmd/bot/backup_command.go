@@ -1545,6 +1545,9 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		if e := recoverM10ExecutionJournal(args[1]); e != nil {
 			return emit("RECOVERY_REQUIRED", nil, e, 1)
 		}
+		if e := recoverM11ManualStopJournal(args[1]); e != nil {
+			return emit("RECOVERY_REQUIRED", nil, e, 1)
+		}
 		if e := recoverM11FailedExecutionJournal(args[1]); e != nil {
 			return emit("RECOVERY_REQUIRED", nil, e, 1)
 		}

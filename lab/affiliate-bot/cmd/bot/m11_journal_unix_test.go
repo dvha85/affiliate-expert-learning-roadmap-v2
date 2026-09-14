@@ -12,6 +12,7 @@ import (
 
 func TestM11JournalFIFOFailsClosedBeforeRuntimeRead(t *testing.T) {
 	for name, journalPath := range map[string]func(string) string{
+		"manual":  m11ManualStopJournalPath,
 		"failed":  m11FailedExecutionJournalPath,
 		"unknown": m11UnknownStopJournalPath,
 		"outcome": m11OutcomeJournalPath,

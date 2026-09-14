@@ -185,8 +185,14 @@ def audit_runtime_acceptance(root, matrix):
         fail("mission-state post-rename regression is missing from the learner Bot test path")
     stop_source = root / "lab/affiliate-bot/cmd/bot/mission_state_fault_test.go"
     stop_text = stop_source.read_text(encoding="utf-8") if stop_source.is_file() else ""
-    if "TestMissionStopPostRenameSyncFaultKeepsDurableStop" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text or '"state", "mission-state.json", 1, false' not in stop_text or '"marker", "STOP", 2, true' not in stop_text:
+    if "TestMissionStopJournalRecoversEveryPostRenameBoundary" not in stop_text or '"PUBLISHED_RECOVERY_REQUIRED"' not in stop_text or '"journal", "m11-manual-stop-journal.json", 1, false, false' not in stop_text or '"marker", "STOP", 3, true, true' not in stop_text or '"RECOVERY_REQUIRED"' not in stop_text:
         fail("durable STOP post-rename regression is missing from the learner Bot test path")
+    if "m11ManualStopJournalPath" not in mission_source_text or "recoverM11ManualStopJournal" not in mission_source_text or '"m11-manual-stop-journal/v1"' not in mission_source_text:
+        fail("durable STOP journal recovery is missing from the learner Bot runtime path")
+    backup_source = root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+    backup_text = backup_source.read_text(encoding="utf-8") if backup_source.is_file() else ""
+    if "TestBackupCreateRecoversPendingDirectStopJournal" not in stop_text or "recoverM11ManualStopJournal(args[1])" not in backup_text:
+        fail("durable STOP journal recovery is missing from the backup path")
     if "TestMissionStopCannotOverwriteDurableReason" not in stop_text or '"replacement-stop"' not in stop_text or "!bytes.Equal(stateBefore, stateAfter)" not in stop_text or "!bytes.Equal(markerBefore, markerAfter)" not in stop_text:
         fail("durable STOP immutability regression is missing from the learner Bot test path")
     artifact_publish = updates.get("RP-01-atomic-artifact-publish")

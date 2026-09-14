@@ -174,7 +174,7 @@ func TestM11JournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	binary := buildMissionBinary(t)
-	for _, journal := range []string{m11OutcomeJournalPath(dir), m11FailedExecutionJournalPath(dir), m11UnknownStopJournalPath(dir)} {
+	for _, journal := range []string{m11ManualStopJournalPath(dir), m11OutcomeJournalPath(dir), m11FailedExecutionJournalPath(dir), m11UnknownStopJournalPath(dir)} {
 		if err := os.Symlink(external, journal); err != nil {
 			t.Fatal(err)
 		}

@@ -47,14 +47,16 @@ func TestWriteJSONAtomicFailurePreservesPriorStateAndRetry(t *testing.T) {
 	}
 }
 
-func TestMissionStopPostRenameSyncFaultKeepsDurableStop(t *testing.T) {
+func TestMissionStopJournalRecoversEveryPostRenameBoundary(t *testing.T) {
 	for _, scenario := range []struct {
 		name, write string
 		faultWrite  int
+		stateAlive  bool
 		markerAlive bool
 	}{
-		{"state", "mission-state.json", 1, false},
-		{"marker", "STOP", 2, true},
+		{"journal", "m11-manual-stop-journal.json", 1, false, false},
+		{"state", "mission-state.json", 2, true, false},
+		{"marker", "STOP", 3, true, true},
 	} {
 		scenario := scenario
 		t.Run(scenario.name, func(t *testing.T) {
@@ -74,19 +76,32 @@ func TestMissionStopPostRenameSyncFaultKeepsDurableStop(t *testing.T) {
 			}
 			t.Cleanup(func() { missionStateWriteFault = nil })
 			if code, response := missionCall(t, "m11-stop", dir, "post-rename-stop"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
-				t.Fatalf("post-rename %s fault hid a visible durable stop: code=%d response=%+v", scenario.write, code, response)
+				t.Fatalf("post-rename %s fault was not disclosed as recoverable: code=%d response=%+v", scenario.write, code, response)
 			}
 			missionStateWriteFault = nil
 			state, err := loadMissionState(dir)
-			if err != nil || !state.Stop || state.StopReason != "post-rename-stop" {
-				t.Fatalf("post-rename STOP was not visible in mission state: state=%+v err=%v", state, err)
+			if err != nil || state.Stop != scenario.stateAlive || (state.Stop && state.StopReason != "post-rename-stop") {
+				t.Fatalf("unexpected mission state after post-rename %s fault: state=%+v err=%v", scenario.write, state, err)
 			}
 			if active, err := stopMarkerActive(dir); err != nil || active != scenario.markerAlive {
 				t.Fatalf("unexpected STOP marker state after %s fault: active=%v err=%v", scenario.write, active, err)
 			}
 			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh Bot exposed partial direct STOP after %s fault: code=%d response=%+v", scenario.write, code, response)
+			}
 			if code, response := missionBinaryCall(t, binary, "mission", "m11-register", dir, "PRODUCTION_LEASE", filepath.Join(t.TempDir(), "unread.json")); code == 0 || response["status"] != "STOPPED" {
-				t.Fatalf("fresh Bot did not retain durable STOP after post-rename fault: code=%d response=%+v", code, response)
+				t.Fatalf("locked fresh Bot did not recover then retain STOP after %s fault: code=%d response=%+v", scenario.write, code, response)
+			}
+			if _, err := os.Stat(m11ManualStopJournalPath(dir)); !os.IsNotExist(err) {
+				t.Fatalf("direct STOP journal remains after locked recovery: %v", err)
+			}
+			state, err = loadMissionState(dir)
+			if err != nil || !state.Stop || state.StopReason != "post-rename-stop" {
+				t.Fatalf("direct STOP recovery did not retain state: state=%+v err=%v", state, err)
+			}
+			if active, err := stopMarkerActive(dir); err != nil || !active {
+				t.Fatalf("direct STOP recovery did not retain marker: active=%v err=%v", active, err)
 			}
 		})
 	}
@@ -118,6 +133,41 @@ func TestMissionStopCannotOverwriteDurableReason(t *testing.T) {
 	markerAfter, err := os.ReadFile(filepath.Join(dir, "STOP"))
 	if err != nil || !bytes.Equal(markerBefore, markerAfter) {
 		t.Fatalf("second stop rewrote durable marker: before=%s after=%s err=%v", markerBefore, markerAfter, err)
+	}
+}
+
+func TestBackupCreateRecoversPendingDirectStopJournal(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize stop fixture: code=%d response=%+v", code, response)
+	}
+	record, err := NewHistoryRecord("backup-stop-recovery", "2026-09-08T00:00:01Z", "2026-09-08T00:00:01Z", []Observation{historyObservation("backup-stop-observation", "backup-stop-product", "Backup Stop Product", 1, 0, "2026-09-08T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := AppendHistory(filepath.Join(dir, "history.jsonl"), record); err != nil || status != appendAdded {
+		t.Fatalf("append backup history fixture: status=%s err=%v", status, err)
+	}
+	journal := m11ManualStopJournal{Version: "m11-manual-stop-journal/v1", Reason: "backup-stop-recovery"}
+	if err := writeJSONAtomic(m11ManualStopJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("pending direct STOP journal was visible to status: code=%d response=%+v", code, response)
+	}
+	backupDir := filepath.Join(t.TempDir(), "backup")
+	if code, response := backupCall(t, "create", dir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup create did not replay direct STOP journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11ManualStopJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("direct STOP journal remains after backup recovery: %v", err)
+	}
+	state, err := loadMissionState(dir)
+	if err != nil || !state.Stop || state.StopReason != journal.Reason {
+		t.Fatalf("backup recovery did not retain direct STOP state: state=%+v err=%v", state, err)
+	}
+	if active, err := stopMarkerActive(dir); err != nil || !active {
+		t.Fatalf("backup recovery did not retain STOP marker: active=%v err=%v", active, err)
 	}
 }
 
