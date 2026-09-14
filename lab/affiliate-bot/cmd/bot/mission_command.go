@@ -1454,6 +1454,9 @@ func loadM10FixtureOutcomes(dir string, s LearnerMissionState) ([]m03.OutcomeRec
 	if err != nil {
 		return nil, err
 	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return nil, err
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
@@ -1507,6 +1510,9 @@ func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
 		return nil, err
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(raw))

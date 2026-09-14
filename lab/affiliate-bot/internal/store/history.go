@@ -152,17 +152,38 @@ type stableJSONLReader struct {
 	opened     fs.FileInfo
 	snapshot   hash.Hash
 	reachedEOF bool
+	bytesRead  int64
+	lastByte   byte
 }
 
 func (r *stableJSONLReader) Read(p []byte) (int, error) {
 	n, err := r.file.Read(p)
 	if n > 0 {
 		_, _ = r.snapshot.Write(p[:n])
+		r.bytesRead += int64(n)
+		r.lastByte = p[n-1]
 	}
 	if err == io.EOF {
 		r.reachedEOF = true
+		// AppendLine acknowledges only a complete LF-delimited record.  Treat a
+		// non-empty file without its final LF as a possibly interrupted append,
+		// not as a valid final JSON value that downstream decoders may use.
+		if r.bytesRead > 0 && r.lastByte != '\n' {
+			return n, fmt.Errorf("JSONL store has incomplete final line framing")
+		}
 	}
 	return n, err
+}
+
+// RequireCompleteJSONLFraming applies the same append boundary to JSONL bytes
+// that were already read through another stable-file primitive.  Runtime M10
+// and M11 fixture stores use this form because they validate an immutable byte
+// snapshot before splitting it into records.
+func RequireCompleteJSONLFraming(raw []byte) error {
+	if len(raw) != 0 && raw[len(raw)-1] != '\n' {
+		return fmt.Errorf("JSONL store has incomplete final line framing")
+	}
+	return nil
 }
 
 // verifySnapshot detects an in-place rewrite of the descriptor that supplied

@@ -64,6 +64,30 @@ func TestJSONLAppendAndRead(t *testing.T) {
 	}
 }
 
+func TestJSONLOpenRejectsIncompleteFinalLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "interrupted.jsonl")
+	if err := os.WriteFile(path, []byte(`{"id":"interrupted"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := (JSONL{}).Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(reader)
+	if err == nil || !bytes.Equal(data, []byte(`{"id":"interrupted"}`)) {
+		t.Fatalf("unterminated JSONL line was accepted: data=%q err=%v", data, err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("reader close after framing rejection: %v", err)
+	}
+	if err := RequireCompleteJSONLFraming([]byte(`{"id":"interrupted"}`)); err == nil {
+		t.Fatal("byte-snapshot framing guard accepted unterminated JSONL")
+	}
+	if err := RequireCompleteJSONLFraming([]byte(`{"id":"complete"}` + "\n")); err != nil {
+		t.Fatalf("byte-snapshot framing guard rejected complete JSONL: %v", err)
+	}
+}
+
 func TestJSONLOpenRejectsSameByteSymlinkReplacement(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "history.jsonl")

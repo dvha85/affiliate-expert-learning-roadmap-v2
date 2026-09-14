@@ -1768,3 +1768,28 @@ func TestMissionInitDoesNotOverwriteExistingState(t *testing.T) {
 		t.Fatal("mission init overwrote an existing state")
 	}
 }
+
+func TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming(t *testing.T) {
+	dir := t.TempDir()
+	for _, fixture := range []struct {
+		name string
+		path string
+		load func() error
+	}{
+		{name: "M10", path: m10OutcomeStorePath(dir), load: func() error { _, err := loadM10FixtureOutcomes(dir, LearnerMissionState{}); return err }},
+		{name: "M11", path: m11OutcomeStorePath(dir), load: func() error { _, err := loadM11FixtureOutcomes(dir); return err }},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			original := []byte(`{}`)
+			if err := os.WriteFile(fixture.path, original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := fixture.load(); err == nil {
+				t.Fatal("unterminated fixture outcome store was accepted")
+			}
+			if current, err := os.ReadFile(fixture.path); err != nil || !bytes.Equal(current, original) {
+				t.Fatalf("framing rejection changed fixture outcome store: %q err=%v", current, err)
+			}
+		})
+	}
+}

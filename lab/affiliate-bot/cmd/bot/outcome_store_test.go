@@ -130,6 +130,14 @@ func TestOutcomeStoreLifecycle(t *testing.T) {
 	if string(after) != "broken\n" {
 		t.Fatal("corruption overwritten")
 	}
+	if err = os.WriteFile(outPath, saved[:len(saved)-1], 0600); err != nil {
+		t.Fatal(err)
+	}
+	call(o, "STORE_ERROR", 1)
+	after, _ = os.ReadFile(outPath)
+	if !bytes.Equal(after, saved[:len(saved)-1]) {
+		t.Fatal("unterminated outcome store was changed")
+	}
 }
 
 func TestOutcomeMetricPrecision(t *testing.T) {

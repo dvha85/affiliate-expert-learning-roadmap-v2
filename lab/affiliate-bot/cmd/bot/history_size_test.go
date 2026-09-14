@@ -150,9 +150,9 @@ func TestHistoryPayloadBoundary(t *testing.T) {
 					t.Fatal(e)
 				}
 				records, e := LoadHistory(file)
-				if size > limit {
+				if size > limit || ending == "" {
 					if e == nil {
-						t.Fatal("oversize read accepted")
+						t.Fatal("oversize or unterminated read accepted")
 					}
 				} else if e != nil || len(records) != 1 || Replay(records[0]).State != replayMatch {
 					t.Fatal("boundary read", ending, e)
