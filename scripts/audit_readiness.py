@@ -124,6 +124,32 @@ def audit_runtime_acceptance(root, matrix):
     source = root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
     if not source.is_file() or "TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses" not in source.read_text(encoding="utf-8"):
         fail("R10 process-barrier regression is missing from the learner Bot test path")
+    # M11 has a distinct registry/ledger lifecycle, so its real-Bot barrier
+    # proof must be independently documented and present.  A passing M10
+    # process race cannot stand in for this claim.
+    smoke_ref = "scripts/smoke_br16a_offline.py"
+    if smoke_ref not in barrier.get("test_refs", []):
+        fail("R10 M11 process-barrier record lacks the shared-runtime smoke regression")
+    required_m11_scope = (
+        "M11",
+        "24 distinct canonical authorizations",
+        "exactly one appends",
+        "pending execution",
+    )
+    if not all(token in scope for token in required_m11_scope):
+        fail("R10 M11 process-barrier record lacks bounded canonical-authorization disclosure")
+    smoke_source = root / smoke_ref
+    smoke_text = smoke_source.read_text(encoding="utf-8") if smoke_source.is_file() else ""
+    required_m11_smoke = (
+        "production_race_authorizations",
+        '"m11-reserve-barrier"',
+        '"m11-reserve-authorization"',
+        'sum(response["status"] == "APPENDED" for response in production_race_responses.values()) == 1',
+        "production_race_head",
+        'expected=1)["status"] == "REJECTED"',
+    )
+    if not all(token in smoke_text for token in required_m11_smoke):
+        fail("R10 M11 process-barrier regression is missing from the shared real-Bot smoke path")
     commit_fault = updates.get("RP-03-m10-reservation-commit-fault")
     if not isinstance(commit_fault, dict):
         fail("matrix lacks the R10 reservation commit-fault acceptance record")

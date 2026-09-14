@@ -438,6 +438,40 @@ def main(argv=None):
         assert production_gate["status"] == "ALLOW_PRODUCTION" and production_gate["artifact"]["execution_authorized"] is False
         production_authorization = invoke(bot, "mission", "m11-authorize", state, production_lease["lease_id"], production_gate["artifact"]["gate_id"], "fixture_stub", gate_time)
         assert production_authorization["status"] == "APPENDED" and production_authorization["artifact"]["intent_id"] == i["intent_id"]
+
+        # M10 already proves its local cap=1 reservation barrier. Exercise the
+        # same real cross-process boundary for M11 rather than inferring that
+        # the shared lock protects a different registry/ledger lifecycle. Each
+        # authorization is individually canonical and points to the same
+        # immutable ALLOW gate and initial ledger. Exactly one may advance the
+        # cap=1 ledger; the other 23 must observe either the held local lock or
+        # the now-stale gate, then reject after the winner commits.
+        production_race_state = work / "m11-reserve-race-state"
+        shutil.copytree(state, production_race_state)
+        production_race_authorizations = {}
+        for index in range(1, 25):
+            authorized_at = f"2026-09-08T00:00:00.{index:03d}Z"
+            result = invoke(bot, "mission", "m11-authorize", production_race_state, production_lease["lease_id"], production_gate["artifact"]["gate_id"], "fixture_stub", authorized_at)
+            assert result["status"] == "APPENDED"
+            production_race_authorizations[f"m11-r{index}"] = result["artifact"]["authorization_id"]
+        production_race_ledger_id = production_lease["lease_id"] + "/" + gate_time
+        production_race_reserved_at = "2026-09-08T00:00:01Z"
+        production_race_responses = synchronized_bot_calls(bot, env, work / "m11-reserve-barrier", (
+            (label, ("mission", "m11-reserve-authorization", production_race_state, authorization_id, production_race_ledger_id, production_race_reserved_at))
+            for label, authorization_id in production_race_authorizations.items()
+        ))
+        assert sum(response["status"] == "APPENDED" for response in production_race_responses.values()) == 1
+        assert all(response["status"] in {"APPENDED", "BUSY", "REJECTED"} for response in production_race_responses.values())
+        production_race_winner = next(label for label, response in production_race_responses.items() if response["status"] == "APPENDED")
+        production_race_winner_authorization = production_race_authorizations[production_race_winner]
+        assert invoke(bot, "mission", "m11-reserve-authorization", production_race_state, production_race_winner_authorization, production_race_ledger_id, production_race_reserved_at)["status"] == "EXACT_DUPLICATE"
+        for label, authorization_id in production_race_authorizations.items():
+            if label != production_race_winner:
+                assert invoke(bot, "mission", "m11-reserve-authorization", production_race_state, authorization_id, production_race_ledger_id, production_race_reserved_at, expected=1)["status"] == "REJECTED"
+        production_race_head = invoke(bot, "mission", "m11-resolve", production_race_state, "PRODUCTION_LEDGER", production_lease["lease_id"] + "/" + production_race_reserved_at)["artifact"]
+        assert production_race_head["executions_total"] == 1 and production_race_head["executions_in_window"] == 1
+        assert production_race_head["pending_outcomes"] == 1 and len(production_race_head["pending_execution_ids"]) == 1
+
         production_reservation = invoke(bot, "mission", "m11-reserve-authorization", state, production_authorization["artifact"]["authorization_id"], production_lease["lease_id"] + "/" + gate_time, "2026-09-08T00:00:01Z")
         assert production_reservation["status"] == "APPENDED"
         production_failed = invoke(bot, "mission", "m11-record-failed", state, production_authorization["artifact"]["authorization_id"], production_lease["lease_id"] + "/2026-09-08T00:00:01Z", "2026-09-08T00:00:02Z", "fixture-dispatch-failed-before-executor")
