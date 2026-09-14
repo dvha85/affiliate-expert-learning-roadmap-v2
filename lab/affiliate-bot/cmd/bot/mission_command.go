@@ -825,7 +825,7 @@ func existingNewJSONStatus(path string, expected []byte) (string, error) {
 // artifact.
 func artifactOutputDirectory(path string) (string, error) {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := ensureOutputParentBeforeCreate(dir); err != nil {
 		return "", err
 	}
 	info, err := os.Lstat(dir)
@@ -843,7 +843,7 @@ func artifactOutputDirectory(path string) (string, error) {
 // would create locks, journals and mission state outside the runtime selected
 // by the operator before any canonical store guard could run.
 func ensureRuntimeDirectory(dir string) error {
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := ensureOutputParentBeforeCreate(dir); err != nil {
 		return err
 	}
 	return requireRuntimeDirectory(dir)

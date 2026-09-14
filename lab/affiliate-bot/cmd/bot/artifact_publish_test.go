@@ -136,3 +136,18 @@ func TestWriteNewJSONRejectsSymlinkParent(t *testing.T) {
 		t.Fatalf("artifact was published outside the owned parent: %v", err)
 	}
 }
+
+func TestWriteNewJSONRejectsMissingParentSymlinkBeforeExternalCreate(t *testing.T) {
+	outside := t.TempDir()
+	parentLink := filepath.Join(t.TempDir(), "artifact-output-parent")
+	if err := os.Symlink(outside, parentLink); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(parentLink, "missing", "artifact.json")
+	if _, err := writeNewJSON(path, map[string]string{"state": "new"}); err == nil {
+		t.Fatal("artifact publisher created through a missing-parent symlink")
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("artifact publisher created external output before rejection: entries=%+v err=%v", entries, err)
+	}
+}

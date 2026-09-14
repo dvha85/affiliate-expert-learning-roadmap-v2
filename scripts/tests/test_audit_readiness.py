@@ -94,8 +94,18 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_missing_backup_restore_missing_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
-        source.write_text(source.read_text(encoding="utf-8").replace("func ensureBackupOutputParent", "func removedBackupOutputParent", 1), encoding="utf-8")
+        source.write_text(source.read_text(encoding="utf-8").replace("func ensureOutputParentBeforeCreate", "func removedOutputParentPreflight", 1), encoding="utf-8")
         self.assertIn("backup/restore missing-parent regression is missing", self.run_audit(False))
+
+    def test_missing_immutable_artifact_missing_parent_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := ensureOutputParentBeforeCreate(dir);", "func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := removedOutputParentPreflight(dir);", 1), encoding="utf-8")
+        self.assertIn("immutable artifact missing-parent regression is missing", self.run_audit(False))
+
+    def test_missing_runtime_missing_parent_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func ensureRuntimeDirectory(dir string) error {\n\tif err := ensureOutputParentBeforeCreate(dir);", "func ensureRuntimeDirectory(dir string) error {\n\tif err := removedOutputParentPreflight(dir);", 1), encoding="utf-8")
+        self.assertIn("runtime missing-parent regression is missing", self.run_audit(False))
 
     def test_missing_identity_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
