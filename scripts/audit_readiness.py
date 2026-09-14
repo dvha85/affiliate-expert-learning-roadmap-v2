@@ -202,7 +202,7 @@ def audit_runtime_acceptance(root, matrix):
     gate_source_text = gate_source.read_text(encoding="utf-8") if gate_source.is_file() else ""
     gate_registry_text = gate_registry_source.read_text(encoding="utf-8") if gate_registry_source.is_file() else ""
     gate_test_text = gate_test.read_text(encoding="utf-8") if gate_test.is_file() else ""
-    if "in.Now, in.Ledger" not in gate_source_text or "Now: gate.EvaluatedAt" not in gate_registry_text or "TestCanaryGateIdentityIncludesEvaluationTime" not in gate_test_text:
+    if "in.Now, in.Ledger" not in gate_source_text or "Now: gate.EvaluatedAt" not in gate_registry_text or "TestCanaryGateIdentityIncludesEvaluationTime" not in gate_test_text or "TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes" not in source_text:
         fail("M10 gate evaluation-identity regression is missing from canonical path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):

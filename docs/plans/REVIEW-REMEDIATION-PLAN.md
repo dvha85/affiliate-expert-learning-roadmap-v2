@@ -603,9 +603,9 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   nay hash cả `evaluated_at`. Trước đó hai đánh giá hợp lệ khác thời điểm nhưng
   cùng grant/cost/intent/policy/ledger có cùng ID và bytes khác nhau, nên
   registry append-only chỉ có thể từ chối lần đánh giá sau như conflict.
-  Core graph recompute cùng time-bound identity; regression tạo hai gate cùng
-  snapshot cách nhau một giây, yêu cầu ID khác nhau và cả hai resolve trong
-  graph. Không suy điều này thành clock trust, execution authority, transaction
+  Core graph recompute cùng time-bound identity; regression core và learner Bot
+  tạo hai gate cùng snapshot cách nhau một giây, yêu cầu ID khác nhau và cả hai
+  resolve trong registry/graph. Không suy điều này thành clock trust, execution authority, transaction
   nhiều file, power-loss hay business outcome; RP-03 vẫn `PARTIAL`.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK

@@ -826,6 +826,31 @@ func TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts(t *test
 	}
 }
 
+func TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, firstGatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	secondGatePath := filepath.Join(filepath.Dir(runtimeDir), "second-gate.json")
+	secondAt := base.Add(time.Second).Format(time.RFC3339)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, secondGatePath, secondAt); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("second valid evaluation could not register a distinct gate: code=%d response=%+v", code, response)
+	}
+	var first, second corem10.CanaryGateDecision
+	if err := readJSON(firstGatePath, &first); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(secondGatePath, &second); err != nil {
+		t.Fatal(err)
+	}
+	if first.EvaluatedAt == second.EvaluatedAt || first.GateID == second.GateID {
+		t.Fatalf("distinct evaluations did not receive distinct immutable IDs: first=%+v second=%+v", first, second)
+	}
+	for _, gate := range []corem10.CanaryGateDecision{first, second} {
+		if code, response := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gate.GateID); code != 0 || response["status"] != "RESOLVED" {
+			t.Fatalf("registered gate did not resolve: code=%d response=%+v", code, response)
+		}
+	}
+}
+
 func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	// Use a short real-time-valid fixture window: each contender invokes the
 	// compiled learner Bot, so unlike a unit clock seam this proves the normal
