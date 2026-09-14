@@ -308,6 +308,18 @@ inject lỗi sau write nhưng trước sync: call phải trả error, không ACK
 công; append tiếp theo giữ line framing hợp lệ. Đây không là mô phỏng
 power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
 
+**Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
+chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`
+chỉ ACK một record đã có LF sau sync, final line không có LF được xem là append
+có thể bị gián đoạn, không phải JSON hợp lệ để history/M03 action/M04 outcome,
+M05 evaluation/proposal/review hoặc receipt ACCESSTRADE tiếp tục dùng. M10/M11
+fixture outcome loader vốn split một stable byte snapshot cũng gọi cùng rule
+trước parse. Regression chạy real action/outcome command với store bị cắt LF,
+đòi `STORE_ERROR` và bytes không đổi; shared store regression cùng direct M10/
+M11 loader coverage chặn framing trước semantic decode. Đây là integrity guard
+filesystem local, không chứng minh recovery sau crash/power-loss, atomic
+multi-file hay transaction multi-host; RP-03 vẫn `PARTIAL`.
+
 **Cập nhật atomic backup publish (2026-09-12):** `backup create` và `restore`
 copy/verify toàn bộ snapshot trong sibling staging, rồi publish qua rename tới
 target rỗng dưới target gate. Mỗi copied file mới phải `fsync`; mọi directory edge

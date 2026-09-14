@@ -173,6 +173,38 @@ def audit_runtime_acceptance(root, matrix):
     m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
     if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text:
         fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
+    framing = updates.get("RP-03-canonical-jsonl-framing")
+    if not isinstance(framing, dict):
+        fail("matrix lacks the canonical JSONL framing acceptance record")
+    required_framing_refs = {
+        "lab/affiliate-bot/internal/store/history.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/internal/store/history_test.go",
+        "lab/affiliate-bot/cmd/bot/action_store_test.go",
+        "lab/affiliate-bot/cmd/bot/outcome_store_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+    }
+    if not required_framing_refs.issubset(set(framing.get("implementation_refs", [])) | set(framing.get("test_refs", []))):
+        fail("canonical JSONL framing record lacks implementation/test refs")
+    framing_scope = framing.get("scope")
+    if not isinstance(framing_scope, str) or "without LF" not in framing_scope or "M10/M11" not in framing_scope or "without changing" not in framing_scope:
+        fail("canonical JSONL framing record lacks bounded scope disclosure")
+    store_source = root / "lab/affiliate-bot/internal/store/history.go"
+    store_test = root / "lab/affiliate-bot/internal/store/history_test.go"
+    framing_source = store_source.read_text(encoding="utf-8") if store_source.is_file() else ""
+    framing_test = store_test.read_text(encoding="utf-8") if store_test.is_file() else ""
+    if "RequireCompleteJSONLFraming" not in framing_source or "incomplete final line framing" not in framing_source or "TestJSONLOpenRejectsIncompleteFinalLine" not in framing_test:
+        fail("canonical JSONL shared framing regression is missing")
+    mission_source = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    mission_text = mission_source.read_text(encoding="utf-8") if mission_source.is_file() else ""
+    if "RequireCompleteJSONLFraming(raw)" not in mission_text or "TestFixtureOutcomeLoadersRejectIncompleteJSONLFraming" not in source_text:
+        fail("M10/M11 fixture outcome framing regression is missing")
+    action_test = root / "lab/affiliate-bot/cmd/bot/action_store_test.go"
+    outcome_test = root / "lab/affiliate-bot/cmd/bot/outcome_store_test.go"
+    if not action_test.is_file() or "unterminated action store was changed" not in action_test.read_text(encoding="utf-8"):
+        fail("M03 incomplete JSONL no-mutation regression is missing")
+    if not outcome_test.is_file() or "unterminated outcome store was changed" not in outcome_test.read_text(encoding="utf-8"):
+        fail("M04 incomplete JSONL no-mutation regression is missing")
 
 
 def audit_evidence_graph(root, criteria_by_id):
