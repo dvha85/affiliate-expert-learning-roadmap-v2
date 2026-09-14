@@ -92,6 +92,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("fixture output parent must be an existing non-symlink directory", "fixture output parent guard removed", 1), encoding="utf-8")
         self.assertIn("advisor fixture output-parent regression is missing", self.run_audit(False))
 
+    def test_missing_backup_restore_missing_parent_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func ensureBackupOutputParent", "func removedBackupOutputParent", 1), encoding="utf-8")
+        self.assertIn("backup/restore missing-parent regression is missing", self.run_audit(False))
+
     def test_missing_identity_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m10_identity_guard.py", "python scripts/removed.py"), encoding="utf-8")

@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 609e9f300086b6aabda39fa3703fb4e77d21ca9a -->
+<!-- readiness-main-baseline: ade7f9bf3a6d342b718ee18165624ebd3a44f356 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -256,6 +256,14 @@ symlink đến thư mục ngoài, nhận `PATH_ERROR` và kiểm thư mục ngo�
 ancestor-path substitution, crash/power-loss, multi-host, provider và business
 outcome vẫn nằm ngoài scope. Inventory các writer khác vẫn mở, nên RP-01 giữ
 `PARTIAL`.
+
+**Cập nhật backup/restore missing-parent guard (2026-09-14):** trước khi
+`backup create` hoặc `backup restore` gọi `MkdirAll` cho output parent do caller
+chọn, shared preflight lùi từng component chưa tồn tại tới entry đã có và reject
+symlink/non-directory. Regression đi đúng CLI bằng đường dẫn `symlink/missing`
+cho cả hai lệnh, nhận `TARGET_ERROR` và kiểm thư mục ngoài vẫn rỗng. Đây không
+phải guard cho ancestor có sẵn hay concurrent substitution sau preflight; cũng
+không là proof crash/power-loss, multi-host, provider hay business outcome.
 
 **Cập nhật M07 history read gate (2026-09-11):** CLI M07 và adapter M07 giờ
 giữ cùng local history runtime gate với watcher trước khi resolve canonical

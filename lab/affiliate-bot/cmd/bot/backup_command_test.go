@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,48 @@ func TestRestoreTargetGateRejectsConcurrentManagedPublisher(t *testing.T) {
 	defer release()
 	if _, err := acquireRestoreTargetGate(target); err == nil {
 		t.Fatal("second restore acquired the same target gate")
+	}
+}
+
+func TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	runtimeDir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtimeDir, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtimeDir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize backup fixture: code=%d response=%+v", code, response)
+	}
+	outside := t.TempDir()
+	parentLink := filepath.Join(t.TempDir(), "output-parent")
+	if err := os.Symlink(outside, parentLink); err != nil {
+		t.Fatal(err)
+	}
+	backupTarget := filepath.Join(parentLink, "missing", "backup")
+	if code, response := backupCall(t, "create", runtimeDir, backupTarget); code == 0 || response["status"] != "TARGET_ERROR" {
+		t.Fatalf("backup created through a missing-parent symlink: code=%d response=%+v", code, response)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("backup created external output before rejection: entries=%+v err=%v", entries, err)
+	}
+
+	backup := filepath.Join(t.TempDir(), "verified-backup")
+	if code, response := backupCall(t, "create", runtimeDir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("prepare valid backup for restore guard: code=%d response=%+v", code, response)
+	}
+	restoreTarget := filepath.Join(parentLink, "missing", "restored")
+	if code, response := backupCall(t, "restore", backup, restoreTarget); code == 0 || response["status"] != "TARGET_ERROR" {
+		t.Fatalf("restore created through a missing-parent symlink: code=%d response=%+v", code, response)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("restore created external output before rejection: entries=%+v err=%v", entries, err)
 	}
 }
 
