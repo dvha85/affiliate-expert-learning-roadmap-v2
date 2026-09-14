@@ -518,11 +518,12 @@ sync không xác nhận được, adapter trả typed publish uncertainty thay v
 append thường. `m10-gate` và `m10-authorize` bàn giao
 `PUBLISHED_RECOVERY_REQUIRED` kèm artifact đã resolve được và không ghi
 portable output; M11 registry cùng CLI `m11-activate`, `m11-ledger-init`,
-offline `m11-evaluate`, `m11-close-cycle` và reviewed `m11-reconcile` bàn giao
-record/ledger/evaluation/cycle hoặc transition reconciliation đã visible để
-resolver hoặc canonical ledger-head kiểm tra trước exact retry. Regression dùng
-seam sau file sync, trước parent sync, và kiểm các đường M10, M11 registry,
-activation, ledger-init, evaluation, cycle và reconciliation. Đây là
+offline `m11-evaluate`, `m11-close-cycle`, reviewed `m11-reconcile` và
+non-authorizing `m11-recovery-admit` bàn giao record/ledger/evaluation/cycle,
+transition reconciliation hoặc admission đã visible để resolver hoặc canonical
+ledger-head kiểm tra trước exact retry. Regression dùng seam sau file sync,
+trước parent sync, và kiểm các đường M10, M11 registry, activation, ledger-init,
+evaluation, cycle, reconciliation và cross-runtime admission. Đây là
 disclosure/recovery local có giới hạn, chưa chứng minh durability qua power
 loss, transaction nhiều file, bao phủ mọi M11
 lifecycle envelope, multi-host, execution hay business outcome; RP-03/RP-07

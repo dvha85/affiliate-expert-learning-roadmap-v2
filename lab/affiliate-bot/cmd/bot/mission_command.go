@@ -2856,7 +2856,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		entry, status, err := admitM11Recovery(args[1], args[2], args[3], raw)
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(entry.Artifact, err), err, 1)
 		}
 		return emit(status, entry, nil, 0)
 	case "m11-outcome":
