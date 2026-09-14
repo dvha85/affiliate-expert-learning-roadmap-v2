@@ -12,6 +12,13 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
+// actionAppend is command-local only so the acknowledgement boundary can be
+// tested against the actual action command. Production uses the shared JSONL
+// writer.
+var actionAppend = func(path string, record []byte) error {
+	return (store.JSONL{}).AppendLine(path, record)
+}
+
 // Resolve the recorded decision, not a caller-supplied packet or an approval.
 func resolveActionDecision(records []HistoryRecord, id string) error {
 	count := 0
@@ -167,7 +174,12 @@ func runActionStore(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("INVALID_SCHEMA", nil, err, 1)
 	}
-	if err := (store.JSONL{}).AppendLine(args[2], encoded); err != nil {
+	if err := appendWithVisibleRecovery(actionAppend, args[2], encoded, a, func() ([]m03.HumanActionRecord, error) {
+		return loadActions(args[2], records)
+	}, func(left, right m03.HumanActionRecord) bool { return left == right }); err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", a, err, 1)
+		}
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	return emit("APPENDED", a, nil, 0)

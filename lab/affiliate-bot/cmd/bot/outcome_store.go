@@ -106,7 +106,7 @@ func loadOutcomes(path string, actions []m03.HumanActionRecord) (out []m03.Outco
 
 func sameOutcome(a, b m03.OutcomeRecord) bool { return reflect.DeepEqual(a, b) }
 
-func appendOutcome(path string, encoded []byte) error {
+var outcomeAppend = func(path string, encoded []byte) error {
 	return (store.JSONL{}).AppendLine(path, encoded)
 }
 
@@ -183,7 +183,12 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("INVALID_SCHEMA", nil, err, 1)
 	}
-	if err := appendOutcome(args[3], encoded); err != nil {
+	if err := appendWithVisibleRecovery(outcomeAppend, args[3], encoded, o, func() ([]m03.OutcomeRecord, error) {
+		return loadOutcomes(args[3], actions)
+	}, sameOutcome); err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", o, err, 1)
+		}
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	return emit("APPENDED", o, nil, 0)

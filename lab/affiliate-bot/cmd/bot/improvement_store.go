@@ -14,6 +14,10 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
+var improvementAppend = func(path string, encoded []byte) error {
+	return (store.JSONL{}).AppendLine(path, encoded)
+}
+
 func linkedProposal(raw []byte, evaluations []m05.EvaluationRecord) (m05.ImprovementProposal, error) {
 	p, status := m05.DecodeM05Proposal(raw)
 	if status != "VALID" || m05.EvaluateImprovementProposal(p) != "REVIEW_REQUIRED" {
@@ -163,7 +167,12 @@ func importImprovement[T any](path, input string, existing []T, decode func([]by
 	if err != nil {
 		return "INVALID_RECORD", nil, err
 	}
-	if err := (store.JSONL{}).AppendLine(path, raw); err != nil {
+	if err := appendWithVisibleRecovery(improvementAppend, path, raw, value, func() ([]T, error) {
+		return loadImprovementRecords(path, decode, id)
+	}, func(left, right T) bool { return reflect.DeepEqual(left, right) }); err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return "PUBLISHED_RECOVERY_REQUIRED", value, err
+		}
 		return "STORE_ERROR", nil, err
 	}
 	return "APPENDED", value, nil

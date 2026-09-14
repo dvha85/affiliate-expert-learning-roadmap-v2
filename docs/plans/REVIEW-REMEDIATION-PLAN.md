@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: b64db58993c6576d2c935a9839e2a38cdf07521a -->
+<!-- readiness-main-baseline: 73c18c1db8bdf2c38a927677c2c7f3fe0ff7dc51 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -322,6 +322,16 @@ regression cùng direct M10/M11 registry/outcome và backup-receipt loader
 coverage chặn framing trước semantic decode. Đây là integrity guard filesystem
 local, không chứng minh recovery sau crash/power-loss, atomic multi-file hay
 transaction multi-host; RP-03 vẫn `PARTIAL`.
+
+**Cập nhật derived JSONL visible append uncertainty (2026-09-14):** M03 action,
+M04 outcome và M05 evaluation/proposal/review không còn trả `STORE_ERROR` mơ hồ
+khi shared JSONL writer báo lỗi sau lúc exact record đã có thể được canonical
+loader đọc lại. Mỗi command re-read đúng derived store; chỉ khi record bằng đúng
+payload mới trả `PUBLISHED_RECOVERY_REQUIRED` (non-zero, kèm artifact) và retry
+exact trả `EXACT_DUPLICATE`. Regression gọi từng command thật, inject ACK loss
+sau append, rồi kiểm loader/retry thật. Đây chỉ là acknowledgement boundary của
+một JSONL file local; không chứng minh `fsync`/power-loss, transaction nhiều
+file, business outcome hay multi-host safety.
 
 **Cập nhật atomic backup publish (2026-09-12):** `backup create` và `restore`
 copy/verify toàn bộ snapshot trong sibling staging, rồi publish qua rename tới
