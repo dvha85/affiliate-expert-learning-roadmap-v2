@@ -767,6 +767,65 @@ func authorityFixtureAt(t *testing.T, base time.Time, expiring string, setupCana
 	return runtimeDir, boundPath, gatePath, boundary
 }
 
+func TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+
+	gateOutput := filepath.Join(root, "conflicting-gate-output.json")
+	gateSentinel := []byte(`{"portable":"gate sentinel"}`)
+	if err := os.WriteFile(gateOutput, gateSentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, base.Format(time.RFC3339)); code == 0 || response["status"] != "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" {
+		t.Fatalf("gate output collision did not disclose canonical artifact: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok || artifact["gate_id"] == "" {
+			t.Fatalf("gate output collision omitted canonical gate: %+v", response)
+		}
+		gateID, ok := artifact["gate_id"].(string)
+		if !ok {
+			t.Fatalf("gate output collision returned invalid gate ID: %+v", artifact)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gateID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("disclosed gate did not resolve from canonical registry: code=%d response=%+v", code, resolved)
+		}
+	}
+	if got, err := os.ReadFile(gateOutput); err != nil || !bytes.Equal(got, gateSentinel) {
+		t.Fatalf("gate output collision changed existing bytes: %v", err)
+	}
+
+	authorizationOutput := filepath.Join(root, "conflicting-authorization-output.json")
+	authorizationSentinel := []byte(`{"portable":"authorization sentinel"}`)
+	if err := os.WriteFile(authorizationOutput, authorizationSentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationOutput, base.Format(time.RFC3339), "fixture_stub"); code == 0 || response["status"] != "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" {
+		t.Fatalf("authorization output collision did not disclose canonical artifact: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok || artifact["authorization_id"] == "" {
+			t.Fatalf("authorization output collision omitted canonical authorization: %+v", response)
+		}
+		authorizationID, ok := artifact["authorization_id"].(string)
+		if !ok {
+			t.Fatalf("authorization output collision returned invalid authorization ID: %+v", artifact)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindExecutionAuthorization, authorizationID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("disclosed authorization did not resolve from canonical registry: code=%d response=%+v", code, resolved)
+		}
+	}
+	if got, err := os.ReadFile(authorizationOutput); err != nil || !bytes.Equal(got, authorizationSentinel) {
+		t.Fatalf("authorization output collision changed existing bytes: %v", err)
+	}
+
+	portableAuthorization := filepath.Join(root, "portable-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, portableAuthorization, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("exact canonical authorization retry did not publish clean portable artifact: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	// Use a short real-time-valid fixture window: each contender invokes the
 	// compiled learner Bot, so unlike a unit clock seam this proves the normal

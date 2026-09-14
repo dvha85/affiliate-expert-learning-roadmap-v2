@@ -2333,7 +2333,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err = writeNewJSON(args[3], gate)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			// The registry append is the canonical commit. A portable artifact can
+			// still be unavailable (for example because its requested path already
+			// exists), so disclose the registered gate instead of incorrectly
+			// presenting the whole operation as an unresolvable conflict.
+			return emit("CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE", gate, err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, gate, nil, 0)
@@ -2401,7 +2405,9 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err = writeNewJSON(args[4], authorization)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			// See m10-gate above: callers need the durable authorization ID to
+			// resolve or publish the exact immutable artifact safely.
+			return emit("CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE", authorization, err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, authorization, nil, 0)

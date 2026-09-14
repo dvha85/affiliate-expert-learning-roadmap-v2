@@ -587,6 +587,18 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
   canonical, state đã bind exact execution, rồi retry sang path mới thành công.
   Không coi portable output là commit boundary, không chứng minh transaction
   registry/state khi crash và không cấp execution authority.
+- **RP-03 M10 canonical output disclosure (2026-09-14):** `m10-gate` và
+  `m10-authorize` vẫn append/validate canonical registry trước portable output
+  để output path không là commit boundary. Nếu output immutable đã tồn tại với
+  bytes khác, CLI trả non-zero
+  `CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE` kèm chính gate hoặc
+  authorization durable; caller có thể dùng ID đó với `m10-resolve` hoặc xuất
+  exact artifact sang path sạch. Regression gọi Bot thật cho cả hai loại,
+  resolve ID trả về và chứng minh bytes của output cũ không đổi; retry
+  authorization sang path sạch thành công. Lỗi sync parent sau publish vẫn là
+  `PUBLISHED_RECOVERY_REQUIRED`. Đây chỉ là disclosure/recovery envelope local,
+  không chứng minh atomicity nhiều file, power-loss, executor hay business
+  outcome; RP-03 vẫn `PARTIAL`.
 - **RP-03 M10 registry foundation:** state directory nay có registry append-only
   `m10-artifacts.jsonl`; core canonicalize/hash envelope và learner chỉ ACK
   `CanaryGrant`, trusted cost-bound, gate, authorization hoặc cancellation

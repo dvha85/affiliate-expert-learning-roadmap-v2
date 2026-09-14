@@ -173,6 +173,16 @@ def audit_runtime_acceptance(root, matrix):
     m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
     if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text:
         fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
+    canonical_output = updates.get("RP-03-m10-canonical-output-disclosure")
+    if not isinstance(canonical_output, dict):
+        fail("matrix lacks M10 canonical-output disclosure acceptance record")
+    if "lab/affiliate-bot/cmd/bot/mission_command.go" not in canonical_output.get("implementation_refs", []) or "lab/affiliate-bot/cmd/bot/mission_command_test.go" not in canonical_output.get("test_refs", []):
+        fail("M10 canonical-output disclosure record lacks implementation/test refs")
+    canonical_output_scope = canonical_output.get("scope")
+    if not isinstance(canonical_output_scope, str) or "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" not in canonical_output_scope or "PUBLISHED_RECOVERY_REQUIRED" not in canonical_output_scope or "m10-resolve" not in canonical_output_scope:
+        fail("M10 canonical-output disclosure record lacks bounded recovery disclosure")
+    if "TestMissionM10DisclosesCanonicalArtifactWhenPortableOutputConflicts" not in source_text or "CANONICAL_ARTIFACT_REGISTERED_OUTPUT_UNAVAILABLE" not in source_text or '"m10-resolve"' not in source_text:
+        fail("M10 canonical-output disclosure regression is missing from learner Bot path")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
         fail("matrix lacks the canonical JSONL framing acceptance record")
