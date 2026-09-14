@@ -2881,7 +2881,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		evaluation, status, err := evaluateM11FixtureOutcome(args[1], args[2], args[3], args[4])
 		if err != nil {
-			return emit(missionErrorStatus(err), nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(evaluation, err), err, 1)
 		}
 		return emit(status, evaluation, nil, 0)
 	case "m11-close-cycle":

@@ -192,6 +192,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11LifecycleDisclosesRegistryPublishUncertainty", "MissingM11LifecycleRegistryPublishUncertainty", 1), encoding="utf-8")
         self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
 
+    def test_missing_m11_evaluation_registry_publish_uncertainty_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM11EvaluationDisclosesRegistryPublishUncertainty", "MissingM11EvaluationRegistryPublishUncertainty", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")

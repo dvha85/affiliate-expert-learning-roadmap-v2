@@ -1900,6 +1900,39 @@ func TestMissionM11LifecycleDisclosesRegistryPublishUncertainty(t *testing.T) {
 	}
 }
 
+func TestMissionM11EvaluationDisclosesRegistryPublishUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init failed: code=%d response=%+v", code, response)
+	}
+	journal, _ := setupM11OutcomeJournalFixture(t, dir)
+	if err := writeJSONAtomic(m11OutcomeJournalPath(dir), journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverM11OutcomeJournal(dir); err != nil {
+		t.Fatalf("fixture outcome recovery failed: %v", err)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "uncertain-evaluation", "2026-09-08T00:00:03Z"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("evaluation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["evaluation_id"] != "uncertain-evaluation" {
+		t.Fatalf("evaluation uncertainty omitted the visible artifact: %+v", response)
+	}
+	if code, response := missionCall(t, "m11-resolve", dir, corem11.ArtifactKindEvaluation, "uncertain-evaluation"); code != 0 || response["status"] != "RESOLVED" {
+		t.Fatalf("uncertain evaluation was not resolvable: code=%d response=%+v", code, response)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-evaluate", dir, journal.Outcome.OutcomeID, "uncertain-evaluation", "2026-09-08T00:00:03Z"); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("evaluation exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
