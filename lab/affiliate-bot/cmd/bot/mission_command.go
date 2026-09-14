@@ -2796,7 +2796,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		resolution, ledger, status, err := reconcileM11Execution(args[1], args[2], args[3])
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit(missionErrorStatus(err), artifactIfRegistryPublishUncertain(map[string]any{"resolution": resolution, "stopped_ledger": ledger}, err), err, 1)
 		}
 		return emit(status, map[string]any{"resolution": resolution, "stopped_ledger": ledger}, nil, 0)
 	case "m11-recovery-export":

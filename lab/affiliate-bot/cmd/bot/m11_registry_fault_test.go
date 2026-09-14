@@ -589,6 +589,48 @@ func TestM11ReconcileRejectsSecondResolutionForSameUnknownExecution(t *testing.T
 	}
 }
 
+func TestMissionM11ReconcileDisclosesRegistryPublishUncertainty(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	execution, _, status, err := recordUnknownM11Execution(fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "fixture timeout")
+	if err != nil || status != appendAdded {
+		t.Fatalf("create stopped UNKNOWN fixture: execution=%+v status=%s err=%v", execution, status, err)
+	}
+	stoppedEntry, _, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve stopped ledger: %v", err)
+	}
+	resolution := corem11.ProductionReconciliationResolution{ResolutionID: "uncertain-reconciliation", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:03Z", EffectState: "NOT_PERFORMED", Reason: "human reviewed fixture timeout"}
+	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindReconciliation, resolution)
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(fixture.dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	if code, response := missionCall(t, "m11-reconcile", fixture.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("reconciliation uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		if !ok {
+			t.Fatalf("reconciliation uncertainty omitted visible transition: %+v", response)
+		}
+		returnedResolution, hasResolution := artifact["resolution"].(map[string]any)
+		returnedLedger, hasLedger := artifact["stopped_ledger"].(map[string]any)
+		if !hasResolution || !hasLedger || returnedResolution["resolution_id"] != resolution.ResolutionID || returnedLedger["reconciliation_required"] != false {
+			t.Fatalf("reconciliation uncertainty did not disclose the canonical transition: %+v", artifact)
+		}
+	}
+	if _, ledger, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID); err != nil || len(ledger.ReconciliationResolutionIDs) != 1 || ledger.ReconciliationResolutionIDs[0] != resolution.ResolutionID {
+		t.Fatalf("uncertain reconciliation ledger was not retained as head: ledger=%+v err=%v", ledger, err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m11-reconcile", fixture.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("reconciliation exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
 func TestBackupCreateRecoversPendingM11UnknownStopJournal(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	const attemptedAt, reason = "2026-09-08T00:00:02Z", "fixture timeout"
