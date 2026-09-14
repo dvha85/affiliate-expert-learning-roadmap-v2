@@ -582,15 +582,15 @@ func missionBinaryCall(t *testing.T, binary string, args ...string) (int, map[st
 	return code, response
 }
 
-// TestMissionReserveProcessBarrierHelper is deliberately test-binary-only. It
-// waits until the parent has started every contender, then delegates to the
+// TestMissionProcessBarrierHelper is deliberately test-binary-only. It waits
+// until the parent has started every contender, then delegates to the
 // separately built Bot binary. Production never reads these variables, so the
-// barrier cannot change authority or clock behavior outside this regression.
-func TestMissionReserveProcessBarrierHelper(t *testing.T) {
-	if os.Getenv("GO_WANT_M10_RESERVE_BARRIER") != "1" {
+// barrier cannot change authority or clock behavior outside a regression.
+func TestMissionProcessBarrierHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_MISSION_BARRIER") != "1" {
 		return
 	}
-	readyDir, startPath := os.Getenv("GO_M10_RESERVE_READY_DIR"), os.Getenv("GO_M10_RESERVE_START_PATH")
+	readyDir, startPath := os.Getenv("GO_MISSION_READY_DIR"), os.Getenv("GO_MISSION_START_PATH")
 	if readyDir == "" || startPath == "" {
 		os.Exit(2)
 	}
@@ -635,7 +635,7 @@ type missionProcessResult struct {
 	err    error
 }
 
-func waitForReservationContenders(t *testing.T, readyDir string, count int) {
+func waitForMissionContenders(t *testing.T, readyDir string, count int) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for {
@@ -647,7 +647,7 @@ func waitForReservationContenders(t *testing.T, readyDir string, count int) {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("only %d/%d reservation processes reached the barrier", len(entries), count)
+			t.Fatalf("only %d/%d Bot processes reached the barrier", len(entries), count)
 		}
 		time.Sleep(time.Millisecond)
 	}
@@ -979,8 +979,8 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	results := make(chan missionProcessResult, contenders)
 	for index := 0; index < contenders; index++ {
 		reservationID := "concurrent-reservation-" + strconv.Itoa(index)
-		command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMissionReserveProcessBarrierHelper$", "--", binary, "mission", "m10-reserve-authorization", runtimeDir, authorizationPath, reservationID)
-		command.Env = append(os.Environ(), "GO_WANT_M10_RESERVE_BARRIER=1", "GO_M10_RESERVE_READY_DIR="+readyDir, "GO_M10_RESERVE_START_PATH="+startPath)
+		command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMissionProcessBarrierHelper$", "--", binary, "mission", "m10-reserve-authorization", runtimeDir, authorizationPath, reservationID)
+		command.Env = append(os.Environ(), "GO_WANT_MISSION_BARRIER=1", "GO_MISSION_READY_DIR="+readyDir, "GO_MISSION_START_PATH="+startPath)
 		var stdout, stderr bytes.Buffer
 		command.Stdout, command.Stderr = &stdout, &stderr
 		if err := command.Start(); err != nil {
@@ -995,7 +995,7 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 			results <- missionProcessResult{id: id, code: code, stdout: stdout.String(), stderr: stderr.String(), err: err}
 		}(reservationID, command, &stdout, &stderr)
 	}
-	waitForReservationContenders(t, readyDir, contenders)
+	waitForMissionContenders(t, readyDir, contenders)
 	if err := os.WriteFile(startPath, []byte("start"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -1033,6 +1033,126 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	}
 	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code != 0 || response["status"] != "VALID" {
 		t.Fatalf("fresh Bot could not replay the persisted cap=1 ledger: code=%d response=%+v", code, response)
+	}
+}
+
+// A fixture outcome is still a durable graph edge: two competing writers must
+// not both attach different observations to the same cancelled execution. This
+// uses normal, separately built Bot processes rather than the in-process
+// command helper, then makes backup/restore replay the sole accepted outcome.
+func TestMissionM10FixtureOutcomeSingleWriterAcrossTwentyFourBotProcesses(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	authorizationPath := filepath.Join(root, "outcome-concurrent-authorization.json")
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "outcome-concurrent-reservation"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+	}
+	recordPath := filepath.Join(root, "outcome-concurrent-record.json")
+	attemptedAt := base.Add(time.Second).Format(time.RFC3339)
+	if code, response := missionCall(t, "m10-cancel", runtimeDir, authorizationPath, recordPath, attemptedAt, "fixture cancelled before side effect"); code != 0 || response["status"] != "APPENDED" {
+		t.Fatalf("cancelled execution setup failed: code=%d response=%+v", code, response)
+	}
+	var record corem10.ExecutionRecord
+	if err := readJSON(recordPath, &record); err != nil {
+		t.Fatal(err)
+	}
+
+	binary := buildMissionBinary(t)
+	const contenders = 24
+	readyDir := filepath.Join(root, "outcome-ready")
+	if err := os.Mkdir(readyDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	startPath := filepath.Join(root, "outcome-start")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := make(chan missionProcessResult, contenders)
+	for index := 0; index < contenders; index++ {
+		outcome := m03.OutcomeRecord{
+			OutcomeID:  "outcome-concurrent-" + strconv.Itoa(index),
+			EffectRef:  m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID},
+			ObservedAt: base.Add(2 * time.Second).Format(time.RFC3339),
+			Status:     "CANCELLED",
+			Metrics:    map[string]float64{},
+			SourceRef:  "fixture:m10-outcome/concurrent",
+		}
+		outcomePath := filepath.Join(root, "outcome-concurrent-"+strconv.Itoa(index)+".json")
+		writeMissionTestJSON(t, outcomePath, outcome)
+		command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMissionProcessBarrierHelper$", "--", binary, "mission", "m10-outcome", runtimeDir, outcomePath)
+		command.Env = append(os.Environ(), "GO_WANT_MISSION_BARRIER=1", "GO_MISSION_READY_DIR="+readyDir, "GO_MISSION_START_PATH="+startPath)
+		var stdout, stderr bytes.Buffer
+		command.Stdout, command.Stderr = &stdout, &stderr
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		go func(id string, command *exec.Cmd, stdout, stderr *bytes.Buffer) {
+			err := command.Wait()
+			code := 0
+			if exited, ok := err.(*exec.ExitError); ok {
+				code = exited.ExitCode()
+			}
+			results <- missionProcessResult{id: id, code: code, stdout: stdout.String(), stderr: stderr.String(), err: err}
+		}(outcome.OutcomeID, command, &stdout, &stderr)
+	}
+	waitForMissionContenders(t, readyDir, contenders)
+	if err := os.WriteFile(startPath, []byte("start"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	appended := 0
+	for index := 0; index < contenders; index++ {
+		result := <-results
+		var response map[string]any
+		if err := json.Unmarshal([]byte(result.stdout), &response); err != nil {
+			t.Fatalf("outcome contender %s emitted invalid response %q: %v (stderr: %s, command error: %v)", result.id, result.stdout, err, result.stderr, result.err)
+		}
+		status, _ := response["status"].(string)
+		switch status {
+		case "APPENDED":
+			if result.code != 0 {
+				t.Fatalf("successful outcome contender %s returned exit %d: %s", result.id, result.code, result.stderr)
+			}
+			appended++
+		case "BUSY", "CONFLICT":
+			if result.code == 0 {
+				t.Fatalf("rejected outcome contender %s returned success: %+v", result.id, response)
+			}
+		default:
+			t.Fatalf("outcome contender %s returned unexpected status %q: response=%+v stderr=%s command error=%v", result.id, status, response, result.stderr, result.err)
+		}
+	}
+	if appended != 1 {
+		t.Fatalf("one cancelled execution admitted %d fixture outcomes across %d Bot processes", appended, contenders)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatalf("reload runtime before outcome replay: %v", err)
+	}
+	outcomes, err := loadM10FixtureOutcomes(runtimeDir, state)
+	if err != nil || len(outcomes) != 1 || outcomes[0].EffectRef.EffectID != record.ExecutionID {
+		t.Fatalf("persisted M10 outcome store is not single-writer: outcomes=%+v err=%v", outcomes, err)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code != 0 || response["status"] != "VALID" {
+		t.Fatalf("fresh Bot could not replay single M10 outcome: code=%d response=%+v", code, response)
+	}
+	backup := filepath.Join(root, "outcome-concurrent-backup")
+	restored := filepath.Join(root, "outcome-concurrent-restored")
+	if code, response := backupCall(t, "create", runtimeDir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("backup after concurrent M10 outcome failed: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("restore after concurrent M10 outcome failed: code=%d response=%+v", code, response)
+	}
+	restoredState, err := loadMissionState(restored)
+	if err != nil {
+		t.Fatalf("reload restored runtime before outcome replay: %v", err)
+	}
+	restoredOutcomes, err := loadM10FixtureOutcomes(restored, restoredState)
+	if err != nil || len(restoredOutcomes) != 1 || !reflect.DeepEqual(restoredOutcomes, outcomes) {
+		t.Fatalf("restore did not retain the sole M10 outcome: outcomes=%+v err=%v", restoredOutcomes, err)
 	}
 }
 
