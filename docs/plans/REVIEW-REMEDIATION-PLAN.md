@@ -295,12 +295,13 @@ multi-host atomicity, nên các phạm vi đó vẫn `PARTIAL`.
 **Cập nhật immutable artifact publish recovery status (2026-09-14):** sau khi
 `Link` đã làm artifact bất biến visible nhưng trước khi sync directory cha,
 `writeNewJSON` phân biệt lỗi đó với lỗi chưa publish bằng typed uncertainty.
-M08 CLI cùng M07 CLI/HTTP adapter trả `PUBLISHED_RECOVERY_REQUIRED`, không mô tả là
-`CONFLICT` hoặc `PERSISTENCE_ERROR` retryable. Regression gọi publisher, M08
-CLI và M07 adapter thật: artifact/tool trace vẫn tồn tại, còn exact retry chỉ
-ACK bytes y hệt. Đây là báo cáo fail-closed về trạng thái syscall local; không
-chứng minh durability sau power-loss, transaction đa file hay filesystem đa
-host.
+M08 intent/policy CLI, M07 CLI/HTTP adapter và M11 `recovery-export` trả
+`PUBLISHED_RECOVERY_REQUIRED` kèm artifact visible, không mô tả là `CONFLICT`
+hoặc `PERSISTENCE_ERROR` retryable. Handoff M11 vẫn non-authorizing. Regression
+gọi publisher, M08 CLI, M07 adapter và reviewed M11 handoff thật: artifact/tool
+trace vẫn tồn tại, còn exact retry chỉ ACK bytes y hệt. Đây là báo cáo
+fail-closed về trạng thái syscall local; không chứng minh durability sau
+power-loss, transaction đa file hay filesystem đa host.
 
 **Cập nhật JSONL acknowledgement boundary (2026-09-11):** canonical và derived
 JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Regression

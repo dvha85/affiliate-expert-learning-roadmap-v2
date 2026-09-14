@@ -159,6 +159,7 @@ def audit_runtime_acceptance(root, matrix):
         "lab/affiliate-bot/cmd/bot/mission_command_test.go",
         "lab/affiliate-bot/cmd/bot/m07_test.go",
         "lab/affiliate-bot/cmd/bot/watcher_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
     }
     if not expected_refs.issubset(set(artifact_publish.get("test_refs", []))):
         fail("immutable artifact post-publish record lacks real publisher/CLI/adapter regressions")
@@ -171,7 +172,9 @@ def audit_runtime_acceptance(root, matrix):
     watcher_text = watcher_source.read_text(encoding="utf-8") if watcher_source.is_file() else ""
     m07_source = root / "lab/affiliate-bot/cmd/bot/m07_test.go"
     m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
-    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text:
+    m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
+    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestMissionM08PolicyReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text or "recovery handoff uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-export"' not in m11_fault_text:
         fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
     canonical_output = updates.get("RP-03-m10-canonical-output-disclosure")
     if not isinstance(canonical_output, dict):
@@ -246,7 +249,7 @@ def audit_runtime_acceptance(root, matrix):
         fail("M10/M11 registry publish-uncertainty record lacks bounded recovery disclosure")
     m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
     m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
-    if "artifactRegistryPublishFailure" not in source_text or "TestMissionM10GateDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM10AuthorizationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11LifecycleDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11GateAuthorizationAndReservationDiscloseRegistryPublishUncertainty" not in source_text or "TestMissionM11EvaluationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11CycleDisclosesRegistryPublishUncertainty" not in source_text or '"m11-activate"' not in source_text or '"m11-ledger-init"' not in source_text or '"m11-gate"' not in source_text or '"m11-authorize"' not in source_text or '"m11-reserve-authorization"' not in source_text or '"m11-evaluate"' not in source_text or '"m11-close-cycle"' not in source_text or "uncertain M11 registry append was not retained" not in m11_fault_text or "TestMissionM11ReconcileDisclosesRegistryPublishUncertainty" not in m11_fault_text or '"m11-reconcile"' not in m11_fault_text or "TestMissionM11RecoveryAdmissionDisclosesRegistryPublishUncertainty" not in m11_fault_text or '"m11-recovery-admit"' not in m11_fault_text:
+    if "artifactRegistryPublishFailure" not in source_text or "TestMissionM10GateDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM10AuthorizationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11LifecycleDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11GateAuthorizationAndReservationDiscloseRegistryPublishUncertainty" not in source_text or "TestMissionM11EvaluationDisclosesRegistryPublishUncertainty" not in source_text or "TestMissionM11CycleDisclosesRegistryPublishUncertainty" not in source_text or '"m11-activate"' not in source_text or '"m11-ledger-init"' not in source_text or '"m11-gate"' not in source_text or '"m11-authorize"' not in source_text or '"m11-reserve-authorization"' not in source_text or '"m11-evaluate"' not in source_text or '"m11-close-cycle"' not in source_text or "uncertain M11 registry append was not retained" not in m11_fault_text or "TestMissionM11ReconcileDisclosesRegistryPublishUncertainty" not in m11_fault_text or '"m11-reconcile"' not in m11_fault_text or "recovery admission uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-admit"' not in m11_fault_text:
         fail("M10/M11 registry publish-uncertainty regression is missing from learner paths")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):

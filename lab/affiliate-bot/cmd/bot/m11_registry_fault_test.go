@@ -659,13 +659,25 @@ func TestMissionM11RecoveryAdmissionDisclosesRegistryPublishUncertainty(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	handoff, err := m11RecoveryHandoff(oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID)
-	if err != nil {
-		t.Fatalf("build recovery handoff: %v", err)
-	}
 	handoffPath := filepath.Join(t.TempDir(), "recovery-handoff.json")
-	if err := writeJSONAtomic(handoffPath, handoff); err != nil {
-		t.Fatal(err)
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected handoff parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m11-recovery-export", oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID, handoffPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("recovery handoff uncertainty was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["resolution_id"] != resolution.ResolutionID || artifact["execution_permitted"] != false {
+		t.Fatalf("recovery handoff uncertainty omitted visible non-authorizing handoff: %+v", response)
+	}
+	if _, err := os.Stat(handoffPath); err != nil {
+		t.Fatalf("recovery handoff was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m11-recovery-export", oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID, handoffPath); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("recovery handoff exact retry failed: code=%d response=%+v", code, response)
 	}
 
 	newRuntime := t.TempDir()

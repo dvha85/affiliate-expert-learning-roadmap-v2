@@ -396,6 +396,8 @@ func TestMissionM08IntentReportsUnconfirmedVisibleArtifact(t *testing.T) {
 	t.Cleanup(func() { artifactWriteFault = nil })
 	if code, response := missionCall(t, "m08-intent", history, request, output); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
 		t.Fatalf("M08 did not disclose visible-but-unconfirmed artifact: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["intent_id"] == "" {
+		t.Fatalf("M08 unconfirmed publish omitted its visible intent: %+v", response)
 	}
 	first, err := os.ReadFile(output)
 	if err != nil {
@@ -407,6 +409,42 @@ func TestMissionM08IntentReportsUnconfirmedVisibleArtifact(t *testing.T) {
 	}
 	if current, err := os.ReadFile(output); err != nil || !bytes.Equal(first, current) {
 		t.Fatalf("M08 retry changed visible artifact: %q err=%v", current, err)
+	}
+}
+
+func TestMissionM08PolicyReportsUnconfirmedVisibleArtifact(t *testing.T) {
+	dir, history, request := missionFixture(t)
+	intent := filepath.Join(dir, "intent.json")
+	if code, response := missionCall(t, "m08-intent", history, request, intent); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("intent setup failed: code=%d response=%+v", code, response)
+	}
+	policyInput := filepath.Join(dir, "policy-input.json")
+	if err := os.WriteFile(policyInput, []byte(`{"policy_version":"unconfirmed-policy","now":"2026-09-07T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "policy-unconfirmed.json")
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if code, response := missionCall(t, "m08-policy", intent, policyInput, output); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("M08 policy did not disclose visible-but-unconfirmed artifact: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["policy_version"] != "unconfirmed-policy" {
+		t.Fatalf("M08 policy unconfirmed publish omitted its visible policy: %+v", response)
+	}
+	first, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("M08 policy output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	if code, response := missionCall(t, "m08-policy", intent, policyInput, output); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("M08 policy exact retry did not resolve output: code=%d response=%+v", code, response)
+	}
+	if current, err := os.ReadFile(output); err != nil || !bytes.Equal(first, current) {
+		t.Fatalf("M08 policy retry changed visible artifact: %q err=%v", current, err)
 	}
 }
 

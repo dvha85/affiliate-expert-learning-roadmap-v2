@@ -2073,7 +2073,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(outputPath, i)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(i, err), err, 1)
 		}
 		return emit(status, i, nil, 0)
 	case "m08-policy", "policy":
@@ -2125,7 +2125,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(outputPath, p)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(p, err), err, 1)
 		}
 		if status == appendDuplicate {
 			return emit(status, p, nil, 0)
@@ -2824,7 +2824,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(args[4], handoff)
 		if err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(handoff, err), err, 1)
 		}
 		return emit(status, handoff, nil, 0)
 	case "m11-recovery-admit":
