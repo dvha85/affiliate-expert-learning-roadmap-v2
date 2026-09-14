@@ -509,6 +509,36 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
         fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 
+def audit_deterministic_runtime_sharding(root, matrix, plan_text):
+    """Keep parallel CI execution from dropping a mandatory regression shard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-deterministic-runtime-sharding")
+    if not isinstance(record, dict) or "three required parallel jobs" not in record.get("scope", ""):
+        fail("matrix lacks scoped deterministic CI sharding acceptance")
+    if "Cập nhật deterministic CI sharding và Go cache" not in plan_text:
+        fail("deterministic CI sharding lacks a scoped plan marker")
+    workflow = root / ".github/workflows/curriculum-ci.yml"
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    required_jobs = (
+        "\n  deterministic-runtime:\n",
+        "\n  deterministic-quickstart:\n",
+        "\n  deterministic-smokes-and-mutations:\n",
+    )
+    required = (
+        "Learner Bot race regression",
+        "Beginner quickstart isolated-clone smoke",
+        "BR-16a shared M00-M11 learner chain",
+        "RP-08 M11 canonical identity mutation proof",
+        "cache-dependency-path:",
+        "lab/affiliate-bot/go.sum",
+        "contracts/go.sum",
+        "core/go.sum",
+        "lab/mission-runtime/go.sum",
+    )
+    if not all(token in workflow_text for token in required_jobs + required):
+        fail("deterministic CI shard/cache is missing a required coverage boundary")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -549,6 +579,7 @@ def audit(root):
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
+    audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

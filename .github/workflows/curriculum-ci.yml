@@ -46,10 +46,13 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
-          # This repository has several independent Go modules and no root
-          # go.mod. Disable setup-go's root cache discovery; each test command
-          # still uses Go's normal local build cache.
-          cache: false
+          # The repository has multiple Go modules. Declare every checksum so
+          # setup-go can safely cache both the module and build caches.
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
       - name: Go test including executable M01 and M02 eval packs
         working-directory: lab/affiliate-bot
         run: go test ./...
@@ -61,11 +64,56 @@ jobs:
         run: |
           go test ./...
           go vet ./...
+      - name: Go vet
+        working-directory: lab/affiliate-bot
+        run: go vet ./...
+      - name: Run M01 deterministic baseline
+        working-directory: lab/affiliate-bot
+        run: go run ./cmd/bot
+      - name: M02 capture restart query replay smoke test
+        working-directory: lab/affiliate-bot
+        run: |
+          rm -f /tmp/m02-history.jsonl
+          go run ./cmd/bot history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
+          go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
+          go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
+          go run ./cmd/bot history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'
+
+  deterministic-quickstart:
+    name: deterministic-quickstart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Beginner quickstart isolated-clone smoke
         run: python scripts/smoke_quickstart.py
+
+  deterministic-smokes-and-mutations:
+    name: deterministic-smokes-and-mutations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: BR-08 learner and harness integration smoke
         run: python scripts/smoke_br08.py
       - name: BR-09 evidence import continuity smoke
@@ -142,17 +190,3 @@ jobs:
         run: python scripts/mutate_m07_registry_strict_decoder.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
-      - name: Go vet
-        working-directory: lab/affiliate-bot
-        run: go vet ./...
-      - name: Run M01 deterministic baseline
-        working-directory: lab/affiliate-bot
-        run: go run ./cmd/bot
-      - name: M02 capture restart query replay smoke test
-        working-directory: lab/affiliate-bot
-        run: |
-          rm -f /tmp/m02-history.jsonl
-          go run ./cmd/bot history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
-          go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
-          go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
-          go run ./cmd/bot history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'

@@ -82,6 +82,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@v4", "removed_n8n_cache", 1), encoding="utf-8")
         self.assertIn("n8n engine CI cache/gate is missing", self.run_audit(False))
 
+    def test_deterministic_shard_removal_is_rejected(self):
+        workflow = self.root / ".github/workflows/curriculum-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("deterministic-quickstart:", "removed-deterministic-quickstart:", 1), encoding="utf-8")
+        self.assertIn("deterministic CI shard/cache is missing", self.run_audit(False))
+
     def test_missing_identity_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m10_identity_guard.py", "python scripts/removed.py"), encoding="utf-8")
