@@ -230,6 +230,24 @@ def audit_runtime_acceptance(root, matrix):
     m11_smoke_text = m11_smoke.read_text(encoding="utf-8") if m11_smoke.is_file() else ""
     if "gateID, executorID, authorizedAt string" not in m11_artifact_text or "gate.GateID, x.ExecutorID, x.AuthorizedAt" not in m11_registry_text or "distinct authorization times reused an immutable ID" not in m11_test_text or "same_gate_later_auth" not in m11_smoke_text:
         fail("M11 authorization time-identity regression is missing from canonical path")
+    registry_publish = updates.get("RP-03-07-registry-publish-uncertainty")
+    if not isinstance(registry_publish, dict):
+        fail("matrix lacks M10/M11 registry publish-uncertainty acceptance record")
+    required_registry_publish_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+    }
+    if not required_registry_publish_refs.issubset(set(registry_publish.get("implementation_refs", [])) | set(registry_publish.get("test_refs", []))):
+        fail("M10/M11 registry publish-uncertainty record lacks implementation/test refs")
+    registry_publish_scope = registry_publish.get("scope")
+    if not isinstance(registry_publish_scope, str) or "PUBLISHED_RECOVERY_REQUIRED" not in registry_publish_scope or "exact-retries" not in registry_publish_scope:
+        fail("M10/M11 registry publish-uncertainty record lacks bounded recovery disclosure")
+    m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
+    if "artifactRegistryPublishFailure" not in source_text or "TestMissionM10GateDisclosesRegistryPublishUncertainty" not in source_text or "uncertain M11 registry append was not retained" not in m11_fault_text:
+        fail("M10/M11 registry publish-uncertainty regression is missing from learner paths")
     framing = updates.get("RP-03-canonical-jsonl-framing")
     if not isinstance(framing, dict):
         fail("matrix lacks the canonical JSONL framing acceptance record")

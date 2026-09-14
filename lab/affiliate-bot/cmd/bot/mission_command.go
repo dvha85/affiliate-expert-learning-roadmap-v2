@@ -399,7 +399,12 @@ func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, s
 		err = verifyStableRegularFileName(path, opened)
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(path))
+		if publishErr := registryPublishFailure(path); publishErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: publishErr}
+		}
+		if syncErr := syncDirectory(filepath.Dir(path)); syncErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: syncErr}
+		}
 	}
 	if err != nil {
 		return entry, "", err
@@ -1012,6 +1017,27 @@ func (e *immutableArtifactPublishUncertainError) Error() string {
 }
 
 func (e *immutableArtifactPublishUncertainError) Unwrap() error { return e.err }
+
+// artifactRegistryPublishFailure is a test-only seam for the boundary after
+// an immutable registry line has been file-synced and its stable pathname has
+// been verified, but before the parent directory can confirm the append name
+// update. Production leaves it nil; it is never controlled by CLI input.
+var artifactRegistryPublishFailure func(path string) error
+
+func registryPublishFailure(path string) error {
+	if artifactRegistryPublishFailure == nil {
+		return nil
+	}
+	return artifactRegistryPublishFailure(path)
+}
+
+func artifactIfRegistryPublishUncertain(artifact any, err error) any {
+	var uncertain *immutableArtifactPublishUncertainError
+	if errors.As(err, &uncertain) {
+		return artifact
+	}
+	return nil
+}
 
 func missionWriteFault(phase string) error {
 	if missionStateWriteFault == nil {
@@ -2329,7 +2355,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, err, 1)
 		}
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindCanaryGate, gateRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(gate, err), err, 1)
 		}
 		status, err = writeNewJSON(args[3], gate)
 		if err != nil {
@@ -2401,7 +2427,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("REJECTED", nil, err, 1)
 		}
 		if _, _, err := registerM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw); err != nil {
-			return emit("CONFLICT", nil, err, 1)
+			return emit("CONFLICT", artifactIfRegistryPublishUncertain(authorization, err), err, 1)
 		}
 		status, err = writeNewJSON(args[4], authorization)
 		if err != nil {
@@ -2674,7 +2700,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		entry, status, err := registerM11Artifact(args[1], args[2], raw)
 		if err != nil {
-			return emit("REJECTED", nil, err, 1)
+			return emit("REJECTED", artifactIfRegistryPublishUncertain(entry.Artifact, err), err, 1)
 		}
 		return emit(status, entry, nil, 0)
 	case "m11-resolve":

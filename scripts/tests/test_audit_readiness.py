@@ -182,6 +182,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("distinct authorization times reused an immutable ID", "missing authorization time identity regression", 1), encoding="utf-8")
         self.assertIn("M11 authorization time-identity regression is missing", self.run_audit(False))
 
+    def test_missing_registry_publish_uncertainty_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10GateDisclosesRegistryPublishUncertainty", "MissingRegistryPublishUncertaintyRegression", 1), encoding="utf-8")
+        self.assertIn("M10/M11 registry publish-uncertainty regression is missing", self.run_audit(False))
+
     def test_unqualified_production_claim_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8") + "\nRepository is ready for production.\n", encoding="utf-8")

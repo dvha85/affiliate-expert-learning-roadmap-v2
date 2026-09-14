@@ -512,6 +512,17 @@ canonical phải làm regression fail. Điều này không cấp thêm reservati
 execution authority, và không là proof clock trust, ledger transaction,
 power-loss, multi-host hay business outcome; RP-07 vẫn `PARTIAL`.
 
+**Cập nhật M10/M11 registry publish uncertainty (2026-09-14):** sau khi một
+line immutable registry đã file-sync và tên file còn đúng nhưng parent-directory
+sync không xác nhận được, adapter trả typed publish uncertainty thay vì lỗi
+append thường. `m10-gate` bàn giao `PUBLISHED_RECOVERY_REQUIRED` kèm gate đã
+resolve được và không ghi portable output; M11 registry giữ entry để chỉ exact
+retry sau khi uncertainty hết. Regression dùng seam sau file sync, trước parent
+sync, và kiểm cả two paths. Đây là disclosure/recovery local có giới hạn, chưa
+chứng minh durability qua power loss, transaction nhiều file, bao phủ mọi M11
+lifecycle envelope, multi-host, execution hay business outcome; RP-03/RP-07
+vẫn `PARTIAL`.
+
 **Cập nhật M10 cost-bound JSONL boundary (2026-09-11):** `m10-cost-register`
 canonicalize JSON đã decode trước khi append, nên input pretty-printed không
 thể tách thành nhiều line registry; append dùng chung file+directory sync trước

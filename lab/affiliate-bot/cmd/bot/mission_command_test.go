@@ -851,6 +851,40 @@ func TestMissionM10RegistersDistinctGatesForDistinctEvaluationTimes(t *testing.T
 	}
 }
 
+func TestMissionM10GateDisclosesRegistryPublishUncertainty(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+	gateOutput := filepath.Join(root, "uncertain-registry-gate.json")
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m10ArtifactRegistryPath(runtimeDir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactRegistryPublishFailure = nil })
+	evaluatedAt := base.Add(time.Second).Format(time.RFC3339)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible canonical registry artifact was not disclosed as uncertain: code=%d response=%+v", code, response)
+	} else {
+		artifact, ok := response["artifact"].(map[string]any)
+		gateID, okID := artifact["gate_id"].(string)
+		if !ok || !okID || gateID == "" {
+			t.Fatalf("registry publish uncertainty omitted the durable gate: %+v", response)
+		}
+		if code, resolved := missionCall(t, "m10-resolve", runtimeDir, corem10.ArtifactKindCanaryGate, gateID); code != 0 || resolved["status"] != "RESOLVED" {
+			t.Fatalf("uncertain registry gate was not resolvable: code=%d response=%+v", code, resolved)
+		}
+	}
+	if _, err := os.Stat(gateOutput); !os.IsNotExist(err) {
+		t.Fatalf("portable output was published after registry uncertainty: %v", err)
+	}
+	artifactRegistryPublishFailure = nil
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("exact registry retry did not publish portable gate: code=%d response=%+v", code, response)
+	}
+}
+
 func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	// Use a short real-time-valid fixture window: each contender invokes the
 	// compiled learner Bot, so unlike a unit clock seam this proves the normal

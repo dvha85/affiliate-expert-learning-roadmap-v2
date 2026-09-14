@@ -127,7 +127,12 @@ func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, s
 		err = verifyStableRegularFileName(path, opened)
 	}
 	if err == nil {
-		err = syncDirectory(filepath.Dir(path))
+		if publishErr := registryPublishFailure(path); publishErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: publishErr}
+		}
+		if syncErr := syncDirectory(filepath.Dir(path)); syncErr != nil {
+			return entry, appendAdded, &immutableArtifactPublishUncertainError{err: syncErr}
+		}
 	}
 	if faultErr == nil {
 		// This fault now follows both file and directory sync, exercising the

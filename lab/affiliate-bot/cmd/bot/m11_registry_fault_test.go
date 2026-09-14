@@ -40,6 +40,36 @@ func TestM11RegistryAfterWriteFailureRecoversAsExactDuplicate(t *testing.T) {
 	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, raw); err != nil || status != appendDuplicate {
 		t.Fatalf("retry must be exact duplicate: status=%s err=%v", status, err)
 	}
+
+	second := lease
+	second.LeaseID, second.ApprovalRef, second.CorrelationID = "uncertain-lease", "uncertain-approval", "uncertain-correlation"
+	second.LeaseHash = corem11.ComputeProductionLeaseHash(second)
+	secondRaw, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifactRegistryPublishFailure = func(path string) error {
+		if filepath.Clean(path) == filepath.Clean(m11ArtifactRegistryPath(dir)) {
+			return errors.New("injected registry parent sync failure")
+		}
+		return nil
+	}
+	if entry, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, secondRaw); err == nil || status != appendAdded {
+		t.Fatalf("registry publication uncertainty was not surfaced: entry=%+v status=%s err=%v", entry, status, err)
+	} else {
+		var uncertain *immutableArtifactPublishUncertainError
+		if !errors.As(err, &uncertain) || entry.ArtifactID != second.LeaseID {
+			t.Fatalf("registry publication did not retain resolvable immutable entry: entry=%+v err=%v", entry, err)
+		}
+	}
+	entries, err = loadM11ArtifactRegistry(dir)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("uncertain M11 registry append was not retained: entries=%d err=%v", len(entries), err)
+	}
+	artifactRegistryPublishFailure = nil
+	if _, status, err := registerM11Artifact(dir, corem11.ArtifactKindLease, secondRaw); err != nil || status != appendDuplicate {
+		t.Fatalf("uncertain M11 registry append did not exact-retry: status=%s err=%v", status, err)
+	}
 }
 
 func TestM11RegistryAppendRejectsSameByteNameReplacement(t *testing.T) {
