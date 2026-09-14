@@ -232,6 +232,10 @@ func missionErrorStatus(err error) string {
 	if err != nil && strings.HasPrefix(err.Error(), "durable STOP:") {
 		return "STOPPED"
 	}
+	var appendUncertain *visibleAppendUncertainError
+	if errors.As(err, &appendUncertain) {
+		return appendPublished
+	}
 	return "REJECTED"
 }
 func m11FailedExecutionJournalPath(dir string) string {
@@ -1012,6 +1016,21 @@ func (e *atomicPublishUncertainError) Error() string {
 
 func (e *atomicPublishUncertainError) Unwrap() error { return e.err }
 
+// visibleAppendUncertainError means an append-only record was found again by
+// the canonical loader after its writer reported an error. The caller must not
+// describe that as a rejected transition: a locked exact retry is required to
+// finish the surrounding journal recovery without creating another record.
+// It is intentionally narrower than durability after power loss.
+type visibleAppendUncertainError struct {
+	err error
+}
+
+func (e *visibleAppendUncertainError) Error() string {
+	return "append-only record is visible but acknowledgement is unconfirmed: " + e.err.Error()
+}
+
+func (e *visibleAppendUncertainError) Unwrap() error { return e.err }
+
 // immutableArtifactPublishUncertainError means a complete immutable command
 // artifact is already visible after Link, while the following parent-directory
 // sync could not be confirmed. It is unsafe for callers to describe this as a
@@ -1055,6 +1074,10 @@ func artifactIfRegistryPublishUncertain(artifact any, err error) any {
 func artifactIfAtomicPublishUncertain(artifact any, err error) any {
 	var uncertain *atomicPublishUncertainError
 	if errors.As(err, &uncertain) {
+		return artifact
+	}
+	var appendUncertain *visibleAppendUncertainError
+	if errors.As(err, &appendUncertain) {
 		return artifact
 	}
 	return nil
@@ -1610,12 +1633,28 @@ func appendM11FixtureOutcome(dir string, outcome m03.OutcomeRecord) (string, err
 		return "", err
 	}
 	if err := (store.JSONL{}).AppendLine(m11OutcomeStorePath(dir), encoded); err != nil {
-		return "", err
+		return "", m11OutcomeAppendUncertainty(dir, outcome, err)
 	}
 	if err := m11OutcomeWriteFault("after_append"); err != nil {
-		return "", err
+		return "", m11OutcomeAppendUncertainty(dir, outcome, err)
 	}
 	return appendAdded, nil
+}
+
+// m11OutcomeAppendUncertainty checks the same canonical JSONL loader the
+// locked replay will use. A writer error with no exact visible record remains a
+// normal error; only a replayable exact record is an acknowledgement-loss
+// boundary.
+func m11OutcomeAppendUncertainty(dir string, outcome m03.OutcomeRecord, cause error) error {
+	persisted, err := loadM11FixtureOutcomes(dir)
+	if err == nil {
+		for _, prior := range persisted {
+			if prior.OutcomeID == outcome.OutcomeID && reflect.DeepEqual(prior, outcome) {
+				return &visibleAppendUncertainError{err: cause}
+			}
+		}
+	}
+	return cause
 }
 
 func nextM11FixtureOutcomeLedger(ledger corem11.ProductionLedger, outcome m03.OutcomeRecord, record corem11.ProductionExecutionRecord) (corem11.ProductionLedger, error) {

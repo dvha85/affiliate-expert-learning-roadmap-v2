@@ -302,6 +302,13 @@ def audit_runtime_acceptance(root, matrix):
         fail("matrix lacks M11 outcome visible-journal recovery acceptance")
     if "TestMissionM11OutcomeJournalVisiblePublishUncertaintyDefersLockedReplay" not in source_text or '"m11-outcome"' not in source_text or "artifactIfAtomicPublishUncertain" not in mission_source_text:
         fail("M11 outcome visible-journal recovery regression is missing from learner path")
+    m11_visible_append = updates.get("RP-07-m11-visible-outcome-append")
+    if not isinstance(m11_visible_append, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_visible_append.get("scope", "") or "EXACT_DUPLICATE" not in m11_visible_append.get("scope", ""):
+        fail("matrix lacks M11 visible outcome-append acknowledgement acceptance")
+    m11_outcome_source = root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"
+    m11_outcome_text = m11_outcome_source.read_text(encoding="utf-8") if m11_outcome_source.is_file() else ""
+    if "visibleAppendUncertainError" not in mission_source_text or "m11OutcomeAppendUncertainty" not in mission_source_text or "TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty" not in m11_outcome_text:
+        fail("M11 visible outcome-append acknowledgement regression is missing from learner path")
     m11_execution_journals = updates.get("RP-07-m11-execution-visible-journals")
     if not isinstance(m11_execution_journals, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in m11_execution_journals.get("scope", ""):
         fail("matrix lacks M11 execution visible-journal recovery acceptance")

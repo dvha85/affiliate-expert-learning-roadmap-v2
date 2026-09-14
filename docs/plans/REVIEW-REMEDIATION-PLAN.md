@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: f6db2b4f6859302cbe1ca8e9a1ce3e57d2e19301 -->
+<!-- readiness-main-baseline: 2aefe852b5e9afe67acff339906b442275ce0dff -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1441,6 +1441,18 @@ cạnh tranh cho cùng execution. Regression gọi command thật với seam ch�
 trong test, rồi xác minh store replay được. Đây là acknowledgement/retry boundary
 của một fixture JSONL file; không chứng minh fsync/power-loss, atomic transaction
 nhiều file, business outcome hay multi-host.
+
+**Cập nhật M11 visible fixture-outcome append uncertainty (2026-09-14):** M11
+đã giữ recovery journal trước ledger/outcome transition, nhưng lỗi ACK sau khi
+exact JSONL outcome line xuất hiện trước đây vẫn bị command báo `REJECTED`.
+`appendM11FixtureOutcome` nay canonical-reload outcome store; khi record đúng
+payload đã hiện diện, `m11-outcome` trả `PUBLISHED_RECOVERY_REQUIRED` (non-zero)
+kèm outcome và post-ledger, còn journal giữ runtime ở `RECOVERY_REQUIRED`.
+Bot process mới không được status/resolve cho tới khi retry exact dưới runtime
+gate hoàn tất journal và trả `EXACT_DUPLICATE`; regression kiểm đúng một outcome
+trước/sau retry. Đây là acknowledgement/recovery boundary local cho một JSONL
+line và journal đã visible, không chứng minh fsync/power-loss, transaction nhiều
+file, live executor, business outcome hoặc multi-host.
 
 **Cập nhật M11 24-process reservation barrier (2026-09-14):** shared smoke
 M00–M11 clone đúng runtime đã có M11 lease/approval/activation/health/cost và

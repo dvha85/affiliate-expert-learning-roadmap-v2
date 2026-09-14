@@ -225,6 +225,50 @@ func TestM11OutcomeJournalRecoversAfterOutcomeAppendAckFailure(t *testing.T) {
 	}
 }
 
+func TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "visible-m11-outcome-append.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	m11OutcomeAppendFault = func(phase string) error {
+		if phase == "after_append" {
+			return errors.New("injected outcome append acknowledgement failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { m11OutcomeAppendFault = nil })
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("visible M11 outcome append did not disclose recovery: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["outcome"] == nil || artifact["post_ledger"] == nil {
+		t.Fatalf("visible M11 outcome append omitted deterministic transition: %+v", response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("visible outcome append did not retain recovery journal: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("visible outcome append did not persist exactly one record: outcomes=%+v err=%v", outcomes, err)
+	}
+	m11OutcomeAppendFault = nil
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh status exposed visible append uncertainty: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked exact retry did not close visible append journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("visible append journal remains after exact retry: %v", err)
+	}
+	outcomes, err = loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("exact retry duplicated or changed outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
 func TestBackupCreateRecoversPendingM11OutcomeJournal(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
