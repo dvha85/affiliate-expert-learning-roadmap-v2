@@ -1351,6 +1351,74 @@ func TestMissionM10CanaryJournalRecoversRegistryStateTransition(t *testing.T) {
 	}
 }
 
+func TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay(t *testing.T) {
+	t.Run("canary", func(t *testing.T) {
+		runtimeDir, grantPath, _, _ := authorityExpiryFixtureWithCanary(t, "intent", false)
+		artifactWriteFault = func(phase string) error {
+			if phase == "after_publish_before_parent_sync" {
+				return errors.New("injected canary journal parent sync failure")
+			}
+			return nil
+		}
+		t.Cleanup(func() { artifactWriteFault = nil })
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+			t.Fatalf("visible canary journal did not require recovery: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); err != nil {
+			t.Fatalf("visible canary journal was missing: %v", err)
+		}
+		if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("status exposed a visible but un-replayed canary transition: code=%d response=%+v", code, response)
+		}
+		artifactWriteFault = nil
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+			t.Fatalf("locked canary retry did not replay visible journal: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("canary journal remains after locked replay: %v", err)
+		}
+	})
+	t.Run("cost-bound", func(t *testing.T) {
+		base := time.Now().UTC().Truncate(time.Second)
+		runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+		var bound corem10.TrustedCostBound
+		if err := readJSON(boundPath, &bound); err != nil {
+			t.Fatal(err)
+		}
+		bound.CostBoundID = "visible-journal-cost"
+		bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+		secondBound := filepath.Join(filepath.Dir(boundPath), "visible-journal-cost.json")
+		writeMissionTestJSON(t, secondBound, bound)
+		artifactWriteFault = func(phase string) error {
+			if phase == "after_publish_before_parent_sync" {
+				return errors.New("injected cost journal parent sync failure")
+			}
+			return nil
+		}
+		t.Cleanup(func() { artifactWriteFault = nil })
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+			t.Fatalf("visible cost-bound journal did not require recovery: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); err != nil {
+			t.Fatalf("visible cost-bound journal was missing: %v", err)
+		}
+		if code, response := missionCall(t, "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+			t.Fatalf("status exposed a visible but un-replayed cost transition: code=%d response=%+v", code, response)
+		}
+		artifactWriteFault = nil
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code != 0 || response["status"] != appendDuplicate {
+			t.Fatalf("locked cost-bound retry did not replay visible journal: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("cost-bound journal remains after locked replay: %v", err)
+		}
+		boundRaw, err := json.Marshal(bound)
+		if err != nil || !resolveM10Artifact(runtimeDir, corem10.ArtifactKindTrustedCostBound, boundRaw) {
+			t.Fatalf("locked replay did not retain canonical cost-bound: err=%v", err)
+		}
+	})
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

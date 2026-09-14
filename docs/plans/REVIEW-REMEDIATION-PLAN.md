@@ -386,19 +386,23 @@ hay recovery multi-host.
 **Cập nhật M10 cost-bound two-store journal (2026-09-13):** đăng ký một
 trusted cost bound nay ghi journal bất biến trước khi ghi cả immutable M10
 artifact registry và compact cost-bound index. Lỗi injected trước artifact,
-sau artifact, hoặc sau index giữ journal; `status` và `m10-resolve` của Bot
-mới trả `RECOVERY_REQUIRED` trước khi lộ transition một nửa. Writer có local
-lock hoặc `backup create` replay đúng bound theo scope/time quan sát, rồi retry
-trả `EXACT_DUPLICATE`. Đây là recovery bounded cho đúng hai files M10, không
-phải transaction toàn runtime, mô phỏng power-loss hay guarantee multi-host.
+sau artifact, sau index, hoặc sau khi journal visible nhưng trước directory
+sync giữ journal; `status` và `m10-resolve` của Bot mới trả
+`RECOVERY_REQUIRED` trước khi lộ transition một nửa. Seam visible-journal trả
+`PUBLISHED_RECOVERY_REQUIRED`, rồi chỉ writer có local lock hoặc `backup create`
+replay đúng bound theo scope/time quan sát; retry trả `EXACT_DUPLICATE`. Đây là
+recovery bounded cho đúng hai files M10, không phải transaction toàn runtime,
+mô phỏng power-loss hay guarantee multi-host.
 
 **Cập nhật M10 canary registry/state journal (2026-09-13):** canary grant
 giờ journal trước immutable `CANARY_GRANT` registry và mutable `mission-state`
-binding/counters. Fault trước artifact, sau artifact hoặc sau state giữ journal;
-Bot mới không cho `status`/`m10-resolve` đọc half-commit, còn writer có lock và
-`backup create` replay đúng grant rồi retry `ACK`. Đây chỉ là recovery local của
-grant registry/state, không chứng minh transaction toàn runtime, power-loss,
-multi-host locking, executor hay production authority.
+binding/counters. Fault trước artifact, sau artifact, sau state, hoặc sau khi
+journal visible nhưng trước directory sync giữ journal; Bot mới không cho
+`status`/`m10-resolve` đọc half-commit. Seam visible-journal trả
+`PUBLISHED_RECOVERY_REQUIRED`, còn writer có lock và `backup create` replay đúng
+grant rồi retry `ACK`. Đây chỉ là recovery local của grant registry/state,
+không chứng minh transaction toàn runtime, power-loss, multi-host locking,
+executor hay production authority.
 
 **Cập nhật atomic JSONL write-path guard (2026-09-13):** ACCESSTRADE outcome/
 receipt và M10 cost-bound index đọc JSONL cũ qua stable regular-file reader,
