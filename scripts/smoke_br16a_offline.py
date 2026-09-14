@@ -480,6 +480,32 @@ def main(argv=None):
         production_outcome.write_text(json.dumps({"outcome_id":"br16-production-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br16-failed"}), encoding="utf-8")
         execution_ledger = production_failed["artifact"]["execution_ledger"]
         execution_ledger_id = execution_ledger["lease_id"] + "/" + execution_ledger["updated_at"]
+
+        # An M11 fixture outcome commits two canonical stores: the append-only
+        # outcome JSONL and its immutable post-outcome ledger.  Prove the real
+        # Bot command serializes that pair across processes rather than only
+        # proving the earlier cap=1 reservation barrier.  Every contender uses
+        # the same immutable input and predecessor ledger, so only one may
+        # publish; subsequent exact retries must resolve the already committed
+        # outcome without a second ledger transition.
+        production_outcome_race_state = work / "m11-outcome-race-state"
+        shutil.copytree(state, production_outcome_race_state)
+        production_outcome_race = work / "production-outcome-race.json"
+        production_outcome_race.write_text(json.dumps({"outcome_id":"br16-production-outcome-race","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:03Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/br16-failed"}), encoding="utf-8")
+        production_outcome_race_responses = synchronized_bot_calls(bot, env, work / "m11-outcome-barrier", (
+            (f"m11-o{index}", ("mission", "m11-outcome", production_outcome_race_state, production_outcome_race, execution_ledger_id))
+            for index in range(1, 25)
+        ))
+        assert sum(response["status"] == "APPENDED" for response in production_outcome_race_responses.values()) == 1
+        assert all(response["status"] in {"APPENDED", "BUSY", "EXACT_DUPLICATE"} for response in production_outcome_race_responses.values())
+        for index in range(1, 25):
+            assert invoke(bot, "mission", "m11-outcome", production_outcome_race_state, production_outcome_race, execution_ledger_id)["status"] == "EXACT_DUPLICATE"
+        outcome_race_records = [json.loads(line) for line in (production_outcome_race_state / "m11-outcomes.jsonl").read_text(encoding="utf-8").splitlines() if line]
+        assert len(outcome_race_records) == 1 and outcome_race_records[0]["outcome_id"] == "br16-production-outcome-race"
+        production_outcome_race_head = invoke(bot, "mission", "m11-resolve", production_outcome_race_state, "PRODUCTION_LEDGER", production_lease["lease_id"] + "/2026-09-08T00:00:03Z")["artifact"]
+        assert production_outcome_race_head["executions_total"] == 1 and production_outcome_race_head["pending_outcomes"] == 0
+        assert len(production_outcome_race_head["outcome_links"]) == 1 and production_outcome_race_head["outcome_links"][0]["outcome_id"] == "br16-production-outcome-race"
+
         production_outcome_result = invoke(bot, "mission", "m11-outcome", state, production_outcome, execution_ledger_id)
         assert production_outcome_result["status"] == "APPENDED"
         production_evaluation = invoke(bot, "mission", "m11-evaluate", state, "br16-production-o", "br16-production-e", "2026-09-08T00:00:04Z")

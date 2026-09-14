@@ -157,6 +157,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace('"m11-reserve-barrier"', '"missing-m11-reserve-barrier"', 1), encoding="utf-8")
         self.assertIn("R10 M11 process-barrier regression is missing", self.run_audit(False))
 
+    def test_missing_m11_outcome_process_barrier_smoke_regression_is_rejected(self):
+        source = self.root / "scripts/smoke_br16a_offline.py"
+        source.write_text(source.read_text(encoding="utf-8").replace('"m11-outcome-barrier"', '"missing-m11-outcome-barrier"', 1), encoding="utf-8")
+        self.assertIn("R10 M11 process-barrier regression is missing", self.run_audit(False))
+
     def test_missing_r10_reservation_commit_fault_regression_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ReservationCommitFaultDoesNotConsumeCap", "MissingCommitFaultRegression", 1), encoding="utf-8")
