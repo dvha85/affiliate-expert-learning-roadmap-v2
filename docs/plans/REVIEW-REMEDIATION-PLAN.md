@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 2aefe852b5e9afe67acff339906b442275ce0dff -->
+<!-- readiness-main-baseline: 4b6de1b713cad9affdeb9fccb817924be364d210 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1453,6 +1453,16 @@ gate hoàn tất journal và trả `EXACT_DUPLICATE`; regression kiểm đúng m
 trước/sau retry. Đây là acknowledgement/recovery boundary local cho một JSONL
 line và journal đã visible, không chứng minh fsync/power-loss, transaction nhiều
 file, live executor, business outcome hoặc multi-host.
+
+**Cập nhật M11 outcome-journal cleanup uncertainty (2026-09-14):** Sau khi
+ledger head và exact fixture outcome đã canonical, lỗi khi dọn
+`m11-outcome-journal.json` không còn được trả là `REJECTED`. Runtime báo
+`PUBLISHED_RECOVERY_REQUIRED`, giữ journal nếu cleanup chưa bắt đầu, và Bot mới
+chặn `status` cho đến exact retry dưới runtime lock. Retry chỉ hoàn tất cleanup
+và trả `EXACT_DUPLICATE`; regression dùng seam ngay trước remove, xác minh một
+outcome và post-ledger duy nhất cả trước lẫn sau restart/retry. Đây là một
+acknowledgement boundary local; không chứng minh fsync/power-loss, transaction
+đa-file, live executor, business outcome hoặc multi-host.
 
 **Cập nhật M11 24-process reservation barrier (2026-09-14):** shared smoke
 M00–M11 clone đúng runtime đã có M11 lease/approval/activation/health/cost và
