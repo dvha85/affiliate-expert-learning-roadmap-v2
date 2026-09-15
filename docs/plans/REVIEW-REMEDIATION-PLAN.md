@@ -677,6 +677,16 @@ nghĩa lại struct/parser. Đây chỉ là contract/conformance reuse; chain li
 migration, executor thật và multi-file crash proof vẫn mở, nên RP-02 vẫn
 `PARTIAL`.
 
+**Cập nhật shared M10 artifact decoders (2026-09-16):** `core/m10` hiện owns
+decoder cho canary grant, trusted cost-bound, gate, authorization và
+execution-record mà mission harness gọi trực tiếp. Decoder execution-record
+schema-only được tách khỏi validator terminal no-side-effect, vì vậy record
+`SUCCEEDED/PERFORMED` hợp lệ không bị loại nhầm trong khi canary profile,
+unknown/duplicate field, hash, time và limit vẫn được kiểm. Harness chỉ giữ
+ledger/approval compatibility boundary và các chain/time checks riêng. Đây là
+contract/conformance reuse trong fixture runtime; executor thật, business
+outcome, migration và crash/power-loss vẫn mở.
+
 **Cập nhật M08 policy semantic binding (2026-09-11):** `core/m08` nay kiểm
 decision/risk/timeline có thể xác minh chỉ từ immutable intent và policy;
 learner `bind` strict-decode policy trước khi ghi state, còn M09/harness dùng

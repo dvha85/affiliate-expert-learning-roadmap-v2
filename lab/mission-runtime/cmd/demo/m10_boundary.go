@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
 
 type CanaryGrantApproval struct {
@@ -45,23 +46,43 @@ func DecodeM10Artifact(kind string, raw []byte) (any, string) {
 	var value any
 	switch kind {
 	case "grant":
-		schema, value = "canary-grant.schema.json", &CanaryGrant{}
+		grant, status := corem10.DecodeCanaryGrant(raw)
+		if status != "VALID" {
+			return nil, status
+		}
+		value = (*CanaryGrant)(&grant)
 	case "approval":
 		schema, value = "canary-grant-approval.schema.json", &CanaryGrantApproval{}
 	case "cost":
-		schema, value = "trusted-cost-bound.schema.json", &CanaryCostBound{}
+		bound, status := corem10.DecodeTrustedCostBound(raw)
+		if status != "VALID" {
+			return nil, status
+		}
+		value = (*CanaryCostBound)(&bound)
 	case "ledger":
 		schema, value = "canary-ledger.schema.json", &CanaryLedger{}
 	case "gate":
-		schema, value = "canary-gate-decision.schema.json", &CanaryGateDecision{}
+		gate, err := corem10.ValidateCanaryGateDecision(raw)
+		if err != nil {
+			return nil, "INVALID_SCHEMA"
+		}
+		value = (*CanaryGateDecision)(&gate)
 	case "authorization":
-		schema, value = "execution-authorization.schema.json", &CanaryExecutionAuthorization{}
+		authorization, err := corem10.ValidateExecutionAuthorization(raw)
+		if err != nil {
+			return nil, "INVALID_SCHEMA"
+		}
+		value = (*CanaryExecutionAuthorization)(&authorization)
 	case "execution":
-		schema, value = "execution-record.schema.json", &CanaryExecutionRecord{}
+		record, err := corem10.DecodeCanaryExecutionRecord(raw)
+		if err != nil {
+			return nil, "INVALID_SCHEMA"
+		}
+		value = (*CanaryExecutionRecord)(&record)
 	default:
 		return nil, "INVALID_PROFILE"
 	}
-	if contracts.ValidateRaw(schema, raw) != nil || contracts.DecodeStrict(raw, value) != nil {
+	if schema != "" && (contracts.ValidateRaw(schema, raw) != nil || contracts.DecodeStrict(raw, value) != nil) {
 		return nil, "INVALID_SCHEMA"
 	}
 	before := func(a, b string) bool {
