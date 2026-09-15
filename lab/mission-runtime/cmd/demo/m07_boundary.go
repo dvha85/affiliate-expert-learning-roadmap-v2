@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
+	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	"io"
-	"net/url"
 	"os"
 	"strings"
 )
@@ -26,73 +26,20 @@ func DecodeM07Registry(raw []byte) ([]ToolSpec, string) {
 	if contracts.ValidateRaw("tool-registry.schema.json", raw) != nil || contracts.DecodeStrict(raw, &registry) != nil {
 		return nil, "INVALID_SCHEMA"
 	}
-	names := []string{}
-	for _, tool := range registry {
-		names = append(names, tool.Name)
-		normalized := []string{}
-		for _, host := range tool.AllowedHosts {
-			u, err := url.Parse("https://" + host)
-			if err != nil || u.Hostname() == "" || u.Host != host || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Port() != "" || strings.TrimSpace(host) != host {
-				return nil, "INVALID_REGISTRY"
-			}
-			normalized = append(normalized, strings.ToLower(host))
-		}
-		if !uniqueM07(normalized) {
-			return nil, "INVALID_REGISTRY"
-		}
+	if len(registry) == 0 {
+		return nil, "INVALID_SCHEMA"
 	}
-	if !uniqueM07(names) {
+	if err := corem07.ValidateRegistry(registry); err != nil {
 		return nil, "INVALID_REGISTRY"
 	}
 	return registry, missionValid
 }
 
-// AgentProposal has no canonical schema. This explicit local shape is not
-// AdvisorOutput and must not be advertised as canonical-schema conformance.
+// DecodeM07Proposal is the mission-runtime view of the shared M07 output
+// decoder. It intentionally has the same required shape as the learner Bot.
 func DecodeM07Proposal(raw []byte) (AgentProposal, string) {
-	var p AgentProposal
-	v, err := contracts.Decode(raw)
+	p, err := corem07.DecodeAgentOutput(raw)
 	if err != nil {
-		return p, "INVALID_SCHEMA"
-	}
-	object, ok := v.(map[string]any)
-	if !ok {
-		return p, "INVALID_SCHEMA"
-	}
-	for _, key := range []string{"state", "answer", "evidence_ids", "tool_calls"} {
-		if object[key] == nil {
-			return p, "INVALID_SCHEMA"
-		}
-	}
-	ids, ok := object["evidence_ids"].([]any)
-	if !ok {
-		return p, "INVALID_SCHEMA"
-	}
-	for _, id := range ids {
-		if _, ok := id.(string); !ok {
-			return p, "INVALID_SCHEMA"
-		}
-	}
-	calls, ok := object["tool_calls"].([]any)
-	if !ok {
-		return p, "INVALID_SCHEMA"
-	}
-	for _, call := range calls {
-		item, ok := call.(map[string]any)
-		if !ok {
-			return p, "INVALID_SCHEMA"
-		}
-		for _, key := range []string{"tool_name", "method", "target"} {
-			value, ok := item[key].(string)
-			if !ok || strings.TrimSpace(value) == "" {
-				return p, "INVALID_SCHEMA"
-			}
-		}
-	}
-	if contracts.DecodeStrict(raw, &p) != nil {
-		return AgentProposal{}, "INVALID_SCHEMA"
-	}
-	if (p.State != "ABSTAIN" && p.State != "PROPOSE" && p.State != "HUMAN_REVIEW") || strings.TrimSpace(p.Answer) == "" || !uniqueM07(p.EvidenceIDs) {
 		return AgentProposal{}, "INVALID_SCHEMA"
 	}
 	return p, missionValid
@@ -126,37 +73,6 @@ func CheckM07Files(proposalRaw, registryRaw, idsRaw []byte) (AgentProposal, []To
 	if !uniqueM07(ids) {
 		return AgentProposal{}, nil, "INVALID_CONTEXT"
 	}
-	// Enforce calls before the legacy ABSTAIN early return, without inventing IDs.
-	tools := map[string]ToolSpec{}
-	for _, tool := range registry {
-		tools[tool.Name] = tool
-	}
-	for _, call := range p.ToolCalls {
-		tool, exists := tools[call.ToolName]
-		if !exists {
-			return AgentProposal{}, nil, "REJECT_TOOL"
-		}
-		method := strings.ToUpper(strings.TrimSpace(call.Method))
-		allowed := false
-		for _, m := range tool.AllowedMethods {
-			if method == m {
-				allowed = true
-			}
-		}
-		u, err := url.Parse(call.Target)
-		if !allowed || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Port() != "" {
-			return AgentProposal{}, nil, "REJECT_TOOL"
-		}
-		hostOK := false
-		for _, host := range tool.AllowedHosts {
-			if strings.EqualFold(host, u.Hostname()) {
-				hostOK = true
-			}
-		}
-		if !hostOK {
-			return AgentProposal{}, nil, "REJECT_TOOL"
-		}
-	}
 	available := map[string]bool{}
 	for _, id := range ids {
 		available[id] = true
@@ -165,6 +81,14 @@ func CheckM07Files(proposalRaw, registryRaw, idsRaw []byte) (AgentProposal, []To
 		if !available[id] {
 			return AgentProposal{}, nil, "REJECT_UNGROUNDED"
 		}
+	}
+	for _, call := range p.ToolCalls {
+		if err := corem07.ValidateToolRequest(call, registry); err != nil {
+			return AgentProposal{}, nil, "REJECT_TOOL"
+		}
+		// This command has no registered adapter trace, so a model-declared
+		// request cannot be handed off as grounded output.
+		return AgentProposal{}, nil, "REJECT_TOOL"
 	}
 	state = EvaluateAgentProposal(p, registry, ids)
 	return p, registry, state

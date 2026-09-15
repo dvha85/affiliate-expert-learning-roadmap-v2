@@ -10,8 +10,12 @@ import (
 	"testing"
 )
 
-const m07P = `{"state":"PROPOSE","answer":"fixture","evidence_ids":["e1"],"tool_calls":[{"tool_name":"http","method":"GET","target":"https://example.com/a"}]}`
+const m07P = `{"state":"HUMAN_REVIEW","answer":"fixture=\"fixture\" [evidence:e1]","claims":[{"text":"fixture=\"fixture\" [evidence:e1]","field_or_claim":"fixture","value":"fixture","evidence_ids":["e1"]}],"evidence_ids":["e1"],"tool_calls":[],"authority":"A2-RO","write_permission":false}`
 const m07R = `[{"name":"http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"]}]`
+
+func m07WithTool(name, method, target string) string {
+	return strings.Replace(m07P, `"tool_calls":[]`, `"tool_calls":[{"tool_name":"`+name+`","method":"`+method+`","target":"`+target+`"}]`, 1)
+}
 
 func TestM07RawBoundary(t *testing.T) {
 	for _, tc := range []struct{ name, p, r, ids, want string }{
@@ -22,13 +26,13 @@ func TestM07RawBoundary(t *testing.T) {
 		{"empty_registry", m07P, `[]`, `["e1"]`, "INVALID_SCHEMA"},
 		{"write_registry", m07P, strings.Replace(m07R, `true`, `false`, 1), `["e1"]`, "INVALID_SCHEMA"},
 		{"duplicate_tool", m07P, "[" + strings.Trim(m07R, "[]") + "," + strings.Trim(m07R, "[]") + "]", `["e1"]`, "INVALID_REGISTRY"},
-		{"post", strings.Replace(m07P, `GET`, `POST`, 1), m07R, `["e1"]`, "REJECT_TOOL"},
-		{"abstain_post", strings.Replace(strings.Replace(m07P, `PROPOSE`, `ABSTAIN`, 1), `GET`, `POST`, 1), m07R, `["e1"]`, "REJECT_TOOL"},
-		{"host", strings.Replace(m07P, `example.com/a`, `evil.invalid/a`, 1), m07R, `["e1"]`, "REJECT_TOOL"},
-		{"port", strings.Replace(m07P, `example.com/a`, `example.com:8443/a`, 1), m07R, `["e1"]`, "REJECT_TOOL"},
-		{"userinfo", strings.Replace(m07P, `example.com/a`, `user@example.com/a`, 1), m07R, `["e1"]`, "REJECT_TOOL"},
+		{"unknown_tool", m07WithTool("unknown", "GET", "https://example.com/a"), m07R, `["e1"]`, "REJECT_TOOL"},
+		{"post", m07WithTool("http", "POST", "https://example.com/a"), m07R, `["e1"]`, "REJECT_TOOL"},
+		{"host", m07WithTool("http", "GET", "https://evil.invalid/a"), m07R, `["e1"]`, "REJECT_TOOL"},
+		{"port", m07WithTool("http", "GET", "https://example.com:8443/a"), m07R, `["e1"]`, "REJECT_TOOL"},
+		{"userinfo", m07WithTool("http", "GET", "https://user@example.com/a"), m07R, `["e1"]`, "REJECT_TOOL"},
 		{"duplicate_key", strings.Replace(m07P, `"state":`, `"state":"ABSTAIN","state":`, 1), m07R, `["e1"]`, "INVALID_SCHEMA"},
-		{"null_call", strings.Replace(m07P, `[{"tool_name":"http","method":"GET","target":"https://example.com/a"}]`, `[null]`, 1), m07R, `["e1"]`, "INVALID_SCHEMA"},
+		{"null_call", strings.Replace(m07P, `"tool_calls":[]`, `"tool_calls":[null]`, 1), m07R, `["e1"]`, "INVALID_SCHEMA"},
 		{"unknown_field", strings.Replace(m07P, `{`, `{"extra":true,`, 1), m07R, `["e1"]`, "INVALID_SCHEMA"},
 		{"null_ids", strings.Replace(m07P, `["e1"]`, `null`, 1), m07R, `["e1"]`, "INVALID_SCHEMA"},
 		{"trailing", m07P + ` {}`, m07R, `["e1"]`, "INVALID_SCHEMA"},
@@ -113,7 +117,7 @@ func TestM07CLI(t *testing.T) {
 			t.Fatal("input changed")
 		}
 	}
-	bad := strings.Replace(m07P, `GET`, `POST`, 1)
+	bad := strings.Replace(m07P, `"write_permission":false`, `"write_permission":true`, 1)
 	if err := os.WriteFile(paths[0], []byte(bad), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +134,13 @@ func TestM07CLI(t *testing.T) {
 	}
 }
 
+func TestM07HarnessRejectsForgedValueForKnownEvidenceID(t *testing.T) {
+	forged := strings.Replace(m07P, `"value":"fixture"`, `"value":"forged"`, 1)
+	if _, _, state := CheckM07Files([]byte(forged), []byte(m07R), []byte(`["e1"]`)); state == "SUPPORTED" {
+		t.Fatal("harness accepted a forged value for a known evidence ID")
+	}
+}
+
 func TestM07RawEval(t *testing.T) {
 	type tc struct {
 		ID       string          `json:"case_id"`
@@ -141,9 +152,6 @@ func TestM07RawEval(t *testing.T) {
 	for _, c := range loadCases[tc](t, "M07-readonly-evidence-agent") {
 		t.Run(c.ID, func(t *testing.T) {
 			want := c.Expected
-			if c.ID == "M07-E02-unknown-tool" || c.ID == "M07-E03-write-tool-rejected" || c.ID == "M07-E04-hallucinated-evidence" {
-				want = "INVALID_SCHEMA"
-			}
 			_, _, s := CheckM07Files(c.Proposal, c.Registry, c.IDs)
 			if s != want {
 				t.Fatal(s, want)

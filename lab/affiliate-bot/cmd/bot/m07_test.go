@@ -298,7 +298,7 @@ func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	}
 	agentClaim := corem07.Claim{FieldOrClaim: historyEvidence.FieldOrClaim, Value: json.RawMessage(`{"observation_id":"o1","subject_id":"p","source_ref":"fixture:history-test","observed_at":"2026-09-01T00:00:00Z","access_method":"local_fixture","evidence_kind":"synthetic","use_context":"test","claim_kind":"assumption","state":"observed","limitation":"Synthetic history test fixture; not market truth.","product_id":"p","product_name":"P","price":100,"commission_rate":0.1,"currency":"USD"}`), EvidenceIDs: []string{historyEvidenceID}}
 	agentClaim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{agentClaim})
-	agentModel := corem07.AgentOutput{State: "HUMAN_REVIEW", Claims: []corem07.Claim{agentClaim}, EvidenceIDs: []string{historyEvidenceID}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
+	agentModel := corem07.AgentOutput{State: "HUMAN_REVIEW", Claims: []corem07.Claim{agentClaim}, EvidenceIDs: []string{historyEvidenceID}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
 	agentModel.Answer = corem07.RenderGroundedAnswer(agentModel.Claims)
 	writeM07File(t, modelPath, agentModel)
 	agentProposalPath := filepath.Join(dir, "agent-proposal.json")
