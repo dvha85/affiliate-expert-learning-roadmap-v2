@@ -34,48 +34,13 @@ var missionClock = time.Now
 
 func missionNowUTC() time.Time { return missionClock().UTC() }
 
-type LearnerIntent struct {
-	IntentID            string         `json:"intent_id"`
-	DecisionID          string         `json:"decision_id"`
-	EvidenceIDs         []string       `json:"evidence_ids"`
-	ActionType          string         `json:"action_type"`
-	Target              string         `json:"target"`
-	Parameters          map[string]any `json:"parameters"`
-	ProposedBy          string         `json:"proposed_by"`
-	ProposalRef         string         `json:"proposal_ref,omitempty"`
-	CreatedAt           string         `json:"created_at"`
-	ExpiresAt           string         `json:"expires_at"`
-	CorrelationID       string         `json:"correlation_id"`
-	IdempotencyKey      string         `json:"idempotency_key"`
-	IntentHash          string         `json:"intent_hash"`
-	IntentMode          string         `json:"intent_mode"`
-	ExecutionAuthorized bool           `json:"execution_authorized"`
-}
-type LearnerPolicy struct {
-	PolicyVersion        string `json:"policy_version"`
-	IntentID             string `json:"intent_id"`
-	IntentHash           string `json:"intent_hash"`
-	Decision             string `json:"decision"`
-	RiskClass            string `json:"risk_class"`
-	Reason               string `json:"reason"`
-	PolicyReviewRequired bool   `json:"policy_review_required"`
-	PolicyMode           string `json:"policy_mode"`
-	ExecutionAuthorized  bool   `json:"execution_authorized"`
-	PolicyCheckedAt      string `json:"policy_checked_at"`
-}
-type LearnerApproval struct {
-	ApprovalID    string `json:"approval_id"`
-	IntentID      string `json:"intent_id"`
-	IntentHash    string `json:"intent_hash"`
-	PolicyVersion string `json:"policy_version"`
-	Decision      string `json:"decision"`
-	ApprovedBy    string `json:"approved_by"`
-	ApproverID    string `json:"approver_id"`
-	ApprovedAt    string `json:"approved_at"`
-	ExpiresAt     string `json:"expires_at"`
-	CorrelationID string `json:"correlation_id"`
-	OneTime       bool   `json:"one_time"`
-}
+// LearnerIntent, LearnerPolicy and LearnerApproval deliberately alias the
+// canonical M08/M09 types. The learner state keeps its own persistence
+// envelope, but it must not grow a second in-process schema that can drift
+// from the shared decoders and validators used by the mission harness.
+type LearnerIntent = corem08.Intent
+type LearnerPolicy = corem08.PolicyDecision
+type LearnerApproval = corem09.ApprovalRecord
 type LearnerCanary struct {
 	corem10.CanaryGrant
 	Status         string `json:"status"`
