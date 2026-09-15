@@ -307,9 +307,18 @@ func m06AdapterHandler(historyPath string) http.HandlerFunc {
 			return
 		}
 		status, resolved, err := appendResolvedHistory(historyPath, record)
-		if err != nil {
+		if err != nil && !isPublishedAppendUncertainty(err) {
 			w.WriteHeader(http.StatusConflict)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "HANDOFF_ERROR", "canonical_history_ack": false, "execution_permitted": false})
+			return
+		}
+		if err != nil {
+			// The record is canonically replayable, but the caller has no durable
+			// acknowledgement that the append completed. Match the direct M06
+			// handoff contract: disclose the exact visible record and require an
+			// idempotent retry rather than claiming a normal ACK or a clean failure.
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved, "canonical_history_ack": false, "canonical_history_persisted": true, "execution_permitted": false})
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "evidence_ids": resolved.RecordedResult.EvidenceIDs, "record": resolved, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false})

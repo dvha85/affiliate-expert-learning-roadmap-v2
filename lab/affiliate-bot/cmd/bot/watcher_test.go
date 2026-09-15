@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/lab/affiliate-bot/internal/store"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -368,6 +369,53 @@ func TestM06AdapterAndM08ResolveTheSameCanonicalFieldIDs(t *testing.T) {
 	writeRequest()
 	if code, envelope := missionCall(t, "m08-intent", history, requestPath, filepath.Join(dir, "drift-intent.json")); code == 0 || envelope["status"] != "REJECTED" {
 		t.Fatalf("M08 accepted a replay-DRIFT M06 record: code=%d envelope=%+v", code, envelope)
+	}
+}
+
+// The workflow-facing M06 adapter must not turn a post-append acknowledgement
+// loss into a generic retryable handoff error. Its caller needs the same
+// PUBLISHED_RECOVERY_REQUIRED boundary as the direct history-handoff command
+// so an exact retry resolves the record without a second append.
+func TestM06AdapterDisclosesVisibleAppendUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	fixtureRaw, err := json.Marshal(m06AdapterRequest{Fixture: mustRawJSON(t, watchFixture())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalHistoryAppend = func(_ store.History, path string, candidate HistoryRecord) (string, error) {
+		if status, err := appendHistoryWith(store.JSONL{}, path, candidate); err != nil || status != appendAdded {
+			return status, err
+		}
+		return appendPublished, &publishedAppendUncertainty{cause: errors.New("injected adapter acknowledgement loss after history append")}
+	}
+	t.Cleanup(func() { canonicalHistoryAppend = appendHistoryWith })
+	call := func() *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		m06AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m06/fixture-import", bytes.NewReader(fixtureRaw)))
+		return response
+	}
+	first := call()
+	if first.Code != http.StatusInternalServerError {
+		t.Fatalf("visible append uncertainty returned %d: %s", first.Code, first.Body.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(first.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope["status"] != appendPublished || envelope["canonical_history_ack"] != false || envelope["canonical_history_persisted"] != true || envelope["record"] == nil {
+		t.Fatalf("M06 adapter hid visible append uncertainty: %+v", envelope)
+	}
+	if records, err := LoadHistory(history); err != nil || len(records) != 1 {
+		t.Fatalf("M06 adapter visible record was not canonical: records=%+v err=%v", records, err)
+	}
+	canonicalHistoryAppend = appendHistoryWith
+	second := call()
+	if second.Code != http.StatusOK {
+		t.Fatalf("exact retry returned %d: %s", second.Code, second.Body.String())
+	}
+	if err := json.Unmarshal(second.Body.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate || envelope["canonical_history_ack"] != true || envelope["canonical_history_persisted"] != true {
+		t.Fatalf("M06 adapter exact retry did not acknowledge canonical record: %+v err=%v", envelope, err)
 	}
 }
 
