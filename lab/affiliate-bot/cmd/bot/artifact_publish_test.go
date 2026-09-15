@@ -151,3 +151,28 @@ func TestWriteNewJSONRejectsMissingParentSymlinkBeforeExternalCreate(t *testing.
 		t.Fatalf("artifact publisher created external output before rejection: entries=%+v err=%v", entries, err)
 	}
 }
+
+func TestWriteNewJSONRejectsParentSymlinkSwapBeforePublish(t *testing.T) {
+	outside := t.TempDir()
+	parent := filepath.Join(t.TempDir(), "artifact-parent")
+	if err := os.Mkdir(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(parent, "artifact.json")
+	artifactWriteFault = func(phase string) error {
+		if phase != "before_publish" {
+			return nil
+		}
+		if err := os.RemoveAll(parent); err != nil {
+			return err
+		}
+		return os.Symlink(outside, parent)
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	if _, err := writeNewJSON(path, map[string]string{"state": "new"}); err == nil {
+		t.Fatal("artifact publisher accepted a parent symlink swap before publish")
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("artifact publisher wrote through swapped parent: entries=%+v err=%v", entries, err)
+	}
+}

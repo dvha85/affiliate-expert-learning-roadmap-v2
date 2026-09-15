@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 123f6fc1068303d352ea62b05744e9aa1c135544 -->
+<!-- readiness-main-baseline: bfd2b24dee62dceee0a92077c2ef55f878f2efed -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -487,6 +487,14 @@ và ngay trước rename, bất cứ pathname target nào xuất hiện đều t
 thật cho cả target rỗng có sẵn và target xuất hiện trong lúc copy. Đây ngăn một
 lần publish lỗi làm thay đổi target caller-owned mà chưa tạo backup; nó không
 chứng minh crash/power-loss, atomic transaction nhiều file hoặc multi-host.
+
+**Cập nhật immutable artifact parent recheck (2026-09-15):** trước hard-link
+publish, publisher kiểm lại chính parent directory đã dùng để tạo temporary
+artifact. Parent mất hoặc thành symlink ở seam `before_publish` bị reject trước
+khi `Link` resolve pathname; regression thay parent bằng symlink tới directory
+ngoài và xác nhận nó vẫn rỗng. Đây chỉ thu hẹp một cửa sổ local đã kiểm tại
+boundary publish; không chứng minh thay tên không hợp tác sau recheck,
+crash/power-loss, atomic transaction nhiều file hay multi-host.
 
 **Cập nhật publish recovery status (2026-09-14):** sau khi final `rename`
 thành công, staging không còn riêng tư. Nếu sync directory cha sau đó lỗi,

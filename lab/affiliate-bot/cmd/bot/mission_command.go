@@ -816,14 +816,24 @@ func artifactOutputDirectory(path string) (string, error) {
 	if err := ensureOutputParentBeforeCreate(dir); err != nil {
 		return "", err
 	}
-	info, err := os.Lstat(dir)
-	if err != nil {
+	if err := requireArtifactOutputDirectory(dir); err != nil {
 		return "", err
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return "", fmt.Errorf("artifact output parent must be a non-symlink directory")
-	}
 	return dir, nil
+}
+
+// requireArtifactOutputDirectory verifies that an already-selected directory
+// remains a real directory. It deliberately does not create a missing path:
+// callers use it again immediately before a pathname-sensitive publish.
+func requireArtifactOutputDirectory(dir string) error {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("artifact output parent must be a non-symlink directory")
+	}
+	return nil
 }
 
 // ensureRuntimeDirectory is the mutable runtime-root boundary. Command state
@@ -894,6 +904,13 @@ func writeNewJSON(path string, value any) (string, error) {
 		return "", err
 	}
 	if err := artifactWriteFailure("before_publish"); err != nil {
+		return "", err
+	}
+	// The temporary artifact was created under dir, but Link resolves its
+	// destination pathname again. Reject a parent that disappeared or became a
+	// symlink between staging and publication rather than publishing outside the
+	// caller-selected directory.
+	if err := requireArtifactOutputDirectory(dir); err != nil {
 		return "", err
 	}
 	if err := os.Link(temporary, path); err != nil {
