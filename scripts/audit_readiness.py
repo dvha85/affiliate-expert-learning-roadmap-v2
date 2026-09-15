@@ -865,6 +865,29 @@ def audit_immutable_artifact_parent_recheck(root, matrix, plan_text):
         fail("immutable artifact parent-recheck regression is missing from the real publisher path")
 
 
+def audit_advisor_fixture_parent_recheck(root, matrix, plan_text):
+    """Keep the disposable advisor bundle inside its selected output parent."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-advisor-fixture-parent-recheck")
+    if not isinstance(record, dict) or "immediately before MkdirTemp" not in record.get("scope", ""):
+        fail("matrix lacks scoped advisor fixture parent recheck")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("test_refs", [])):
+        fail("advisor fixture parent-recheck record lacks CLI and audit regressions")
+    if "Cập nhật advisor fixture output-parent guard" not in plan_text:
+        fail("advisor fixture parent recheck lacks a scoped plan marker")
+    source_path = root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    if "func requireAdvisorFixtureOutputParent(parent string) error" not in source or source.count("requireAdvisorFixtureOutputParent(parent)") < 2 or "TestAdvisorFixtureBundleRejectsParentSymlinkSwapBeforeCreate" not in test or "fixture-run created bundle through swapped parent" not in test:
+        fail("advisor fixture parent-recheck regression is missing from the real CLI path")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -918,6 +941,7 @@ def audit(root):
     audit_m06_adapter_visible_append(root, matrix, plan_text)
     audit_backup_target_absence_guard(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
+    audit_advisor_fixture_parent_recheck(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
