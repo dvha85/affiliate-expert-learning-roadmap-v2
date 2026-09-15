@@ -1,9 +1,9 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: d048d8df75af41d48087430b9bde737e5eec0a1f -->
+<!-- readiness-main-baseline: d05b5c5b5fd32ed7339d84f7db104ccbbb4ec884 -->
 
-> Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
+> Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
@@ -1095,6 +1095,16 @@ negative chạy qua harness thật và bắt unknown tool, write/host/port/useri
 forged known-ID value, duplicate/null/trailing fields và allowlist mơ hồ.
 Đây là local fixture evidence, không đóng provider/live executor/business
 outcome/pilot/deployment hoặc multi-host/power-loss.
+
+**Cập nhật shared M10 historical-chain validator (2026-09-16):**
+`m10-chain-check` giờ strict-decode tại mission boundary rồi chuyển toàn bộ
+kiểm tra lineage intent/policy → grant/approval → cost/ledger → gate →
+authorization → execution sang `core/m10.ValidateHistoricalChain`. Core sở hữu
+link, profile/scope, thứ tự thời gian, snapshot ledger, duplicate/block và
+budget/overflow checks; harness không còn giữ bản sao cross-artifact validator.
+Các regression chain hiện tại vì thế chạy đúng implementation dùng chung. Đây
+chỉ là historical canary fixture audit, không cấp quyền, không gọi executor và
+không chứng minh provider, business outcome, crash/power-loss hay multi-host.
 
 ### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
