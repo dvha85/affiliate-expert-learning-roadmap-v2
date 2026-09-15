@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 51fae13a152b29610514b21cd7b57ca3ba939514 -->
+<!-- readiness-main-baseline: 8352c89bf12f61491bbb22d3d252cc03df317292 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -343,12 +343,22 @@ power-loss/filesystem crash hoặc multi-host transaction, nên vẫn `PARTIAL`.
 canonical history append báo lỗi sau khi exact `HistoryRecord` đã replay được,
 `AppendHistory` trả `PUBLISHED_RECOVERY_REQUIRED` thay vì ngụ ý append có thể
 retry an toàn. M06 watcher/HTTP handoff canonical-reload record đó nhưng giữ
-`canonical_history_ack=false`, trả non-zero/409 và không cho consumer coi
+`canonical_history_ack=false`, trả non-zero/HTTP 500 và không cho consumer coi
 handoff là ACK; chỉ retry exact mới trả `EXACT_DUPLICATE` với ACK. Regression
 chạy `watcher history-handoff` thật, inject ACK loss sau append, rồi kiểm record
 canonical và retry. Đây chỉ là boundary acknowledgement một file; không chứng
 minh fsync/power-loss, transaction đa file, provider/selected-source run hay
 multi-host safety.
+
+**Cập nhật M06 adapter visible append uncertainty (2026-09-15):** workflow
+M06 trước đây biến acknowledgement loss sau append thành `HANDOFF_ERROR`, làm
+n8n không phân biệt được record đã canonical nhưng chưa ACK với một append chưa
+tồn tại. Adapter nay trả HTTP 500 `PUBLISHED_RECOVERY_REQUIRED`, kèm record đã
+resolve và `canonical_history_persisted=true` nhưng `canonical_history_ack=false`.
+Regression gọi handler thật với fault sau append, rồi xác nhận exact retry trả
+`EXACT_DUPLICATE` cùng ACK. Đây là proof local một JSONL file; không là n8n hay
+provider operated run, fsync/power-loss, transaction đa file hoặc multi-host
+safety.
 
 **Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
 chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`

@@ -662,6 +662,23 @@ def audit_m06_history_handoff_strict_decode(root, matrix, plan_text):
         fail("M06 history-handoff strict decoder regression is missing")
 
 
+def audit_m06_adapter_visible_append(root, matrix, plan_text):
+    """Keep the workflow-facing M06 ACK-loss path distinct from a clean failure."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-04-history-visible-append")
+    if not isinstance(record, dict) or "workflow-facing M06 adapter expose PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
+        fail("matrix lacks scoped M06 adapter visible-append boundary")
+    if "Cập nhật M06 adapter visible append uncertainty" not in plan_text:
+        fail("M06 adapter visible-append boundary lacks a scoped plan marker")
+    watcher = (root / "lab/affiliate-bot/cmd/bot/watcher.go").read_text(encoding="utf-8")
+    _, handler_marker, adapter_and_rest = watcher.partition("func m06AdapterHandler(historyPath string) http.HandlerFunc {")
+    adapter, _, _ = adapter_and_rest.partition("func m07ArtifactPath(")
+    test_path = root / "lab/affiliate-bot/cmd/bot/watcher_test.go"
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    if not handler_marker or "if err != nil && !isPublishedAppendUncertainty(err)" not in adapter or "\"canonical_history_persisted\": true, \"execution_permitted\": false" not in adapter or "TestM06AdapterDisclosesVisibleAppendUncertainty" not in test:
+        fail("M06 adapter visible-append regression is missing")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -707,6 +724,7 @@ def audit(root):
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)
+    audit_m06_adapter_visible_append(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
