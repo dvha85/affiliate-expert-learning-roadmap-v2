@@ -627,6 +627,35 @@ def audit_accesstrade_pending_import_recovery(root, matrix, plan_text):
         fail("ACCESSTRADE pending-import recovery regression is missing from learner path")
 
 
+def audit_campaign_result_visible_ack(root, matrix, plan_text):
+    """Keep an ambiguous paid canary result from looking safely retryable."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-campaign-result-visible-ack")
+    if not isinstance(record, dict) or "PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", "") or "without a second provider request" not in record.get("scope", ""):
+        fail("matrix lacks scoped campaign-result acknowledgement acceptance")
+    if "Cập nhật campaign result visible acknowledgement" not in plan_text:
+        fail("campaign-result acknowledgement lacks a scoped plan marker")
+    results = root / "lab/affiliate-bot/cmd/bot/advisor_results.go"
+    canary = root / "lab/affiliate-bot/cmd/bot/advisor_canary.go"
+    test = root / "lab/affiliate-bot/cmd/bot/advisor_canary_test.go"
+    results_text = results.read_text(encoding="utf-8") if results.is_file() else ""
+    canary_text = canary.read_text(encoding="utf-8") if canary.is_file() else ""
+    test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
+    required_results = (
+        "func campaignResultPublishFailure",
+        "campaignResultVisible(path, candidate)",
+        "campaignResultWriteFailure(\"after_result_file_sync\")",
+        'return n, "PUBLISHED_RECOVERY_REQUIRED", err',
+    )
+    required_canary = (
+        "status == \"PUBLISHED_RECOVERY_REQUIRED\"",
+        "resolvedCampaignResult(path, n)",
+        "campaignCanaryProvider",
+    )
+    if not all(token in results_text for token in required_results) or not all(token in canary_text for token in required_canary) or "TestCanaryDisclosesVisibleResultAcknowledgementWithoutProviderRetry" not in test_text or "TestCanaryCLIDisclosesVisibleResultAcknowledgement" not in test_text:
+        fail("campaign-result acknowledgement regression is missing from learner path")
+
+
 def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
     """Keep recovery handoff admission from accepting a lease with no review."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -752,6 +781,7 @@ def audit(root):
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_accesstrade_pending_import_recovery(root, matrix, plan_text)
+    audit_campaign_result_visible_ack(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)

@@ -98,6 +98,9 @@ func runBR10RecordedCampaignAttempt(ctx context.Context, path, bundle string, p 
 		err = persistCampaignResult(path, r)
 	}
 	if err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return n, "PUBLISHED_RECOVERY_REQUIRED", err
+		}
 		return n, "RESULT_ERROR", err
 	}
 	return n, status, nil

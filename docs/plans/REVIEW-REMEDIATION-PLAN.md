@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 6a6db51ab16011fece9efaaf4018396ca8f1ad25 -->
+<!-- readiness-main-baseline: eca05d8ffed06ef91acb0fe3a0b82b7cfec81440 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -270,6 +270,18 @@ mới. Regression gọi đúng CLI, bao phủ empty, outcome-visible/receipt-mis
 changed report và partial outcomes. Đây là recovery local cho report đã được
 cung cấp, không fetch/đăng nhập ACCESSTRADE, không xác nhận business outcome,
 atomicity power-loss hay multi-host transaction; RP-01/RP-06 vẫn `PARTIAL`.
+
+**Cập nhật campaign result visible acknowledgement (2026-09-15):** controlled
+advisor canary đã reserve trước request, nên sau response không thể coi lỗi
+persist result chung chung là lý do gửi provider lần nữa. Result writer nay
+canonical-reload exact immutable result sau lỗi file-sync/close/parent-sync;
+nếu đã visible, runner và CLI trả non-success
+`PUBLISHED_RECOVERY_REQUIRED`, CLI bàn giao result đã resolve với
+`execution_permitted=false`. Canary gọi lại là `REVIEW_REQUIRED` và không gửi
+request thứ hai. Regression dùng loopback và test-only fault seam, không dùng
+credit. Đây là acknowledgement boundary local cho một result file, không phải
+billing reconciliation, provider operation, crash/power-loss, transaction
+nhiều file, business outcome hay multi-host proof; RP-03 vẫn `PARTIAL`.
 
 **Cập nhật backup/restore missing-parent guard (2026-09-14):** trước khi
 `backup create` hoặc `backup restore` gọi `MkdirAll` cho output parent do caller
