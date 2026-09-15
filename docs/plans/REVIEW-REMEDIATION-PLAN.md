@@ -34,6 +34,16 @@ tính hiện tại chạy đúng implementation dùng bởi harness. Đây là b
 offline/read-only, không chứng minh provider, live executor, business outcome,
 crash/power-loss, distributed lock hay production readiness.
 
+**Cập nhật learner schema identity (2026-09-16):** learner Bot không còn khai
+báo bản sao cục bộ của `Intent`, `PolicyDecision` và `ApprovalRecord`. Các
+field tương ứng trong mission state giờ là alias trực tiếp của
+`core/m08.Intent`, `core/m08.PolicyDecision` và `core/m09.ApprovalRecord`, còn
+decoder/validator dùng chung tiếp tục là điểm kiểm tra canonical. Regression
+`TestLearnerMissionStateUsesCanonicalM08M09Types` sẽ fail nếu một local struct
+được reintroduce. Đây chỉ đóng một seam schema-drift offline; authorization/
+execution migration rộng hơn, crash/power-loss, provider, live executor,
+business outcome và multi-host proof vẫn mở.
+
 Cập nhật sau review PR #94: bổ sung dependency RP-05 cho RP-06, tách nghiệm thu
 restore M00–M10 khỏi phần mở rộng M11 bắt buộc ở RP-07a, và giao rõ việc tạo/lưu/
 kiểm chuỗi cost-bound, gate, authorization, execution và EffectRef. Các phạm vi

@@ -1018,6 +1018,41 @@ def audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text):
         fail("advisor fixture failed-staging cleanup regression is missing from the real CLI path")
 
 
+def audit_learner_schema_identity(root, matrix, plan_text):
+    """Keep learner M08/M09 state fields on the canonical shared types."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-02-learner-m08-m09-type-identity-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks learner M08/M09 type-identity acceptance record")
+    required_impl = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "core/m08/m08.go",
+        "core/m09/m09.go",
+    }
+    if required_impl - set(record.get("implementation_refs", [])):
+        fail("learner schema identity record lacks canonical implementation refs")
+    required_tests = {
+        "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go",
+        "docs/architecture/EVIDENCE-LEARNER-SCHEMA-IDENTITY-20260916.md",
+    }
+    if required_tests - set(record.get("test_refs", [])):
+        fail("learner schema identity record lacks regression/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or "alias" not in scope or "schema-drift" not in scope:
+        fail("learner schema identity record lacks bounded scope disclosure")
+    source_path = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test_path = root / "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go"
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_source = (
+        "type LearnerIntent = corem08.Intent",
+        "type LearnerPolicy = corem08.PolicyDecision",
+        "type LearnerApproval = corem09.ApprovalRecord",
+    )
+    if any(marker not in source for marker in required_source) or "TestLearnerMissionStateUsesCanonicalM08M09Types" not in test:
+        fail("learner schema identity regression is missing from the canonical learner path")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1075,6 +1110,7 @@ def audit(root):
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
+    audit_learner_schema_identity(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
