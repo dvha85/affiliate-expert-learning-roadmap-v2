@@ -1617,6 +1617,105 @@ func TestMissionM10VisibleJournalPublishUncertaintyDefersLockedReplay(t *testing
 	})
 }
 
+// Once a journal-backed transition is canonical, an acknowledgement failure
+// while removing that journal must not be reported as a plain STORE_ERROR or
+// RECOVERY_REQUIRED. The journal name may already be absent, so the command
+// exposes the exact visible transition and an exact retry must not duplicate
+// its canonical side.
+func TestMissionDisclosesCommittedJournalCleanupUncertainty(t *testing.T) {
+	withCleanupFault := func(t *testing.T, path string) {
+		t.Helper()
+		recoveryJournalCleanupFault = func(currentPath, phase string) error {
+			if currentPath == path && phase == "after_remove_before_parent_sync" {
+				return errors.New("injected committed journal cleanup acknowledgement failure")
+			}
+			return nil
+		}
+		t.Cleanup(func() { recoveryJournalCleanupFault = nil })
+	}
+
+	t.Run("canary", func(t *testing.T) {
+		runtimeDir, grantPath, _, _ := authorityExpiryFixtureWithCanary(t, "intent", false)
+		withCleanupFault(t, m10CanaryJournalPath(runtimeDir))
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" || response["artifact"] == nil {
+			t.Fatalf("canary cleanup uncertainty was not disclosed: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CanaryJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("canary cleanup acknowledgement fault did not follow removal: %v", err)
+		}
+		recoveryJournalCleanupFault = nil
+		if code, response := missionCall(t, "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+			t.Fatalf("canary exact retry did not preserve the visible transition: code=%d response=%+v", code, response)
+		}
+	})
+
+	t.Run("cost bound", func(t *testing.T) {
+		base := time.Now().UTC().Truncate(time.Second)
+		runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 2)
+		var bound corem10.TrustedCostBound
+		if err := readJSON(boundPath, &bound); err != nil {
+			t.Fatal(err)
+		}
+		bound.CostBoundID = "cleanup-visible-cost"
+		bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+		secondBound := filepath.Join(filepath.Dir(boundPath), "cleanup-visible-cost.json")
+		writeMissionTestJSON(t, secondBound, bound)
+		withCleanupFault(t, m10CostBoundJournalPath(runtimeDir))
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" || response["artifact"] == nil {
+			t.Fatalf("cost cleanup uncertainty was not disclosed: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10CostBoundJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("cost cleanup acknowledgement fault did not follow removal: %v", err)
+		}
+		recoveryJournalCleanupFault = nil
+		if code, response := missionCall(t, "m10-cost-register", runtimeDir, secondBound); code != 0 || response["status"] != appendDuplicate {
+			t.Fatalf("cost exact retry did not preserve the visible transition: code=%d response=%+v", code, response)
+		}
+	})
+
+	t.Run("execution", func(t *testing.T) {
+		runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+		root := filepath.Dir(runtimeDir)
+		authorizationPath := filepath.Join(root, "cleanup-visible-execution-authorization.json")
+		if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+			t.Fatalf("execution authorization setup failed: code=%d response=%+v", code, response)
+		}
+		if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "cleanup-visible-execution-reservation"); code != 0 || response["status"] != "RESERVED" {
+			t.Fatalf("execution reservation setup failed: code=%d response=%+v", code, response)
+		}
+		recordPath := filepath.Join(root, "cleanup-visible-execution.json")
+		withCleanupFault(t, m10ExecutionJournalPath(runtimeDir))
+		if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "cleanup acknowledgement fixture"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" || response["artifact"] == nil {
+			t.Fatalf("execution cleanup uncertainty was not disclosed: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m10ExecutionJournalPath(runtimeDir)); !os.IsNotExist(err) {
+			t.Fatalf("execution cleanup acknowledgement fault did not follow removal: %v", err)
+		}
+		recoveryJournalCleanupFault = nil
+		if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "cleanup acknowledgement fixture"); code != 0 || response["status"] != appendAdded {
+			t.Fatalf("execution exact retry did not preserve the visible transition: code=%d response=%+v", code, response)
+		}
+	})
+
+	t.Run("direct STOP", func(t *testing.T) {
+		dir := t.TempDir()
+		if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+			t.Fatalf("initialize direct STOP fixture: code=%d response=%+v", code, response)
+		}
+		withCleanupFault(t, m11ManualStopJournalPath(dir))
+		if code, response := missionCall(t, "m11-stop", dir, "cleanup acknowledgement fixture"); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" || response["artifact"] == nil {
+			t.Fatalf("direct STOP cleanup uncertainty was not disclosed: code=%d response=%+v", code, response)
+		}
+		if _, err := os.Stat(m11ManualStopJournalPath(dir)); !os.IsNotExist(err) {
+			t.Fatalf("direct STOP cleanup acknowledgement fault did not follow removal: %v", err)
+		}
+		recoveryJournalCleanupFault = nil
+		if code, response := missionCall(t, "m11-stop", dir, "cleanup acknowledgement fixture"); code == 0 || response["status"] != "STOPPED" {
+			t.Fatalf("direct STOP exact retry did not preserve durable STOP: code=%d response=%+v", code, response)
+		}
+	})
+}
+
 // The execution journal is a separate commit boundary from the canary and
 // cost-bound journals.  Once its atomic rename is visible, a failed parent
 // directory sync must not let a later reader treat the still-unregistered

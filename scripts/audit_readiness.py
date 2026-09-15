@@ -657,6 +657,32 @@ def audit_campaign_result_visible_ack(root, matrix, plan_text):
         fail("campaign-result acknowledgement regression is missing from learner path")
 
 
+def audit_committed_journal_cleanup_ack(root, matrix, plan_text):
+    """Keep completed M10/direct-STOP journals from looking safely uncommitted."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-07-committed-journal-cleanup-ack")
+    if not isinstance(record, dict) or "M10 canary, cost-bound or execution-record" not in record.get("scope", "") or "direct M11 STOP" not in record.get("scope", "") or "PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
+        fail("matrix lacks scoped committed journal-cleanup acknowledgement acceptance")
+    if "Cập nhật committed recovery-journal cleanup acknowledgement" not in plan_text:
+        fail("committed journal-cleanup acknowledgement lacks a scoped plan marker")
+    source_path = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required = (
+        "type journalCleanupUncertainError struct",
+        "func removeCommittedRecoveryJournal(path string) error",
+        'recoveryJournalCleanupWriteFault(path, "after_remove_before_parent_sync")',
+        "return removeCommittedRecoveryJournal(m10CanaryJournalPath(dir))",
+        "return removeCommittedRecoveryJournal(m10CostBoundJournalPath(dir))",
+        "return removeCommittedRecoveryJournal(m10ExecutionJournalPath(dir))",
+        "return removeCommittedRecoveryJournal(m11ManualStopJournalPath(dir))",
+        "errors.As(err, &cleanupUncertain)",
+    )
+    if not all(token in source for token in required) or "TestMissionDisclosesCommittedJournalCleanupUncertainty" not in test:
+        fail("committed journal-cleanup acknowledgement regression is missing from learner path")
+
+
 def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
     """Keep recovery handoff admission from accepting a lease with no review."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -783,6 +809,7 @@ def audit(root):
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_accesstrade_pending_import_recovery(root, matrix, plan_text)
     audit_campaign_result_visible_ack(root, matrix, plan_text)
+    audit_committed_journal_cleanup_ack(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)

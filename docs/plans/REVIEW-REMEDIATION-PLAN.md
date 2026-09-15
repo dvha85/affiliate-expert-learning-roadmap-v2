@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: cb21e0f69f57e8f3a1f7f5722539f197712216eb -->
+<!-- readiness-main-baseline: 31a635b0015b9f6024adcaec2d7bdf8bc202e554 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -23,6 +23,17 @@ restore M00–M10 khỏi phần mở rộng M11 bắt buộc ở RP-07a, và gia
 kiểm chuỗi cost-bound, gate, authorization, execution và EffectRef. Các phạm vi
 còn lại được ghi cụ thể `PARTIAL`/`OPEN`, không suy từ test PASS sang nghiệm thu
 toàn bộ R01–R16.
+
+**Cập nhật committed recovery-journal cleanup acknowledgement (2026-09-15):**
+M10 canary, cost-bound và execution-record, cùng direct `m11-stop`, đều đi
+qua một cleanup boundary sau khi transition canonical đã hiện hữu. Nếu `Remove`
+hoặc parent-directory sync không được ACK, CLI trả non-success
+`PUBLISHED_RECOVERY_REQUIRED` kèm transition xác định thay vì `STORE_ERROR` hay
+`RECOVERY_REQUIRED` ngụ ý chưa có gì được ghi. Regression gọi CLI thật, inject
+lỗi chỉ sau `Remove`, xác nhận journal name đã biến mất và exact retry không tạo
+thêm canary/bound/execution hay đổi STOP. Đây chỉ là acknowledgement local,
+không chứng minh power-loss, atomic multi-file, executor, business outcome hay
+multi-host safety.
 
 ## 1. Mục tiêu và giới hạn
 
