@@ -1883,6 +1883,14 @@ capture, list, replay và decision. Cách này loại compile lặp của nhiề
 trong cùng job; không thay đổi test coverage, không bỏ required check và không
 được coi là bằng chứng production/runtime ngoài CI.
 
+**Merged-main verification (2026-09-16):** sau khi merge PR #344, local
+re-run theo đúng single-build sequence đã PASS internal tests, contracts
+test/vet, learner vet, M01/M02 smoke và readiness audit. Evidence được ghi tại
+`docs/architecture/EVIDENCE-DETERMINISTIC-RUNTIME-SINGLE-BUILD-20260916.md`.
+Đây là kiểm chứng fixture/local cho đường CI; không đoán wall-clock GitHub
+runner và không nâng phạm vi sang provider, business outcome, pilot hay
+deployment.
+
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và
 `contracts`, rồi lần lượt bỏ đúng từng guard canonical `GateID`,
