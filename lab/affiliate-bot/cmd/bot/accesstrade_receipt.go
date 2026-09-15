@@ -108,6 +108,23 @@ func validateAccesstradeReceipt(receipt AccesstradeImportReceipt) error {
 	return nil
 }
 
+// decodeAccesstradeReceipt is deliberately shared by the append-only receipt
+// store and the mutable pending journal.  The journal is a recovery boundary:
+// accepting a second JSON value or unknown field there would let a stale or
+// hand-edited sidecar change what an exact recovery is allowed to publish.
+func decodeAccesstradeReceipt(raw []byte) (AccesstradeImportReceipt, error) {
+	var receipt AccesstradeImportReceipt
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&receipt); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
+		return AccesstradeImportReceipt{}, fmt.Errorf("invalid ACCESSTRADE receipt")
+	}
+	if err := validateAccesstradeReceipt(receipt); err != nil {
+		return AccesstradeImportReceipt{}, err
+	}
+	return receipt, nil
+}
+
 func sameStringSet(left, right []string) bool {
 	if len(left) != len(right) {
 		return false
@@ -136,13 +153,8 @@ func loadAccesstradeReceipts(path string) (receipts []AccesstradeImportReceipt, 
 	receipts = []AccesstradeImportReceipt{}
 	seen := map[string]bool{}
 	for scanner.Scan() {
-		var receipt AccesstradeImportReceipt
-		decoder := json.NewDecoder(strings.NewReader(string(scanner.Bytes())))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&receipt); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
-			return nil, fmt.Errorf("invalid ACCESSTRADE receipt")
-		}
-		if err := validateAccesstradeReceipt(receipt); err != nil || seen[receipt.ReceiptID] {
+		receipt, decodeErr := decodeAccesstradeReceipt(scanner.Bytes())
+		if decodeErr != nil || seen[receipt.ReceiptID] {
 			return nil, fmt.Errorf("invalid or duplicate ACCESSTRADE receipt")
 		}
 		seen[receipt.ReceiptID] = true
@@ -152,6 +164,14 @@ func loadAccesstradeReceipts(path string) (receipts []AccesstradeImportReceipt, 
 		return nil, err
 	}
 	return receipts, nil
+}
+
+func loadAccesstradePendingReceipt(outcomesPath string) (AccesstradeImportReceipt, error) {
+	raw, _, err := readStableRegularFileLimit(accesstradeJournalPath(outcomesPath), store.MaxHistoryRecordBytes)
+	if err != nil {
+		return AccesstradeImportReceipt{}, err
+	}
+	return decodeAccesstradeReceipt(raw)
 }
 
 func validateAccesstradeReceiptGraph(receipts []AccesstradeImportReceipt, outcomes []m03.OutcomeRecord, outcomesPath string) error {

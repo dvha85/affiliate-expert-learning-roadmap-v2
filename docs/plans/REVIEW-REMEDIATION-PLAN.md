@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 8c9507e45336fd75e2ce2849e8abd0c7c6145be6 -->
+<!-- readiness-main-baseline: 6a6db51ab16011fece9efaaf4018396ca8f1ad25 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -256,6 +256,20 @@ symlink đến thư mục ngoài, nhận `PATH_ERROR` và kiểm thư mục ngo�
 ancestor-path substitution, crash/power-loss, multi-host, provider và business
 outcome vẫn nằm ngoài scope. Inventory các writer khác vẫn mở, nên RP-01 giữ
 `PARTIAL`.
+
+**Cập nhật ACCESSTRADE pending import recovery (2026-09-15):** importer outcome
+read-only đã có pending receipt journal để chặn mixed snapshot, nhưng chưa có
+entrypoint hoàn tất replay. `bot outcome accesstrade-recover HISTORY ACTIONS
+OUTCOMES REPORT.csv MANIFEST.json` nay chỉ mở journal strict, re-derive đúng
+CSV/manifest local và yêu cầu receipt/hash khớp byte identity đã ghi. Nó chỉ
+append phần còn thiếu khi tập outcome là rỗng hoặc toàn bộ exact; changed input
+hay partial set bị từ chối mà giữ nguyên journal/store. Sau khi receipt graph
+được reload hợp lệ mới xóa journal; uncertainty sau khi journal visible hoặc
+cleanup parent-sync trả `PUBLISHED_RECOVERY_REQUIRED`, không mời tạo snapshot
+mới. Regression gọi đúng CLI, bao phủ empty, outcome-visible/receipt-missing,
+changed report và partial outcomes. Đây là recovery local cho report đã được
+cung cấp, không fetch/đăng nhập ACCESSTRADE, không xác nhận business outcome,
+atomicity power-loss hay multi-host transaction; RP-01/RP-06 vẫn `PARTIAL`.
 
 **Cập nhật backup/restore missing-parent guard (2026-09-14):** trước khi
 `backup create` hoặc `backup restore` gọi `MkdirAll` cho output parent do caller

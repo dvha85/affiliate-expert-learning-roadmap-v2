@@ -41,6 +41,11 @@ IDs. Nó không lưu order ID, customer data hay tracking URL. CLI
 `outcome accesstrade-receipts` resolve lại history/action/outcome và fail nếu
 receipt mồ côi, thiếu outcome, khác store hoặc có outcome ACCESSTRADE thiếu
 receipt. Một journal pending được giữ fail-closed khi commit hai store bị ngắt.
+Không được xóa journal hoặc chạy import với source mới: `outcome
+accesstrade-recover HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json` re-derive
+đúng snapshot, yêu cầu receipt/hash khớp, chỉ bổ sung phần còn thiếu khi outcome
+set rỗng hoặc exact toàn bộ, rồi reload graph trước khi clear journal. Partial
+set hay source drift giữ fail-closed để reviewer điều tra.
 Backup/restore runtime tiêu chuẩn cũng derive receipt requirement từ
 `outcomes.jsonl`, nên không thể sửa manifest backup để bỏ receipt mà vẫn
 restore thành công. Đây là kiểm integrity/replay của fixture, **không** là

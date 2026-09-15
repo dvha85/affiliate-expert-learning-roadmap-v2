@@ -603,6 +603,30 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         fail("deterministic CI shard/cache is missing a required coverage boundary")
 
 
+def audit_accesstrade_pending_import_recovery(root, matrix, plan_text):
+    """Keep the multi-file ACCESSTRADE sidecar from becoming a manual delete path."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-accesstrade-pending-import-recovery")
+    if not isinstance(record, dict) or "only the exact local CSV/manifest snapshot" not in record.get("scope", "") or "PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
+        fail("matrix lacks scoped ACCESSTRADE pending-import recovery acceptance")
+    if "Cập nhật ACCESSTRADE pending import recovery" not in plan_text:
+        fail("ACCESSTRADE pending-import recovery lacks a scoped plan marker")
+    source = root / "lab/affiliate-bot/cmd/bot/accesstrade_import.go"
+    test = root / "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go"
+    source_text = source.read_text(encoding="utf-8") if source.is_file() else ""
+    test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
+    required = (
+        "func runAccesstradeOutcomeRecover",
+        "sameReceipt(pending, receipt)",
+        "PARTIAL_DUPLICATE",
+        "validateAccesstradeReceiptGraph(finalReceipts, finalOutcomes, args[3])",
+        "removeAccesstradeJournal(args[3])",
+        'emit("PUBLISHED_RECOVERY_REQUIRED", map[string]any{"outcomes": candidates, "receipt": receipt}',
+    )
+    if not all(token in source_text for token in required) or "TestAccesstradeImporterRecoveryReplaysOnlyExactPendingSnapshot" not in test_text or "changed report and partial outcomes fail closed" not in test_text:
+        fail("ACCESSTRADE pending-import recovery regression is missing from learner path")
+
+
 def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
     """Keep recovery handoff admission from accepting a lease with no review."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -727,6 +751,7 @@ def audit(root):
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
+    audit_accesstrade_pending_import_recovery(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
