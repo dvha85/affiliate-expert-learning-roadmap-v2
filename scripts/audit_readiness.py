@@ -631,6 +631,21 @@ def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
         fail("M11 fixture-outcome execution cardinality regression is missing")
 
 
+def audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text):
+    """Keep recovery admission from collapsing duplicate portable-input keys."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-recovery-handoff-strict-decode")
+    if not isinstance(record, dict) or "shared strict JSON decoder" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 recovery-handoff strict decoder")
+    if "Cập nhật M11 recovery-handoff strict decoder" not in plan_text:
+        fail("M11 recovery-handoff strict decoder lacks a scoped plan marker")
+    source = (root / "lab/affiliate-bot/cmd/bot/m11_registry.go").read_text(encoding="utf-8")
+    test_path = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    if "func decodeM11RecoveryHandoff(raw []byte)" not in source or "contracts.Decode(raw)" not in source or "provided, err := decodeM11RecoveryHandoff(providedRaw)" not in source or "duplicate-key recovery handoff reached admission" not in test:
+        fail("M11 recovery-handoff strict decoder regression is missing")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -674,6 +689,7 @@ def audit(root):
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
+    audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
