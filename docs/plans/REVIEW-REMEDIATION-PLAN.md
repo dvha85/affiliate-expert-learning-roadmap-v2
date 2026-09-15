@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-14 -->
-<!-- readiness-main-baseline: 4354f07fe3e0afdbc0b93838a416bff13d46dda5 -->
+<!-- readiness-as-of: 2026-09-15 -->
+<!-- readiness-main-baseline: 315ee17e3b1b6195fbe59901d93e630073734219 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1641,15 +1641,18 @@ của n8n `2.38.1`/Node 24 được cache theo OS/Node/version để cache hit k
 phải resolve npm lại. Job skip chỉ nói thay đổi không liên quan, không phải
 evidence n8n; thay đổi có liên quan và `main` vẫn cần engine thật.
 
-**Cập nhật deterministic CI sharding và Go cache (2026-09-14):** workload
+**Cập nhật deterministic CI sharding và Go cache (2026-09-15):** workload
 trước đây nối tiếp trong một `deterministic-runtime` được giữ nguyên command
-nhưng chia thành ba required jobs chạy song song: core Go/race/CLI,
-`deterministic-quickstart`, và `deterministic-smokes-and-mutations`. Mỗi job
-khai báo đủ bốn `go.sum` cho setup-go cache, nên cache chỉ tái sử dụng build và
-module hợp lệ theo toàn dependency set. Không shard nào bị skip theo thay đổi:
-mọi PR và push `main` vẫn chạy toàn bộ Go/race, quickstart, M00–M11 smoke và
-mutation proof. Mục tiêu là giảm wall-clock CI, không giảm coverage hoặc suy
-cache hit thành runtime evidence.
+nhưng chia thành bốn required jobs chạy song song: core Go/CLI,
+`learner-bot-race`, `deterministic-quickstart`, và
+`deterministic-smokes-and-mutations`. Tách `go test -race ./...` có build cache
+key riêng ra khỏi core job để kết quả test thường/CLI trả về sớm, nhưng race vẫn
+là check bắt buộc trên mọi PR và push `main`. Mỗi job Go khai báo đủ bốn `go.sum`
+cho setup-go cache, nên cache chỉ tái sử dụng build và module hợp lệ theo toàn
+dependency set. Không shard nào bị skip theo thay đổi: mọi PR và push `main`
+vẫn chạy toàn bộ Go/race, quickstart, M00–M11 smoke và mutation proof. Mục tiêu
+là giảm wall-clock CI, không giảm coverage hoặc suy cache hit thành runtime
+evidence.
 
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và

@@ -84,7 +84,7 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_deterministic_shard_removal_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
-        workflow.write_text(workflow.read_text(encoding="utf-8").replace("deterministic-quickstart:", "removed-deterministic-quickstart:", 1), encoding="utf-8")
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("learner-bot-race:", "removed-learner-bot-race:", 1), encoding="utf-8")
         self.assertIn("deterministic CI shard/cache is missing", self.run_audit(False))
 
     def test_missing_advisor_fixture_output_parent_guard_is_rejected(self):
