@@ -171,6 +171,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("backup target appeared while staging", "backup target appearance ignored", 1), encoding="utf-8")
         self.assertIn("backup target-absence guard regression is missing", self.run_audit(False))
 
+    def test_missing_immutable_artifact_parent_recheck_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("if err := requireArtifactOutputDirectory(dir); err != nil {\n\t\treturn \"\", err\n\t}\n\tif err := os.Link(temporary, path);", "if err := os.Link(temporary, path);", 1), encoding="utf-8")
+        self.assertIn("immutable artifact parent-recheck regression is missing", self.run_audit(False))
+
     def test_missing_immutable_artifact_missing_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := ensureOutputParentBeforeCreate(dir);", "func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := removedOutputParentPreflight(dir);", 1), encoding="utf-8")
