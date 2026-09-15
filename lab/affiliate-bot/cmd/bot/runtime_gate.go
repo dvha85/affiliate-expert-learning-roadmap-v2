@@ -1,15 +1,18 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
+var errManagedPathLockBusy = errors.New("managed path lock is busy")
+
 // runtimeGateName serializes every managed runtime mutation with backup
-// capture. It is a directory because mkdir is an atomic cross-process claim
-// on the local filesystem. A stale gate fails closed; no command removes it
-// automatically or guesses whether a prior writer completed.
+// capture. On POSIX the path is an advisory OS lock, so the kernel releases it
+// when a writer process exits. The path itself is retained as a regular file;
+// it is control metadata and is excluded from backup inventory.
 const runtimeGateName = ".runtime-gate.lock"
 
 func runtimeGatePath(dir string) string { return filepath.Join(dir, runtimeGateName) }
@@ -22,14 +25,14 @@ func acquireRuntimeGate(dir string) (func(), error) {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, fmt.Errorf("runtime root must be a non-symlink directory")
 	}
-	path := runtimeGatePath(dir)
-	if err := os.Mkdir(path, 0700); err != nil {
-		if os.IsExist(err) {
-			return nil, fmt.Errorf("runtime is busy or has an unrecovered writer; explicit recovery required")
+	release, err := acquireManagedPathLock(runtimeGatePath(dir))
+	if err != nil {
+		if errors.Is(err, errManagedPathLockBusy) {
+			return nil, fmt.Errorf("runtime is busy or has an active writer")
 		}
 		return nil, err
 	}
-	return func() { _ = os.Remove(path) }, nil
+	return release, nil
 }
 
 func acquireHistoryRuntimeGate(historyPath string) (func(), error) {

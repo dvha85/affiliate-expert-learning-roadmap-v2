@@ -18,3 +18,8 @@ secrets/
 
 # Go
 lab/affiliate-bot/bin/
+
+# Learner runtime coordination control files
+.runtime-gate.lock
+.backup-target-*.lock
+.restore-target-*.lock

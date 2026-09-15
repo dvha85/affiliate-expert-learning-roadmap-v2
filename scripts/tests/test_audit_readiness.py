@@ -20,6 +20,10 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("lab/affiliate-bot/cmd/bot/runtime_gate.go", "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
         matrix = json.loads((ROOT / "docs/plans/READINESS-MATRIX.json").read_text(encoding="utf-8"))
         for item in matrix["criteria"]:
             for field in ("implementation_refs", "test_refs"):
@@ -175,6 +179,16 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("backup target appeared while staging", "backup target appearance ignored", 1), encoding="utf-8")
         self.assertIn("backup target-absence guard regression is missing", self.run_audit(False))
+
+    def test_missing_backup_process_exit_lock_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("syscall.Flock", "removedFlock"), encoding="utf-8")
+        self.assertIn("backup process-exit lock regression is missing", self.run_audit(False))
+
+    def test_missing_backup_process_exit_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds", "RemovedBackupProcessExitRegression"), encoding="utf-8")
+        self.assertIn("backup process-exit lock regression is missing", self.run_audit(False))
 
     def test_missing_immutable_artifact_parent_recheck_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
