@@ -1,7 +1,7 @@
 {
   "version": "readiness-evidence-graph/v1",
   "as_of": "2026-09-15",
-  "main_baseline": "2981cf67760360860496c9a4a8cfecf9bf9d40f8",
+  "main_baseline": "51fae13a152b29610514b21cd7b57ca3ba939514",
   "criteria": [
     {
       "criterion_id": "BR-13",
@@ -18,6 +18,7 @@
       "claims": [
         {"id": "BR-14-implementation", "kind": "implementation", "status": "IMPLEMENTED_OFFLINE", "matrix_field": "implementation_refs", "scope": "An inactive manual selected-source blueprint passes only a sanitized capture to the fixed loopback adapter; no n8n authenticated-page fetch is configured.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Selected source ACCESSTRADE Shopee Smartlink"}]},
         {"id": "BR-14-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Disposable n8n covers fixture success, conflict/source rejection, replay and unavailable adapter. It also imports the inactive/manual selected-source workflow with sanitized synthetic metadata and proves append/exact-duplicate, allowlist rejection before ACK/report, changed-fingerprint append and replay. A separate local synthetic/read-only server activates a real one-second Schedule Trigger for the fixture path. No selected-source deployment or network fetch is exercised.", "ci": [{"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_engine_regression.py"}, {"workflow": ".github/workflows/mission-agent-path-ci.yml", "command": "python scripts/run_n8n_m06_schedule_regression.py"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "M06 selected-source engine CI"}, {"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M06 Schedule Trigger regression"}]},
+        {"id": "BR-14-test-history-handoff-strict-decode", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "The real M06 history-handoff CLI and HTTP append handler strict-decode raw HistoryRecord JSON before persistence. A duplicate record_id key returns INVALID_SCHEMA and leaves the canonical history path absent. This is a bounded local input-decoder proof, not n8n/provider operation, crash/power-loss, multi-file atomicity or multi-host evidence.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "go test -race ./..."}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "Cập nhật M06 history-handoff strict decoder"}]},
         {"id": "BR-14-operated-local-synthetic", "kind": "operated", "status": "VERIFIED_OFFLINE", "scope": "A local synthetic/read-only M06 n8n execution capture passed the operated verifier, rejected an unsupported fixture source before report, and replayed after restart; it is not a selected deployment run.", "plan_refs": [{"path": "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "marker": "M06 operated re-verification"}]},
         {"id": "BR-14-external", "kind": "external", "status": "MISSING", "scope": "No independently operated import/execution is recorded on the selected supported deployment.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]

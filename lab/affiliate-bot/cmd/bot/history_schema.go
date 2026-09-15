@@ -29,6 +29,25 @@ func validateHistoryJSON(raw []byte) error {
 	return contracts.DecodeStrict(raw, &record)
 }
 
+// decodeHistoryHandoffRecord keeps command- and HTTP-supplied history records
+// at the same raw JSON boundary as canonical history replay. In particular,
+// validate the original bytes before projecting into HistoryRecord so duplicate
+// keys cannot collapse through encoding/json and become a different record
+// that then passes its recomputed hash.
+func decodeHistoryHandoffRecord(raw []byte) (HistoryRecord, error) {
+	if err := validateHistoryJSON(raw); err != nil {
+		return HistoryRecord{}, err
+	}
+	var record HistoryRecord
+	if err := contracts.DecodeStrict(raw, &record); err != nil {
+		return HistoryRecord{}, err
+	}
+	if err := validateHistoryRecord(record); err != nil {
+		return HistoryRecord{}, err
+	}
+	return record, nil
+}
+
 func loadHistoryObservations(path string) ([]Observation, error) {
 	raw, err := readGeneralPortableInput(path)
 	if err != nil {
