@@ -983,6 +983,36 @@ def audit_backup_process_exit_lock(root, matrix, plan_text):
         fail("backup process-exit lock regression is missing from the real CLI/test/CI path")
 
 
+def audit_managed_lock_path_guard(root, matrix, plan_text):
+    """Prevent a managed lock pathname from following an external symlink."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-managed-lock-path-guard")
+    if not isinstance(record, dict):
+        fail("matrix lacks managed lock path-guard acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go",
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("managed lock path-guard record lacks implementation, test or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("O_NOFOLLOW", "symlink", "external", "unchanged")):
+        fail("managed lock path-guard record lacks a bounded path disclosure")
+    if "Cập nhật managed lock path guard" not in plan_text:
+        fail("managed lock path guard lacks a scoped plan marker")
+    posix = root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
+    test = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+    posix_text = posix.read_text(encoding="utf-8") if posix.is_file() else ""
+    test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
+    workflow = root / ".github/workflows/curriculum-ci.yml"
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    if "syscall.O_NOFOLLOW" not in posix_text or "TestManagedPathLockRejectsSymlinkWithoutTouchingExternal" not in test_text or "external lock target changed after symlink rejection" not in test_text or "run_learner_bot_test_shard.py" not in workflow_text:
+        fail("managed lock path-guard regression is missing from the real test/CI path")
+
+
 def audit_immutable_artifact_parent_recheck(root, matrix, plan_text):
     """Keep hard-link publication from following a swapped parent directory."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1149,6 +1179,7 @@ def audit(root):
     audit_m06_adapter_visible_append(root, matrix, plan_text)
     audit_backup_target_absence_guard(root, matrix, plan_text)
     audit_backup_process_exit_lock(root, matrix, plan_text)
+    audit_managed_lock_path_guard(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)

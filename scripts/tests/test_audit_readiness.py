@@ -190,6 +190,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds", "RemovedBackupProcessExitRegression"), encoding="utf-8")
         self.assertIn("backup process-exit lock regression is missing", self.run_audit(False))
 
+    def test_missing_managed_lock_path_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("syscall.O_NOFOLLOW", "removedNoFollow"), encoding="utf-8")
+        self.assertIn("managed lock path-guard regression is missing", self.run_audit(False))
+
     def test_missing_immutable_artifact_parent_recheck_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("if err := requireArtifactOutputDirectory(dir); err != nil {\n\t\treturn \"\", err\n\t}\n\tif err := os.Link(temporary, path);", "if err := os.Link(temporary, path);", 1), encoding="utf-8")
