@@ -106,6 +106,52 @@ func TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate(t *testing.
 	}
 }
 
+func TestBackupRejectsPreexistingOrAppearedTargetWithoutMutation(t *testing.T) {
+	runtimeDir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtimeDir, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtimeDir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize backup fixture: code=%d response=%+v", code, response)
+	}
+	root := filepath.Dir(runtimeDir)
+	preexisting := filepath.Join(root, "preexisting-backup")
+	if err := os.Mkdir(preexisting, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := backupCall(t, "create", runtimeDir, preexisting); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+		t.Fatalf("backup accepted preexisting empty target: code=%d response=%+v", code, response)
+	}
+	if entries, err := os.ReadDir(preexisting); err != nil || len(entries) != 0 {
+		t.Fatalf("backup mutated rejected preexisting target: entries=%+v err=%v", entries, err)
+	}
+
+	appeared := filepath.Join(root, "appeared-backup")
+	created := false
+	backupCopyFault = func(string) error {
+		if !created {
+			created = true
+			return os.Mkdir(appeared, 0700)
+		}
+		return nil
+	}
+	t.Cleanup(func() { backupCopyFault = nil })
+	if code, response := backupCall(t, "create", runtimeDir, appeared); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+		t.Fatalf("backup published over target that appeared while staging: code=%d response=%+v", code, response)
+	}
+	if !created {
+		t.Fatal("backup copy hook did not create competing target")
+	}
+	if entries, err := os.ReadDir(appeared); err != nil || len(entries) != 0 {
+		t.Fatalf("backup mutated target that appeared while staging: entries=%+v err=%v", entries, err)
+	}
+}
+
 func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testing.T) {
 	runtime := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtime); err != nil {

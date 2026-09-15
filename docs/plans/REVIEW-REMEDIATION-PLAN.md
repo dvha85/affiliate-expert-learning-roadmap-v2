@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 015401c4b6cabab0ace02849e8bdffd2672f47cb -->
+<!-- readiness-main-baseline: 123f6fc1068303d352ea62b05744e9aa1c135544 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -478,6 +478,15 @@ target không bị chiếm và retry publish/restore thành công. Reader snapsh
 thành symlink sau inventory phải reject trước copy/publish, không đọc hay đổi
 external target. Đây không chứng minh crash/power-loss durability sau rename hay
 transaction multi-host, nên vẫn `PARTIAL`.
+
+**Cập nhật backup target-absence guard (2026-09-15):** `backup create` giờ
+đòi target chưa tồn tại, giống contract publish staging của `restore`; không
+còn nhận rồi tự xoá một directory rỗng do caller tạo. Sau khi nhận target gate
+và ngay trước rename, bất cứ pathname target nào xuất hiện đều trả
+`TARGET_NOT_EMPTY`, giữ nguyên directory đó và dọn staging. Regression gọi CLI
+thật cho cả target rỗng có sẵn và target xuất hiện trong lúc copy. Đây ngăn một
+lần publish lỗi làm thay đổi target caller-owned mà chưa tạo backup; nó không
+chứng minh crash/power-loss, atomic transaction nhiều file hoặc multi-host.
 
 **Cập nhật publish recovery status (2026-09-14):** sau khi final `rename`
 thành công, staging không còn riêng tư. Nếu sync directory cha sau đó lỗi,
