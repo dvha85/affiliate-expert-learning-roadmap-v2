@@ -392,7 +392,7 @@ func TestM07CLIDisclosesUnconfirmedVisibleArtifact(t *testing.T) {
 		t.Fatalf("M07 accepted unconfirmed artifact as an ACK: %s", out.String())
 	}
 	var envelope map[string]any
-	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "PUBLISHED_RECOVERY_REQUIRED" || envelope["artifact"] == nil {
 		t.Fatalf("M07 did not disclose visible artifact uncertainty: response=%s err=%v stderr=%s", out.String(), err, errOut.String())
 	}
 	if _, err := os.Stat(outputPath); err != nil {
@@ -406,5 +406,58 @@ func TestM07CLIDisclosesUnconfirmedVisibleArtifact(t *testing.T) {
 	}
 	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate {
 		t.Fatalf("M07 exact retry did not resolve visible artifact: response=%s err=%v", out.String(), err)
+	}
+}
+
+func TestM07CLIProposalDisclosesUnconfirmedVisibleArtifact(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.jsonl")
+	record, err := NewHistoryRecord("m07-unconfirmed-proposal-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("m07-unconfirmed-proposal-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(historyPath, record); err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := m07EvidenceContext(record)
+	if err != nil || len(ctx.Evidence) == 0 {
+		t.Fatalf("missing canonical M07 evidence: %+v err=%v", ctx, err)
+	}
+	value, err := json.Marshal(ctx.Evidence[0].Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claim := corem07.Claim{FieldOrClaim: ctx.Evidence[0].FieldOrClaim, Value: value, EvidenceIDs: []string{ctx.Evidence[0].EvidenceID}}
+	claim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{claim})
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: claim.Text, EvidenceIDs: []string{ctx.Evidence[0].EvidenceID}, Claims: []corem07.Claim{claim}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{}`)}}
+	registryPath, modelPath, outputPath := filepath.Join(dir, "registry.json"), filepath.Join(dir, "model.json"), filepath.Join(dir, "proposal.json")
+	writeM07File(t, registryPath, []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}})
+	writeM07File(t, modelPath, model)
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected M07 proposal parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	var out, errOut bytes.Buffer
+	if code := runM07([]string{"register-proposal", historyPath, record.RecordID, modelPath, registryPath, outputPath}, &out, &errOut); code == 0 {
+		t.Fatalf("M07 proposal accepted unconfirmed artifact as ACK: %s", out.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != "PUBLISHED_RECOVERY_REQUIRED" || envelope["artifact"] == nil {
+		t.Fatalf("M07 proposal did not disclose visible artifact uncertainty: response=%s err=%v stderr=%s", out.String(), err, errOut.String())
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("M07 proposal output was not visible after unconfirmed publish: %v", err)
+	}
+	artifactWriteFault = nil
+	out.Reset()
+	errOut.Reset()
+	if code := runM07([]string{"register-proposal", historyPath, record.RecordID, modelPath, registryPath, outputPath}, &out, &errOut); code != 0 {
+		t.Fatalf("M07 proposal exact retry was not accepted: response=%s stderr=%s", out.String(), errOut.String())
+	}
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate {
+		t.Fatalf("M07 proposal exact retry did not resolve visible artifact: response=%s err=%v", out.String(), err)
 	}
 }

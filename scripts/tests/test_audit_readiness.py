@@ -126,6 +126,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("if err != nil && !isPublishedAppendUncertainty(err)", "if err != nil", 1), encoding="utf-8")
         self.assertIn("M06 adapter visible-append regression is missing", self.run_audit(False))
 
+    def test_missing_m07_visible_artifact_recovery_disclosure_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/watcher.go"
+        source.write_text(source.read_text(encoding="utf-8").replace('response["artifact_id"] = artifactID', 'response["artifact_id"] = "removed"', 1), encoding="utf-8")
+        self.assertIn("immutable artifact post-publish regression is missing", self.run_audit(False))
+
     def test_missing_advisor_fixture_output_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
         source.write_text(source.read_text(encoding="utf-8").replace("fixture output parent must be an existing non-symlink directory", "fixture output parent guard removed", 1), encoding="utf-8")

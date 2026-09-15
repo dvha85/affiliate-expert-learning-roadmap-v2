@@ -347,6 +347,19 @@ func m07ArtifactPath(historyPath, kind, id string) (string, error) {
 	return filepath.Clean(historyPath) + ".m07/" + kind + "/" + strings.TrimPrefix(id, "sha256:") + ".json", nil
 }
 
+// m07PersistenceFailureResponse makes a visible immutable sidecar
+// recoverable without turning it into an adapter ACK. Consumers must still
+// stop on PUBLISHED_RECOVERY_REQUIRED and exact-retry before using the trace or
+// proposal downstream.
+func m07PersistenceFailureResponse(err error, artifactID string, artifact any) map[string]any {
+	response := map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false}
+	if m07PersistenceStatus(err) == "PUBLISHED_RECOVERY_REQUIRED" {
+		response["artifact_id"] = artifactID
+		response["artifact"] = artifact
+	}
+	return response
+}
+
 func decodeM07AdapterRequest(r *http.Request) (m07AdapterRequest, error) {
 	var request m07AdapterRequest
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
@@ -599,7 +612,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(m07PersistenceFailureResponse(err, registered.TraceID, registered))
 				return
 			}
 			evidence := registered.Evidence()
@@ -628,7 +641,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(m07PersistenceFailureResponse(err, registered.TraceID, registered))
 				return
 			}
 			evidence := registered.Evidence()
@@ -685,7 +698,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": m07PersistenceStatus(err), "execution_permitted": false})
+				_ = json.NewEncoder(w).Encode(m07PersistenceFailureResponse(err, proposal.ProposalID, proposal))
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": proposal.ProposalID, "artifact": proposal, "execution_permitted": false})

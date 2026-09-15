@@ -186,7 +186,14 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(args[5], registered)
 		if err != nil {
-			return emit("PERSISTENCE_ERROR", nil, err, 1)
+			artifact := any(nil)
+			if m07PersistenceStatus(err) == "PUBLISHED_RECOVERY_REQUIRED" {
+				// The immutable trace is already visible and has been validated;
+				// disclose its deterministic recovery identity without treating it
+				// as an acknowledgement that a downstream caller may consume.
+				artifact = map[string]any{"registered": registered, "evidence": registered.Evidence()}
+			}
+			return emit("PERSISTENCE_ERROR", artifact, err, 1)
 		}
 		return emit(status, map[string]any{"registered": registered, "evidence": registered.Evidence()}, nil, 0)
 	case "register-proposal":
@@ -218,7 +225,13 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 		}
 		status, err := writeNewJSON(args[5], proposal)
 		if err != nil {
-			return emit("PERSISTENCE_ERROR", nil, err, 1)
+			artifact := any(nil)
+			if m07PersistenceStatus(err) == "PUBLISHED_RECOVERY_REQUIRED" {
+				// Proposal identity is deterministic from the already validated raw
+				// output. It supports exact recovery/retry but is never an ACK.
+				artifact = proposal
+			}
+			return emit("PERSISTENCE_ERROR", artifact, err, 1)
 		}
 		return emit(status, proposal, nil, 0)
 	case "validate":

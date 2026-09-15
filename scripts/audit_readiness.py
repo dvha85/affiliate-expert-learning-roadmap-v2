@@ -271,9 +271,13 @@ def audit_runtime_acceptance(root, matrix):
     watcher_text = watcher_source.read_text(encoding="utf-8") if watcher_source.is_file() else ""
     m07_source = root / "lab/affiliate-bot/cmd/bot/m07_test.go"
     m07_text = m07_source.read_text(encoding="utf-8") if m07_source.is_file() else ""
+    m07_runtime_source = root / "lab/affiliate-bot/cmd/bot/m07.go"
+    m07_runtime_text = m07_runtime_source.read_text(encoding="utf-8") if m07_runtime_source.is_file() else ""
+    watcher_runtime_source = root / "lab/affiliate-bot/cmd/bot/watcher.go"
+    watcher_runtime_text = watcher_runtime_source.read_text(encoding="utf-8") if watcher_runtime_source.is_file() else ""
     m11_fault_source = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
     m11_fault_text = m11_fault_source.read_text(encoding="utf-8") if m11_fault_source.is_file() else ""
-    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestMissionM08PolicyReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text or "recovery handoff uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-export"' not in m11_fault_text:
+    if "TestWriteNewJSONReportsVisibleArtifactWhenParentSyncIsUnconfirmed" not in artifact_text or "TestMissionM08IntentReportsUnconfirmedVisibleArtifact" not in source_text or "TestMissionM08PolicyReportsUnconfirmedVisibleArtifact" not in source_text or "TestM07CLIDisclosesUnconfirmedVisibleArtifact" not in m07_text or "TestM07CLIProposalDisclosesUnconfirmedVisibleArtifact" not in m07_text or "artifact = proposal" not in m07_runtime_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact" not in watcher_text or "TestM07HTTPAdapterReportsUnconfirmedVisibleProposal" not in watcher_text or "func m07PersistenceFailureResponse" not in watcher_runtime_text or 'response["artifact_id"] = artifactID' not in watcher_runtime_text or "recovery handoff uncertainty was not disclosed" not in m11_fault_text or '"m11-recovery-export"' not in m11_fault_text:
         fail("immutable artifact post-publish regression is missing from a real publisher, CLI, or adapter path")
     canonical_output = updates.get("RP-03-m10-canonical-output-disclosure")
     if not isinstance(canonical_output, dict):

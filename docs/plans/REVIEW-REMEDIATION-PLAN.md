@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 6a7cc7a9063727654fcb7c356f98353a318fb295 -->
+<!-- readiness-main-baseline: 8c9507e45336fd75e2ce2849e8abd0c7c6145be6 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -332,6 +332,17 @@ gọi publisher, M08 CLI, M07 adapter và reviewed M11 handoff thật: artifact/
 trace vẫn tồn tại, còn exact retry chỉ ACK bytes y hệt. Đây là báo cáo
 fail-closed về trạng thái syscall local; không chứng minh durability sau
 power-loss, transaction đa file hay filesystem đa host.
+
+**Cập nhật M07 visible artifact recovery disclosure (2026-09-15):** M07 đã
+trả `PUBLISHED_RECOVERY_REQUIRED` khi trace/proposal bất biến visible nhưng
+directory sync chưa được xác nhận, nhưng response trước đây không mang identity
+đã validate để caller đối chiếu retry. CLI và HTTP adapter nay kèm trace hoặc
+proposal deterministic chỉ trong response non-success đó;
+`execution_permitted=false` và workflow không có ACK nên không được cite/đi
+tiếp. Regression chạy cả CLI tool/proposal lẫn HTTP tool/proposal, inject fault
+sau publish, kiểm sidecar visible, identity khớp và exact retry mới
+`ACK`/`EXACT_DUPLICATE`. Đây là recovery disclosure local, không là provider,
+power-loss, transaction đa file hay multi-host proof.
 
 **Cập nhật JSONL acknowledgement boundary (2026-09-11):** canonical và derived
 JSONL append giờ chỉ thành công sau `fsync` file và parent directory. Regression
