@@ -666,7 +666,7 @@ def audit_m06_adapter_visible_append(root, matrix, plan_text):
     """Keep the workflow-facing M06 ACK-loss path distinct from a clean failure."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
     record = updates.get("RP-04-history-visible-append")
-    if not isinstance(record, dict) or "fixture-import CLI" not in record.get("scope", "") or "workflow-facing M06 adapter expose PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
+    if not isinstance(record, dict) or "fixture-import CLI" not in record.get("scope", "") or "pinned-fixture fetch CLI" not in record.get("scope", "") or "workflow-facing M06 adapter expose PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
         fail("matrix lacks scoped M06 adapter visible-append boundary")
     if "Cập nhật M06 adapter visible append uncertainty" not in plan_text:
         fail("M06 adapter visible-append boundary lacks a scoped plan marker")
@@ -677,7 +677,8 @@ def audit_m06_adapter_visible_append(root, matrix, plan_text):
     test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
     fixture_prefix, fixture_marker, fixture_and_rest = watcher.partition("func runWatcher(args []string, stdout, stderr io.Writer) int {")
     fixture, _, _ = fixture_and_rest.partition("// m06AdapterRequest carries")
-    if not fixture_marker or "if err != nil && !isPublishedAppendUncertainty(err)" not in fixture or "TestM06FixtureImportDisclosesVisibleAppendUncertainty" not in test or not handler_marker or "if err != nil && !isPublishedAppendUncertainty(err)" not in adapter or "\"canonical_history_persisted\": true, \"execution_permitted\": false" not in adapter or "TestM06AdapterDisclosesVisibleAppendUncertainty" not in test:
+    fetch = (root / "lab/affiliate-bot/cmd/bot/watcher_fetch.go").read_text(encoding="utf-8")
+    if not fixture_marker or "if err != nil && !isPublishedAppendUncertainty(err)" not in fixture or "TestM06FixtureImportDisclosesVisibleAppendUncertainty" not in test or "var watcherPinnedFetch = fetchPinnedWatcher" not in fetch or "if err != nil && !isPublishedAppendUncertainty(err)" not in fetch or "TestM06PinnedFetchDisclosesVisibleAppendUncertainty" not in test or not handler_marker or "if err != nil && !isPublishedAppendUncertainty(err)" not in adapter or "\"canonical_history_persisted\": true, \"execution_permitted\": false" not in adapter or "TestM06AdapterDisclosesVisibleAppendUncertainty" not in test:
         fail("M06 adapter visible-append regression is missing")
 
 

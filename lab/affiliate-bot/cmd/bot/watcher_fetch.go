@@ -70,6 +70,12 @@ func fetchPinnedWatcher(ctx context.Context, client *http.Client) ([]byte, error
 	return raw, nil
 }
 
+// watcherPinnedFetch is a narrow test seam around the fixed fetch source. The
+// command still supplies only the pinned client and no caller-controlled URL;
+// the seam lets the real post-fetch canonical append contract be exercised
+// without making a network request in a deterministic regression.
+var watcherPinnedFetch = fetchPinnedWatcher
+
 func runWatcherFetch(args []string, stdout, stderr io.Writer) int {
 	attempted := false
 	emit := func(status string, artifact any, err error, code int) int {
@@ -110,7 +116,7 @@ func runWatcherFetch(args []string, stdout, stderr io.Writer) int {
 	defer client.CloseIdleConnections()
 	started := time.Now().UTC().Format(time.RFC3339Nano)
 	attempted = true
-	raw, err := fetchPinnedWatcher(context.Background(), client)
+	raw, err := watcherPinnedFetch(context.Background(), client)
 	if err != nil {
 		return emit("FETCH_ERROR", nil, err, 1)
 	}
@@ -119,8 +125,15 @@ func runWatcherFetch(args []string, stdout, stderr io.Writer) int {
 		return emit("FIXTURE_ERROR", nil, err, 1)
 	}
 	status, resolved, err := appendResolvedHistory(args[1], record)
-	if err != nil {
+	if err != nil && !isPublishedAppendUncertainty(err) {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": resolved.RecordID, "state": resolved.RecordedResult.State, "source_url": watcherPinnedURL, "response_sha256": watcherPinnedHash, "fetch_started_at": started, "fetch_completed_at": time.Now().UTC().Format(time.RFC3339Nano), "evidence_kind": "synthetic", "scenario_observed_at": resolved.AsOf}, nil, 0)
+	artifact := map[string]any{"record_id": resolved.RecordID, "state": resolved.RecordedResult.State, "source_url": watcherPinnedURL, "response_sha256": watcherPinnedHash, "fetch_started_at": started, "fetch_completed_at": time.Now().UTC().Format(time.RFC3339Nano), "evidence_kind": "synthetic", "scenario_observed_at": resolved.AsOf}
+	if err != nil {
+		// The fixed synthetic response has already become canonical. Do not tell
+		// a caller that it can safely retry an unknown append; preserve the record
+		// and require an exact retry for normal acknowledgement.
+		return emit(status, artifact, err, 1)
+	}
+	return emit(status, artifact, nil, 0)
 }
