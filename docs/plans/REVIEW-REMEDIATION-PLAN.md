@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: bfd2b24dee62dceee0a92077c2ef55f878f2efed -->
+<!-- readiness-main-baseline: dc689a19ec5b5c6972ccae3ef2de1b55f54cf1e4 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -274,10 +274,11 @@ history/model/registry/tool input nào. Regression gọi CLI implementation th�
 và kiểm input bytes không đổi. Đây chỉ mở rộng inventory output của M07; các
 writer khác vẫn phải được audit riêng trước khi đổi RP-01 khỏi `PARTIAL`.
 
-**Cập nhật advisor fixture output-parent guard (2026-09-14):** `bot advisor
-fixture-run` kiểm `Lstat` output parent do caller chọn trước `MkdirTemp`; parent
-phải tồn tại, là directory và không phải symlink. Regression gọi đúng CLI với
-symlink đến thư mục ngoài, nhận `PATH_ERROR` và kiểm thư mục ngoài vẫn rỗng.
+**Cập nhật advisor fixture output-parent guard (2026-09-15):** `bot advisor
+fixture-run` kiểm `Lstat` output parent do caller chọn trước `MkdirTemp`, rồi
+kiểm lại ngay trước khi tạo bundle; parent phải tồn tại, là directory và không
+phải symlink. Regression gọi đúng CLI với symlink đến thư mục ngoài ở cả hai
+boundary, nhận `PATH_ERROR` và kiểm thư mục ngoài vẫn rỗng.
 Đây chỉ là guard trực tiếp của output parent cho bundle fixture read-only;
 ancestor-path substitution, crash/power-loss, multi-host, provider và business
 outcome vẫn nằm ngoài scope. Inventory các writer khác vẫn mở, nên RP-01 giữ

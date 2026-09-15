@@ -82,3 +82,34 @@ func TestAdvisorFixtureBundleRejectsSymlinkOutputParent(t *testing.T) {
 		t.Fatalf("fixture-run created a bundle through a rejected symlink parent: %+v", entries)
 	}
 }
+
+func TestAdvisorFixtureBundleRejectsParentSymlinkSwapBeforeCreate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions are not portable on Windows")
+	}
+	outside := t.TempDir()
+	parent := filepath.Join(t.TempDir(), "fixture-output-parent")
+	if err := os.Mkdir(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	advisorFixtureBeforeMkdirTemp = func(string) error {
+		if err := os.RemoveAll(parent); err != nil {
+			return err
+		}
+		return os.Symlink(outside, parent)
+	}
+	t.Cleanup(func() { advisorFixtureBeforeMkdirTemp = nil })
+	var output, stderr bytes.Buffer
+	if code := runAdvisor([]string{"fixture-run", parent}, &output, &stderr); code == 0 {
+		t.Fatalf("fixture-run accepted parent symlink swap: output=%s stderr=%s", output.String(), stderr.String())
+	}
+	var envelope struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &envelope); err != nil || envelope.Status != "PATH_ERROR" {
+		t.Fatalf("fixture-run did not reject swapped parent: envelope=%s err=%v", output.String(), err)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("fixture-run created bundle through swapped parent: entries=%+v err=%v", entries, err)
+	}
+}

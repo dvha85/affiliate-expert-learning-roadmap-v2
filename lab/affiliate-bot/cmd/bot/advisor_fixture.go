@@ -32,6 +32,21 @@ func writeFixtureJSON(path string, v any) error {
 	return closed
 }
 
+// advisorFixtureBeforeMkdirTemp is a test-only seam for the caller-selected
+// output-parent boundary. It is not configurable by CLI or environment.
+var advisorFixtureBeforeMkdirTemp func(parent string) error
+
+func requireAdvisorFixtureOutputParent(parent string) error {
+	info, err := os.Lstat(parent)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("fixture output parent must be an existing non-symlink directory")
+	}
+	return nil
+}
+
 // Build only in a newly-created directory. No user input or network evidence.
 func buildBR10AdvisorFixture(dir string) (advisorContext, error) {
 	price, rate := 100.0, 0.08
@@ -91,12 +106,19 @@ func runAdvisorFixture(args []string, stdout, stderr io.Writer) int {
 	// parent, which would otherwise create the offline bundle outside the
 	// location the caller named.  The fixture is intentionally disposable, but
 	// it still must not turn a symlinked output parent into an external write.
-	info, err := os.Lstat(parent)
-	if err != nil {
+	if err := requireAdvisorFixtureOutputParent(parent); err != nil {
 		return emit("PATH_ERROR", "", err, 1)
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return emit("PATH_ERROR", "", errors.New("fixture output parent must be an existing non-symlink directory"), 1)
+	if advisorFixtureBeforeMkdirTemp != nil {
+		if err := advisorFixtureBeforeMkdirTemp(parent); err != nil {
+			return emit("PATH_ERROR", "", err, 1)
+		}
+	}
+	// MkdirTemp resolves parent anew. Recheck after all pre-create work so a
+	// caller-selected directory that changed into a symlink cannot redirect the
+	// disposable bundle outside its named output boundary.
+	if err := requireAdvisorFixtureOutputParent(parent); err != nil {
+		return emit("PATH_ERROR", "", err, 1)
 	}
 	dir, err := os.MkdirTemp(parent, "br11-offline-")
 	if err != nil {
