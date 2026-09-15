@@ -357,13 +357,7 @@ type m11ManualStopJournal struct {
 }
 
 func removeM11ManualStopJournal(dir string) error {
-	if err := os.Remove(m11ManualStopJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if err := syncDirectory(dir); err != nil {
-		return err
-	}
-	return nil
+	return removeCommittedRecoveryJournal(m11ManualStopJournalPath(dir))
 }
 
 func recoverM11ManualStopJournal(dir string) error {
@@ -635,10 +629,7 @@ func recoverM10CanaryJournal(dir string) error {
 	if err := m10CanaryFault("after_state"); err != nil {
 		return err
 	}
-	if err := os.Remove(m10CanaryJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return syncDirectory(dir)
+	return removeCommittedRecoveryJournal(m10CanaryJournalPath(dir))
 }
 
 // recoverM10CostBoundJournal makes the M10 artifact envelope and its compact
@@ -706,10 +697,7 @@ func recoverM10CostBoundJournal(dir string) error {
 	if err := m10CostBoundFault("after_index"); err != nil {
 		return err
 	}
-	if err := os.Remove(m10CostBoundJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return syncDirectory(dir)
+	return removeCommittedRecoveryJournal(m10CostBoundJournalPath(dir))
 }
 
 func resolveTrustedCostBound(dir string, bound corem10.TrustedCostBound) bool {
@@ -1111,6 +1099,24 @@ func (e *visibleAppendUncertainError) Error() string {
 
 func (e *visibleAppendUncertainError) Unwrap() error { return e.err }
 
+// journalCleanupUncertainError means a transition's canonical records have
+// already been made visible, but removal of its replay journal could not be
+// acknowledged. It must not be presented as a rejected transition: the
+// operation may be complete, while a fresh process still needs to establish
+// the exact durable filesystem state before another mutation proceeds.
+//
+// This remains a local-filesystem acknowledgement boundary. It is not a
+// power-loss, atomic multi-file, or multi-host durability guarantee.
+type journalCleanupUncertainError struct {
+	err error
+}
+
+func (e *journalCleanupUncertainError) Error() string {
+	return "canonical transition is visible but recovery-journal cleanup acknowledgement is unconfirmed: " + e.err.Error()
+}
+
+func (e *journalCleanupUncertainError) Unwrap() error { return e.err }
+
 // immutableArtifactPublishUncertainError means a complete immutable command
 // artifact is already visible after Link, while the following parent-directory
 // sync could not be confirmed. It is unsafe for callers to describe this as a
@@ -1160,6 +1166,10 @@ func artifactIfAtomicPublishUncertain(artifact any, err error) any {
 	if errors.As(err, &appendUncertain) {
 		return artifact
 	}
+	var cleanupUncertain *journalCleanupUncertainError
+	if errors.As(err, &cleanupUncertain) {
+		return artifact
+	}
 	return nil
 }
 
@@ -1184,6 +1194,37 @@ func syncDirectory(dir string) error {
 		return err
 	}
 	return closeErr
+}
+
+// recoveryJournalCleanupFault is test-only. It models the narrow window after
+// Remove has made a completed journal disappear but before the parent
+// directory acknowledgement returns. It cannot be configured by a CLI caller.
+var recoveryJournalCleanupFault func(path, phase string) error
+
+func recoveryJournalCleanupWriteFault(path, phase string) error {
+	if recoveryJournalCleanupFault == nil {
+		return nil
+	}
+	return recoveryJournalCleanupFault(path, phase)
+}
+
+// removeCommittedRecoveryJournal removes a replay plan only after the caller
+// has made its exact canonical transition visible. A failed removal or parent
+// sync leaves the command at an acknowledgement boundary, never a plain
+// rejected transition. The existing journal, if still present, continues to
+// block later mutation; if Remove was already visible, the caller must expose
+// PUBLISHED_RECOVERY_REQUIRED rather than inviting a second transition.
+func removeCommittedRecoveryJournal(path string) error {
+	if err := os.Remove(path); err != nil {
+		return &journalCleanupUncertainError{err: err}
+	}
+	if err := recoveryJournalCleanupWriteFault(path, "after_remove_before_parent_sync"); err != nil {
+		return &journalCleanupUncertainError{err: err}
+	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return &journalCleanupUncertainError{err: err}
+	}
+	return nil
 }
 
 // Mission state is mutable, unlike M08 artifacts. Commit it by atomic rename
@@ -1489,19 +1530,7 @@ func validateExecutionReservation(s LearnerMissionState, authorization corem10.E
 }
 
 func removeM10ExecutionJournal(dir string) error {
-	if err := os.Remove(m10ExecutionJournalPath(dir)); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	parent, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	err = parent.Sync()
-	closeErr := parent.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return removeCommittedRecoveryJournal(m10ExecutionJournalPath(dir))
 }
 
 func recoverM10ExecutionJournal(dir string) error {
@@ -2152,6 +2181,10 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if errors.As(err, &artifactUncertain) {
 			status = "PUBLISHED_RECOVERY_REQUIRED"
 		}
+		var cleanupUncertain *journalCleanupUncertainError
+		if errors.As(err, &cleanupUncertain) {
+			status = "PUBLISHED_RECOVERY_REQUIRED"
+		}
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 		}
@@ -2442,7 +2475,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, fmt.Errorf("M10 canary journal was not published"), 1)
 		}
 		if err := recoverM10CanaryJournal(args[1]); err != nil {
-			return emit("RECOVERY_REQUIRED", nil, err, 1)
+			return emit("RECOVERY_REQUIRED", artifactIfAtomicPublishUncertain(c, err), err, 1)
 		}
 		return emit("ACK", c, nil, 0)
 	case "m10-cost-register":
@@ -2487,7 +2520,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("STORE_ERROR", nil, fmt.Errorf("M10 cost-bound journal was not published"), 1)
 		}
 		if err := recoverM10CostBoundJournal(args[1]); err != nil {
-			return emit("RECOVERY_REQUIRED", nil, err, 1)
+			return emit("RECOVERY_REQUIRED", artifactIfAtomicPublishUncertain(bound, err), err, 1)
 		}
 		return emit("APPENDED", bound, nil, 0)
 	case "m10-gate":
@@ -2708,7 +2741,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("REJECTED", nil, err, 1)
 		}
 		if err := commitM10ExecutionRecord(args[1], s, reservationIndex, authorization, record); err != nil {
-			return emit("STORE_ERROR", nil, err, 1)
+			return emit("STORE_ERROR", artifactIfAtomicPublishUncertain(record, err), err, 1)
 		}
 		// The registry record and mission reservation are canonical runtime state;
 		// the requested output is only a portable view. Bind the reservation
@@ -3156,11 +3189,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err = writeJSONAtomic(m11ManualStopJournalPath(args[1]), journal); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
-		if err = recoverM11ManualStopJournal(args[1]); err != nil {
-			return emit("RECOVERY_REQUIRED", nil, err, 1)
-		}
 		s.Stop = true
 		s.StopReason = args[2]
+		if err = recoverM11ManualStopJournal(args[1]); err != nil {
+			return emit("RECOVERY_REQUIRED", artifactIfAtomicPublishUncertain(s, err), err, 1)
+		}
 		return emit("STOPPED", s, nil, 0)
 	case "status", "m11-status":
 		if len(args) != 2 {
