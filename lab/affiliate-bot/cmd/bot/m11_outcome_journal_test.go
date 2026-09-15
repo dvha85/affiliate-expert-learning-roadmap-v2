@@ -338,6 +338,39 @@ func TestMissionM11OutcomeDisclosesPublishedJournalCleanupUncertainty(t *testing
 	}
 }
 
+func TestMissionM11OutcomeDisclosesPostRemoveCleanupUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "post-remove-m11-outcome-journal.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	m11OutcomeAppendFault = func(phase string) error {
+		if phase == "after_remove_before_parent_sync" {
+			return errors.New("injected post-remove outcome journal cleanup failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { m11OutcomeAppendFault = nil })
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+		t.Fatalf("post-remove outcome cleanup was not disclosed: code=%d response=%+v", code, response)
+	} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["outcome"] == nil || artifact["post_ledger"] == nil {
+		t.Fatalf("post-remove cleanup omitted deterministic transition: %+v", response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("post-remove outcome cleanup did not remove journal name: %v", err)
+	}
+	m11OutcomeAppendFault = nil
+	if code, response := missionCall(t, "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("post-remove exact retry did not preserve outcome: code=%d response=%+v", code, response)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("post-remove exact retry duplicated or changed outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
 func TestBackupCreateRecoversPendingM11OutcomeJournal(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
