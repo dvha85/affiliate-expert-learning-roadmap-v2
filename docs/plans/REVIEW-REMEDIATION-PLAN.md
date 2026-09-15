@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: ab4015d4c382ca8db7ece9f70964429ed7923095 -->
+<!-- readiness-main-baseline: 6a7cc7a9063727654fcb7c356f98353a318fb295 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -368,6 +368,15 @@ nhất mới trả `EXACT_DUPLICATE`. Regression dùng CLI thật và fault sau 
 kiểm record vẫn replay được rồi retry ACK. Đây là boundary một JSONL local,
 không là provider/n8n operated run, fsync/power-loss, transaction đa file hay
 multi-host safety.
+
+**Cập nhật M06 pinned-fetch visible append uncertainty (2026-09-15):** CLI
+`fetch-fixture` gọi fixed pinned synthetic source nhưng cũng từng che ACK loss
+sau append dưới `HANDOFF_ERROR`. Lệnh nay trả
+`PUBLISHED_RECOVERY_REQUIRED`, giữ artifact đã resolve là `persisted=true`, và
+chỉ exact retry trả `EXACT_DUPLICATE`. Regression gọi command thật; fetch seam
+chỉ thay request mạng trong test, không mở URL/configuration mới, rồi inject lỗi
+sau append. Đây là boundary JSONL local; không là external fetch/provider
+operation, fsync/power-loss, transaction đa file hay multi-host safety.
 
 **Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
 chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`

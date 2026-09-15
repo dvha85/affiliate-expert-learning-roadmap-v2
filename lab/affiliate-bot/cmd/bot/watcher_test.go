@@ -461,6 +461,49 @@ func TestM06FixtureImportDisclosesVisibleAppendUncertainty(t *testing.T) {
 	}
 }
 
+func TestM06PinnedFetchDisclosesVisibleAppendUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	fixtureRaw, err := json.Marshal(watchFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	watcherPinnedFetch = func(_ context.Context, _ *http.Client) ([]byte, error) {
+		return fixtureRaw, nil
+	}
+	t.Cleanup(func() { watcherPinnedFetch = fetchPinnedWatcher })
+	canonicalHistoryAppend = func(_ store.History, path string, candidate HistoryRecord) (string, error) {
+		if status, err := appendHistoryWith(store.JSONL{}, path, candidate); err != nil || status != appendAdded {
+			return status, err
+		}
+		return appendPublished, &publishedAppendUncertainty{cause: errors.New("injected pinned-fetch acknowledgement loss after history append")}
+	}
+	t.Cleanup(func() { canonicalHistoryAppend = appendHistoryWith })
+	var stdout, stderr bytes.Buffer
+	if code := runWatcherFetch([]string{"fetch-fixture", history}, &stdout, &stderr); code == 0 {
+		t.Fatalf("visible append uncertainty returned success: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope["status"] != appendPublished || envelope["persisted"] != true || envelope["artifact"] == nil || envelope["network_fetch_attempted"] != true {
+		t.Fatalf("pinned fetch hid visible append uncertainty: %+v", envelope)
+	}
+	if records, err := LoadHistory(history); err != nil || len(records) != 1 {
+		t.Fatalf("pinned fetch visible record was not canonical: records=%+v err=%v", records, err)
+	}
+	canonicalHistoryAppend = appendHistoryWith
+	stdout.Reset()
+	stderr.Reset()
+	if code := runWatcherFetch([]string{"fetch-fixture", history}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exact retry failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate || envelope["persisted"] != true {
+		t.Fatalf("pinned fetch exact retry did not acknowledge canonical record: %+v err=%v", envelope, err)
+	}
+}
+
 func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	dir := t.TempDir()
 	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
