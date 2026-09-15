@@ -1036,6 +1036,10 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 			if result.code == 0 {
 				t.Fatalf("rejected contender %s returned success: %+v", result.id, response)
 			}
+		case "REJECTED":
+			if result.code == 0 || !strings.Contains(result.stderr, "execution authorization already has a reservation") {
+				t.Fatalf("contender %s returned an unexpected rejection: response=%+v stderr=%s command error=%v", result.id, response, result.stderr, result.err)
+			}
 		default:
 			t.Fatalf("contender %s returned unexpected status %q: response=%+v stderr=%s command error=%v", result.id, status, response, result.stderr, result.err)
 		}
