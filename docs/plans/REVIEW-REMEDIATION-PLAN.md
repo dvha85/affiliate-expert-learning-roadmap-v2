@@ -1593,7 +1593,8 @@ rồi dùng barrier test-owned để giải phóng đồng thời 24 process ch�
 đã build riêng vào `m10-reserve-authorization`. Chính binary vận hành đọc wall
 clock thông thường; barrier chỉ nằm trong test wrapper, không phải override
 runtime hay authority. Đúng một lệnh trả `RESERVED`; mọi process khác trả
-`BUSY` hoặc `BUDGET_DENIED`. Sau đó loader kiểm `ExecutionsUsed=1`,
+`BUSY`, `BUDGET_DENIED` hoặc `REJECTED` với lý do authorization đã có
+reservation. Sau đó loader kiểm `ExecutionsUsed=1`,
 `CostUsedMinor=1` và đúng một governed reservation, rồi một process Bot mới
 chạy `status` để replay state đã persist. Điều này thay claim cũ sai rằng smoke
 BR-16a đã có test 24 process. Nó chứng minh lock cục bộ/cap accounting, không
