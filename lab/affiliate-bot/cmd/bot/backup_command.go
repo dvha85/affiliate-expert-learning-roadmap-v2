@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -186,13 +187,14 @@ func writeBackupStagingFile(root, path string, data []byte) error {
 func acquireBackupTargetGate(target string) (func(), error) {
 	identity := sha256.Sum256([]byte(filepath.Clean(target)))
 	path := filepath.Join(filepath.Dir(target), ".backup-target-"+hex.EncodeToString(identity[:16])+".lock")
-	if err := os.Mkdir(path, 0700); err != nil {
-		if os.IsExist(err) {
-			return nil, fmt.Errorf("backup target is busy or has an unrecovered publisher")
+	release, err := acquireManagedPathLock(path)
+	if err != nil {
+		if errors.Is(err, errManagedPathLockBusy) {
+			return nil, fmt.Errorf("backup target is busy or has an active publisher")
 		}
 		return nil, err
 	}
-	return func() { _ = os.Remove(path) }, nil
+	return release, nil
 }
 
 // restoreTargetGate serializes managed restores to one destination. Rename(2)
@@ -201,13 +203,14 @@ func acquireBackupTargetGate(target string) (func(), error) {
 func acquireRestoreTargetGate(target string) (func(), error) {
 	identity := sha256.Sum256([]byte(filepath.Clean(target)))
 	path := filepath.Join(filepath.Dir(target), ".restore-target-"+hex.EncodeToString(identity[:16])+".lock")
-	if err := os.Mkdir(path, 0700); err != nil {
-		if os.IsExist(err) {
-			return nil, fmt.Errorf("restore target is busy or has an unrecovered publisher")
+	release, err := acquireManagedPathLock(path)
+	if err != nil {
+		if errors.Is(err, errManagedPathLockBusy) {
+			return nil, fmt.Errorf("restore target is busy or has an active publisher")
 		}
 		return nil, err
 	}
-	return func() { _ = os.Remove(path) }, nil
+	return release, nil
 }
 
 // ensureOutputParentBeforeCreate rejects a symlink in the missing portion of a
@@ -589,6 +592,9 @@ func backupFiles(source string) ([]string, error) {
 			if entry.Name() == ".mission.lock" {
 				return fmt.Errorf("runtime has an active writer lock")
 			}
+			return nil
+		}
+		if entry.Name() == runtimeGateName && filepath.Dir(path) == source {
 			return nil
 		}
 		if !entry.Type().IsRegular() {

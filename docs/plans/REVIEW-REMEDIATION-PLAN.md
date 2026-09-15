@@ -2329,6 +2329,13 @@ không đóng provider, live executor, business outcome, clean-machine pilot,
 target-host deployment, multi-host hoặc crash/power-loss. Record:
 `docs/architecture/EVIDENCE-LOCAL-FULL-REGRESSION-20260916-C56CF95.md`.
 
+**Cập nhật local backup/restore process-exit lock (2026-09-16):** regression
+chạy learner Bot thật trong process con, buộc process thoát khi output còn ở
+staging. POSIX advisory lock tự nhả khi process kết thúc; backup/restore retry
+được và target dở dang không xuất hiện. Đây chỉ là một seam local trước
+publish, không chứng minh power-loss, atomic multi-file, Windows native lock,
+multi-host hay dọn staging mồ côi; readiness vẫn `NOT_READY_FOR_PRODUCTION`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
