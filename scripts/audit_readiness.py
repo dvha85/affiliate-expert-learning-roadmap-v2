@@ -612,6 +612,38 @@ def audit_local_recovery_drill(root, matrix, plan_text):
         fail("local recovery drill evidence graph claim is missing")
 
 
+def audit_assisted_fresh_workspace(root, matrix, plan_text):
+    """Require assisted reruns to remain distinct from an independent pilot."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-10-br16b-assisted-fresh-workspace")
+    required_scope = (
+        "fresh local workspace",
+        "assisted automated verification",
+        "not a clean-machine self-service pilot PASS",
+        "RP-10 remains OPEN",
+    )
+    if not isinstance(record, dict) or any(marker not in record.get("scope", "") for marker in required_scope):
+        fail("assisted fresh-workspace record lacks its pilot boundary")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/main.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "scripts/smoke_quickstart.py",
+        "scripts/smoke_br16a_offline.py",
+        "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("assisted fresh-workspace record lacks durable implementation/evidence refs")
+    evidence_path = root / "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    if "BR-16b — assisted fresh-workspace verification" not in evidence or "QUICKSTART SMOKE PASS" not in evidence or "human pilot `INCOMPLETE`" not in evidence:
+        fail("assisted fresh-workspace evidence is missing its result or pilot boundary")
+    graph_text = (root / "docs/plans/READINESS-EVIDENCE-GRAPH.json").read_text(encoding="utf-8")
+    if "BR-16a-operated-assisted-fresh-workspace" not in graph_text:
+        fail("assisted fresh-workspace evidence graph claim is missing")
+
+
 def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     """Keep the checked-in engine evidence tied to the Node major n8n needs."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1046,6 +1078,7 @@ def audit(root):
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
+    audit_assisted_fresh_workspace(root, matrix, plan_text)
     audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():
         if not (root / script).is_file():

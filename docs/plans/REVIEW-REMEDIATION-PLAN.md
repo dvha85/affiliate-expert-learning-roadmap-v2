@@ -2015,6 +2015,18 @@ target host, power-loss/multi-host/24/7 hoặc business/provider evidence, nên
 BR-18b vẫn `PARTIAL`, RP-10 vẫn `OPEN` và readiness giữ
 `NOT_READY_FOR_PRODUCTION`.
 
+**BR-16b assisted fresh-workspace verification (2026-09-15):** chạy
+`smoke_quickstart.py` trên clone cô lập với cache rỗng và
+`smoke_br16a_offline.py` trên workspace mới
+`/tmp/br16b-assisted-pilot.zcjhwp`. Quickstart đã thực hiện intentional
+FAIL/fix; chuỗi M00–M11 trả `BR-16a PASS`, replay `MATCH`, EC-01…EC-05 PASS,
+`stop=true`, `stop_reason=RECONCILIATION_REQUIRED` và
+`recovery_admission_execution_permitted=false`. Bản ghi chi tiết nằm tại
+`docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md`.
+Đây là automation/maintainer-assisted verification, không phải clean-machine
+self-service pilot PASS; pilot độc lập, target deployment và external outcome
+vẫn mở, nên BR-16a/RP-10 và overall readiness không được nâng trạng thái.
+
 **M06 selected-source engine CI (2026-09-13):** cùng runner disposable import
 blueprint M06 ACCESSTRADE Shopee Smartlink ở dạng inactive/manual, thay trigger
 chỉ trong bản copy test và truyền metadata fixture đã làm sạch. Nó phải append
