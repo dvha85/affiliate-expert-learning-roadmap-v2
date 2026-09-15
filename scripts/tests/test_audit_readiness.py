@@ -114,6 +114,13 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(prefix + marker + suffix.replace("if err != nil && !isPublishedAppendUncertainty(err)", "if err != nil", 1), encoding="utf-8")
         self.assertIn("M06 adapter visible-append regression is missing", self.run_audit(False))
 
+    def test_missing_m06_fixture_import_visible_append_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/watcher.go"
+        prefix, marker, suffix = source.read_text(encoding="utf-8").partition("func runWatcher(args []string, stdout, stderr io.Writer) int {")
+        fixture, delimiter, rest = suffix.partition("// m06AdapterRequest carries")
+        source.write_text(prefix + marker + fixture.replace("if err != nil && !isPublishedAppendUncertainty(err)", "if err != nil", 1) + delimiter + rest, encoding="utf-8")
+        self.assertIn("M06 adapter visible-append regression is missing", self.run_audit(False))
+
     def test_missing_advisor_fixture_output_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
         source.write_text(source.read_text(encoding="utf-8").replace("fixture output parent must be an existing non-symlink directory", "fixture output parent guard removed", 1), encoding="utf-8")

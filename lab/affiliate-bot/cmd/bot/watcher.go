@@ -143,10 +143,17 @@ func runWatcher(args []string, stdout, stderr io.Writer) int {
 		return emit("FIXTURE_ERROR", nil, err, 1)
 	}
 	status, resolved, err := appendResolvedHistory(args[1], record)
-	if err != nil {
+	if err != nil && !isPublishedAppendUncertainty(err) {
 		return emit("HANDOFF_ERROR", nil, err, 1)
 	}
-	return emit(status, map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "observation_ids": resolved.RecordedResult.EvidenceIDs}, nil, 0)
+	artifact := map[string]any{"record_id": resolved.RecordID, "decision_id": resolved.RecordedResult.DecisionID, "state": resolved.RecordedResult.State, "observation_ids": resolved.RecordedResult.EvidenceIDs}
+	if err != nil {
+		// A record that canonical-reloads after an append error is not safe to
+		// treat as an unpersisted handoff. Preserve the resolved record and make
+		// the caller perform an exact retry for a normal acknowledgement.
+		return emit(status, artifact, err, 1)
+	}
+	return emit(status, artifact, nil, 0)
 }
 
 // m06AdapterRequest carries exactly one governed M06 profile input. The
