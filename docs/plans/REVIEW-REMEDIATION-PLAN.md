@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: d05b5c5b5fd32ed7339d84f7db104ccbbb4ec884 -->
+<!-- readiness-main-baseline: f2c01a18ec2b05fbc251f23a103610efb288fbe8 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -24,6 +24,15 @@ chưa có bằng chứng.
 - Cơ sở: [sổ phát hiện và bằng chứng baseline](evidence/REVIEW-ECE6A32.md).
 - Liên kết kế hoạch gốc: [BR-2026-09](BEGINNER-READINESS-PLAN.md); trạng thái tích hợp BR: [readiness matrix](READINESS-MATRIX.json).
 - Người lập kế hoạch: Codex theo yêu cầu chủ repo. Người triển khai/reviewer từng đợt: chưa phân công; điền khi nhận việc. Không mặc định chủ repo đã nghiệm thu kế hoạch hoặc cho phép live operation.
+
+**Cập nhật shared M11 historical-chain validator (2026-09-16):** `m11-chain-check`
+giữ strict decode tại mission boundary nhưng chuyển toàn bộ kiểm tra liên kết
+closed-cycle/resolved-stop, EffectRef machine execution, scope, time, health,
+ledger/replay/budget, STOP transition và review sang `core/m11`. Adapter
+canonical closed-cycle cũng dùng `core/m11.ValidateClosedCycle`; regression âm
+tính hiện tại chạy đúng implementation dùng bởi harness. Đây là bằng chứng
+offline/read-only, không chứng minh provider, live executor, business outcome,
+crash/power-loss, distributed lock hay production readiness.
 
 Cập nhật sau review PR #94: bổ sung dependency RP-05 cho RP-06, tách nghiệm thu
 restore M00–M10 khỏi phần mở rộng M11 bắt buộc ở RP-07a, và giao rõ việc tạo/lưu/
