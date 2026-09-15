@@ -818,6 +818,29 @@ def audit_m06_adapter_visible_append(root, matrix, plan_text):
         fail("M06 adapter visible-append regression is missing")
 
 
+def audit_backup_target_absence_guard(root, matrix, plan_text):
+    """Keep backup publish from deleting an empty caller-owned target."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-06-backup-target-absence-guard")
+    if not isinstance(record, dict) or "not already exist" not in record.get("scope", "") or "appears while staging" not in record.get("scope", ""):
+        fail("matrix lacks scoped backup target-absence guard")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("test_refs", [])):
+        fail("backup target-absence record lacks CLI and audit regressions")
+    if "Cập nhật backup target-absence guard" not in plan_text:
+        fail("backup target-absence guard lacks a scoped plan marker")
+    source_path = root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    if source.count("backup target must not already exist") < 2 or "backup target appeared while staging" not in source or "os.Remove(args[2])" in source or "TestBackupRejectsPreexistingOrAppearedTargetWithoutMutation" not in test or "backup mutated target that appeared while staging" not in test:
+        fail("backup target-absence guard regression is missing from the real CLI path")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -869,6 +892,7 @@ def audit(root):
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_adapter_visible_append(root, matrix, plan_text)
+    audit_backup_target_absence_guard(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

@@ -166,6 +166,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("func ensureOutputParentBeforeCreate", "func removedOutputParentPreflight", 1), encoding="utf-8")
         self.assertIn("backup/restore missing-parent regression is missing", self.run_audit(False))
 
+    def test_missing_backup_target_absence_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("backup target appeared while staging", "backup target appearance ignored", 1), encoding="utf-8")
+        self.assertIn("backup target-absence guard regression is missing", self.run_audit(False))
+
     def test_missing_immutable_artifact_missing_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := ensureOutputParentBeforeCreate(dir);", "func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := removedOutputParentPreflight(dir);", 1), encoding="utf-8")
@@ -184,7 +189,7 @@ class ReadinessAuditTests(unittest.TestCase):
     def test_missing_backup_source_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_backup_source_guard.py", "python scripts/removed.py"), encoding="utf-8")
-        self.assertIn("unresolved CI evidence", self.run_audit(False))
+        self.assertIn("required regression is not wired", self.run_audit(False))
 
     def test_missing_runtime_store_path_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
