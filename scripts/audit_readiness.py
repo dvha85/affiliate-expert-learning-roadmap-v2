@@ -888,6 +888,37 @@ def audit_advisor_fixture_parent_recheck(root, matrix, plan_text):
         fail("advisor fixture parent-recheck regression is missing from the real CLI path")
 
 
+def audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text):
+    """Ensure failed disposable advisor bundles do not remain visible."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-advisor-fixture-failed-staging-cleanup")
+    if not isinstance(record, dict) or "build/evaluate/write/sync failure" not in record.get("scope", ""):
+        fail("matrix lacks scoped advisor fixture failed-staging cleanup")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("test_refs", [])):
+        fail("advisor fixture failed-staging record lacks CLI and audit regressions")
+    if "Cập nhật advisor fixture failed-staging cleanup" not in plan_text:
+        fail("advisor fixture failed-staging cleanup lacks a scoped plan marker")
+    source_path = root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_source = (
+        "var advisorFixtureBuild = buildBR10AdvisorFixture",
+        "c, err := advisorFixtureBuild(dir)",
+        "published := false",
+        "if !published {",
+        "_ = os.RemoveAll(dir)",
+        "published = true",
+    )
+    if any(marker not in source for marker in required_source) or "TestAdvisorFixtureBundleCleansFailedStaging" not in test or "parent still contains failed bundle staging" not in test:
+        fail("advisor fixture failed-staging cleanup regression is missing from the real CLI path")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -942,6 +973,7 @@ def audit(root):
     audit_backup_target_absence_guard(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_parent_recheck(root, matrix, plan_text)
+    audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

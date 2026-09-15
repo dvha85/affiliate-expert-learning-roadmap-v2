@@ -36,6 +36,10 @@ func writeFixtureJSON(path string, v any) error {
 // output-parent boundary. It is not configurable by CLI or environment.
 var advisorFixtureBeforeMkdirTemp func(parent string) error
 
+// advisorFixtureBuild is a test-only seam for failures after the staging
+// directory is created. The production path still uses the canonical builder.
+var advisorFixtureBuild = buildBR10AdvisorFixture
+
 func requireAdvisorFixtureOutputParent(parent string) error {
 	info, err := os.Lstat(parent)
 	if err != nil {
@@ -124,7 +128,13 @@ func runAdvisorFixture(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("IO_ERROR", "", err, 1)
 	}
-	c, err := buildBR10AdvisorFixture(dir)
+	published := false
+	defer func() {
+		if !published {
+			_ = os.RemoveAll(dir)
+		}
+	}()
+	c, err := advisorFixtureBuild(dir)
 	if err != nil {
 		return emit("FIXTURE_ERROR", dir, err, 1)
 	}
@@ -141,5 +151,6 @@ func runAdvisorFixture(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("IO_ERROR", dir, err, 1)
 	}
+	published = true
 	return emit(status, dir, nil, 0)
 }
