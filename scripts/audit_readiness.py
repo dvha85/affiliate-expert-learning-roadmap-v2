@@ -568,7 +568,7 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
     """Keep parallel CI execution from dropping a mandatory regression shard."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
     record = updates.get("RP-08-deterministic-runtime-sharding")
-    if not isinstance(record, dict) or "four required parallel jobs" not in record.get("scope", ""):
+    if not isinstance(record, dict) or "six required parallel jobs" not in record.get("scope", ""):
         fail("matrix lacks scoped deterministic CI sharding acceptance")
     if "Cập nhật deterministic CI sharding và Go cache" not in plan_text:
         fail("deterministic CI sharding lacks a scoped plan marker")
@@ -576,12 +576,16 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
     workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
     required_jobs = (
         "\n  deterministic-runtime:\n",
+        "\n  learner-bot-tests-shard-0:\n",
+        "\n  learner-bot-tests-shard-1:\n",
         "\n  learner-bot-race:\n",
         "\n  deterministic-quickstart:\n",
         "\n  deterministic-smokes-and-mutations:\n",
     )
     required = (
         "Learner Bot race regression",
+        "run_learner_bot_test_shard.py --shard-index 0 --shard-count 2",
+        "run_learner_bot_test_shard.py --shard-index 1 --shard-count 2",
         "Beginner quickstart isolated-clone smoke",
         "BR-16a shared M00-M11 learner chain",
         "RP-08 M11 canonical identity mutation proof",

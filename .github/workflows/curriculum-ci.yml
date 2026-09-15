@@ -53,9 +53,9 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - name: Go test including executable M01 and M02 eval packs
+      - name: Learner Bot internal packages
         working-directory: lab/affiliate-bot
-        run: go test ./...
+        run: go test ./internal/...
       - name: Embedded canonical schema tests
         working-directory: contracts
         run: |
@@ -75,6 +75,48 @@ jobs:
           go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
           go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
           go run ./cmd/bot history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'
+
+  learner-bot-tests-shard-0:
+    name: learner-bot-tests-shard-0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify deterministic learner Bot shard helper
+        run: python -m unittest scripts.tests.test_run_learner_bot_test_shard -v
+      - name: Learner Bot top-level tests, deterministic shard 0
+        run: python scripts/run_learner_bot_test_shard.py --shard-index 0 --shard-count 2
+
+  learner-bot-tests-shard-1:
+    name: learner-bot-tests-shard-1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify deterministic learner Bot shard helper
+        run: python -m unittest scripts.tests.test_run_learner_bot_test_shard -v
+      - name: Learner Bot top-level tests, deterministic shard 1
+        run: python scripts/run_learner_bot_test_shard.py --shard-index 1 --shard-count 2
 
   learner-bot-race:
     name: learner-bot-race
