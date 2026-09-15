@@ -107,6 +107,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace('m11JournalCleanupWriteFault("unknown_after_remove_before_parent_sync")', 'm11JournalCleanupWriteFault("removed_after_remove")', 1), encoding="utf-8")
         self.assertIn("M11 post-remove journal-cleanup acknowledgement regression is missing", self.run_audit(False))
 
+    def test_missing_m10_canary_cost_journal_path_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func readM10CostBoundJournal", "func removedM10CostBoundJournal", 1), encoding="utf-8")
+        self.assertIn("M10 canary/cost journal path-guard regression is missing", self.run_audit(False))
+
     def test_missing_m11_recovery_admission_approval_guard_is_rejected(self):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("approval, approvalOK := approvals[x.NewApprovalID]", "approval guard removed", 1), encoding="utf-8")

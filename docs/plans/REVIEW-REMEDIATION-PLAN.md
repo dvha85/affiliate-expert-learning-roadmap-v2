@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 756eab10e506a0a1a7ae14d10bd328f9a7b967f2 -->
+<!-- readiness-main-baseline: 015401c4b6cabab0ace02849e8bdffd2672f47cb -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -42,6 +42,13 @@ M11 outcome, FAILED execution và UNKNOWN→STOP đều có regression fault sau
 đã absent và exact retry không thêm outcome/execution hoặc thay STOP. Đây vẫn
 chỉ là test seam local sau `Remove`, không chứng minh durability khi mất điện,
 atomic transaction đa file, executor, business outcome hay multi-host.
+
+**Cập nhật M10 canary/cost journal path guards (2026-09-15):** trên
+Linux/macOS, từng canary và cost-bound recovery journal bị thay bằng FIFO phải
+bị prelude/status/reader thật chặn trước đọc. Cùng test stable reader mở rộng
+đến execution, canary, cost-bound và M11 journal: thay symlink cùng bytes sau
+open đều bị reject. Đây là proof local path identity cho ba M10 replay plan,
+không bao phủ Windows FIFO, crash/power-loss, atomic multi-file hay multi-host.
 
 ## 1. Mục tiêu và giới hạn
 
