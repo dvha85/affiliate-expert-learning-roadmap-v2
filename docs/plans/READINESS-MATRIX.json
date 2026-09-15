@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-15",
-  "main_baseline": "6ce54c1c0b25586c1b1a05c5da8d0a08ea32d527",
+  "main_baseline": "d048d8df75af41d48087430b9bde737e5eec0a1f",
   "overall": "NOT_READY_FOR_PRODUCTION",
   "recent_updates": [
 	{"id":"RP-01-advisor-fixture-failed-staging-cleanup","status":"PARTIAL","implementation_refs":["lab/affiliate-bot/cmd/bot/advisor_fixture.go"],"test_refs":["lab/affiliate-bot/cmd/bot/advisor_fixture_test.go","scripts/audit_readiness.py","scripts/tests/test_audit_readiness.py"],"scope":"advisor fixture-run removes its newly-created bundle staging directory on build/evaluate/write/sync failure and retains a directory only after a complete synced bundle; the real CLI regression injects build failure, verifies the reported bundle path and parent are absent, and keeps execution_permitted=false. This bounded local cleanup guard excludes crash/power-loss durability, multi-host filesystems, provider operation and business outcomes"},
