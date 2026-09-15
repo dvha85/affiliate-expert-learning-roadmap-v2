@@ -372,6 +372,18 @@ func encodeAccesstradeOutcomes(candidates []m03.OutcomeRecord) ([][]byte, error)
 	return encodedRecords, nil
 }
 
+// accesstradeJournalCleanupFault is test-only. No command argument or
+// environment setting can make an operator report a successful cleanup as an
+// ambiguous acknowledgement boundary.
+var accesstradeJournalCleanupFault func(phase string) error
+
+func accesstradeJournalCleanupFailure(phase string) error {
+	if accesstradeJournalCleanupFault == nil {
+		return nil
+	}
+	return accesstradeJournalCleanupFault(phase)
+}
+
 // removeAccesstradeJournal treats removal as another visible name boundary.
 // Once the receipt/outcomes are complete, an unsuccessful parent sync must not
 // be reported as an ordinary failed recovery: the caller gets the exact
@@ -383,6 +395,9 @@ func removeAccesstradeJournal(outcomesPath string) error {
 			return &atomicPublishUncertainError{err: err}
 		}
 		return err
+	}
+	if err := accesstradeJournalCleanupFailure("after_remove_before_parent_sync"); err != nil {
+		return &atomicPublishUncertainError{err: err}
 	}
 	if err := syncDirectory(filepath.Dir(path)); err != nil {
 		return &atomicPublishUncertainError{err: err}

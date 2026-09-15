@@ -607,7 +607,7 @@ def audit_accesstrade_pending_import_recovery(root, matrix, plan_text):
     """Keep the multi-file ACCESSTRADE sidecar from becoming a manual delete path."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
     record = updates.get("RP-01-accesstrade-pending-import-recovery")
-    if not isinstance(record, dict) or "only the exact local CSV/manifest snapshot" not in record.get("scope", "") or "PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", ""):
+    if not isinstance(record, dict) or "only the exact local CSV/manifest snapshot" not in record.get("scope", "") or "PUBLISHED_RECOVERY_REQUIRED" not in record.get("scope", "") or "removal is visible before parent sync" not in record.get("scope", ""):
         fail("matrix lacks scoped ACCESSTRADE pending-import recovery acceptance")
     if "Cập nhật ACCESSTRADE pending import recovery" not in plan_text:
         fail("ACCESSTRADE pending-import recovery lacks a scoped plan marker")
@@ -622,8 +622,9 @@ def audit_accesstrade_pending_import_recovery(root, matrix, plan_text):
         "validateAccesstradeReceiptGraph(finalReceipts, finalOutcomes, args[3])",
         "removeAccesstradeJournal(args[3])",
         'emit("PUBLISHED_RECOVERY_REQUIRED", map[string]any{"outcomes": candidates, "receipt": receipt}',
+        "accesstradeJournalCleanupFailure(\"after_remove_before_parent_sync\")",
     )
-    if not all(token in source_text for token in required) or "TestAccesstradeImporterRecoveryReplaysOnlyExactPendingSnapshot" not in test_text or "changed report and partial outcomes fail closed" not in test_text:
+    if not all(token in source_text for token in required) or "TestAccesstradeImporterRecoveryReplaysOnlyExactPendingSnapshot" not in test_text or "TestAccesstradeImporterDisclosesVisibleJournalCleanupUncertainty" not in test_text or "changed report and partial outcomes fail closed" not in test_text:
         fail("ACCESSTRADE pending-import recovery regression is missing from learner path")
 
 
