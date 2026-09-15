@@ -1987,6 +1987,22 @@ reject phải dừng ở adapter trước ACK/report và không được thay đ
 changed event mới phải persist record riêng và replay `MATCH`. Phạm vi vẫn là
 fixture synthetic; selected-source profile không được suy ra là đã nghiệm thu.
 
+**M06 selected-source operated run (2026-09-15):** phiên vận hành đã quan sát
+campaign Shopee Smartlink trên ACCESSTRADE ở chế độ read-only, lọc thành
+sanitized capture theo profile cố định và tính SHA-256 ảnh trang giữ riêng.
+Learner Bot thật import capture vào history mới với `APPENDED`,
+`GET_MORE_DATA`, `execution_permitted=false`, không fetch/network/link và
+`history replay=MATCH`. Cùng capture được đưa qua bản copy inactive của
+blueprint M06 trong n8n local `2.38.1`, gọi adapter loopback thật; execution
+`success`, `APPENDED`, canonical history ACK/persisted đều `true`, sau đó replay
+vẫn `MATCH`. Bản ghi chi tiết nằm tại
+`docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md`.
+Runtime vẫn gắn `evidence_kind=synthetic`, thiếu `price`/`commission_rate`, và
+không suy ra business outcome. Đây là local operated evidence, chưa phải
+independent review/deployment evidence; approval campaign, provider diversity,
+Smartlink, live executor, payout, pilot máy sạch và recovery host thật vẫn mở,
+nên BR-13/14 và overall readiness giữ `PARTIAL`/`NOT_READY_FOR_PRODUCTION`.
+
 **M06 selected-source engine CI (2026-09-13):** cùng runner disposable import
 blueprint M06 ACCESSTRADE Shopee Smartlink ở dạng inactive/manual, thay trigger
 chỉ trong bản copy test và truyền metadata fixture đã làm sạch. Nó phải append
