@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 	"io"
 	"os"
@@ -19,19 +18,16 @@ func DecodeM09Approval(raw []byte) (ApprovalRecord, string) {
 	return ApprovalRecord(a), missionValid
 }
 func DecodeM09Authorization(raw []byte) (ExecutionAuthorization, string) {
-	var a ExecutionAuthorization
-	if contracts.ValidateRaw("execution-authorization.schema.json", raw) != nil || contracts.DecodeStrict(raw, &a) != nil {
-		return ExecutionAuthorization{}, "INVALID_SCHEMA"
-	}
-	if a.ExecutionMode != "APPROVED_LIVE" {
-		return ExecutionAuthorization{}, "INVALID_PROFILE"
+	a, status := corem09.DecodeAuthorization(raw)
+	if status != corem09.Valid {
+		return ExecutionAuthorization{}, status
 	}
 	return a, missionValid
 }
 func DecodeM09Execution(raw []byte) (ExecutionRecord, string) {
-	var r ExecutionRecord
-	if contracts.ValidateRaw("execution-record.schema.json", raw) != nil || contracts.DecodeStrict(raw, &r) != nil {
-		return ExecutionRecord{}, "INVALID_SCHEMA"
+	r, status := corem09.DecodeExecution(raw)
+	if status != corem09.Valid {
+		return ExecutionRecord{}, status
 	}
 	return r, missionValid
 }

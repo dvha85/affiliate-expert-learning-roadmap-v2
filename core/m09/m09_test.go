@@ -68,3 +68,63 @@ func TestDecodeApprovalRejectsDuplicateAndUnknownFields(t *testing.T) {
 		t.Fatalf("unknown approval field: %s", status)
 	}
 }
+
+func TestDecodeAuthorizationUsesM09Profile(t *testing.T) {
+	raw, err := json.Marshal(ExecutionAuthorization{
+		AuthorizationID: "auth-1", IntentID: "intent-1", IntentHash: "sha256:" + strings.Repeat("a", 64),
+		PolicyVersion: "policy-1", ApprovalID: "approval-1", ExecutorID: "fixture-executor",
+		AuthorizedAt: "2026-09-07T01:45:00Z", ExpiresAt: "2026-09-07T02:30:00Z",
+		IdempotencyKey: "idem-1", CorrelationID: "corr-1", ExecutionMode: "APPROVED_LIVE", ExecutionAuthorized: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeAuthorization(raw); status != Valid {
+		t.Fatalf("valid M09 authorization: %s", status)
+	}
+
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	fields["execution_mode"] = "GOVERNED_CANARY"
+	canaryRaw, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeAuthorization(canaryRaw); status != InvalidSchema {
+		t.Fatalf("incomplete canary authorization: %s", status)
+	}
+	fields["execution_mode"] = "APPROVED_LIVE"
+	fields["unexpected"] = true
+	unknownRaw, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeAuthorization(unknownRaw); status != InvalidSchema {
+		t.Fatalf("unknown authorization field: %s", status)
+	}
+}
+
+func TestDecodeExecutionRejectsSchemaAmbiguity(t *testing.T) {
+	raw, err := json.Marshal(ExecutionRecord{
+		ExecutionID: "exec-1", AuthorizationID: "auth-1", ApprovalID: "approval-1", IntentID: "intent-1",
+		IntentHash: "sha256:" + strings.Repeat("a", 64), ExecutorID: "fixture-executor", IdempotencyKey: "idem-1",
+		AttemptedAt: "2026-09-07T01:50:00Z", Status: "CANCELLED", SideEffectState: "NOT_PERFORMED",
+		Error: "fixture cancellation", CorrelationID: "corr-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeExecution(raw); status != Valid {
+		t.Fatalf("valid M09 execution: %s", status)
+	}
+	duplicated := strings.Replace(string(raw), `"execution_id":"exec-1"`, `"execution_id":"exec-1","execution_id":"other"`, 1)
+	if _, status := DecodeExecution([]byte(duplicated)); status != InvalidSchema {
+		t.Fatalf("duplicate execution_id: %s", status)
+	}
+	badSucceeded := strings.Replace(string(raw), `"status":"CANCELLED"`, `"status":"SUCCEEDED"`, 1)
+	if _, status := DecodeExecution([]byte(badSucceeded)); status != InvalidSchema {
+		t.Fatalf("succeeded without performed side effect: %s", status)
+	}
+}

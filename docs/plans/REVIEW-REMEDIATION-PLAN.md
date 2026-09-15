@@ -666,8 +666,16 @@ one-time approval, link và timeline. Learner dùng boundary đó cả khi appen
 approval lẫn khi reload/revalidate authority; harness M09 dùng cùng decoder và
 validator trước authorization. Regression chứng minh duplicate-key approval
 không ghi state, và persisted policy bị đổi sang `DENY` không thể reserve sau
-reload. M09 authorization/execution contract rộng hơn, migration, executor
-thật và multi-file crash proof vẫn mở.
+reload.
+
+**Cập nhật shared M09 authorization/execution decoders (2026-09-16):**
+`core/m09` hiện owns strict decoding cho cả `APPROVED_LIVE`
+`execution-authorization` và M09 `execution-record`, bao gồm unknown/duplicate
+field rejection, profile check và schema constraints. Harness `m09-check` và
+state restore dùng các decoder này qua compatibility aliases thay vì tự định
+nghĩa lại struct/parser. Đây chỉ là contract/conformance reuse; chain links,
+migration, executor thật và multi-file crash proof vẫn mở, nên RP-02 vẫn
+`PARTIAL`.
 
 **Cập nhật M08 policy semantic binding (2026-09-11):** `core/m08` nay kiểm
 decision/risk/timeline có thể xác minh chỉ từ immutable intent và policy;

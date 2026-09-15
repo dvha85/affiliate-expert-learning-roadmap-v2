@@ -15,19 +15,7 @@ import (
 	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 )
 
-type ApprovalRecord struct {
-	ApprovalID    string `json:"approval_id"`
-	IntentID      string `json:"intent_id"`
-	IntentHash    string `json:"intent_hash"`
-	PolicyVersion string `json:"policy_version"`
-	Decision      string `json:"decision"`
-	ApprovedBy    string `json:"approved_by"`
-	ApproverID    string `json:"approver_id"`
-	ApprovedAt    string `json:"approved_at"`
-	ExpiresAt     string `json:"expires_at"`
-	CorrelationID string `json:"correlation_id"`
-	OneTime       bool   `json:"one_time"`
-}
+type ApprovalRecord = corem09.ApprovalRecord
 
 type ExecutorProfile struct {
 	ExecutorID         string   `json:"executor_id"`
@@ -35,36 +23,9 @@ type ExecutorProfile struct {
 	AllowedHosts       []string `json:"allowed_hosts"`
 }
 
-type ExecutionAuthorization struct {
-	AuthorizationID     string `json:"authorization_id"`
-	IntentID            string `json:"intent_id"`
-	IntentHash          string `json:"intent_hash"`
-	PolicyVersion       string `json:"policy_version"`
-	ApprovalID          string `json:"approval_id"`
-	ExecutorID          string `json:"executor_id"`
-	AuthorizedAt        string `json:"authorized_at"`
-	ExpiresAt           string `json:"expires_at"`
-	IdempotencyKey      string `json:"idempotency_key"`
-	CorrelationID       string `json:"correlation_id"`
-	ExecutionMode       string `json:"execution_mode"`
-	ExecutionAuthorized bool   `json:"execution_authorized"`
-}
+type ExecutionAuthorization = corem09.ExecutionAuthorization
 
-type ExecutionRecord struct {
-	ExecutionID     string `json:"execution_id"`
-	AuthorizationID string `json:"authorization_id"`
-	ApprovalID      string `json:"approval_id"`
-	IntentID        string `json:"intent_id"`
-	IntentHash      string `json:"intent_hash"`
-	ExecutorID      string `json:"executor_id"`
-	IdempotencyKey  string `json:"idempotency_key"`
-	AttemptedAt     string `json:"attempted_at"`
-	Status          string `json:"status"`
-	SideEffectState string `json:"side_effect_state"`
-	ExternalRef     string `json:"external_ref,omitempty"`
-	Error           string `json:"error,omitempty"`
-	CorrelationID   string `json:"correlation_id"`
-}
+type ExecutionRecord = corem09.ExecutionRecord
 
 type M09State struct {
 	Intent               ShadowActionIntent      `json:"intent"`
