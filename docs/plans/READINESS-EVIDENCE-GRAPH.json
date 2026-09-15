@@ -1,6 +1,6 @@
 {
   "version": "readiness-evidence-graph/v1",
-  "as_of": "2026-09-15",
+  "as_of": "2026-09-16",
   "main_baseline": "d048d8df75af41d48087430b9bde737e5eec0a1f",
   "criteria": [
     {
@@ -81,6 +81,7 @@
       "claims": [
         {"id": "BR-19-implementation", "kind": "implementation", "status": "PARTIAL", "matrix_field": "implementation_refs", "scope": "Audit derives this repository evidence graph but cannot fetch remote CI or external proof.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-09"}]},
         {"id": "BR-19-test", "kind": "test", "status": "VERIFIED_OFFLINE", "matrix_field": "test_refs", "scope": "Negative fixtures execute the real auditor against isolated copies of the matrix and graph.", "ci": [{"workflow": ".github/workflows/curriculum-ci.yml", "command": "python -m unittest discover -s scripts/tests -v"}], "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-09"}]},
+        {"id": "BR-19-operated-local-regression-rerun", "kind": "operated", "status": "VERIFIED_OFFLINE", "scope": "A fresh local re-verification ran the core, contracts, mission-runtime and learner Bot suites plus semantic validators, BR-16a/BR-18b smoke and disposable n8n M06/M07 engine and Schedule Trigger regressions. Results were PASS with synthetic fixture/read-only boundaries; no provider, business outcome, live executor, clean-machine pilot or deployment proof is claimed.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "BR-19 local regression re-verification"}, {"path": "docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md", "marker": "## Commands and results"}]},
         {"id": "BR-19-external", "kind": "external", "status": "MISSING", "scope": "GitHub Actions run evidence and independent review remain outside the local audit.", "plan_refs": [{"path": "docs/plans/REVIEW-REMEDIATION-PLAN.md", "marker": "RP-10"}]}
       ]
     }
