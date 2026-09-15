@@ -2336,6 +2336,12 @@ staging. POSIX advisory lock tự nhả khi process kết thúc; backup/restore 
 publish, không chứng minh power-loss, atomic multi-file, Windows native lock,
 multi-host hay dọn staging mồ côi; readiness vẫn `NOT_READY_FOR_PRODUCTION`.
 
+**Cập nhật managed lock path guard (2026-09-16):** POSIX lock publisher dùng
+`O_NOFOLLOW`; regression thay lock pathname bằng symlink tới file ngoài và xác
+nhận acquisition bị từ chối, bytes external vẫn nguyên vẹn. Đây là guard
+pathname local cho runtime/backup/restore lock, không thay thế ancestor-path
+TOCTOU, Windows native lock, multi-host hoặc power-loss proof.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.

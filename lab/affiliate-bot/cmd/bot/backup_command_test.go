@@ -551,6 +551,28 @@ func TestRuntimeGateRejectsAnotherProcess(t *testing.T) {
 	}
 }
 
+func TestManagedPathLockRejectsSymlinkWithoutTouchingExternal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX O_NOFOLLOW is not the Windows lock implementation")
+	}
+	root := t.TempDir()
+	external := filepath.Join(t.TempDir(), "external-lock-target")
+	sentinel := []byte("external sentinel")
+	if err := os.WriteFile(external, sentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(root, "managed.lock")
+	if err := os.Symlink(external, lockPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := acquireManagedPathLock(lockPath); err == nil {
+		t.Fatal("managed lock followed a symlink to an external file")
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, sentinel) {
+		t.Fatalf("external lock target changed after symlink rejection: %q err=%v", got, err)
+	}
+}
+
 func TestBackupRestoreRejectsExpiredM10AuthorityWithoutMutation(t *testing.T) {
 	binary := buildMissionBinary(t)
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {

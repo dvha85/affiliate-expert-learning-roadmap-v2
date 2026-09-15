@@ -12,7 +12,7 @@ import (
 // marker directory. Closing the descriptor, including implicit close on
 // process exit, releases the lock while preserving the harmless control file.
 func acquireManagedPathLock(path string) (func(), error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if err != nil {
 		return nil, err
 	}
