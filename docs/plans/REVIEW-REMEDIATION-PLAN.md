@@ -1659,18 +1659,20 @@ của n8n `2.38.1`/Node 24 được cache theo OS/Node/version để cache hit k
 phải resolve npm lại. Job skip chỉ nói thay đổi không liên quan, không phải
 evidence n8n; thay đổi có liên quan và `main` vẫn cần engine thật.
 
-**Cập nhật deterministic CI sharding và Go cache (2026-09-15):** workload
-trước đây nối tiếp trong một `deterministic-runtime` được giữ nguyên command
-nhưng chia thành bốn required jobs chạy song song: core Go/CLI,
-`learner-bot-race`, `deterministic-quickstart`, và
-`deterministic-smokes-and-mutations`. Tách `go test -race ./...` có build cache
-key riêng ra khỏi core job để kết quả test thường/CLI trả về sớm, nhưng race vẫn
-là check bắt buộc trên mọi PR và push `main`. Mỗi job Go khai báo đủ bốn `go.sum`
-cho setup-go cache, nên cache chỉ tái sử dụng build và module hợp lệ theo toàn
-dependency set. Không shard nào bị skip theo thay đổi: mọi PR và push `main`
-vẫn chạy toàn bộ Go/race, quickstart, M00–M11 smoke và mutation proof. Mục tiêu
-là giảm wall-clock CI, không giảm coverage hoặc suy cache hit thành runtime
-evidence.
+**Cập nhật deterministic CI sharding và Go cache (2026-09-15):** coverage
+trước đây nối tiếp trong một `deterministic-runtime` được giữ nguyên nhưng chia
+thành sáu required jobs chạy song song: core Go/CLI, hai shard
+top-level test learner Bot, `learner-bot-race`, `deterministic-quickstart`, và
+`deterministic-smokes-and-mutations`. Helper shard hỏi chính `go test -list`,
+gán từng tên `Test*` bằng SHA-256 ổn định vào đúng một shard không rỗng, rồi gọi
+`go test` thực; test mới tự được bao phủ thay vì phụ thuộc một regex thủ công.
+Tách `go test -race ./...` có build cache key riêng ra khỏi core job để kết quả
+test thường/CLI trả về sớm, nhưng race vẫn là check bắt buộc trên mọi PR và push
+`main`. Mỗi job Go khai báo đủ bốn `go.sum` cho setup-go cache, nên cache chỉ tái
+sử dụng build và module hợp lệ theo toàn dependency set. Không shard nào bị skip
+theo thay đổi: mọi PR và push `main` vẫn chạy toàn bộ Go/race, quickstart,
+M00–M11 smoke và mutation proof. Mục tiêu là giảm wall-clock CI, không giảm
+coverage hoặc suy cache hit thành runtime evidence.
 
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và
