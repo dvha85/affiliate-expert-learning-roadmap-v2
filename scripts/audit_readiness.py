@@ -646,6 +646,22 @@ def audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text):
         fail("M11 recovery-handoff strict decoder regression is missing")
 
 
+def audit_m06_history_handoff_strict_decode(root, matrix, plan_text):
+    """Keep M06 CLI and HTTP history handoff on the same strict raw decoder."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-04-m06-history-handoff-strict-decode")
+    if not isinstance(record, dict) or "one strict raw HistoryRecord decoder" not in record.get("scope", ""):
+        fail("matrix lacks scoped M06 history-handoff strict decoder")
+    if "Cập nhật M06 history-handoff strict decoder" not in plan_text:
+        fail("M06 history-handoff strict decoder lacks a scoped plan marker")
+    schema = (root / "lab/affiliate-bot/cmd/bot/history_schema.go").read_text(encoding="utf-8")
+    watcher = (root / "lab/affiliate-bot/cmd/bot/watcher.go").read_text(encoding="utf-8")
+    test_path = root / "lab/affiliate-bot/cmd/bot/watcher_test.go"
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    if "func decodeHistoryHandoffRecord(raw []byte)" not in schema or "contracts.DecodeStrict(raw, &record)" not in schema or "record, err := decodeHistoryHandoffRecord(body)" not in watcher or "record, err := decodeHistoryHandoffRecord(raw)" not in watcher or "TestHistoryHandoffRejectsDuplicateRawKeyBeforePersistence" not in test:
+        fail("M06 history-handoff strict decoder regression is missing")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -690,6 +706,7 @@ def audit(root):
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
+    audit_m06_history_handoff_strict_decode(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

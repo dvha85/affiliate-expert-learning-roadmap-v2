@@ -118,6 +118,46 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	}
 }
 
+func TestHistoryHandoffRejectsDuplicateRawKeyBeforePersistence(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "record.json")
+	fixtureRaw, err := json.Marshal(watchFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := watcherRecord(fixtureRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	needle := []byte(`"record_id":"` + record.RecordID + `"`)
+	duplicate := bytes.Replace(valid, needle, append(append([]byte(nil), needle...), append([]byte(`,`), needle...)...), 1)
+	if bytes.Equal(valid, duplicate) {
+		t.Fatal("could not construct duplicate-key history handoff")
+	}
+	if err := os.WriteFile(input, duplicate, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := runWatcherHistoryHandoff([]string{history, input}, &stdout, &stderr); code == 0 || !strings.Contains(stdout.String(), `"status":"INVALID_SCHEMA"`) {
+		t.Fatalf("CLI accepted duplicate-key history handoff: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(history); !os.IsNotExist(err) {
+		t.Fatalf("CLI duplicate-key handoff created canonical history: %v", err)
+	}
+	httpResult := httptest.NewRecorder()
+	historyHandoffHTTPHandler(history).ServeHTTP(httpResult, httptest.NewRequest(http.MethodPost, "/v1/history/append", bytes.NewReader(duplicate)))
+	if httpResult.Code != http.StatusBadRequest || !strings.Contains(httpResult.Body.String(), `"status":"INVALID_SCHEMA"`) {
+		t.Fatalf("HTTP accepted duplicate-key history handoff: code=%d body=%s", httpResult.Code, httpResult.Body.String())
+	}
+	if _, err := os.Stat(history); !os.IsNotExist(err) {
+		t.Fatalf("HTTP duplicate-key handoff created canonical history: %v", err)
+	}
+}
+
 func TestSelectedAccesstradeCampaignUsesSharedM06HistoryAndM07Boundary(t *testing.T) {
 	dir := t.TempDir()
 	history := filepath.Join(dir, "history.jsonl")

@@ -721,7 +721,22 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"status":"OK","execution_permitted":false}`+"\n")
 	})
-	mux.HandleFunc("/v1/history/append", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/history/append", historyHandoffHTTPHandler(historyPath))
+	mux.HandleFunc("/v1/history", historyReadHandler(historyPath))
+	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
+	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
+}
+
+// historyHandoffHTTPHandler is the HTTP counterpart of watcher
+// history-handoff. It reports persistence only after the shared strict raw
+// decoder and canonical append path accept the same HistoryRecord.
+func historyHandoffHTTPHandler(historyPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -734,15 +749,10 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			_, _ = io.WriteString(w, `{"status":"INPUT_ERROR","canonical_history_ack":false}`+"\n")
 			return
 		}
-		var record HistoryRecord
-		if err := json.Unmarshal(body, &record); err != nil {
+		record, err := decodeHistoryHandoffRecord(body)
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"status":"INVALID_SCHEMA","canonical_history_ack":false}`+"\n")
-			return
-		}
-		if err := validateHistoryRecord(record); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = io.WriteString(w, `{"status":"INVALID_HISTORY","canonical_history_ack":false}`+"\n")
 			return
 		}
 		status, resolved, err := appendResolvedHistory(historyPath, record)
@@ -757,15 +767,7 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
-	})
-	mux.HandleFunc("/v1/history", historyReadHandler(historyPath))
-	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
-	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintln(stderr, err)
-		return 1
 	}
-	return 0
 }
 
 // runWatcherHistoryHandoff is the local BR-13 adapter used by the n8n
@@ -799,12 +801,9 @@ func runWatcherHistoryHandoff(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return emit("INPUT_ERROR", nil, err, 1)
 	}
-	var record HistoryRecord
-	if err := json.Unmarshal(raw, &record); err != nil {
+	record, err := decodeHistoryHandoffRecord(raw)
+	if err != nil {
 		return emit("INVALID_SCHEMA", nil, err, 1)
-	}
-	if err := validateHistoryRecord(record); err != nil {
-		return emit("INVALID_HISTORY", nil, err, 1)
 	}
 	status, resolved, err := appendResolvedHistory(args[0], record)
 	if err != nil && !isPublishedAppendUncertainty(err) {

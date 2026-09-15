@@ -313,15 +313,14 @@ func loadHistoryWith(storage store.History, path string) (records []HistoryRecor
 		if raw == "" {
 			return nil, fmt.Errorf("history line %d is empty", lineNumber)
 		}
-		var record HistoryRecord
-		if err := validateHistoryJSON([]byte(raw)); err != nil {
-			return nil, fmt.Errorf("history line %d corrupt: %w", lineNumber, err)
-		}
-		if err := json.Unmarshal([]byte(raw), &record); err != nil {
-			return nil, fmt.Errorf("history line %d corrupt: %w", lineNumber, err)
-		}
-		if err := validateHistoryRecord(record); err != nil {
-			return nil, fmt.Errorf("history line %d invalid: %w", lineNumber, err)
+		record, err := decodeHistoryHandoffRecord([]byte(raw))
+		if err != nil {
+			// Preserve the public replay contract: an invalid persisted JSONL line
+			// is reported as corruption, even when its raw decoder explains the
+			// particular schema/syntax failure. The handoff entrypoints expose
+			// INVALID_SCHEMA before any write; replay must fail closed as corrupt
+			// history instead.
+			return nil, fmt.Errorf("corrupt history line %d: %w", lineNumber, err)
 		}
 		records = append(records, record)
 	}

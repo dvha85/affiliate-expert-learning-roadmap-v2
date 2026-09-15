@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 2981cf67760360860496c9a4a8cfecf9bf9d40f8 -->
+<!-- readiness-main-baseline: 51fae13a152b29610514b21cd7b57ca3ba939514 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1527,6 +1527,14 @@ trước khi admission có thể đọc/đăng ký artifact. Regression gọi CL
 admission thật với duplicate `profile`, yêu cầu `REJECTED` và registry runtime
 mới giữ byte-identical. Đây chỉ là hardening JSON cục bộ; không thay thế human
 review, live execution, crash/power-loss durability hay multi-host recovery.
+
+**Cập nhật M06 history-handoff strict decoder (2026-09-15):** M06 handoff
+nhận `HistoryRecord` qua CLI và `/v1/history/append`, nhưng parse thường có thể
+collapse duplicate key trước khi hash được recompute và record được append. Hai
+entrypoint nay cùng strict-decode raw bytes trước canonical append. Regression
+gửi duplicate `record_id` qua cả CLI và HTTP, yêu cầu `INVALID_SCHEMA` và không
+được tạo history. Đây là boundary input local; không là n8n/provider operated
+proof, crash/power-loss durability, transaction đa-file hay multi-host safety.
 
 **Cập nhật M11 outcome-journal cleanup uncertainty (2026-09-14):** Sau khi
 ledger head và exact fixture outcome đã canonical, lỗi khi dọn
