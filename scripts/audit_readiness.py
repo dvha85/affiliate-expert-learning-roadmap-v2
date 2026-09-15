@@ -545,6 +545,40 @@ def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
             fail("beginner plan incorrectly treats the selected-source contract as absent")
 
 
+def audit_selected_source_operated_run(root, matrix, plan_text):
+    """Require a durable, scoped record when local operated evidence is recorded."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-10-m06-selected-source-local-operated-run")
+    required_scope = (
+        "local operator-observed",
+        "canonical_history_ack=true",
+        "execution_permitted=false",
+        "no ACCESSTRADE request",
+        "not an independently reviewed",
+    )
+    if not isinstance(record, dict) or any(marker not in record.get("scope", "") for marker in required_scope):
+        fail("selected-source operated run record lacks its bounded local evidence scope")
+    required_refs = {
+        "core/m06/accesstrade_shopee.go",
+        "lab/affiliate-bot/cmd/bot/watcher.go",
+        "lab/n8n/M06-accesstrade-shopee-readonly.blueprint.json",
+        "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("selected-source operated run record lacks durable implementation/evidence refs")
+    marker = "M06 selected-source operated run"
+    evidence_path = root / "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    if marker not in plan_text or "## n8n local run" not in evidence or "GET_MORE_DATA" not in evidence or "replay=MATCH" not in evidence:
+        fail("selected-source operated run evidence is missing its durable plan or result record")
+    graph_text = (root / "docs/plans/READINESS-EVIDENCE-GRAPH.json").read_text(encoding="utf-8")
+    for claim_id in ("BR-13-operated-local-selected-source", "BR-14-operated-local-selected-source"):
+        if claim_id not in graph_text:
+            fail("selected-source operated run evidence graph claim is missing")
+
+
 def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     """Keep the checked-in engine evidence tied to the Node major n8n needs."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -977,6 +1011,7 @@ def audit(root):
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
+    audit_selected_source_operated_run(root, matrix, plan_text)
     audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():
         if not (root / script).is_file():
