@@ -1675,12 +1675,17 @@ func loadM11FixtureOutcomes(dir string) ([]m03.OutcomeRecord, error) {
 	scanner.Buffer(make([]byte, 4096), store.MaxHistoryRecordBytes+2)
 	outcomes := []m03.OutcomeRecord{}
 	seen := map[string]bool{}
+	seenExecution := map[string]bool{}
 	for scanner.Scan() {
 		outcome, _, status := validateM11FixtureOutcome(dir, scanner.Bytes())
-		if status != "VALID" || seen[outcome.OutcomeID] {
+		// Every fixture outcome closes exactly one governed execution. Reject a
+		// second syntactically valid outcome for that execution at the loader,
+		// not only when a later writer or backup happens to compare the store.
+		if status != "VALID" || seen[outcome.OutcomeID] || seenExecution[outcome.EffectRef.EffectID] {
 			return nil, fmt.Errorf("invalid M11 fixture outcome store")
 		}
 		seen[outcome.OutcomeID] = true
+		seenExecution[outcome.EffectRef.EffectID] = true
 		outcomes = append(outcomes, outcome)
 	}
 	if err := scanner.Err(); err != nil {

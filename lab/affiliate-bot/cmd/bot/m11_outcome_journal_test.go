@@ -179,6 +179,27 @@ func TestM11OutcomeJournalRecoversLedgerThenOutcomeAppendFailure(t *testing.T) {
 	}
 }
 
+func TestM11FixtureOutcomeLoaderRejectsDuplicateExecutionBeforeRuntimeUse(t *testing.T) {
+	dir := t.TempDir()
+	journal, _ := setupM11OutcomeJournalFixture(t, dir)
+	duplicate := journal.Outcome
+	duplicate.OutcomeID = "journal-outcome-duplicate"
+	first, err := json.Marshal(journal.Outcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := json.Marshal(duplicate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(m11OutcomeStorePath(dir), append(append(first, '\n'), append(second, '\n')...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11FixtureOutcomes(dir); err == nil || !strings.Contains(err.Error(), "invalid M11 fixture outcome store") {
+		t.Fatalf("two outcomes for one M11 execution reached runtime loader: %v", err)
+	}
+}
+
 func TestM11OutcomeJournalRecoversAfterOutcomeAppendAckFailure(t *testing.T) {
 	dir := t.TempDir()
 	journal, _ := setupM11OutcomeJournalFixture(t, dir)

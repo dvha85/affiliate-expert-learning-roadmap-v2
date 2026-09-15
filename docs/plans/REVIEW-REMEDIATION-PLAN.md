@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 423c3ee6d2fe04071406e2c4977e67fa105ee4aa -->
+<!-- readiness-main-baseline: 5529a15aaa53c2e97312ddcb062575fd20ab21cf -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1509,6 +1509,15 @@ gate hoàn tất journal và trả `EXACT_DUPLICATE`; regression kiểm đúng m
 trước/sau retry. Đây là acknowledgement/recovery boundary local cho một JSONL
 line và journal đã visible, không chứng minh fsync/power-loss, transaction nhiều
 file, live executor, business outcome hoặc multi-host.
+
+**Cập nhật M11 fixture-outcome execution cardinality (2026-09-15):** writer
+và backup graph đã cấm hai outcome cùng `MACHINE_EXECUTION`, nhưng loader JSONL
+chỉ từng cấm duplicate `outcome_id`. Loader nay giữ thêm `effect_id` đã thấy và
+fail closed khi hai outcome hợp lệ khác nhau trỏ tới cùng execution. Regression
+tạo đúng hai JSONL records hợp lệ cùng execution trên fixture runtime và chứng
+minh loader reject trước evaluate hoặc recovery. Đây là fixture-store cardinality
+local; không là business outcome, atomic recovery, power-loss hay multi-host
+proof.
 
 **Cập nhật M11 outcome-journal cleanup uncertainty (2026-09-14):** Sau khi
 ledger head và exact fixture outcome đã canonical, lỗi khi dọn
