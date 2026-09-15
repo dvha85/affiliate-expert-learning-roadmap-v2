@@ -677,6 +677,14 @@ nghĩa lại struct/parser. Đây chỉ là contract/conformance reuse; chain li
 migration, executor thật và multi-file crash proof vẫn mở, nên RP-02 vẫn
 `PARTIAL`.
 
+**Cập nhật shared M09 historical chain validator (2026-09-16):** `core/m09`
+hiện kiểm tra non-authorizing toàn bộ chuỗi intent → policy → approval →
+`APPROVED_LIVE` authorization → execution record, gồm exact links, profile,
+timeline, authorization expiry và điều kiện `PERFORMED`. Harness `m09-check`
+chỉ còn decode file rồi gọi validator chung; regression có chain hợp lệ,
+broken link và performed-after-expiry reject. Đây chưa phải executor thật,
+migration của mọi runtime path hay multi-file crash/power-loss proof.
+
 **Cập nhật shared M10 artifact decoders (2026-09-16):** `core/m10` hiện owns
 decoder cho canary grant, trusted cost-bound, gate, authorization và
 execution-record mà mission harness gọi trực tiếp. Decoder execution-record
