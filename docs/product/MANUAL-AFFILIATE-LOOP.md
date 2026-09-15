@@ -110,10 +110,20 @@ go run ./cmd/bot outcome accesstrade-receipts HISTORY.jsonl ACTIONS.jsonl OUTCOM
 
 Receipt chỉ có `snapshot_id`, hash SHA-256 của CSV/manifest, IDs canonical và
 metadata; không giữ mã đơn hay URL tracking. Runtime để lại journal fail-closed
-nếu tiến trình dừng giữa outcome và receipt, khi đó phải điều tra/khôi phục chứ
-không import tiếp. `bot backup create RUNTIME_DIR BACKUP_DIR` buộc receipt vào
-backup khi `outcomes.jsonl` có source `accesstrade:`; restore kiểm lại toàn bộ
-graph. Các kiểm tra này vẫn không phải proof export thật hoặc payment.
+nếu tiến trình dừng giữa outcome và receipt. Đừng xóa journal hoặc import một
+snapshot khác: dùng lại đúng CSV/manifest đã tạo journal để replay có kiểm hash:
+
+```text
+go run ./cmd/bot outcome accesstrade-recover HISTORY.jsonl ACTIONS.jsonl OUTCOMES.jsonl \
+  ../../examples/accesstrade-report/sanitized-orders.csv \
+  ../../examples/accesstrade-report/manifest.json
+```
+
+Lệnh chỉ hoàn tất snapshot khi toàn bộ source bytes và mapping khớp receipt;
+source đổi hoặc outcome xuất hiện một phần sẽ bị từ chối và giữ journal để điều
+tra. `bot backup create RUNTIME_DIR BACKUP_DIR` buộc receipt vào backup khi
+`outcomes.jsonl` có source `accesstrade:`; restore kiểm lại toàn bộ graph. Các
+kiểm tra này vẫn không phải proof export thật hoặc payment.
 
 ## 9. Phần còn mở
 

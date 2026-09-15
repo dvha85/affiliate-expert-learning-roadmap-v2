@@ -38,8 +38,8 @@ func setupAccesstradeImport(t *testing.T) (string, string, string, string) {
 	return history, actions, outcomes, dir
 }
 
-func TestAccesstradeImporterLifecycle(t *testing.T) {
-	history, actions, outcomes, dir := setupAccesstradeImport(t)
+func writeAccesstradeImportInputs(t *testing.T, dir string) (string, string) {
+	t.Helper()
 	report := filepath.Join(dir, "report.csv")
 	manifest := filepath.Join(dir, "manifest.json")
 	if err := os.WriteFile(report, []byte("Mã đơn,Trạng thái,Giá trị đơn hàng,Hoa hồng\nredacted-1,Tạm duyệt,250.000,17.500\nredacted-2,Từ chối,150.000,0\n"), 0600); err != nil {
@@ -48,6 +48,12 @@ func TestAccesstradeImporterLifecycle(t *testing.T) {
 	if err := os.WriteFile(manifest, []byte(`{"snapshot_id":"snapshot-1","observed_at":"2026-09-08T12:00:00+07:00","source_ref":"accesstrade:sanitized:snapshot-1","currency":"VND","mappings":[{"order_id":"redacted-1","outcome_id":"outcome-1","action_id":"manual-action-001"},{"order_id":"redacted-2","outcome_id":"outcome-2","action_id":"manual-action-001"}]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
+	return report, manifest
+}
+
+func TestAccesstradeImporterLifecycle(t *testing.T) {
+	history, actions, outcomes, dir := setupAccesstradeImport(t)
+	report, manifest := writeAccesstradeImportInputs(t, dir)
 	invoke := func(want string, code int) map[string]any {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
@@ -122,6 +128,111 @@ func TestAccesstradeImporterLifecycle(t *testing.T) {
 	if err := os.Remove(accesstradeJournalPath(outcomes)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestAccesstradeImporterRecoveryReplaysOnlyExactPendingSnapshot(t *testing.T) {
+	invoke := func(t *testing.T, args []string, want string, code int) map[string]any {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		if got := runOutcomeStore(args, &stdout, &stderr); got != code {
+			t.Fatalf("code=%d want=%d stdout=%s stderr=%s", got, code, stdout.String(), stderr.String())
+		}
+		var response map[string]any
+		if err := json.Unmarshal(stdout.Bytes(), &response); err != nil || response["status"] != want || response["execution_permitted"] != false {
+			t.Fatalf("response=%s err=%v", stdout.String(), err)
+		}
+		return response
+	}
+	setupPending := func(t *testing.T) (string, string, string, string, string, []m03.OutcomeRecord, AccesstradeImportReceipt) {
+		t.Helper()
+		history, actionsPath, outcomes, dir := setupAccesstradeImport(t)
+		report, manifest := writeAccesstradeImportInputs(t, dir)
+		historyRecords, err := LoadHistory(history)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actions, err := loadActions(actionsPath, historyRecords)
+		if err != nil {
+			t.Fatal(err)
+		}
+		candidates, receipt, err := loadAccesstradeImportInputs([]string{"accesstrade-recover", history, actionsPath, outcomes, report, manifest}, actions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := writeJSONAtomic(accesstradeJournalPath(outcomes), receipt); err != nil {
+			t.Fatal(err)
+		}
+		return history, actionsPath, outcomes, report, manifest, candidates, receipt
+	}
+
+	t.Run("empty snapshot is completed and journal is removed", func(t *testing.T) {
+		history, actions, outcomes, report, manifest, _, _ := setupPending(t)
+		args := []string{"accesstrade-recover", history, actions, outcomes, report, manifest}
+		response := invoke(t, args, "RECOVERED", 0)
+		if response["artifact"] == nil {
+			t.Fatal("recovery did not return the exact recovered artifact")
+		}
+		if _, err := os.Lstat(accesstradeJournalPath(outcomes)); !os.IsNotExist(err) {
+			t.Fatal("pending journal remains after complete recovery", err)
+		}
+		invoke(t, []string{"accesstrade-import", history, actions, outcomes, report, manifest}, "EXACT_DUPLICATE", 0)
+	})
+
+	t.Run("visible outcomes without receipt are completed without rewriting outcomes", func(t *testing.T) {
+		history, actions, outcomes, report, manifest, candidates, _ := setupPending(t)
+		encoded, err := encodeAccesstradeOutcomes(candidates)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := appendOutcomesAtomically(outcomes, encoded); err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.ReadFile(outcomes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		invoke(t, []string{"accesstrade-recover", history, actions, outcomes, report, manifest}, "RECOVERED", 0)
+		after, err := os.ReadFile(outcomes)
+		if err != nil || !bytes.Equal(before, after) {
+			t.Fatalf("recovery rewrote visible exact outcomes: err=%v", err)
+		}
+	})
+
+	t.Run("changed report and partial outcomes fail closed", func(t *testing.T) {
+		history, actions, outcomes, report, manifest, candidates, _ := setupPending(t)
+		journalBefore, err := os.ReadFile(accesstradeJournalPath(outcomes))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(report, []byte("Mã đơn,Trạng thái,Giá trị đơn hàng,Hoa hồng\nredacted-1,Tạm duyệt,250000,17500\nredacted-2,Từ chối,150000,0\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		invoke(t, []string{"accesstrade-recover", history, actions, outcomes, report, manifest}, "REPLAY_MISMATCH", 1)
+		if current, err := os.ReadFile(accesstradeJournalPath(outcomes)); err != nil || !bytes.Equal(current, journalBefore) {
+			t.Fatalf("mismatch changed pending journal: err=%v", err)
+		}
+		if err := os.WriteFile(report, []byte("Mã đơn,Trạng thái,Giá trị đơn hàng,Hoa hồng\nredacted-1,Tạm duyệt,250.000,17.500\nredacted-2,Từ chối,150.000,0\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := encodeAccesstradeOutcomes(candidates[:1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := appendOutcomesAtomically(outcomes, encoded); err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.ReadFile(outcomes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		invoke(t, []string{"accesstrade-recover", history, actions, outcomes, report, manifest}, "PARTIAL_DUPLICATE", 1)
+		if after, err := os.ReadFile(outcomes); err != nil || !bytes.Equal(before, after) {
+			t.Fatalf("partial recovery changed outcomes: err=%v", err)
+		}
+		if _, err := os.Lstat(accesstradeJournalPath(outcomes)); err != nil {
+			t.Fatal("partial recovery removed pending journal", err)
+		}
+	})
 }
 
 func TestAccesstradeImporterDoesNotMapUTM(t *testing.T) {

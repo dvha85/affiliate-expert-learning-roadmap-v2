@@ -327,6 +327,69 @@ func appendOutcomesAtomically(path string, records [][]byte) error {
 	return appendJSONLLinesAtomically(path, records)
 }
 
+func loadAccesstradeImportInputs(args []string, actions []m03.HumanActionRecord) ([]m03.OutcomeRecord, AccesstradeImportReceipt, error) {
+	report, _, err := readStableRegularFileLimit(args[4], maxAccesstradeReportBytes)
+	if err != nil {
+		return nil, AccesstradeImportReceipt{}, err
+	}
+	rawManifest, err := readGeneralPortableInput(args[5])
+	if err != nil {
+		return nil, AccesstradeImportReceipt{}, err
+	}
+	manifest, err := decodeAccesstradeManifest(rawManifest)
+	if err != nil {
+		return nil, AccesstradeImportReceipt{}, err
+	}
+	candidates, err := decodeAccesstradeOutcomes(report, manifest)
+	if err != nil {
+		return nil, AccesstradeImportReceipt{}, err
+	}
+	for _, candidate := range candidates {
+		raw, err := json.Marshal(candidate)
+		if err != nil {
+			return nil, AccesstradeImportReceipt{}, err
+		}
+		if _, status := linkedOutcome(raw, actions); status != "VALID" {
+			return nil, AccesstradeImportReceipt{}, fmt.Errorf("outcome rejected: %s", status)
+		}
+	}
+	receipt := newAccesstradeReceipt(manifest, report, rawManifest, args[3], candidates)
+	if err := validateAccesstradeReceipt(receipt); err != nil {
+		return nil, AccesstradeImportReceipt{}, err
+	}
+	return candidates, receipt, nil
+}
+
+func encodeAccesstradeOutcomes(candidates []m03.OutcomeRecord) ([][]byte, error) {
+	encodedRecords := make([][]byte, 0, len(candidates))
+	for _, candidate := range candidates {
+		encodedCandidate, err := json.Marshal(candidate)
+		if err != nil {
+			return nil, err
+		}
+		encodedRecords = append(encodedRecords, encodedCandidate)
+	}
+	return encodedRecords, nil
+}
+
+// removeAccesstradeJournal treats removal as another visible name boundary.
+// Once the receipt/outcomes are complete, an unsuccessful parent sync must not
+// be reported as an ordinary failed recovery: the caller gets the exact
+// artifact and must re-read/retry rather than creating a competing snapshot.
+func removeAccesstradeJournal(outcomesPath string) error {
+	path := accesstradeJournalPath(outcomesPath)
+	if err := os.Remove(path); err != nil {
+		if _, statErr := os.Lstat(path); os.IsNotExist(statErr) {
+			return &atomicPublishUncertainError{err: err}
+		}
+		return err
+	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return &atomicPublishUncertainError{err: err}
+	}
+	return nil
+}
+
 func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 	emit := func(status string, artifact any, err error, code int) int {
 		if err != nil {
@@ -433,15 +496,14 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 			return emit("RECEIPT_CONFLICT", nil, fmt.Errorf("snapshot_id reused with different content"), 1)
 		}
 	}
-	encodedRecords := make([][]byte, 0, len(candidates))
-	for _, candidate := range candidates {
-		encodedCandidate, err := json.Marshal(candidate)
-		if err != nil {
-			return emit("INVALID_SCHEMA", nil, err, 1)
-		}
-		encodedRecords = append(encodedRecords, encodedCandidate)
+	encodedRecords, err := encodeAccesstradeOutcomes(candidates)
+	if err != nil {
+		return emit("INVALID_SCHEMA", nil, err, 1)
 	}
 	if err := writeJSONAtomic(accesstradeJournalPath(args[3]), receipt); err != nil {
+		if artifactIfAtomicPublishUncertain(receipt, err) != nil {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", map[string]any{"outcomes": candidates, "receipt": receipt}, err, 1)
+		}
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	if err := appendOutcomesAtomically(args[3], encodedRecords); err != nil {
@@ -454,8 +516,135 @@ func runAccesstradeOutcomeImport(args []string, stdout, stderr io.Writer) int {
 	if err := appendJSONLLinesAtomically(accesstradeReceiptPath(args[3]), [][]byte{encodedReceipt}); err != nil {
 		return emit("STORE_ERROR", nil, err, 1)
 	}
-	if err := os.Remove(accesstradeJournalPath(args[3])); err != nil {
+	if err := removeAccesstradeJournal(args[3]); err != nil {
+		if artifactIfAtomicPublishUncertain(receipt, err) != nil {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", map[string]any{"outcomes": candidates, "receipt": receipt}, err, 1)
+		}
 		return emit("STORE_ERROR", nil, err, 1)
 	}
 	return emit("APPENDED", map[string]any{"outcomes": candidates, "receipt": receipt}, nil, 0)
+}
+
+// runAccesstradeOutcomeRecover completes only the exact snapshot named by a
+// visible pending journal.  It never contacts ACCESSTRADE: the caller must
+// supply the same bounded local report and manifest, whose hashes and derived
+// receipt must match the journal before any missing local line is written.
+func runAccesstradeOutcomeRecover(args []string, stdout, stderr io.Writer) int {
+	emit := func(status string, artifact any, err error, code int) int {
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+		}
+		envelope := map[string]any{"command": "outcome accesstrade-recover", "status": status, "execution_permitted": false}
+		if artifact != nil {
+			envelope["artifact"] = artifact
+		}
+		if err := json.NewEncoder(stdout).Encode(envelope); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return code
+	}
+	if len(args) != 6 {
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot outcome accesstrade-recover HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json"), 2)
+	}
+	if err := distinctActionPaths(args[1:]...); err != nil {
+		return emit("PATH_ERROR", nil, err, 1)
+	}
+	release, lockErr := acquireHistoryRuntimeGate(args[1])
+	if lockErr != nil {
+		return emit("BUSY", nil, lockErr, 1)
+	}
+	defer release()
+	history, err := LoadHistory(args[1])
+	if err != nil {
+		return emit("HISTORY_ERROR", nil, err, 1)
+	}
+	actions, err := loadActions(args[2], history)
+	if err != nil {
+		return emit("ACTION_STORE_ERROR", nil, err, 1)
+	}
+	existing, err := loadOutcomes(args[3], actions)
+	if err != nil && !os.IsNotExist(err) {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	pending, err := loadAccesstradePendingReceipt(args[3])
+	if err != nil {
+		if os.IsNotExist(err) {
+			return emit("JOURNAL_MISSING", nil, err, 1)
+		}
+		return emit("RECOVERY_ERROR", nil, err, 1)
+	}
+	candidates, receipt, err := loadAccesstradeImportInputs(args, actions)
+	if err != nil {
+		return emit("REPLAY_ERROR", nil, err, 1)
+	}
+	if !sameReceipt(pending, receipt) {
+		return emit("REPLAY_MISMATCH", nil, fmt.Errorf("report or manifest does not exactly match pending ACCESSTRADE receipt"), 1)
+	}
+	artifact := map[string]any{"outcomes": candidates, "receipt": receipt}
+	byID := map[string]m03.OutcomeRecord{}
+	for _, outcome := range existing {
+		byID[outcome.OutcomeID] = outcome
+	}
+	existingCount := 0
+	for _, candidate := range candidates {
+		if old, ok := byID[candidate.OutcomeID]; ok {
+			if !sameOutcome(old, candidate) {
+				return emit("CONFLICT", nil, fmt.Errorf("outcome_id reused with different content"), 1)
+			}
+			existingCount++
+		}
+	}
+	if existingCount != 0 && existingCount != len(candidates) {
+		return emit("PARTIAL_DUPLICATE", nil, fmt.Errorf("pending snapshot has only a partial set of outcomes"), 1)
+	}
+	receipts, err := loadAccesstradeReceipts(accesstradeReceiptPath(args[3]))
+	if err != nil && !os.IsNotExist(err) {
+		return emit("RECEIPT_STORE_ERROR", nil, err, 1)
+	}
+	hasReceipt := false
+	for _, old := range receipts {
+		if old.ReceiptID == receipt.ReceiptID {
+			if !sameReceipt(old, receipt) {
+				return emit("RECEIPT_CONFLICT", nil, fmt.Errorf("pending receipt id was reused with different content"), 1)
+			}
+			hasReceipt = true
+		}
+	}
+	if hasReceipt && existingCount != len(candidates) {
+		return emit("RECOVERY_CONFLICT", nil, fmt.Errorf("receipt exists without every exact pending outcome"), 1)
+	}
+	if existingCount == 0 {
+		encoded, err := encodeAccesstradeOutcomes(candidates)
+		if err != nil {
+			return emit("INVALID_SCHEMA", nil, err, 1)
+		}
+		if err := appendOutcomesAtomically(args[3], encoded); err != nil {
+			return emit("STORE_ERROR", nil, err, 1)
+		}
+	}
+	if !hasReceipt {
+		encoded, err := json.Marshal(receipt)
+		if err != nil {
+			return emit("INVALID_RECEIPT", nil, err, 1)
+		}
+		if err := appendJSONLLinesAtomically(accesstradeReceiptPath(args[3]), [][]byte{encoded}); err != nil {
+			return emit("RECEIPT_STORE_ERROR", nil, err, 1)
+		}
+	}
+	finalOutcomes, err := loadOutcomes(args[3], actions)
+	if err != nil {
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	finalReceipts, err := loadAccesstradeReceipts(accesstradeReceiptPath(args[3]))
+	if err != nil || validateAccesstradeReceiptGraph(finalReceipts, finalOutcomes, args[3]) != nil {
+		return emit("RECOVERY_CONFLICT", nil, fmt.Errorf("recovered ACCESSTRADE graph is invalid"), 1)
+	}
+	if err := removeAccesstradeJournal(args[3]); err != nil {
+		if artifactIfAtomicPublishUncertain(receipt, err) != nil {
+			return emit("PUBLISHED_RECOVERY_REQUIRED", artifact, err, 1)
+		}
+		return emit("STORE_ERROR", nil, err, 1)
+	}
+	return emit("RECOVERED", artifact, nil, 0)
 }

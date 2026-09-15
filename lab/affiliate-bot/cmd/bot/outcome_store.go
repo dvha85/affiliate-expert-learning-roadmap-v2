@@ -132,11 +132,14 @@ func runOutcomeStore(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "accesstrade-import" {
 		return runAccesstradeOutcomeImport(args, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "accesstrade-recover" {
+		return runAccesstradeOutcomeRecover(args, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "accesstrade-receipts" {
 		return runAccesstradeReceiptList(args, stdout, stderr)
 	}
 	if len(args) == 0 || (args[0] != "import" && args[0] != "list") || (args[0] == "import" && len(args) != 5) || (args[0] == "list" && len(args) != 4) {
-		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot outcome import HISTORY ACTIONS OUTCOMES INPUT | bot outcome list HISTORY ACTIONS OUTCOMES"), 2)
+		return emit("USAGE_ERROR", nil, fmt.Errorf("usage: bot outcome import HISTORY ACTIONS OUTCOMES INPUT | bot outcome list HISTORY ACTIONS OUTCOMES | bot outcome accesstrade-import HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json | bot outcome accesstrade-recover HISTORY ACTIONS OUTCOMES REPORT.csv MANIFEST.json"), 2)
 	}
 	if err := distinctActionPaths(args[1:]...); err != nil {
 		return emit("PATH_ERROR", nil, err, 1)
