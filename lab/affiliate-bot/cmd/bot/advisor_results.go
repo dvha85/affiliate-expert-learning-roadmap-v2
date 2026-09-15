@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -36,6 +37,18 @@ type campaignResult struct {
 	ExecutionPermitted bool               `json:"execution_permitted"`
 	Context            *advisorContext    `json:"context,omitempty"`
 	AdvisorOutput      *m04.AdvisorOutput `json:"advisor_output,omitempty"`
+}
+
+// campaignResultWriteFault is test-only.  The campaign CLI has no flag or
+// environment override for it: a real operator cannot turn an ambiguous paid
+// attempt into a synthetic acknowledgement result.
+var campaignResultWriteFault func(phase string) error
+
+func campaignResultWriteFailure(phase string) error {
+	if campaignResultWriteFault == nil {
+		return nil
+	}
+	return campaignResultWriteFault(phase)
 }
 
 func estimateCampaignUsage(u *deepSeekUsage) (*int64, error) {
@@ -123,6 +136,49 @@ func readCampaignResults(path string) ([]campaignResult, error) {
 	return results, nil
 }
 
+func campaignResultVisible(path string, candidate campaignResult) bool {
+	results, err := readCampaignResults(path)
+	if err != nil {
+		return false
+	}
+	expected, err := json.Marshal(candidate)
+	if err != nil {
+		return false
+	}
+	for _, result := range results {
+		actual, err := json.Marshal(result)
+		if result.Attempt == candidate.Attempt && err == nil && bytes.Equal(actual, expected) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvedCampaignResult(path string, attempt int) (campaignResult, error) {
+	results, err := readCampaignResults(path)
+	if err != nil {
+		return campaignResult{}, err
+	}
+	for _, result := range results {
+		if result.Attempt == attempt {
+			return result, nil
+		}
+	}
+	return campaignResult{}, errors.New("campaign result is not visible")
+}
+
+// campaignResultPublishFailure distinguishes a normal result write error from
+// an ambiguous acknowledgement only after the campaign's canonical loader has
+// re-read the exact immutable result.  In the latter case the provider has
+// already been called and the reservation remains consumed: callers must
+// report/reconcile, not retry the provider request.
+func campaignResultPublishFailure(path string, candidate campaignResult, cause error) error {
+	if campaignResultVisible(path, candidate) {
+		return &publishedAppendUncertainty{cause: cause}
+	}
+	return cause
+}
+
 func persistCampaignResult(path string, r campaignResult) error {
 	if err := validateCampaignResult(r); err != nil {
 		return err
@@ -149,14 +205,23 @@ func persistCampaignResult(path string, r campaignResult) error {
 	if err == nil {
 		err = f.Sync()
 	}
+	if err == nil {
+		err = campaignResultWriteFailure("after_result_file_sync")
+	}
 	closed := f.Close()
 	if err != nil {
-		return err
+		return campaignResultPublishFailure(path, r, err)
 	}
 	if closed != nil {
-		return closed
+		return campaignResultPublishFailure(path, r, closed)
 	}
-	return syncCampaignDir(path)
+	if err = campaignResultWriteFailure("before_result_parent_sync"); err != nil {
+		return campaignResultPublishFailure(path, r, err)
+	}
+	if err = syncCampaignDir(path); err != nil {
+		return campaignResultPublishFailure(path, r, err)
+	}
+	return nil
 }
 
 // Internal only. This uses the ledger fixture, not yet the BR-10 live runner.
@@ -178,6 +243,9 @@ func runRecordedCampaignAttempt(ctx context.Context, path string, p advisorProvi
 		return n, "RESULT_ERROR", err
 	}
 	if err = persistCampaignResult(path, r); err != nil {
+		if isPublishedAppendUncertainty(err) {
+			return n, "PUBLISHED_RECOVERY_REQUIRED", err
+		}
 		return n, "RESULT_ERROR", err
 	}
 	return n, status, nil

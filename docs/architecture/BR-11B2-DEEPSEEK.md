@@ -13,6 +13,13 @@ Tại `lab/affiliate-bot`, sau khi review code và xác nhận quyền dùng API
 
 Thiếu/sai định dạng key trả CONFIG_ERROR trước reservation. PATH_ERROR/REPORT_ERROR cần kiểm cấu hình hoặc tính toàn vẹn dữ liệu. LOCKED cần xác minh tiến trình còn chạy và phục hồi có review; không tự xóa khóa. Có bất kỳ reservation nào trả REVIEW_REQUIRED, kể cả lượt trước lỗi/mất kết quả. Không gọi lại tự động sau timeout hoặc lỗi ghi stdout; đọc report trước. Exit 0 chỉ SUPPORTED/ABSTAIN, exit 2 sai cú pháp, exit 1 các lỗi/reject còn lại. `execution_permitted=false` ở mọi trạng thái.
 
+Nếu command trả `PUBLISHED_RECOVERY_REQUIRED`, result exact đã đọc lại được từ
+ledger nhưng acknowledgement file/directory chưa được xác nhận. Envelope mang
+result đó chỉ để đối soát; exit vẫn khác 0 và **không được** gọi lại canary.
+Đọc `campaign-report`, giữ reservation, đối soát provider/billing rồi review
+trước bất kỳ hành động nào. Lần gọi canary tiếp theo phải trả
+`REVIEW_REQUIRED`, không gửi request provider thứ hai.
+
 Bundle partial được giữ trong thư mục ứng dụng để kiểm tra, không tự sửa/xóa. Result ledger mới là nơi đọc kết quả canonical. Giới hạn còn lại: không chống người dùng đổi OS profile/config root, rollback ledger hoặc tác nhân local thay directory đồng thời; khóa còn sót do crash sẽ chặn chạy. Chưa có bằng chứng canary thật; tests chỉ dùng HTTP loopback và key giả. Không tăng lượt hoặc đánh BR-11 DONE trước review bằng chứng live.
 
 ## BR-10 context và accepted output trong ledger
@@ -73,7 +80,7 @@ Review #61 bổ sung hai chốt: context digest phải khớp fixture campaign h
 
 Sau #60 merged `94c32c8` (chain conformance offline), `advisor_results.go` bổ sung result metadata immutable trong cùng thư mục campaign. Result liên kết attempt đã reserve, lưu provider/model/prompt version, SHA256 context, status, usage nullable, snapshot giá và estimate microUSD. Không lưu raw provider body, reasoning, secret hay output bị reject. Đây chưa là artifact nội dung phục vụ review chất lượng model.
 
-Writer dùng lock cùng reservation, O_EXCL và fsync file/directory. Duplicate/overwrite/orphan bị từ chối; reader strict/canonical/bounded kiểm chi phí tính lại. Reservation kế tiếp kiểm mọi result đã có; result hỏng hoặc orphan chặn request. Nếu crash trước khi có result, reservation vẫn giữ nguyên và lần sau không tái dùng attempt đó. Partial result sau write failure chặn lượt mới, không tự xóa hoặc refund. RESULT_ERROR không có nghĩa request chưa bị tính phí.
+Writer dùng lock cùng reservation, O_EXCL và fsync file/directory. Duplicate/overwrite/orphan bị từ chối; reader strict/canonical/bounded kiểm chi phí tính lại. Reservation kế tiếp kiểm mọi result đã có; result hỏng hoặc orphan chặn request. Nếu crash trước khi có result, reservation vẫn giữ nguyên và lần sau không tái dùng attempt đó. Nếu result exact đã visible sau lỗi file-sync/close/parent-sync, command trả `PUBLISHED_RECOVERY_REQUIRED` và bàn giao result đã resolve để đọc report, không retry provider. Partial result sau write failure chặn lượt mới, không tự xóa hoặc refund. RESULT_ERROR không có nghĩa request chưa bị tính phí.
 
 Estimate dùng snapshot [giá chính thức](https://api-docs.deepseek.com/quick_start/pricing/) kiểm tra ngày 2026-09-07: Flash peak cache-miss input $0.44/MTok, output $1.32/MTok, tính nguyên microUSD và làm tròn lên. Bỏ qua giảm giá cache/off-peak để ước tính bảo thủ; không phải invoice, không là giá đảm bảo tương lai. Usage không có là null, không phải zero. Không giải phóng reservation theo estimate. Mock không được có usage tính phí. Runner ghi metadata hiện chỉ dùng fixture ledger; chưa nối thành lệnh live nhận artifact BR-10.
 

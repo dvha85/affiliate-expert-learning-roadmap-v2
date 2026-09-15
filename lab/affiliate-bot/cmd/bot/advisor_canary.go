@@ -46,28 +46,46 @@ func runCampaignCanary(ctx context.Context, path string, p *deepSeekProvider) (i
 	return runBR10RecordedCampaignAttempt(ctx, path, bundle, p)
 }
 
+// Test-owned dependency seams; production always resolves the fixed OS-user
+// campaign path and default DeepSeek adapter. They are not configurable by CLI
+// flags or environment values beyond the existing credential lookup.
+var campaignCanaryProvider = newDeepSeekProvider
+var campaignCanaryPath = advisorCampaignPath
+
 func runCampaignCanaryCLI(args []string, stdout, stderr io.Writer) int {
-	emit := func(n int, status string, err error, code int) int {
+	emit := func(n int, status string, artifact any, err error, code int) int {
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 		}
-		if err := json.NewEncoder(stdout).Encode(map[string]any{"command": "advisor campaign-canary", "status": status, "attempt": n, "execution_permitted": false}); err != nil {
+		envelope := map[string]any{"command": "advisor campaign-canary", "status": status, "attempt": n, "execution_permitted": false}
+		if artifact != nil {
+			envelope["artifact"] = artifact
+		}
+		if err := json.NewEncoder(stdout).Encode(envelope); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
 		return code
 	}
 	if len(args) != 1 {
-		return emit(0, "USAGE_ERROR", errors.New("usage: bot advisor campaign-canary (no path, endpoint, model or input arguments)"), 2)
+		return emit(0, "USAGE_ERROR", nil, errors.New("usage: bot advisor campaign-canary (no path, endpoint, model or input arguments)"), 2)
 	}
-	path, err := advisorCampaignPath()
+	path, err := campaignCanaryPath()
 	if err != nil {
-		return emit(0, "CONFIG_ERROR", err, 1)
+		return emit(0, "CONFIG_ERROR", nil, err, 1)
 	}
-	n, status, err := runCampaignCanary(context.Background(), path, newDeepSeekProvider())
+	n, status, err := runCampaignCanary(context.Background(), path, campaignCanaryProvider())
+	var artifact any
+	if status == "PUBLISHED_RECOVERY_REQUIRED" {
+		result, resolveErr := resolvedCampaignResult(path, n)
+		if resolveErr != nil {
+			return emit(n, "RESULT_ERROR", nil, fmt.Errorf("visible campaign result could not be resolved: %w", resolveErr), 1)
+		}
+		artifact = result
+	}
 	code := 1
 	if err == nil && (status == "SUPPORTED" || status == "ABSTAIN") {
 		code = 0
 	}
-	return emit(n, status, err, code)
+	return emit(n, status, artifact, err, code)
 }
