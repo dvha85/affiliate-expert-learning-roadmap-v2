@@ -128,3 +128,34 @@ func TestDecodeExecutionRejectsSchemaAmbiguity(t *testing.T) {
 		t.Fatalf("succeeded without performed side effect: %s", status)
 	}
 }
+
+func TestValidateHistoricalChainBindsEveryM09Artifact(t *testing.T) {
+	intent, policy, approval, _ := approvalFixture(t)
+	authorization := ExecutionAuthorization{
+		AuthorizationID: "auth-1", IntentID: intent.IntentID, IntentHash: intent.IntentHash,
+		PolicyVersion: policy.PolicyVersion, ApprovalID: approval.ApprovalID, ExecutorID: "fixture-executor",
+		AuthorizedAt: "2026-09-07T01:40:00Z", ExpiresAt: "2026-09-07T02:30:00Z",
+		IdempotencyKey: intent.IdempotencyKey, CorrelationID: intent.CorrelationID,
+		ExecutionMode: "APPROVED_LIVE", ExecutionAuthorized: true,
+	}
+	execution := ExecutionRecord{
+		ExecutionID: "exec-1", AuthorizationID: authorization.AuthorizationID, ApprovalID: approval.ApprovalID,
+		IntentID: intent.IntentID, IntentHash: intent.IntentHash, ExecutorID: authorization.ExecutorID,
+		IdempotencyKey: intent.IdempotencyKey, AttemptedAt: "2026-09-07T02:00:00Z",
+		Status: "CANCELLED", SideEffectState: "NOT_PERFORMED", CorrelationID: intent.CorrelationID,
+	}
+	if status := ValidateHistoricalChain(intent, policy, approval, authorization, execution); status != Valid {
+		t.Fatalf("valid historical chain: %s", status)
+	}
+	wrongExecutor := execution
+	wrongExecutor.ExecutorID = "other-executor"
+	if status := ValidateHistoricalChain(intent, policy, approval, authorization, wrongExecutor); status != "BROKEN_LINK" {
+		t.Fatalf("broken execution link: %s", status)
+	}
+	performedAfterExpiry := execution
+	performedAfterExpiry.AttemptedAt = authorization.ExpiresAt
+	performedAfterExpiry.SideEffectState = "PERFORMED"
+	if status := ValidateHistoricalChain(intent, policy, approval, authorization, performedAfterExpiry); status != "EXPIRED_AUTHORIZATION" {
+		t.Fatalf("performed effect after expiry: %s", status)
+	}
+}

@@ -6,8 +6,6 @@ import (
 	corem09 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m09"
 	"io"
 	"os"
-	"strings"
-	"time"
 )
 
 func DecodeM09Approval(raw []byte) (ApprovalRecord, string) {
@@ -67,45 +65,8 @@ func CheckM09Chain(intentRaw, policyRaw, approvalRaw, authorizationRaw, executio
 	if state != missionValid {
 		return M09CheckSummary{}, state
 	}
-	for _, v := range []string{i.IntentID, i.DecisionID, i.CorrelationID, i.IdempotencyKey, p.PolicyVersion, a.ApprovalID, a.ApproverID, auth.AuthorizationID, auth.ExecutorID, r.ExecutionID} {
-		if strings.TrimSpace(v) == "" {
-			return M09CheckSummary{}, missionInvalid
-		}
-	}
-	if i.IntentHash != ComputeShadowIntentHash(i) {
-		return M09CheckSummary{}, "TAMPERED_INTENT"
-	}
-	if p.IntentID != i.IntentID || p.IntentHash != i.IntentHash || a.IntentID != i.IntentID || a.IntentHash != i.IntentHash || a.PolicyVersion != p.PolicyVersion || a.CorrelationID != i.CorrelationID {
-		return M09CheckSummary{}, "BROKEN_LINK"
-	}
-	if a.Decision != "APPROVE" {
-		return M09CheckSummary{}, "REJECTED_APPROVAL"
-	}
-	if p.Decision != "ALLOW" && p.Decision != "HUMAN_REVIEW" {
-		return M09CheckSummary{}, "INVALID_POLICY_STATE"
-	}
-	if auth.ApprovalID != a.ApprovalID || auth.IntentID != i.IntentID || auth.IntentHash != i.IntentHash || auth.PolicyVersion != p.PolicyVersion || auth.CorrelationID != i.CorrelationID || auth.IdempotencyKey != i.IdempotencyKey {
-		return M09CheckSummary{}, "BROKEN_LINK"
-	}
-	if r.AuthorizationID != auth.AuthorizationID || r.ApprovalID != a.ApprovalID || r.IntentID != i.IntentID || r.IntentHash != i.IntentHash || r.ExecutorID != auth.ExecutorID || r.IdempotencyKey != i.IdempotencyKey || r.CorrelationID != i.CorrelationID {
-		return M09CheckSummary{}, "BROKEN_LINK"
-	}
-	times := make([]time.Time, 8)
-	for n, value := range []string{i.CreatedAt, i.ExpiresAt, p.PolicyCheckedAt, a.ApprovedAt, a.ExpiresAt, auth.AuthorizedAt, auth.ExpiresAt, r.AttemptedAt} {
-		parsed, err := time.Parse(time.RFC3339, value)
-		if err != nil {
-			return M09CheckSummary{}, "INVALID_TIME_BINDING"
-		}
-		times[n] = parsed
-	}
-	created, intentEnd, checked, approved, approvalEnd, authorized, authEnd, attempted := times[0], times[1], times[2], times[3], times[4], times[5], times[6], times[7]
-	if !intentEnd.After(created) || checked.Before(created) || approved.Before(checked) || !approvalEnd.After(approved) || authorized.Before(approved) || !authEnd.After(authorized) || authEnd.After(intentEnd) || authEnd.After(approvalEnd) || attempted.Before(authorized) {
-		return M09CheckSummary{}, "INVALID_TIME_BINDING"
-	}
-	// Failed/unknown attempts may be recorded after expiry; a claimed performed
-	// effect must have been attempted within the authorization window.
-	if r.SideEffectState == "PERFORMED" && !attempted.Before(authEnd) {
-		return M09CheckSummary{}, "EXPIRED_AUTHORIZATION"
+	if state := corem09.ValidateHistoricalChain(coreIntent(i), coreM09Policy(p), corem09.ApprovalRecord(a), corem09.ExecutionAuthorization(auth), corem09.ExecutionRecord(r)); state != corem09.Valid {
+		return M09CheckSummary{}, state
 	}
 	return M09CheckSummary{Result: "CONSISTENT_UNVERIFIED", IntentID: i.IntentID, ApprovalID: a.ApprovalID, AuthorizationID: auth.AuthorizationID, ExecutionID: r.ExecutionID, ExecutionStatus: r.Status, SideEffectState: r.SideEffectState, ApprovalAuthenticated: false, ExecutionPermitted: false}, missionValid
 }

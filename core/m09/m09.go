@@ -114,6 +114,60 @@ func DecodeExecution(raw []byte) (ExecutionRecord, string) {
 	return record, Valid
 }
 
+// ValidateHistoricalChain checks a decoded M09 history without consulting
+// wall-clock time or granting authority. Historical records may be inspected
+// after their intent/authorization windows have expired; only a performed
+// effect is required to have happened before authorization expiry.
+func ValidateHistoricalChain(intent m08.Intent, policy m08.PolicyDecision, approval ApprovalRecord, authorization ExecutionAuthorization, execution ExecutionRecord) string {
+	for _, value := range []string{
+		intent.IntentID, intent.DecisionID, intent.CorrelationID, intent.IdempotencyKey,
+		policy.PolicyVersion, approval.ApprovalID, approval.ApproverID,
+		authorization.AuthorizationID, authorization.ApprovalID, authorization.ExecutorID,
+		execution.ExecutionID, execution.AuthorizationID, execution.ApprovalID,
+	} {
+		if strings.TrimSpace(value) == "" {
+			return "INVALID"
+		}
+	}
+	if intent.IntentHash != m08.ComputeIntentHash(intent) {
+		return "TAMPERED_INTENT"
+	}
+	if status := m08.ValidatePolicyForIntent(intent, policy); status != Valid || (policy.Decision != "ALLOW" && policy.Decision != "HUMAN_REVIEW") {
+		return "INVALID_POLICY_STATE"
+	}
+	if approval.IntentID != intent.IntentID || approval.IntentHash != intent.IntentHash || approval.PolicyVersion != policy.PolicyVersion || approval.CorrelationID != intent.CorrelationID || approval.Decision != "APPROVE" {
+		if approval.Decision != "APPROVE" {
+			return RejectedApproval
+		}
+		return "BROKEN_LINK"
+	}
+	if authorization.ExecutionMode != "APPROVED_LIVE" || !authorization.ExecutionAuthorized {
+		return InvalidProfile
+	}
+	if authorization.ApprovalID != approval.ApprovalID || authorization.IntentID != intent.IntentID || authorization.IntentHash != intent.IntentHash || authorization.PolicyVersion != policy.PolicyVersion || authorization.CorrelationID != intent.CorrelationID || authorization.IdempotencyKey != intent.IdempotencyKey {
+		return "BROKEN_LINK"
+	}
+	if execution.AuthorizationID != authorization.AuthorizationID || execution.ApprovalID != approval.ApprovalID || execution.IntentID != intent.IntentID || execution.IntentHash != intent.IntentHash || execution.ExecutorID != authorization.ExecutorID || execution.IdempotencyKey != intent.IdempotencyKey || execution.CorrelationID != intent.CorrelationID {
+		return "BROKEN_LINK"
+	}
+	times := make([]time.Time, 8)
+	for index, value := range []string{intent.CreatedAt, intent.ExpiresAt, policy.PolicyCheckedAt, approval.ApprovedAt, approval.ExpiresAt, authorization.AuthorizedAt, authorization.ExpiresAt, execution.AttemptedAt} {
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			return InvalidTimeBinding
+		}
+		times[index] = parsed
+	}
+	created, intentEnd, checked, approved, approvalEnd, authorized, authorizationEnd, attempted := times[0], times[1], times[2], times[3], times[4], times[5], times[6], times[7]
+	if !intentEnd.After(created) || checked.Before(created) || approved.Before(checked) || !approvalEnd.After(approved) || authorized.Before(approved) || !authorizationEnd.After(authorized) || authorizationEnd.After(intentEnd) || authorizationEnd.After(approvalEnd) || attempted.Before(authorized) {
+		return InvalidTimeBinding
+	}
+	if execution.SideEffectState == "PERFORMED" && !attempted.Before(authorizationEnd) {
+		return "EXPIRED_AUTHORIZATION"
+	}
+	return Valid
+}
+
 // ValidateApproval checks an approval against the immutable M08 proposal-only
 // intent and its non-authorizing policy result at a runtime-owned time. It
 // grants no execution authority and does not mutate caller state.
