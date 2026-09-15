@@ -579,6 +579,39 @@ def audit_selected_source_operated_run(root, matrix, plan_text):
             fail("selected-source operated run evidence graph claim is missing")
 
 
+def audit_local_recovery_drill(root, matrix, plan_text):
+    """Require a durable, bounded record when the local recovery smoke is operated."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-10-br18b-local-recovery-drill")
+    required_scope = (
+        "fresh local learner Bot process",
+        "typed manifest v3",
+        "durable STOP",
+        "target-host deployment recovery",
+        "RP-10 remains OPEN",
+    )
+    if not isinstance(record, dict) or any(marker not in record.get("scope", "") for marker in required_scope):
+        fail("local recovery drill record lacks its bounded runtime/external scope")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "scripts/smoke_br18b_backup_restore.py",
+        "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("local recovery drill record lacks durable implementation/evidence refs")
+    evidence_path = root / "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    if "BR-18b local recovery drill" not in plan_text or "BR-18b PASS" not in evidence or "## Giới hạn" not in evidence:
+        fail("local recovery drill evidence is missing its durable plan or result record")
+    graph_text = (root / "docs/plans/READINESS-EVIDENCE-GRAPH.json").read_text(encoding="utf-8")
+    if "BR-18b-operated-local-recovery" not in graph_text:
+        fail("local recovery drill evidence graph claim is missing")
+
+
 def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     """Keep the checked-in engine evidence tied to the Node major n8n needs."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1012,6 +1045,7 @@ def audit(root):
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
+    audit_local_recovery_drill(root, matrix, plan_text)
     audit_public_readiness_boundary(root, matrix["overall"])
     for script, workflow in CI_REQUIRED.items():
         if not (root / script).is_file():

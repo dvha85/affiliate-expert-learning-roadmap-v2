@@ -2003,6 +2003,18 @@ independent review/deployment evidence; approval campaign, provider diversity,
 Smartlink, live executor, payout, pilot máy sạch và recovery host thật vẫn mở,
 nên BR-13/14 và overall readiness giữ `PARTIAL`/`NOT_READY_FOR_PRODUCTION`.
 
+**BR-18b local recovery drill (2026-09-15):** chạy
+`python3 scripts/smoke_br18b_backup_restore.py` trên `main`
+`7be0ccc59aa05d4068ade3193ace0d3c26295aa5`. Learner Bot thật đã build graph
+M10/M11 trong workspace tạm, tạo backup/restore bằng manifest v3, đọc lại bằng
+process mới, kiểm replay, budget/lease-window, các link evaluation/cycle và
+durable STOP; kết quả `BR-18b PASS`. Bằng chứng chi tiết nằm tại
+`docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md`.
+Đây chỉ là local fixture/runtime evidence: không đóng deployment recovery trên
+target host, power-loss/multi-host/24/7 hoặc business/provider evidence, nên
+BR-18b vẫn `PARTIAL`, RP-10 vẫn `OPEN` và readiness giữ
+`NOT_READY_FOR_PRODUCTION`.
+
 **M06 selected-source engine CI (2026-09-13):** cùng runner disposable import
 blueprint M06 ACCESSTRADE Shopee Smartlink ở dạng inactive/manual, thay trigger
 chỉ trong bản copy test và truyền metadata fixture đã làm sạch. Nó phải append
