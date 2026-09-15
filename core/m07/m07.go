@@ -132,16 +132,27 @@ func ValidateRegistry(registry []ToolSpec) error {
 		if tool.FollowRedirects {
 			return fmt.Errorf("tool %s must disable redirects", tool.Name)
 		}
+		methodSeen := map[string]bool{}
 		for _, method := range tool.AllowedMethods {
 			method = strings.ToUpper(strings.TrimSpace(method))
 			if method != "GET" && method != "HEAD" {
 				return fmt.Errorf("tool %s allows a write method", tool.Name)
 			}
+			if methodSeen[method] {
+				return fmt.Errorf("tool %s repeats an allowed method", tool.Name)
+			}
+			methodSeen[method] = true
 		}
+		hostSeen := map[string]bool{}
 		for _, host := range tool.AllowedHosts {
 			if err := validateHost(host); err != nil {
 				return fmt.Errorf("tool %s: %w", tool.Name, err)
 			}
+			normalizedHost := strings.ToLower(host)
+			if hostSeen[normalizedHost] {
+				return fmt.Errorf("tool %s repeats an allowed host", tool.Name)
+			}
+			hostSeen[normalizedHost] = true
 		}
 	}
 	if len(seen) == 0 {
@@ -151,6 +162,9 @@ func ValidateRegistry(registry []ToolSpec) error {
 }
 
 func validateHost(host string) error {
+	if strings.TrimSpace(host) != host {
+		return fmt.Errorf("invalid allowlisted host %q", host)
+	}
 	host = strings.TrimSpace(host)
 	u, err := url.Parse("https://" + host)
 	if err != nil || u.Hostname() == "" || u.Host != host || u.User != nil || u.Port() != "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
@@ -383,10 +397,11 @@ func renderClaim(claim Claim) string {
 	return claim.FieldOrClaim + "=" + string(value) + " [evidence:" + strings.Join(claim.EvidenceIDs, ",") + "]"
 }
 
-// ValidateAgentOutput checks the model's actual structured output. Context IDs
-// are never copied into the answer automatically: every cited ID and every
-// claim must be present in the model output and resolve in the supplied store.
-func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (AgentOutput, error) {
+// DecodeAgentOutput strictly decodes the model's structured output without
+// consulting evidence or tool policy. Keeping this decoder separate lets
+// policy adapters validate tool requests before a model output is handed to a
+// client, while ValidateAgentOutput remains the grounding boundary.
+func DecodeAgentOutput(raw []byte) (AgentOutput, error) {
 	// Decode the complete untrusted model payload through the same strict
 	// boundary used by durable M07 artifacts. In particular, do this before
 	// inspecting individual fields: encoding/json otherwise accepts duplicate
@@ -401,8 +416,12 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 		return AgentOutput{}, fmt.Errorf("agent output is not JSON: %w", err)
 	}
 	for _, required := range []string{"state", "answer", "evidence_ids", "claims", "tool_calls", "authority", "write_permission"} {
-		if _, ok := shape[required]; !ok {
+		value, ok := shape[required]
+		if !ok {
 			return AgentOutput{}, fmt.Errorf("agent output missing required field %q", required)
+		}
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return AgentOutput{}, fmt.Errorf("agent output field %q cannot be null", required)
 		}
 	}
 	if string(bytes.TrimSpace(shape["write_permission"])) != "false" {
@@ -437,6 +456,25 @@ func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (
 	}
 	if !uniqueNonEmpty(output.EvidenceIDs) {
 		return output, fmt.Errorf("evidence_ids must be unique and non-empty")
+	}
+	if output.EvidenceIDs == nil || output.Claims == nil || output.ToolCalls == nil {
+		return output, fmt.Errorf("agent output arrays cannot be null")
+	}
+	for _, call := range output.ToolCalls {
+		if strings.TrimSpace(call.ToolName) == "" || strings.TrimSpace(call.Method) == "" || strings.TrimSpace(call.Target) == "" {
+			return output, fmt.Errorf("tool call is incomplete")
+		}
+	}
+	return output, nil
+}
+
+// ValidateAgentOutput checks the model's actual structured output. Context IDs
+// are never copied into the answer automatically: every cited ID and every
+// claim must be present in the model output and resolve in the supplied store.
+func ValidateAgentOutput(raw []byte, evidence []Evidence, registry []ToolSpec) (AgentOutput, error) {
+	output, err := DecodeAgentOutput(raw)
+	if err != nil {
+		return output, err
 	}
 	known := map[string]Evidence{}
 	for _, item := range evidence {

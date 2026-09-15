@@ -25,6 +25,18 @@ func TestValidateToolRequestIsExactAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestValidateRegistryRejectsAmbiguousAllowlistEntries(t *testing.T) {
+	for _, tools := range [][]ToolSpec{
+		{{Name: "http", ReadOnly: true, AllowedMethods: []string{"GET", "get"}, AllowedHosts: []string{"example.com"}}},
+		{{Name: "http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com", "EXAMPLE.COM"}}},
+		{{Name: "http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{" example.com"}}},
+	} {
+		if err := ValidateRegistry(tools); err == nil {
+			t.Fatalf("ambiguous registry accepted: %+v", tools)
+		}
+	}
+}
+
 func TestValidateAgentOutputRequiresModelCitations(t *testing.T) {
 	base := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{{FieldOrClaim: "price", Value: json.RawMessage("100"), EvidenceIDs: []string{"e1"}}}, EvidenceIDs: []string{"e1"}, ToolCalls: []ToolRequest{}, Authority: "A2-RO", WritePermission: false}
 	base.Claims[0].Text = renderClaim(base.Claims[0])
@@ -139,7 +151,7 @@ func TestRegisteredToolResultIsBoundToRequestAndRecord(t *testing.T) {
 func TestRegisteredAgentProposalRerunsGroundingAndDigest(t *testing.T) {
 	claim := Claim{FieldOrClaim: "price", Value: json.RawMessage("100"), EvidenceIDs: []string{"e1"}}
 	claim.Text = renderClaim(claim)
-	output := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{claim}, EvidenceIDs: []string{"e1"}, Authority: "A2-RO", WritePermission: false, ProposedAction: &ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
+	output := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{claim}, EvidenceIDs: []string{"e1"}, ToolCalls: []ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
 	output.Answer = RenderGroundedAnswer(output.Claims)
 	raw, _ := json.Marshal(output)
 	registered, err := RegisterAgentProposal(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1")

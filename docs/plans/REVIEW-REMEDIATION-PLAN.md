@@ -1085,6 +1085,17 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 
 **Nghiệm thu:** R01/R05 đóng; không yêu cầu provider trả phí để chứng minh guard offline. **Rollback:** vô hiệu hóa tool/proposal handoff khi version không tương thích, không quay lại behavior “tự gắn evidence IDs”.
 
+**Cập nhật shared M07 harness boundary (2026-09-16):** mission-runtime không
+còn giữ parser/policy M07 độc lập. `ToolSpec`, tool request và Agent output
+dùng type/decoder của `core/m07`; registry, strict output contract,
+claim/value grounding và read-only tool policy đều chạy qua implementation
+chung. Eval/testdata được nâng lên output `HUMAN_REVIEW` có claims/evidence/
+authority/write boundary; tool request chưa có adapter trace vẫn bị chặn. Test
+negative chạy qua harness thật và bắt unknown tool, write/host/port/userinfo,
+forged known-ID value, duplicate/null/trailing fields và allowlist mơ hồ.
+Đây là local fixture evidence, không đóng provider/live executor/business
+outcome/pilot/deployment hoặc multi-host/power-loss.
+
 ### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
 **Chạm tới:** `backup_command.go`, runtime store inventory, canonical loaders, manifest version và deployment runbook.

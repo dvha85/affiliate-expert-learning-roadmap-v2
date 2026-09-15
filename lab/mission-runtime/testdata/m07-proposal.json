@@ -1,1 +1,1 @@
-{"state":"PROPOSE","answer":"Synthetic example only; no source fetched.","evidence_ids":["syn-e1"],"tool_calls":[{"tool_name":"public_http","method":"GET","target":"https://example.com/offer"}]}
+{"state":"HUMAN_REVIEW","answer":"fixture=\"fixture\" [evidence:syn-e1]","claims":[{"text":"fixture=\"fixture\" [evidence:syn-e1]","field_or_claim":"fixture","value":"fixture","evidence_ids":["syn-e1"]}],"evidence_ids":["syn-e1"],"tool_calls":[],"authority":"A2-RO","write_permission":false}
