@@ -1876,6 +1876,13 @@ theo thay đổi: mọi PR và push `main` vẫn chạy toàn bộ Go/race, quic
 M00–M11 smoke và mutation proof. Mục tiêu là giảm wall-clock CI, không giảm
 coverage hoặc suy cache hit thành runtime evidence.
 
+**Cập nhật deterministic-runtime single-build (2026-09-16):** job giữ nguyên
+toàn bộ M01/M02 CLI smoke nhưng build learner Bot một lần vào
+`$RUNNER_TEMP/learner-bot`, sau đó tái sử dụng binary cho các lệnh baseline,
+capture, list, replay và decision. Cách này loại compile lặp của nhiều `go run`
+trong cùng job; không thay đổi test coverage, không bỏ required check và không
+được coi là bằng chứng production/runtime ngoài CI.
+
 **Cập nhật mutation proof M11 (2026-09-12):** job `deterministic-runtime`
 chạy `scripts/mutate_m11_identity_guard.py`. Script copy riêng `core` và
 `contracts`, rồi lần lượt bỏ đúng từng guard canonical `GateID`,
