@@ -647,7 +647,11 @@ def main():
         missing_approval_backup = root / "missing-recovery-approval-backup"; shutil.copytree(admission_backup, missing_approval_backup)
         remove_m11_entry(missing_approval_backup, "PRODUCTION_LEASE_APPROVAL", admission_lease_value["approval_ref"])
         missing_approval_result = invoke(bot, "backup", "restore", missing_approval_backup, root / "missing-recovery-approval-restored", expected=1, env=env)
-        assert missing_approval_result["status"] == "GRAPH_FAILED", missing_approval_result
+        # The edited snapshot carries a matching file digest but not a matching
+        # manifest-required runtime graph, so restore must stop at its earlier
+        # verification boundary. The direct learner-loader regression covers
+        # the same approval-less admission at canonical graph validation.
+        assert missing_approval_result["status"] == "VERIFY_FAILED", missing_approval_result
         missing_activation_backup = root / "missing-recovery-activation-backup"; shutil.copytree(admission_backup, missing_activation_backup)
         remove_m11_entry(missing_activation_backup, "PRODUCTION_ACTIVATION", admission_lease_value["lease_id"] + "/" + admission_lease_value["lease_version"])
         missing_activation_result = invoke(bot, "backup", "restore", missing_activation_backup, root / "missing-recovery-activation-restored", expected=1, env=env)

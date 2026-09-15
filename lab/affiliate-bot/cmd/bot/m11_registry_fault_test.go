@@ -157,6 +157,45 @@ func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T)
 	}
 }
 
+func TestM11RegistryLoaderRejectsRecoveryAdmissionWithoutRecordedApproval(t *testing.T) {
+	dir := t.TempDir()
+	lease := corem11.ProductionLease{LeaseID: "admission-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "admission-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "admission-correlation", HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	admission := corem11.ProductionRecoveryAdmission{RecoveryAdmissionID: "missing-approval-admission", PriorRuntimeDir: "/runtime/old", PriorLeaseID: "old-lease", PriorLeaseVersion: "v1", PriorLeaseHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", PriorApprovalID: "old-approval", ResolutionID: "old-resolution", NewRuntimeID: "runtime-new", NewRuntimeDir: "/runtime/new", NewLeaseID: lease.LeaseID, NewLeaseVersion: lease.LeaseVersion, NewLeaseHash: lease.LeaseHash, NewApprovalID: lease.ApprovalRef, ReviewedBy: "human", ReviewerID: "new-reviewer", ReviewedAt: "2026-09-08T00:00:01Z", ExecutionPermitted: false}
+	entries := []corem11.ArtifactEntry{}
+	for _, artifact := range []struct {
+		kind  string
+		value any
+	}{
+		{corem11.ArtifactKindLease, lease},
+		{corem11.ArtifactKindRecoveryAdmission, admission},
+	} {
+		raw, err := json.Marshal(artifact.value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := corem11.NewArtifactEntry(artifact.kind, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, entry)
+	}
+	lines := []byte{}
+	for _, entry := range entries {
+		line, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, append(line, '\n')...)
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(dir), lines, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(dir); err == nil || !strings.Contains(err.Error(), "orphaned") {
+		t.Fatalf("recovery admission without approval reached runtime loader: %v", err)
+	}
+}
+
 func TestM11JournalSymlinkFailsClosedBeforeRecoveryOrMutation(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink permissions are not portable on Windows")
