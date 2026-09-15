@@ -59,14 +59,48 @@ func TestM10ExecutionJournalFIFOFailsClosedBeforeRuntimeRead(t *testing.T) {
 	}
 }
 
+func TestM10CanaryAndCostBoundJournalFIFOsFailClosedBeforeRuntimeRead(t *testing.T) {
+	for name, journal := range map[string]struct {
+		path     func(string) string
+		recovery func(string) error
+		reader   func(string) ([]byte, error)
+	}{
+		"canary":     {path: m10CanaryJournalPath, recovery: m10CanaryJournalRecoveryRequired, reader: readM10CanaryJournal},
+		"cost-bound": {path: m10CostBoundJournalPath, recovery: m10CostBoundJournalRecoveryRequired, reader: readM10CostBoundJournal},
+	} {
+		journal := journal
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+				t.Fatalf("init failed: code=%d response=%+v", code, response)
+			}
+			path := journal.path(dir)
+			if err := syscall.Mkfifo(path, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := journal.recovery(dir); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+				t.Fatalf("FIFO %s journal was not rejected before recovery: %v", name, err)
+			}
+			if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("status did not fail closed for %s FIFO: code=%d response=%+v", name, code, response)
+			}
+			if _, err := journal.reader(filepath.Clean(path)); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+				t.Fatalf("FIFO %s journal reached reader: %v", name, err)
+			}
+		})
+	}
+}
+
 // The recovery-presence check intentionally only needs Lstat: it fails closed
 // as soon as a journal exists. The parser, however, must not follow a same-byte
 // replacement after its Lstat/open check, because a journal is an authority
 // replay plan. Exercise the real M10/M11 readers with the stable-reader seam.
 func TestRecoveryJournalReadersRejectSymlinkSwapAfterOpen(t *testing.T) {
 	readers := map[string]func(string) ([]byte, error){
-		"m10": readM10ExecutionJournal,
-		"m11": readM11Journal,
+		"m10-execution":  readM10ExecutionJournal,
+		"m10-canary":     readM10CanaryJournal,
+		"m10-cost-bound": readM10CostBoundJournal,
+		"m11":            readM11Journal,
 	}
 	for name, reader := range readers {
 		t.Run(name, func(t *testing.T) {

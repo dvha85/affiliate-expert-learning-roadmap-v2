@@ -706,6 +706,35 @@ def audit_m11_post_remove_journal_cleanup_ack(root, matrix, plan_text):
         fail("M11 post-remove journal-cleanup acknowledgement regression is missing from learner path")
 
 
+def audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text):
+    """Keep each M10 authority replay journal on the guarded reader path."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-m10-canary-cost-journal-path-guard")
+    if not isinstance(record, dict) or "canary and cost-bound recovery journal rejects a FIFO" not in record.get("scope", "") or "same-byte external target replacement after open" not in record.get("scope", ""):
+        fail("matrix lacks scoped M10 canary/cost journal path-guard acceptance")
+    if "Cập nhật M10 canary/cost journal path guards" not in plan_text:
+        fail("M10 canary/cost journal path guard lacks a scoped plan marker")
+    source_path = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/m11_journal_unix_test.go"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_source = (
+        "func readM10CanaryJournal(path string) ([]byte, error)",
+        "func readM10CostBoundJournal(path string) ([]byte, error)",
+        "func m10CanaryJournalRecoveryRequired(dir string) error",
+        "func m10CostBoundJournalRecoveryRequired(dir string) error",
+    )
+    required_test = (
+        "TestM10CanaryAndCostBoundJournalFIFOsFailClosedBeforeRuntimeRead",
+        "m10CanaryJournalPath",
+        "m10CostBoundJournalPath",
+        '"m10-canary":     readM10CanaryJournal',
+        '"m10-cost-bound": readM10CostBoundJournal',
+    )
+    if not all(token in source for token in required_source) or not all(token in test for token in required_test):
+        fail("M10 canary/cost journal path-guard regression is missing from learner path")
+
+
 def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
     """Keep recovery handoff admission from accepting a lease with no review."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -834,6 +863,7 @@ def audit(root):
     audit_campaign_result_visible_ack(root, matrix, plan_text)
     audit_committed_journal_cleanup_ack(root, matrix, plan_text)
     audit_m11_post_remove_journal_cleanup_ack(root, matrix, plan_text)
+    audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
