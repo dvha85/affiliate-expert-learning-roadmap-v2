@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: dc689a19ec5b5c6972ccae3ef2de1b55f54cf1e4 -->
+<!-- readiness-main-baseline: 6ce54c1c0b25586c1b1a05c5da8d0a08ea32d527 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -282,6 +282,15 @@ boundary, nhận `PATH_ERROR` và kiểm thư mục ngoài vẫn rỗng.
 Đây chỉ là guard trực tiếp của output parent cho bundle fixture read-only;
 ancestor-path substitution, crash/power-loss, multi-host, provider và business
 outcome vẫn nằm ngoài scope. Inventory các writer khác vẫn mở, nên RP-01 giữ
+`PARTIAL`.
+
+**Cập nhật advisor fixture failed-staging cleanup (2026-09-15):** sau khi tạo
+staging directory, `bot advisor fixture-run` giờ xóa staging nếu build/evaluate,
+ghi bundle hoặc sync bị lỗi; chỉ giữ bundle sau khi toàn bộ nội dung đã được sync
+và parent sync thành công. Regression gọi đúng CLI, inject lỗi build, kiểm path
+bundle được báo đã biến mất, parent không còn staging và
+`execution_permitted=false`. Đây là cleanup local có giới hạn; crash/power-loss,
+multi-host, provider và business outcome vẫn ngoài scope, nên RP-01 vẫn
 `PARTIAL`.
 
 **Cập nhật ACCESSTRADE pending import recovery (2026-09-15):** importer outcome

@@ -185,6 +185,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(first + separator + remainder.replace(marker, "", 1), encoding="utf-8")
         self.assertIn("advisor fixture parent-recheck regression is missing", self.run_audit(False))
 
+    def test_missing_advisor_fixture_failed_staging_cleanup_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("var advisorFixtureBuild = buildBR10AdvisorFixture", "var removedAdvisorFixtureBuild = buildBR10AdvisorFixture", 1), encoding="utf-8")
+        self.assertIn("advisor fixture failed-staging cleanup regression is missing", self.run_audit(False))
+
     def test_missing_immutable_artifact_missing_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := ensureOutputParentBeforeCreate(dir);", "func artifactOutputDirectory(path string) (string, error) {\n\tdir := filepath.Dir(path)\n\tif err := removedOutputParentPreflight(dir);", 1), encoding="utf-8")

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -111,5 +112,43 @@ func TestAdvisorFixtureBundleRejectsParentSymlinkSwapBeforeCreate(t *testing.T) 
 	}
 	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
 		t.Fatalf("fixture-run created bundle through swapped parent: entries=%+v err=%v", entries, err)
+	}
+}
+
+func TestAdvisorFixtureBundleCleansFailedStaging(t *testing.T) {
+	parent := t.TempDir()
+	var staged string
+	advisorFixtureBuild = func(dir string) (advisorContext, error) {
+		staged = dir
+		return advisorContext{}, errors.New("injected fixture build failure")
+	}
+	t.Cleanup(func() { advisorFixtureBuild = buildBR10AdvisorFixture })
+
+	var output, stderr bytes.Buffer
+	if code := runAdvisor([]string{"fixture-run", parent}, &output, &stderr); code == 0 {
+		t.Fatalf("fixture-run accepted injected build failure: output=%s stderr=%s", output.String(), stderr.String())
+	}
+	var envelope struct {
+		Status string `json:"status"`
+		Path   string `json:"bundle_path"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Status != "FIXTURE_ERROR" || envelope.Path != staged {
+		t.Fatalf("fixture-run did not report failed staging: envelope=%+v staged=%q", envelope, staged)
+	}
+	if staged == "" {
+		t.Fatal("fixture build seam did not observe a staging directory")
+	}
+	if _, err := os.Lstat(staged); !os.IsNotExist(err) {
+		t.Fatalf("failed fixture staging still exists: path=%s err=%v", staged, err)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("parent still contains failed bundle staging: %+v", entries)
 	}
 }
