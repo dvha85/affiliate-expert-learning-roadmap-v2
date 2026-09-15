@@ -102,8 +102,11 @@ func DecodeCanaryGrant(raw []byte) (CanaryGrant, string) {
 	approved, approvedErr := time.Parse(time.RFC3339, grant.ApprovedAt)
 	validFrom, fromErr := time.Parse(time.RFC3339, grant.ValidFrom)
 	expires, expiresErr := time.Parse(time.RFC3339, grant.ExpiresAt)
-	if approvedErr != nil || fromErr != nil || expiresErr != nil || approved.After(validFrom) || !expires.After(validFrom) || grant.MaxExecutionsPerWindow > grant.MaxExecutionsTotal {
-		return grant, "INVALID_TIME_OR_LIMITS"
+	if approvedErr != nil || fromErr != nil || expiresErr != nil || approved.After(validFrom) || !expires.After(validFrom) {
+		return grant, "INVALID_TIME_BINDING"
+	}
+	if grant.MaxExecutionsPerWindow > grant.MaxExecutionsTotal {
+		return grant, "INVALID_LIMITS"
 	}
 	return grant, "VALID"
 }

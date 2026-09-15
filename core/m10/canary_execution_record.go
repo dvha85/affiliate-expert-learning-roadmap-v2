@@ -30,6 +30,7 @@ type ExecutionRecord struct {
 	AttemptedAt          string `json:"attempted_at"`
 	Status               string `json:"status"`
 	SideEffectState      string `json:"side_effect_state"`
+	ExternalRef          string `json:"external_ref,omitempty"`
 	Error                string `json:"error,omitempty"`
 	CorrelationID        string `json:"correlation_id"`
 }
@@ -106,6 +107,24 @@ func ValidateExecutionRecord(raw []byte) (ExecutionRecord, error) {
 	}
 	if (record.Status != "CANCELLED" && record.Status != "FAILED") || record.SideEffectState != "NOT_PERFORMED" || record.AuthorizationID == "" || record.CanaryGrantID == "" || record.CanaryGrantVersion == "" || record.CanaryGrantHash == "" || record.CanaryGateID == "" || record.CanaryCostBoundID == "" || record.CanaryCostBoundHash == "" || record.Error == "" {
 		return ExecutionRecord{}, fmt.Errorf("invalid terminal no-side-effect governed-canary execution record")
+	}
+	return record, nil
+}
+
+// DecodeCanaryExecutionRecord performs only the schema/profile decode shared
+// by readers. Unlike ValidateExecutionRecord, it also accepts a successful
+// canary record with a performed side effect; the latter validator is limited
+// to the terminal no-side-effect fixture profile used by this package.
+func DecodeCanaryExecutionRecord(raw []byte) (ExecutionRecord, error) {
+	var record ExecutionRecord
+	if err := contracts.ValidateRaw("execution-record.schema.json", raw); err != nil {
+		return record, err
+	}
+	if err := contracts.DecodeStrict(raw, &record); err != nil {
+		return ExecutionRecord{}, err
+	}
+	if record.CanaryGrantID == "" || record.CanaryGrantVersion == "" || record.CanaryGrantHash == "" || record.CanaryGateID == "" || record.CanaryCostBoundID == "" || record.CanaryCostBoundHash == "" {
+		return ExecutionRecord{}, fmt.Errorf("not a governed canary execution record")
 	}
 	return record, nil
 }

@@ -2,6 +2,7 @@ package m10
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -17,6 +18,33 @@ func m10Entry(t *testing.T, kind string, value any) ArtifactEntry {
 		t.Fatal(err)
 	}
 	return entry
+}
+
+func TestDecodeCanaryExecutionRecordAcceptsPerformedSuccess(t *testing.T) {
+	record := ExecutionRecord{
+		ExecutionID: "exec-1", AuthorizationID: "auth-1", CanaryGrantID: "grant-1", CanaryGrantVersion: "v1",
+		CanaryGrantHash: "sha256:" + strings.Repeat("a", 64), CanaryGateID: "gate-1", CanaryCostBoundID: "cost-1",
+		CanaryCostBoundHash: "sha256:" + strings.Repeat("b", 64), CanaryCostBoundMinor: 1, IntentID: "intent-1",
+		IntentHash: "sha256:" + strings.Repeat("c", 64), ExecutorID: "fixture", IdempotencyKey: "idem-1",
+		AttemptedAt: "2026-09-08T01:00:00Z", Status: "SUCCEEDED", SideEffectState: "PERFORMED",
+		ExternalRef: "fixture-marker", CorrelationID: "corr-1",
+	}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeCanaryExecutionRecord(raw)
+	if err != nil || decoded.ExternalRef != record.ExternalRef {
+		t.Fatal(err, decoded)
+	}
+	unknown := strings.Replace(string(raw), "{", `{"unexpected":true,`, 1)
+	if _, err := DecodeCanaryExecutionRecord([]byte(unknown)); err == nil {
+		t.Fatal("unknown execution field accepted")
+	}
+	duplicate := strings.Replace(string(raw), `"execution_id":"exec-1"`, `"execution_id":"exec-1","execution_id":"other"`, 1)
+	if _, err := DecodeCanaryExecutionRecord([]byte(duplicate)); err == nil {
+		t.Fatal("duplicate execution field accepted")
+	}
 }
 
 func TestTrustedCostBoundDecodeAndBinding(t *testing.T) {
