@@ -595,6 +595,21 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         fail("deterministic CI shard/cache is missing a required coverage boundary")
 
 
+def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
+    """Keep recovery handoff admission from accepting a lease with no review."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-recovery-admission-approval-guard")
+    if not isinstance(record, dict) or "exact immutable new-lease approval" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 recovery-admission approval guard")
+    if "Cập nhật recovery admission approval guard" not in plan_text:
+        fail("M11 recovery-admission approval guard lacks a scoped plan marker")
+    validator = (root / "core/m11/artifact_registry.go").read_text(encoding="utf-8")
+    core_test = (root / "core/m11/artifact_test.go").read_text(encoding="utf-8")
+    loader_test = (root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go").read_text(encoding="utf-8")
+    if "approval, approvalOK := approvals[x.NewApprovalID]" not in validator or "admissionAt.After(approvalAt)" not in validator or "recovery admission without its immutable lease approval was accepted" not in core_test or "TestM11RegistryLoaderRejectsRecoveryAdmissionWithoutRecordedApproval" not in loader_test:
+        fail("M11 recovery-admission approval regression is missing")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -636,6 +651,7 @@ def audit(root):
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
+    audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

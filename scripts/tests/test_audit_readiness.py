@@ -87,6 +87,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("learner-bot-race:", "removed-learner-bot-race:", 1), encoding="utf-8")
         self.assertIn("deterministic CI shard/cache is missing", self.run_audit(False))
 
+    def test_missing_m11_recovery_admission_approval_guard_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("approval, approvalOK := approvals[x.NewApprovalID]", "approval guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 recovery-admission approval regression is missing", self.run_audit(False))
+
     def test_missing_advisor_fixture_output_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
         source.write_text(source.read_text(encoding="utf-8").replace("fixture output parent must be an existing non-symlink directory", "fixture output parent guard removed", 1), encoding="utf-8")

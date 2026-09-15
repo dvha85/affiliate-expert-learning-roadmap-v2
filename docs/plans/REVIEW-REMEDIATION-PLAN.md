@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 315ee17e3b1b6195fbe59901d93e630073734219 -->
+<!-- readiness-main-baseline: 423c3ee6d2fe04071406e2c4977e67fa105ee4aa -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -554,6 +554,15 @@ graph nay sở hữu một admission cho mỗi new lease và mỗi cặp prior r
 resolution. Regression bắt cả hai conflict trên graph hợp lệ, nên generic
 registry không lệch learner/backup boundary. Đây không chứng minh recovery
 atomic, power-loss hay multi-host, nên RP-07 vẫn `PARTIAL`.
+
+**Cập nhật recovery admission approval guard (2026-09-15):** canonical M11
+graph không còn coi `RECOVERY_ADMISSION` là lease draft. Nó phải resolve exact
+`PRODUCTION_LEASE_APPROVAL` của new lease, và thời điểm human review của
+admission phải sau review của approval. Core regression dựng registry integrity
+hợp lệ chỉ gồm lease + admission để chứng minh reject; regression loader Bot
+đọc đúng file JSONL đó và cũng reject trước khi runtime dùng artifact. Điều này
+không chứng minh source lineage giữa hai runtime, atomic recovery, power-loss
+hay multi-host safety, nên RP-07 vẫn `PARTIAL`.
 
 **Cập nhật core M10 registry graph (2026-09-11):** M10 immutable graph được
 canonicalize vào core và learner registry dùng trực tiếp implementation này.

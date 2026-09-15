@@ -311,7 +311,15 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			resolutions[x.ExecutionID] = *x
 		case *ProductionRecoveryAdmission:
 			lease, leaseOK := leases[x.NewLeaseID]
-			if !leaseOK || lease.LeaseVersion != x.NewLeaseVersion || lease.LeaseHash != x.NewLeaseHash || lease.ApprovalRef != x.NewApprovalID || x.ExecutionPermitted {
+			approval, approvalOK := approvals[x.NewApprovalID]
+			admissionAt, admissionErr := time.Parse(time.RFC3339, x.ReviewedAt)
+			approvalAt, approvalErr := time.Parse(time.RFC3339, approval.ReviewedAt)
+			// A recovery admission is not a draft transition. Unlike a lease draft,
+			// it asserts that a separately reviewed new runtime has already been
+			// admitted. Require the exact immutable approval entry now, rather than
+			// allowing a registry truncated before that approval to look admissible
+			// until a later activation or gate happens to reject it.
+			if !leaseOK || !approvalOK || admissionErr != nil || approvalErr != nil || !admissionAt.After(approvalAt) || lease.LeaseVersion != x.NewLeaseVersion || lease.LeaseHash != x.NewLeaseHash || lease.ApprovalRef != x.NewApprovalID || approval.LeaseID != lease.LeaseID || approval.LeaseVersion != lease.LeaseVersion || approval.LeaseHash != lease.LeaseHash || x.ExecutionPermitted {
 				return fmt.Errorf("production recovery admission has an orphaned or mismatched link")
 			}
 			priorKey := x.PriorRuntimeDir + "\x00" + x.ResolutionID

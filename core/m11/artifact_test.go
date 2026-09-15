@@ -445,6 +445,16 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	if err := ValidateArtifactGraph(admissionEntries); err != nil {
 		t.Fatalf("valid recovery admission rejected: %v", err)
 	}
+	// A recovery admission asserts a separately reviewed new runtime. A lease
+	// draft alone is allowed in append-only history, but cannot make that
+	// stronger admission claim until its exact approval was also recorded.
+	orphanAdmissionEntries := []ArtifactEntry{
+		m11Entry(t, ArtifactKindLease, lease),
+		m11Entry(t, ArtifactKindRecoveryAdmission, admission),
+	}
+	if err := ValidateArtifactGraph(orphanAdmissionEntries); err == nil {
+		t.Fatal("recovery admission without its immutable lease approval was accepted")
+	}
 	secondAdmission := admission
 	secondAdmission.RecoveryAdmissionID, secondAdmission.PriorRuntimeDir, secondAdmission.ResolutionID = "admission-2", "/runtime/other", "resolution-other"
 	if err := ValidateArtifactGraph(append(admissionEntries, m11Entry(t, ArtifactKindRecoveryAdmission, secondAdmission))); err == nil {
