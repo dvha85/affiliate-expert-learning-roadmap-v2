@@ -635,11 +635,72 @@ func TestM07HTTPAdapterReportsUnconfirmedVisibleToolArtifact(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("tool artifact was not visible after unconfirmed publish: %v", err)
 	}
+	if !strings.Contains(first.Body.String(), `"artifact_id":"`+registered.TraceID+`"`) || !strings.Contains(first.Body.String(), `"artifact":`) {
+		t.Fatalf("adapter did not disclose deterministic recovery artifact: %s", first.Body.String())
+	}
 	artifactWriteFault = nil
 	retry := httptest.NewRecorder()
 	m07AdapterHandler(history).ServeHTTP(retry, httptest.NewRequest(http.MethodPost, "/v1/m07/register-tool-result", bytes.NewReader(payload)))
 	if retry.Code != http.StatusOK || !strings.Contains(retry.Body.String(), `"status":"ACK"`) {
 		t.Fatalf("exact tool retry did not acknowledge visible artifact: status=%d body=%s", retry.Code, retry.Body.String())
+	}
+}
+
+func TestM07HTTPAdapterReportsUnconfirmedVisibleProposal(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
+	watchRun(t, history, input, watchFixture(), appendAdded)
+	records, err := LoadHistory(history)
+	if err != nil || len(records) != 1 {
+		t.Fatal(err, records)
+	}
+	ctx, err := m07EvidenceContext(records[0])
+	if err != nil || len(ctx.Evidence) == 0 {
+		t.Fatalf("missing canonical M07 evidence: %+v err=%v", ctx, err)
+	}
+	value, err := json.Marshal(ctx.Evidence[0].Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claim := corem07.Claim{FieldOrClaim: ctx.Evidence[0].FieldOrClaim, Value: value, EvidenceIDs: []string{ctx.Evidence[0].EvidenceID}}
+	claim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{claim})
+	registry := []corem07.ToolSpec{{Name: "public_http", ReadOnly: true, AllowedMethods: []string{"GET"}, AllowedHosts: []string{"example.com"}, TimeoutMS: 1000, FollowRedirects: false}}
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: claim.Text, EvidenceIDs: []string{ctx.Evidence[0].EvidenceID}, Claims: []corem07.Claim{claim}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{}`)}}
+	payload, err := json.Marshal(m07AdapterRequest{RecordID: records[0].RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifactWriteFault = func(phase string) error {
+		if phase == "after_publish_before_parent_sync" {
+			return errors.New("injected proposal artifact parent sync failure")
+		}
+		return nil
+	}
+	t.Cleanup(func() { artifactWriteFault = nil })
+	first := httptest.NewRecorder()
+	m07AdapterHandler(history).ServeHTTP(first, httptest.NewRequest(http.MethodPost, "/v1/m07/register-proposal", bytes.NewReader(payload)))
+	if first.Code != http.StatusInternalServerError || !strings.Contains(first.Body.String(), `"status":"PUBLISHED_RECOVERY_REQUIRED"`) {
+		t.Fatalf("adapter did not disclose unconfirmed visible proposal: status=%d body=%s", first.Code, first.Body.String())
+	}
+	proposal, err := corem07.RegisterAgentProposal(mustRawJSON(t, model), ctx.Evidence, registry, records[0].RecordID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := m07ArtifactPath(history, "proposals", proposal.ProposalID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("proposal artifact was not visible after unconfirmed publish: %v", err)
+	}
+	if !strings.Contains(first.Body.String(), `"artifact_id":"`+proposal.ProposalID+`"`) || !strings.Contains(first.Body.String(), `"artifact":`) {
+		t.Fatalf("adapter did not disclose deterministic proposal recovery artifact: %s", first.Body.String())
+	}
+	artifactWriteFault = nil
+	retry := httptest.NewRecorder()
+	m07AdapterHandler(history).ServeHTTP(retry, httptest.NewRequest(http.MethodPost, "/v1/m07/register-proposal", bytes.NewReader(payload)))
+	if retry.Code != http.StatusOK || !strings.Contains(retry.Body.String(), `"status":"ACK"`) {
+		t.Fatalf("exact proposal retry did not acknowledge visible artifact: status=%d body=%s", retry.Code, retry.Body.String())
 	}
 }
 
