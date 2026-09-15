@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 31a635b0015b9f6024adcaec2d7bdf8bc202e554 -->
+<!-- readiness-main-baseline: 756eab10e506a0a1a7ae14d10bd328f9a7b967f2 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -34,6 +34,14 @@ lỗi chỉ sau `Remove`, xác nhận journal name đã biến mất và exact r
 thêm canary/bound/execution hay đổi STOP. Đây chỉ là acknowledgement local,
 không chứng minh power-loss, atomic multi-file, executor, business outcome hay
 multi-host safety.
+
+**Cập nhật M11 post-remove journal cleanup acknowledgement (2026-09-15):**
+M11 outcome, FAILED execution và UNKNOWN→STOP đều có regression fault sau
+`Remove` nhưng trước parent sync. Cả ba đường CLI phải trả non-success
+`PUBLISHED_RECOVERY_REQUIRED` cùng transition canonical đã thấy; journal path
+đã absent và exact retry không thêm outcome/execution hoặc thay STOP. Đây vẫn
+chỉ là test seam local sau `Remove`, không chứng minh durability khi mất điện,
+atomic transaction đa file, executor, business outcome hay multi-host.
 
 ## 1. Mục tiêu và giới hạn
 

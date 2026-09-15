@@ -1882,6 +1882,9 @@ func recoverM11OutcomeJournal(dir string) error {
 	if err := os.Remove(m11OutcomeJournalPath(dir)); err != nil && !os.IsNotExist(err) {
 		return &visibleAppendUncertainError{err: err}
 	}
+	if err := m11OutcomeWriteFault("after_remove_before_parent_sync"); err != nil {
+		return &visibleAppendUncertainError{err: err}
+	}
 	parent, err := os.Open(dir)
 	if err != nil {
 		return &visibleAppendUncertainError{err: err}
@@ -1998,6 +2001,9 @@ func recoverM11FailedExecutionJournal(dir string) error {
 	if err := os.Remove(m11FailedExecutionJournalPath(dir)); err != nil && !os.IsNotExist(err) {
 		return &visibleAppendUncertainError{err: err}
 	}
+	if err := m11JournalCleanupWriteFault("failed_after_remove_before_parent_sync"); err != nil {
+		return &visibleAppendUncertainError{err: err}
+	}
 	parent, err := os.Open(dir)
 	if err != nil {
 		return &visibleAppendUncertainError{err: err}
@@ -2102,6 +2108,9 @@ func recoverM11UnknownStopJournal(dir string) error {
 		return &visibleAppendUncertainError{err: err}
 	}
 	if err := os.Remove(m11UnknownStopJournalPath(dir)); err != nil && !os.IsNotExist(err) {
+		return &visibleAppendUncertainError{err: err}
+	}
+	if err := m11JournalCleanupWriteFault("unknown_after_remove_before_parent_sync"); err != nil {
 		return &visibleAppendUncertainError{err: err}
 	}
 	parent, err := os.Open(dir)

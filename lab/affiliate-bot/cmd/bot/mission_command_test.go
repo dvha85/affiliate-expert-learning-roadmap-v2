@@ -1913,6 +1913,45 @@ func TestMissionM11ExecutionJournalsDisclosePublishedCleanupUncertainty(t *testi
 	}
 }
 
+func TestMissionM11ExecutionJournalsDisclosePostRemoveCleanupUncertainty(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		command   string
+		journal   func(string) string
+		ledgerKey string
+		attempted string
+		reason    string
+		phase     string
+	}{
+		{name: "failed", command: "m11-record-failed", journal: m11FailedExecutionJournalPath, ledgerKey: "execution_ledger", attempted: "2026-09-08T00:00:02Z", reason: "post-remove failed cleanup fixture", phase: "failed_after_remove_before_parent_sync"},
+		{name: "unknown-stop", command: "m11-record-unknown", journal: m11UnknownStopJournalPath, ledgerKey: "stopped_ledger", attempted: "2026-09-08T00:00:02Z", reason: "post-remove unknown cleanup fixture", phase: "unknown_after_remove_before_parent_sync"},
+	} {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			m11JournalCleanupFault = func(phase string) error {
+				if phase == scenario.phase {
+					return errors.New("injected post-remove M11 execution journal cleanup failure")
+				}
+				return nil
+			}
+			t.Cleanup(func() { m11JournalCleanupFault = nil })
+			if code, response := missionCall(t, scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code == 0 || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" {
+				t.Fatalf("post-remove %s cleanup was not disclosed: code=%d response=%+v", scenario.name, code, response)
+			} else if artifact, ok := response["artifact"].(map[string]any); !ok || artifact["execution"] == nil || artifact[scenario.ledgerKey] == nil {
+				t.Fatalf("post-remove %s cleanup omitted deterministic transition: %+v", scenario.name, response)
+			}
+			if _, err := os.Stat(scenario.journal(fixture.dir)); !os.IsNotExist(err) {
+				t.Fatalf("post-remove %s cleanup did not remove journal name: %v", scenario.name, err)
+			}
+			m11JournalCleanupFault = nil
+			if code, response := missionCall(t, scenario.command, fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, scenario.attempted, scenario.reason); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+				t.Fatalf("post-remove %s exact retry did not preserve transition: code=%d response=%+v", scenario.name, code, response)
+			}
+		})
+	}
+}
+
 func TestMissionM10ResolveFailsClosedWhileRuntimeGateIsHeld(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
