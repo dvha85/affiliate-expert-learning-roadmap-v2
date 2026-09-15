@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 6ce54c1c0b25586c1b1a05c5da8d0a08ea32d527 -->
+<!-- readiness-main-baseline: d048d8df75af41d48087430b9bde737e5eec0a1f -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
