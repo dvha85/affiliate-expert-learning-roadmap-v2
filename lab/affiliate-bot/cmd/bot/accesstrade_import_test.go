@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -233,6 +234,44 @@ func TestAccesstradeImporterRecoveryReplaysOnlyExactPendingSnapshot(t *testing.T
 			t.Fatal("partial recovery removed pending journal", err)
 		}
 	})
+}
+
+func TestAccesstradeImporterDisclosesVisibleJournalCleanupUncertainty(t *testing.T) {
+	history, actions, outcomes, dir := setupAccesstradeImport(t)
+	report, manifest := writeAccesstradeImportInputs(t, dir)
+	args := []string{"accesstrade-import", history, actions, outcomes, report, manifest}
+	accesstradeJournalCleanupFault = func(phase string) error {
+		if phase == "after_remove_before_parent_sync" {
+			return errors.New("simulated ACCESSTRADE journal parent-sync acknowledgement loss")
+		}
+		return nil
+	}
+	t.Cleanup(func() { accesstradeJournalCleanupFault = nil })
+	var stdout, stderr bytes.Buffer
+	if code := runOutcomeStore(args, &stdout, &stderr); code != 1 {
+		t.Fatalf("code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var response map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil || response["status"] != "PUBLISHED_RECOVERY_REQUIRED" || response["artifact"] == nil || response["execution_permitted"] != false {
+		t.Fatalf("response=%s stderr=%s err=%v", stdout.String(), stderr.String(), err)
+	}
+	if _, err := os.Lstat(accesstradeJournalPath(outcomes)); !os.IsNotExist(err) {
+		t.Fatalf("journal cleanup was not visible: %v", err)
+	}
+	var receiptOut, receiptErr bytes.Buffer
+	if code := runOutcomeStore([]string{"accesstrade-receipts", history, actions, outcomes}, &receiptOut, &receiptErr); code != 0 {
+		t.Fatalf("visible stores do not resolve: code=%d stderr=%s", code, receiptErr.String())
+	}
+	accesstradeJournalCleanupFault = nil
+	stdout.Reset()
+	stderr.Reset()
+	if code := runOutcomeStore(args, &stdout, &stderr); code != 0 {
+		t.Fatalf("exact retry code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	response = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil || response["status"] != "EXACT_DUPLICATE" || response["artifact"] == nil {
+		t.Fatalf("exact retry=%s err=%v", stdout.String(), err)
+	}
 }
 
 func TestAccesstradeImporterDoesNotMapUTM(t *testing.T) {

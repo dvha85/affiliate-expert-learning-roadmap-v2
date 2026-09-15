@@ -89,7 +89,7 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_missing_accesstrade_pending_import_recovery_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/accesstrade_import.go"
-        source.write_text(source.read_text(encoding="utf-8").replace("sameReceipt(pending, receipt)", "pendingReceiptCheckRemoved", 1), encoding="utf-8")
+        source.write_text(source.read_text(encoding="utf-8").replace('accesstradeJournalCleanupFailure("after_remove_before_parent_sync")', "journalCleanupAcknowledgementRemoved", 1), encoding="utf-8")
         self.assertIn("ACCESSTRADE pending-import recovery regression is missing", self.run_audit(False))
 
     def test_missing_campaign_result_acknowledgement_is_rejected(self):

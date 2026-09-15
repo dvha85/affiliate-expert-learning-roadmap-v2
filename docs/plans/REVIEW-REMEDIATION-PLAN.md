@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: eca05d8ffed06ef91acb0fe3a0b82b7cfec81440 -->
+<!-- readiness-main-baseline: cb21e0f69f57e8f3a1f7f5722539f197712216eb -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -267,9 +267,12 @@ hay partial set bị từ chối mà giữ nguyên journal/store. Sau khi receip
 được reload hợp lệ mới xóa journal; uncertainty sau khi journal visible hoặc
 cleanup parent-sync trả `PUBLISHED_RECOVERY_REQUIRED`, không mời tạo snapshot
 mới. Regression gọi đúng CLI, bao phủ empty, outcome-visible/receipt-missing,
-changed report và partial outcomes. Đây là recovery local cho report đã được
-cung cấp, không fetch/đăng nhập ACCESSTRADE, không xác nhận business outcome,
-atomicity power-loss hay multi-host transaction; RP-01/RP-06 vẫn `PARTIAL`.
+changed report và partial outcomes. Fault seam chỉ trong test cũng chứng minh
+khi receipt/outcome đã visible nhưng journal removal mất ACK trước parent sync,
+import trả `PUBLISHED_RECOVERY_REQUIRED`; retry exact là `EXACT_DUPLICATE`,
+không tạo snapshot thứ hai. Đây là recovery local cho report đã được cung cấp,
+không fetch/đăng nhập ACCESSTRADE, không xác nhận business outcome, atomicity
+power-loss hay multi-host transaction; RP-01/RP-06 vẫn `PARTIAL`.
 
 **Cập nhật campaign result visible acknowledgement (2026-09-15):** controlled
 advisor canary đã reserve trước request, nên sau response không thể coi lỗi

@@ -121,7 +121,9 @@ go run ./cmd/bot outcome accesstrade-recover HISTORY.jsonl ACTIONS.jsonl OUTCOME
 
 Lệnh chỉ hoàn tất snapshot khi toàn bộ source bytes và mapping khớp receipt;
 source đổi hoặc outcome xuất hiện một phần sẽ bị từ chối và giữ journal để điều
-tra. `bot backup create RUNTIME_DIR BACKUP_DIR` buộc receipt vào backup khi
+tra. Nếu trả `PUBLISHED_RECOVERY_REQUIRED` sau cleanup journal, outcome/receipt
+đã resolve được nhưng ACK thư mục chưa xác nhận: không import source mới; chạy
+lại đúng lệnh import với cùng input để nhận `EXACT_DUPLICATE`. `bot backup create RUNTIME_DIR BACKUP_DIR` buộc receipt vào backup khi
 `outcomes.jsonl` có source `accesstrade:`; restore kiểm lại toàn bộ graph. Các
 kiểm tra này vẫn không phải proof export thật hoặc payment.
 
