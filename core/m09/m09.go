@@ -24,6 +24,7 @@ const (
 	ExpiredIntent        = "EXPIRED_INTENT"
 	ExpiredApproval      = "EXPIRED_APPROVAL"
 	ApprovalBeforePolicy = "APPROVAL_BEFORE_POLICY"
+	InvalidProfile       = "INVALID_PROFILE"
 )
 
 // ApprovalRecord is the canonical, human-only, one-time M09 approval.
@@ -50,6 +51,67 @@ func DecodeApproval(raw []byte) (ApprovalRecord, string) {
 		return ApprovalRecord{}, InvalidSchema
 	}
 	return approval, Valid
+}
+
+// ExecutionAuthorization is the M09 human-approval capability shape. M10 and
+// M11 have separate governed capability types; keeping this type here makes
+// the approved-live decoder explicit instead of silently accepting another
+// execution profile at the M09 boundary.
+type ExecutionAuthorization struct {
+	AuthorizationID     string `json:"authorization_id"`
+	IntentID            string `json:"intent_id"`
+	IntentHash          string `json:"intent_hash"`
+	PolicyVersion       string `json:"policy_version"`
+	ApprovalID          string `json:"approval_id"`
+	ExecutorID          string `json:"executor_id"`
+	AuthorizedAt        string `json:"authorized_at"`
+	ExpiresAt           string `json:"expires_at"`
+	IdempotencyKey      string `json:"idempotency_key"`
+	CorrelationID       string `json:"correlation_id"`
+	ExecutionMode       string `json:"execution_mode"`
+	ExecutionAuthorized bool   `json:"execution_authorized"`
+}
+
+// ExecutionRecord is the M09 audit record shape. It is decoded strictly but
+// cross-artifact chain binding remains the responsibility of the caller.
+type ExecutionRecord struct {
+	ExecutionID     string `json:"execution_id"`
+	AuthorizationID string `json:"authorization_id"`
+	ApprovalID      string `json:"approval_id"`
+	IntentID        string `json:"intent_id"`
+	IntentHash      string `json:"intent_hash"`
+	ExecutorID      string `json:"executor_id"`
+	IdempotencyKey  string `json:"idempotency_key"`
+	AttemptedAt     string `json:"attempted_at"`
+	Status          string `json:"status"`
+	SideEffectState string `json:"side_effect_state"`
+	ExternalRef     string `json:"external_ref,omitempty"`
+	Error           string `json:"error,omitempty"`
+	CorrelationID   string `json:"correlation_id"`
+}
+
+// DecodeAuthorization validates an M09 capability before typed decoding. A
+// schema-valid canary or production capability is not an M09 approval result.
+func DecodeAuthorization(raw []byte) (ExecutionAuthorization, string) {
+	var authorization ExecutionAuthorization
+	if contracts.ValidateRaw("execution-authorization.schema.json", raw) != nil || contracts.DecodeStrict(raw, &authorization) != nil {
+		return ExecutionAuthorization{}, InvalidSchema
+	}
+	if authorization.ExecutionMode != "APPROVED_LIVE" || !authorization.ExecutionAuthorized {
+		return ExecutionAuthorization{}, InvalidProfile
+	}
+	return authorization, Valid
+}
+
+// DecodeExecution validates an M09 execution record before typed decoding.
+// Cross-artifact links and time windows are checked by the caller's chain
+// validator because the record alone does not contain the referenced intent.
+func DecodeExecution(raw []byte) (ExecutionRecord, string) {
+	var record ExecutionRecord
+	if contracts.ValidateRaw("execution-record.schema.json", raw) != nil || contracts.DecodeStrict(raw, &record) != nil {
+		return ExecutionRecord{}, InvalidSchema
+	}
+	return record, Valid
 }
 
 // ValidateApproval checks an approval against the immutable M08 proposal-only
