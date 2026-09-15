@@ -64,17 +64,20 @@ jobs:
       - name: Go vet
         working-directory: lab/affiliate-bot
         run: go vet ./...
+      - name: Build learner Bot once for CLI smoke commands
+        working-directory: lab/affiliate-bot
+        run: go build -o "$RUNNER_TEMP/learner-bot" ./cmd/bot
       - name: Run M01 deterministic baseline
         working-directory: lab/affiliate-bot
-        run: go run ./cmd/bot
+        run: "$RUNNER_TEMP/learner-bot"
       - name: M02 capture restart query replay smoke test
         working-directory: lab/affiliate-bot
         run: |
           rm -f /tmp/m02-history.jsonl
-          go run ./cmd/bot history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
-          go run ./cmd/bot history list /tmp/m02-history.jsonl | grep -q "ci-demo"
-          go run ./cmd/bot history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
-          go run ./cmd/bot history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'
+          "$RUNNER_TEMP/learner-bot" history capture /tmp/m02-history.jsonl data/m02-sample-observations.json ci-demo 2026-09-01T01:00:00Z 2026-09-03T10:00:00Z
+          "$RUNNER_TEMP/learner-bot" history list /tmp/m02-history.jsonl | grep -q "ci-demo"
+          "$RUNNER_TEMP/learner-bot" history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
+          "$RUNNER_TEMP/learner-bot" history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'
 
   learner-bot-tests-shard-0:
     name: learner-bot-tests-shard-0
