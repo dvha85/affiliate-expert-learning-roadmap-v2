@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 8352c89bf12f61491bbb22d3d252cc03df317292 -->
+<!-- readiness-main-baseline: ab4015d4c382ca8db7ece9f70964429ed7923095 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -359,6 +359,15 @@ Regression gọi handler thật với fault sau append, rồi xác nhận exact 
 `EXACT_DUPLICATE` cùng ACK. Đây là proof local một JSONL file; không là n8n hay
 provider operated run, fsync/power-loss, transaction đa file hoặc multi-host
 safety.
+
+**Cập nhật M06 fixture-import visible append uncertainty (2026-09-15):** CLI
+fixture-import có cùng append/replay path, nhưng từng trả `HANDOFF_ERROR` dù
+record đã canonical sau ACK loss. Lệnh nay giữ status
+`PUBLISHED_RECOVERY_REQUIRED` và artifact `persisted=true`; exact retry duy
+nhất mới trả `EXACT_DUPLICATE`. Regression dùng CLI thật và fault sau append để
+kiểm record vẫn replay được rồi retry ACK. Đây là boundary một JSONL local,
+không là provider/n8n operated run, fsync/power-loss, transaction đa file hay
+multi-host safety.
 
 **Cập nhật canonical JSONL framing guard (2026-09-14):** reader JSONL dùng
 chung giờ fail-closed nếu file không rỗng kết thúc thiếu LF. Vì `AppendLine`

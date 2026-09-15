@@ -419,6 +419,48 @@ func TestM06AdapterDisclosesVisibleAppendUncertainty(t *testing.T) {
 	}
 }
 
+func TestM06FixtureImportDisclosesVisibleAppendUncertainty(t *testing.T) {
+	dir := t.TempDir()
+	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
+	fixtureRaw, err := json.Marshal(watchFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(input, fixtureRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	canonicalHistoryAppend = func(_ store.History, path string, candidate HistoryRecord) (string, error) {
+		if status, err := appendHistoryWith(store.JSONL{}, path, candidate); err != nil || status != appendAdded {
+			return status, err
+		}
+		return appendPublished, &publishedAppendUncertainty{cause: errors.New("injected fixture-import acknowledgement loss after history append")}
+	}
+	t.Cleanup(func() { canonicalHistoryAppend = appendHistoryWith })
+	var stdout, stderr bytes.Buffer
+	if code := runWatcher([]string{"fixture-import", history, input}, &stdout, &stderr); code == 0 {
+		t.Fatalf("visible append uncertainty returned success: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope["status"] != appendPublished || envelope["persisted"] != true || envelope["artifact"] == nil {
+		t.Fatalf("fixture import hid visible append uncertainty: %+v", envelope)
+	}
+	if records, err := LoadHistory(history); err != nil || len(records) != 1 {
+		t.Fatalf("fixture import visible record was not canonical: records=%+v err=%v", records, err)
+	}
+	canonicalHistoryAppend = appendHistoryWith
+	stdout.Reset()
+	stderr.Reset()
+	if code := runWatcher([]string{"fixture-import", history, input}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exact retry failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil || envelope["status"] != appendDuplicate || envelope["persisted"] != true {
+		t.Fatalf("fixture import exact retry did not acknowledge canonical record: %+v err=%v", envelope, err)
+	}
+}
+
 func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	dir := t.TempDir()
 	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "fixture.json")
