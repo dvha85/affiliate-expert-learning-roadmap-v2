@@ -2308,6 +2308,17 @@ business outcome, clean-machine pilot, deployment, multi-host hoặc
 crash/power-loss. Overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
 `docs/architecture/EVIDENCE-LOCAL-RUNTIME-RERUN-20260916-2.md`.
 
+**Full local regression re-run (2026-09-16):** trên `main` tại
+`6103eb8`, chạy lại bốn Go module (test/vet), 104 Python regression tests,
+các validator M06/M07, BR-16a, BR-18b và `git diff --check`; tất cả đều PASS.
+Disposable n8n `2.38.1` với Node `24.21.0` cũng PASS cho M06/M07 engine và
+Schedule Trigger: append đúng một lần, retry exact-deduplicate trước/sau
+restart, và adapter unavailable bị fail-closed. Đây là record local/offline
+được tạo từ implementation thật; không đóng các gap provider, live executor,
+business outcome, clean-machine pilot, target-host deployment, multi-host hay
+crash/power-loss. Record:
+`docs/architecture/EVIDENCE-LOCAL-FULL-REGRESSION-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
