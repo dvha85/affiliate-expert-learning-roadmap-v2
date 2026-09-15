@@ -2241,6 +2241,18 @@ thế proof snapshot atomic, crash/power-loss hoặc recovery multi-host.
 
 **Nghiệm thu:** R16 đóng ở mức cơ chế kiểm chứng; giữ overall NOT_READY_FOR_PRODUCTION cho tới khi có evidence ngoài repo và authority cần thiết. Không biến VERIFIED_OFFLINE thành learner/pilot PASS.
 
+**BR-16a/BR-18b local runtime re-run (2026-09-16):** trên `main` tại
+`2511efd`, chạy lại `smoke_br16a_offline.py` và
+`smoke_br18b_backup_restore.py` bằng learner Bot thật. Cả hai PASS: chuỗi
+M00→M11 dùng chung runtime/artifact, backup v3 được tạo và restore vào target
+mới, graph được replay, và post-restore budget/lease-window cùng durable STOP
+được kiểm. Cùng đợt chạy `audit_readiness.py`, 88 negative audit tests,
+`go test -count=1 ./...` và `go vet ./...` cho cả bốn module đều PASS. Đây là
+evidence local fixture/read-only; không đóng BR-16a/BR-18b ở mức provider,
+business outcome, clean-machine pilot, deployment, multi-host hoặc
+crash/power-loss. Overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
+`docs/architecture/EVIDENCE-LOCAL-RUNTIME-RERUN-20260916-2.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
