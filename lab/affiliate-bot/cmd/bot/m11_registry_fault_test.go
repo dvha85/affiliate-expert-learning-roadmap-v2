@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -750,6 +751,34 @@ func TestMissionM11RecoveryAdmissionDisclosesRegistryPublishUncertainty(t *testi
 	}
 	admissionPath := filepath.Join(t.TempDir(), "recovery-admission.json")
 	if err := writeJSONAtomic(admissionPath, json.RawMessage(admissionRaw)); err != nil {
+		t.Fatal(err)
+	}
+	// Handoff is portable input, not a runtime artifact. A duplicate key with
+	// the same apparent value must be rejected before it can collapse through
+	// a generic JSON map and register a recovery admission.
+	originalHandoff, err := os.ReadFile(handoffPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	duplicate := bytes.Replace(originalHandoff, []byte(`"profile": "M11_RECOVERY_HANDOFF/v1"`), []byte(`"profile": "M11_RECOVERY_HANDOFF/v1", "profile": "M11_RECOVERY_HANDOFF/v1"`), 1)
+	if bytes.Equal(duplicate, originalHandoff) {
+		t.Fatal("could not construct duplicate-key recovery handoff")
+	}
+	registryBefore, err := os.ReadFile(m11ArtifactRegistryPath(newRuntime))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffPath, duplicate, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("duplicate-key recovery handoff reached admission: code=%d response=%+v", code, response)
+	}
+	registryAfter, err := os.ReadFile(m11ArtifactRegistryPath(newRuntime))
+	if err != nil || !bytes.Equal(registryBefore, registryAfter) {
+		t.Fatalf("duplicate-key recovery handoff mutated new registry: err=%v before=%q after=%q", err, registryBefore, registryAfter)
+	}
+	if err := os.WriteFile(handoffPath, originalHandoff, 0600); err != nil {
 		t.Fatal(err)
 	}
 	artifactRegistryPublishFailure = func(path string) error {

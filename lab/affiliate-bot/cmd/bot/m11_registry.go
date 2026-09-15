@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
@@ -1028,6 +1029,23 @@ func m11DistinctRuntimeDirs(oldDir, newDir string) (string, string, error) {
 	return oldAbs, newAbs, nil
 }
 
+// decodeM11RecoveryHandoff accepts only one complete JSON object with no
+// duplicate keys. A recovery handoff is command-supplied portable input, not
+// a trusted runtime artifact: json.Unmarshal would silently retain the last
+// duplicate key before the later canonical comparison. Decode it first so a
+// malformed handoff cannot collapse into a value that looks canonical.
+func decodeM11RecoveryHandoff(raw []byte) (map[string]any, error) {
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return nil, err
+	}
+	handoff, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("recovery handoff must be a JSON object")
+	}
+	return handoff, nil
+}
+
 // admitM11Recovery persists an audit link only in the new runtime. It checks
 // the old runtime read-only, and it never clears its durable STOP or grants an
 // authorization in the new runtime.
@@ -1063,8 +1081,8 @@ func admitM11Recovery(newDir, oldDir, handoffPath string, admissionRaw []byte) (
 	if err != nil {
 		return corem11.ArtifactEntry{}, "", err
 	}
-	var provided map[string]any
-	if err := json.Unmarshal(providedRaw, &provided); err != nil {
+	provided, err := decodeM11RecoveryHandoff(providedRaw)
+	if err != nil {
 		return corem11.ArtifactEntry{}, "", fmt.Errorf("invalid recovery handoff input")
 	}
 	resolutionID, _ := provided["resolution_id"].(string)

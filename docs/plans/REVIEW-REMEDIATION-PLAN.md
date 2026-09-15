@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-15 -->
-<!-- readiness-main-baseline: 5529a15aaa53c2e97312ddcb062575fd20ab21cf -->
+<!-- readiness-main-baseline: 2981cf67760360860496c9a4a8cfecf9bf9d40f8 -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -1518,6 +1518,15 @@ tạo đúng hai JSONL records hợp lệ cùng execution trên fixture runtime 
 minh loader reject trước evaluate hoặc recovery. Đây là fixture-store cardinality
 local; không là business outcome, atomic recovery, power-loss hay multi-host
 proof.
+
+**Cập nhật M11 recovery-handoff strict decoder (2026-09-15):**
+`m11-recovery-admit` nhận handoff qua portable input, nhưng trước đây dùng
+`json.Unmarshal` vào map nên duplicate key có thể bị collapse trước khi so với
+lineage canonical của runtime đã STOP. Đường này nay dùng decoder strict chung
+trước khi admission có thể đọc/đăng ký artifact. Regression gọi CLI recovery
+admission thật với duplicate `profile`, yêu cầu `REJECTED` và registry runtime
+mới giữ byte-identical. Đây chỉ là hardening JSON cục bộ; không thay thế human
+review, live execution, crash/power-loss durability hay multi-host recovery.
 
 **Cập nhật M11 outcome-journal cleanup uncertainty (2026-09-14):** Sau khi
 ledger head và exact fixture outcome đã canonical, lỗi khi dọn
