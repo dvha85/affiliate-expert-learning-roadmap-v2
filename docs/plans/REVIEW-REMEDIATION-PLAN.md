@@ -2319,6 +2319,16 @@ business outcome, clean-machine pilot, target-host deployment, multi-host hay
 crash/power-loss. Record:
 `docs/architecture/EVIDENCE-LOCAL-FULL-REGRESSION-20260916.md`.
 
+**Full local regression re-run on current main (2026-09-16):** tại `main`
+`c56cf95`, chạy lại bốn Go module (test/vet), 104 Python regression tests,
+validator M06/M07, BR-16a, BR-18b, disposable n8n engine và M06 Schedule
+Trigger; tất cả PASS. Schedule Trigger append đúng một lần, exact-deduplicate
+trước/sau restart n8n + adapter và fail-closed khi adapter unavailable. Audit
+vẫn trả `NOT_READY_FOR_PRODUCTION`. Đây chỉ là bằng chứng local fixture/read-only;
+không đóng provider, live executor, business outcome, clean-machine pilot,
+target-host deployment, multi-host hoặc crash/power-loss. Record:
+`docs/architecture/EVIDENCE-LOCAL-FULL-REGRESSION-20260916-C56CF95.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
