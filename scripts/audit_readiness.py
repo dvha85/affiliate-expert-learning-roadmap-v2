@@ -610,6 +610,23 @@ def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
         fail("M11 recovery-admission approval regression is missing")
 
 
+def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
+    """Keep direct M11 JSONL reads aligned with one-outcome-per-execution."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-fixture-outcome-execution-cardinality")
+    if not isinstance(record, dict) or "two otherwise valid distinct outcome IDs" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 fixture-outcome execution cardinality")
+    if "Cập nhật M11 fixture-outcome execution cardinality" not in plan_text:
+        fail("M11 fixture-outcome execution cardinality lacks a scoped plan marker")
+    source = (root / "lab/affiliate-bot/cmd/bot/mission_command.go").read_text(encoding="utf-8")
+    start = source.find("func loadM11FixtureOutcomes")
+    end = source.find("\nfunc appendM11FixtureOutcome", start)
+    loader = source[start:end] if start >= 0 and end > start else ""
+    test = (root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go").read_text(encoding="utf-8")
+    if "|| seenExecution[outcome.EffectRef.EffectID] {" not in loader or "TestM11FixtureOutcomeLoaderRejectsDuplicateExecutionBeforeRuntimeUse" not in test:
+        fail("M11 fixture-outcome execution cardinality regression is missing")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -652,6 +669,7 @@ def audit(root):
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
+    audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     claim_count = audit_evidence_graph(root, criteria_by_id)

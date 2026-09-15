@@ -92,6 +92,12 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("approval, approvalOK := approvals[x.NewApprovalID]", "approval guard removed", 1), encoding="utf-8")
         self.assertIn("M11 recovery-admission approval regression is missing", self.run_audit(False))
 
+    def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        prefix, marker, suffix = source.read_text(encoding="utf-8").partition("func loadM11FixtureOutcomes")
+        source.write_text(prefix + marker + suffix.replace("|| seenExecution[outcome.EffectRef.EffectID] {", "", 1), encoding="utf-8")
+        self.assertIn("M11 fixture-outcome execution cardinality regression is missing", self.run_audit(False))
+
     def test_missing_advisor_fixture_output_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/advisor_fixture.go"
         source.write_text(source.read_text(encoding="utf-8").replace("fixture output parent must be an existing non-symlink directory", "fixture output parent guard removed", 1), encoding="utf-8")
