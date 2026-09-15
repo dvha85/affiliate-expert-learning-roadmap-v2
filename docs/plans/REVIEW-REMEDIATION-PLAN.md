@@ -1,6 +1,6 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-15 -->
+<!-- readiness-as-of: 2026-09-16 -->
 <!-- readiness-main-baseline: d048d8df75af41d48087430b9bde737e5eec0a1f -->
 
 > Reconcile 13/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
@@ -10,6 +10,13 @@
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
+
+**BR-19 local regression re-verification (2026-09-16):** đã chạy lại các Go
+module, semantic validators, smoke BR-16a/BR-18b và disposable n8n engine /
+Schedule Trigger trên local Darwin arm64 với n8n 2.38.1 và Node 24.21.0.
+Kết quả PASS chỉ là fixture/read-only evidence; provider, business outcome,
+clean-machine pilot, target deployment, power-loss và distributed locking vẫn
+chưa có bằng chứng.
 - Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
   `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã
