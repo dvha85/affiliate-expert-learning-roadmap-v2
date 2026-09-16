@@ -51,6 +51,15 @@ checksum-valid lần lượt orphan decision/action/outcome/evaluation/proposal;
 không phải atomic multi-file, power-loss, distributed lock, provider,
 deployment, pilot hay business outcome. Marker: `Cập nhật backup/restore M00-M05 graph guards`.
 
+**Cập nhật backup/restore output-parent ancestor guard (2026-09-16):** POSIX
+backup/restore output creation dùng descriptor-pinned `openat(O_NOFOLLOW)` và
+`mkdirat` sau preflight. Regression gọi command thật, thay ancestor bằng
+symlink ngay trước traversal, yêu cầu cả backup và restore trả `TARGET_ERROR`
+và không ghi vào cây external. macOS `/var` alias hệ thống được xử lý riêng;
+Windows/fallback vẫn fail closed theo preflight. Đây chỉ là local path-race
+hardening, không đóng distributed lock, power-loss/atomic multi-file,
+provider, deployment, pilot hoặc business outcome. Marker: `Cập nhật backup/restore output-parent ancestor guard`.
+
 - Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
   `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã

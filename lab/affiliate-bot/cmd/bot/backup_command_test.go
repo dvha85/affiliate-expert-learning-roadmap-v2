@@ -107,6 +107,87 @@ func TestBackupRestoreRejectMissingParentSymlinkBeforeExternalCreate(t *testing.
 	}
 }
 
+func TestBackupRestoreRejectsAncestorSwapBeforeOutputCreate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("descriptor-pinned ancestor traversal is POSIX-only")
+	}
+	runtimeDir := t.TempDir()
+	if _, err := buildBR10AdvisorFixture(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"action-input.json", "outcome-input.json"} {
+		if err := os.Remove(filepath.Join(runtimeDir, name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if code, response := missionCall(t, "init", runtimeDir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize ancestor-swap fixture: code=%d response=%+v", code, response)
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	ancestor := filepath.Join(root, "backup-ancestor")
+	if err := os.Mkdir(ancestor, 0700); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	outputParentBeforeOpenHook = func() {
+		if swapped {
+			return
+		}
+		swapped = true
+		if err := os.Rename(ancestor, ancestor+"-moved"); err != nil {
+			t.Fatalf("move preflighted ancestor: %v", err)
+		}
+		if err := os.Symlink(outside, ancestor); err != nil {
+			t.Fatalf("replace ancestor with symlink: %v", err)
+		}
+	}
+	t.Cleanup(func() { outputParentBeforeOpenHook = nil })
+	backupTarget := filepath.Join(ancestor, "missing", "backup")
+	if code, response := backupCall(t, "create", runtimeDir, backupTarget); code == 0 || response["status"] != "TARGET_ERROR" {
+		t.Fatalf("backup followed an ancestor swapped after preflight: code=%d response=%+v", code, response)
+	}
+	if !swapped {
+		t.Fatal("backup did not reach the ancestor-swap seam")
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("backup created external output after ancestor swap: entries=%+v err=%v", entries, err)
+	}
+
+	validBackup := filepath.Join(root, "valid-backup")
+	if code, response := backupCall(t, "create", runtimeDir, validBackup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("prepare valid backup for ancestor-swap restore: code=%d response=%+v", code, response)
+	}
+	restoreAncestor := filepath.Join(root, "restore-ancestor")
+	if err := os.Mkdir(restoreAncestor, 0700); err != nil {
+		t.Fatal(err)
+	}
+	restoreOutside := t.TempDir()
+	restoreSwapped := false
+	outputParentBeforeOpenHook = func() {
+		if restoreSwapped {
+			return
+		}
+		restoreSwapped = true
+		if err := os.Rename(restoreAncestor, restoreAncestor+"-moved"); err != nil {
+			t.Fatalf("move restore ancestor: %v", err)
+		}
+		if err := os.Symlink(restoreOutside, restoreAncestor); err != nil {
+			t.Fatalf("replace restore ancestor with symlink: %v", err)
+		}
+	}
+	restoreTarget := filepath.Join(restoreAncestor, "missing", "restored")
+	if code, response := backupCall(t, "restore", validBackup, restoreTarget); code == 0 || response["status"] != "TARGET_ERROR" {
+		t.Fatalf("restore followed an ancestor swapped after preflight: code=%d response=%+v", code, response)
+	}
+	if !restoreSwapped {
+		t.Fatal("restore did not reach the ancestor-swap seam")
+	}
+	if entries, err := os.ReadDir(restoreOutside); err != nil || len(entries) != 0 {
+		t.Fatalf("restore created external output after ancestor swap: entries=%+v err=%v", entries, err)
+	}
+}
+
 func TestBackupRejectsPreexistingOrAppearedTargetWithoutMutation(t *testing.T) {
 	runtimeDir := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtimeDir); err != nil {
