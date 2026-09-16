@@ -516,6 +516,16 @@ def main():
             return True
         rewrite_m11_registry(authorization_stale_health_backup, authorization_stale_health_change)
         assert invoke(bot, "backup", "restore", authorization_stale_health_backup, root / "authorization-stale-health-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        authorization_health_hash_drift_backup = root / "authorization-health-hash-drift-backup"; shutil.copytree(backup, authorization_health_hash_drift_backup)
+        rewrite_m11_registry(authorization_health_hash_drift_backup, replace_m11_field("PRODUCTION_EXECUTION_AUTHORIZATION", "production_health_snapshot_hash", "sha256:" + "0" * 64))
+        authorization_health_hash_drift_restored = root / "authorization-health-hash-drift-restored"
+        assert invoke(bot, "backup", "restore", authorization_health_hash_drift_backup, authorization_health_hash_drift_restored, expected=1, env=env)["status"] == "GRAPH_FAILED"
+        assert not authorization_health_hash_drift_restored.exists()
+        execution_health_hash_drift_backup = root / "execution-health-hash-drift-backup"; shutil.copytree(backup, execution_health_hash_drift_backup)
+        rewrite_m11_registry(execution_health_hash_drift_backup, replace_m11_field("PRODUCTION_EXECUTION_RECORD", "production_health_snapshot_hash", "sha256:" + "0" * 64))
+        execution_health_hash_drift_restored = root / "execution-health-hash-drift-restored"
+        assert invoke(bot, "backup", "restore", execution_health_hash_drift_backup, execution_health_hash_drift_restored, expected=1, env=env)["status"] == "GRAPH_FAILED"
+        assert not execution_health_hash_drift_restored.exists()
         execution_at_authorization_expiry_backup = root / "execution-at-authorization-expiry-backup"; shutil.copytree(backup, execution_at_authorization_expiry_backup)
         rewrite_m11_registry(execution_at_authorization_expiry_backup, replace_m11_field("PRODUCTION_EXECUTION_AUTHORIZATION", "expires_at", "2026-09-08T00:00:02Z"))
         assert invoke(bot, "backup", "restore", execution_at_authorization_expiry_backup, root / "execution-at-authorization-expiry-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
@@ -775,7 +785,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M00-M05/M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, M00-M05 orphan links, duplicate M11 artifact identity, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M00-M05/M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, M00-M05 orphan links, duplicate M11 artifact identity, lease-window activation, activation-bound health, authorization/execution lineage, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":

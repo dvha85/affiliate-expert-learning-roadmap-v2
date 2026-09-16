@@ -1956,6 +1956,16 @@ không publish target. Snapshot recovery-only không có evaluation vẫn hợp 
 distributed/multi-host, provider, deployment, pilot và business outcome vẫn
 mở.
 
+**Cập nhật M11 restore authorization/execution lineage (2026-09-16):** BR-18b
+giờ tạo bản sao checksum-valid của backup bằng learner Bot thật rồi làm lệch
+`production_health_snapshot_hash` trong `PRODUCTION_EXECUTION_AUTHORIZATION`
+hoặc `PRODUCTION_EXECUTION_RECORD`, trong khi artifact health và các parent
+khác vẫn còn nguyên. Cả hai bản sao phải trả `GRAPH_FAILED` và không publish
+restore target; positive restore/replay vẫn chạy trong cùng smoke. Đây là
+cross-artifact lineage evidence của local restore path, không đóng provider,
+live executor, business outcome, pilot, deployment, distributed lock hoặc
+crash/power-loss/atomic multi-file proof.
+
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
 **Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00
