@@ -20,6 +20,9 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
+        evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)
         evidence_377 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md"
         evidence_377.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md", evidence_377)
@@ -262,6 +265,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestM11ProcessKillAfterJournalBeforeLedgerAppendLeavesJournalForFreshRecovery", "RemovedM11ProcessKillRegression"), encoding="utf-8")
         self.assertIn("M11 process-kill journal regression is missing", self.run_audit(False))
+
+    def test_missing_m11_outcome_process_kill_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend", "func RemovedM11OutcomeProcessKillRegression", 1), encoding="utf-8")
+        self.assertIn("M11 outcome process-kill regression is missing", self.run_audit(False))
 
     def test_missing_backup_orphan_staging_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"

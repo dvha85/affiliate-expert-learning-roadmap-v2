@@ -1112,6 +1112,49 @@ def audit_m11_process_kill_journal(root, matrix, plan_text):
         fail("M11 process-kill journal regression is missing from the real learner/CI path")
 
 
+def audit_m11_outcome_process_kill(root, matrix, plan_text):
+    """Keep the isolated M11 outcome process-boundary proof discoverable."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-outcome-process-kill-recovery-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks M11 outcome process-kill recovery acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 outcome process-kill record lacks implementation, test, evidence or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("SIGKILL", "RECOVERY_REQUIRED", "EXACT_DUPLICATE", "exactly one", "POSIX")):
+        fail("M11 outcome process-kill record lacks a bounded outcome disclosure")
+    if "Cập nhật M11 outcome process-kill recovery" not in plan_text:
+        fail("M11 outcome process-kill recovery lacks a scoped plan marker")
+    outcome_test = root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"
+    helper_test = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    workflow = root / ".github/workflows/curriculum-ci.yml"
+    outcome_text = outcome_test.read_text(encoding="utf-8") if outcome_test.is_file() else ""
+    helper_text = helper_test.read_text(encoding="utf-8") if helper_test.is_file() else ""
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    required_test_markers = (
+        "func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend",
+        "GO_WANT_M11_PROCESS_TERMINATION",
+        "GO_M11_PROCESS_TERMINATION_MODE",
+        "syscall.SIGKILL",
+        "RECOVERY_REQUIRED",
+        "EXACT_DUPLICATE",
+        "len(outcomes) != 1",
+    )
+    if not all(marker in outcome_text for marker in required_test_markers) or "TestM11ProcessTerminationChild" not in helper_text or "run_learner_bot_test_shard.py" not in workflow_text:
+        fail("M11 outcome process-kill regression is missing from the real learner/CI path")
+
+
 def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
     """Keep exact retries from accumulating target-owned staging debris."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1367,6 +1410,7 @@ def audit(root):
     audit_backup_process_exit_lock(root, matrix, plan_text)
     audit_managed_lock_path_guard(root, matrix, plan_text)
     audit_m11_process_kill_journal(root, matrix, plan_text)
+    audit_m11_outcome_process_kill(root, matrix, plan_text)
     audit_backup_orphan_staging_recovery(root, matrix, plan_text)
     audit_backup_post_publish_process_kill(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)

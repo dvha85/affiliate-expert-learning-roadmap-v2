@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -287,6 +290,62 @@ func TestMissionM11OutcomeDisclosesVisibleAppendAcknowledgementUncertainty(t *te
 	outcomes, err = loadM11FixtureOutcomes(dir)
 	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
 		t.Fatalf("exact retry duplicated or changed outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+}
+
+// TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend exercises the real
+// two-file command boundary in a separate process. The journal must remain the
+// only recovery authority after SIGKILL; a fresh writer replays the exact
+// ledger/outcome transition once and an exact retry must not duplicate either
+// side. This is process-termination evidence, not a kernel power-loss claim.
+func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize outcome process-kill fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "process-kill-m11-outcome.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	childArgs := []string{"-test.run=^TestM11ProcessTerminationChild$", "--", "m11-outcome", dir, input, predecessor.ArtifactID}
+	command := exec.Command(os.Args[0], childArgs...)
+	command.Env = append(os.Environ(), "GO_WANT_M11_PROCESS_TERMINATION=1", "GO_M11_PROCESS_TERMINATION_MODE=kill")
+	var childStdout, childStderr strings.Builder
+	command.Stdout, command.Stderr = &childStdout, &childStderr
+	if err := command.Run(); err == nil {
+		t.Fatal("M11 outcome child unexpectedly completed after injected SIGKILL")
+	} else {
+		exited, ok := err.(*exec.ExitError)
+		if !ok {
+			t.Fatal(err)
+		}
+		status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+		if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+			t.Fatalf("M11 outcome child did not receive SIGKILL: %v stdout=%q stderr=%q", err, childStdout.String(), childStderr.String())
+		}
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("M11 outcome journal was not left for recovery: %v", err)
+	}
+	if code, response := missionCall(t, "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh read-only process exposed interrupted M11 outcome: code=%d response=%+v", code, response)
+	}
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked exact retry did not replay M11 outcome exactly once: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("M11 outcome journal remains after exact recovery: %v", err)
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("process-kill recovery duplicated or changed outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("process-kill recovery changed post-outcome ledger: ledger=%+v err=%v", head, err)
 	}
 }
 
