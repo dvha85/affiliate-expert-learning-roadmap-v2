@@ -6,7 +6,7 @@ Trạng thái: **local automated verification / synthetic fixture / read-only**.
 
 - `run_id`: `m10-execution-process-kill-20260916`
 - `implementation_commit`: `2571ec74fb14e0aaf7271f2afb96fd4f6724cd63`
-- `merge_commit`: to be recorded after the PR is merged
+- `merge_commit`: `a82911db5d61aaa8faed750efa5973859f53389a` (PR #364 squash merge)
 - `host`: local Darwin arm64
 - `scope`: learner Bot M10 governed execution journal transition
 
