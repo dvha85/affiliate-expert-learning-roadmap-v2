@@ -44,6 +44,12 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_post_392 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md"
         evidence_post_392.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md", evidence_post_392)
+        lineage_mutation = self.root / "scripts/mutate_m11_authorization_lineage.py"
+        lineage_mutation.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_authorization_lineage.py", lineage_mutation)
+        lineage_mutation_evidence = self.root / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-LINEAGE-MUTATION-20260916.md"
+        lineage_mutation_evidence.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-LINEAGE-MUTATION-20260916.md", lineage_mutation_evidence)
         evidence_383 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md"
         evidence_383.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md", evidence_383)
@@ -157,6 +163,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("gate.HealthSnapshotID != x.ProductionHealthSnapshotID", "health lineage guard removed", 1), encoding="utf-8")
         self.assertIn("M11 authorization gate exact-lineage regression is missing", self.run_audit(False))
+
+    def test_missing_m11_authorization_lineage_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_m11_authorization_lineage.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("LINEAGE_GUARDS", "REMOVED_GUARD_SET"), encoding="utf-8")
+        self.assertIn("M11 authorization lineage mutation proof is missing", self.run_audit(False))
 
     def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"

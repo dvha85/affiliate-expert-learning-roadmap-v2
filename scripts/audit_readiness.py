@@ -15,6 +15,7 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_authorization_lineage.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_recovery_journal_path_guard.py": ".github/workflows/curriculum-ci.yml",
@@ -877,6 +878,28 @@ def audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text):
         fail("M11 authorization gate exact-lineage regression is missing")
 
 
+def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):
+    """Require CI mutation coverage for the exact authorization lineage guard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-m11-authorization-lineage-mutation-20260916")
+    if not isinstance(record, dict) or "disposable-copy mutation" not in record.get("scope", "") or "real core graph regression" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 authorization lineage mutation acceptance")
+    if "Cập nhật RP-08 M11 authorization lineage mutation proof" not in plan_text:
+        fail("M11 authorization lineage mutation lacks a scoped plan marker")
+    script_path = root / "scripts/mutate_m11_authorization_lineage.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "LINEAGE_GUARDS",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "mutated = source",
+        "authorization switched to health/cost artifacts not evaluated by its gate",
+        "mutated M11 authorization gate lineage guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_m11_authorization_lineage.py" not in workflow:
+        fail("M11 authorization lineage mutation proof is missing or not wired to CI")
+
+
 def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
     """Keep direct M11 JSONL reads aligned with one-outcome-per-execution."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1333,6 +1356,7 @@ def audit(root):
     audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
+    audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)
