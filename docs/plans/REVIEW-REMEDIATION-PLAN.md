@@ -1,12 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 780bc6bf2ab0774d684f0eb3cc856e6531c32304 -->
+<!-- readiness-main-baseline: 1c071ca539de7e77050f43804d91f36884921b58 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #398 (2026-09-16):** PR #398 đã merge vào `main` tại
+`1c071ca539de7e77050f43804d91f36884921b58`, bổ sung regression process-kill
+cho M11 sau khi ledger transition đã append và directory-sync. Re-run local
+trên đúng head này giữ nguyên `NOT_READY_FOR_PRODUCTION`; bằng chứng vẫn chỉ
+là fixture/read-only POSIX và không mở rộng thành proof power-loss, atomic
+multi-file, provider, business outcome, pilot hoặc deployment. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-398-20260916.md`.
 
 **Baseline sync after PR #397 (2026-09-16):** PR #397 đã merge vào `main` tại
 `780bc6bf2ab0774d684f0eb3cc856e6531c32304`, bổ sung process-termination
