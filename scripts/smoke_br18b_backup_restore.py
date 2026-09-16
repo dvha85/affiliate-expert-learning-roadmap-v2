@@ -473,6 +473,25 @@ def main():
         duplicate_m11_artifact_result = invoke(bot, "backup", "restore", duplicate_m11_artifact_backup, duplicate_m11_artifact_restored, expected=1, env=env)
         assert duplicate_m11_artifact_result["status"] == "VERIFY_FAILED", duplicate_m11_artifact_result
         assert not duplicate_m11_artifact_restored.exists()
+        missing_m11_artifacts = [
+            ("PRODUCTION_LEASE", "br18-production-lease"),
+            ("PRODUCTION_LEASE_APPROVAL", "br18-production-approval"),
+            ("PRODUCTION_HEALTH_SNAPSHOT", "br18-production-health"),
+            ("TRUSTED_COST_BOUND", "br18-cost"),
+            ("PRODUCTION_GATE", gate["artifact"]["gate_id"]),
+            ("PRODUCTION_EXECUTION_AUTHORIZATION", authorization["artifact"]["authorization_id"]),
+            ("PRODUCTION_EXECUTION_RECORD", production_failed["artifact"]["execution"]["execution_id"]),
+            ("PRODUCTION_OUTCOME_EVALUATION", "br18-production-e"),
+        ]
+        for missing_kind, missing_id in missing_m11_artifacts:
+            missing_name = "missing-" + missing_kind.lower().replace("_", "-")
+            missing_backup = root / (missing_name + "-backup")
+            missing_restored = root / (missing_name + "-restored")
+            shutil.copytree(backup, missing_backup)
+            remove_m11_entry(missing_backup, missing_kind, missing_id)
+            missing_result = invoke(bot, "backup", "restore", missing_backup, missing_restored, expected=1, env=env)
+            assert missing_result["status"] in {"VERIFY_FAILED", "GRAPH_FAILED"}, missing_result
+            assert not missing_restored.exists()
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"

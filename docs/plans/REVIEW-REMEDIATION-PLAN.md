@@ -2435,12 +2435,17 @@ local POSIX process-termination evidence, chưa phải power-loss, transaction
 deployment proof. Record:
 `docs/architecture/EVIDENCE-M10-EXECUTION-PROCESS-KILL-20260916.md`.
 
-**Cập nhật backup/restore M11 duplicate-artifact guard (2026-09-16):**
+**Cập nhật backup/restore M11 graph guards (2026-09-16):**
 `smoke_br18b_backup_restore.py` tạo backup bằng learner Bot thật, nhân đôi
 nguyên `PRODUCTION_EXECUTION_RECORD` trong `m11-artifacts.jsonl` rồi cập nhật
-checksum/size manifest để mutation vượt qua lớp integrity. Restore thực tế trả
-`VERIFY_FAILED` và không publish target; đây là kiểm cardinality/identity của
-canonical M11 registry trên đường backup/restore. Phạm vi vẫn là local
+checksum/size manifest để mutation vượt qua lớp integrity; restore trả
+`VERIFY_FAILED` và không publish target. Cùng run tạo các bản sao checksum-valid
+thiếu từng artifact M11 bắt buộc từ lease/approval/health/cost/gate tới
+authorization/execution/evaluation; learner Bot trả `VERIFY_FAILED` hoặc
+`GRAPH_FAILED` và không publish target. `PRODUCTION_CYCLE` hiện là hậu kiểm tùy
+chọn trong snapshot lịch sử, nên không được gắn required trong test này. Đây là
+kiểm cardinality/identity/required-link của canonical M11 registry trên đường
+backup/restore. Phạm vi vẫn là local
 fixture/read-only, không phải atomic multi-file crash/power-loss,
 multi-host/provider/business-outcome/pilot/deployment proof. Record:
 `docs/architecture/EVIDENCE-BACKUP-M11-DUPLICATE-ARTIFACT-20260916.md`.
