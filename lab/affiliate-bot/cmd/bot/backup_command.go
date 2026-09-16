@@ -594,7 +594,7 @@ func backupFiles(source string) ([]string, error) {
 			}
 			return nil
 		}
-		if entry.Name() == runtimeGateName && filepath.Dir(path) == source {
+		if (entry.Name() == runtimeGateName || entry.Name() == ".mission.lock") && filepath.Dir(path) == source {
 			return nil
 		}
 		if !entry.Type().IsRegular() {

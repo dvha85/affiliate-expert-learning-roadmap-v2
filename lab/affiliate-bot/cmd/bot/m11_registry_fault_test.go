@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
@@ -375,6 +377,114 @@ func TestM11InterruptedJournalFreshProcessFailsClosedThenLockedWriterRecovers(t 
 			t.Fatalf("fresh-process outcome recovery was not exact: outcomes=%+v err=%v", outcomes, err)
 		}
 	})
+}
+
+// TestM11ProcessTerminationChild is a test-binary-only entrypoint. It kills
+// the child immediately before the new M11 ledger append, after the exact
+// journal has been published, exercising the real process boundary rather
+// than only an in-process error return.
+func TestM11ProcessTerminationChild(t *testing.T) {
+	if os.Getenv("GO_WANT_M11_PROCESS_TERMINATION") != "1" {
+		return
+	}
+	mode := os.Getenv("GO_M11_PROCESS_TERMINATION_MODE")
+	if mode != "exit" && mode != "kill" {
+		os.Exit(2)
+	}
+	separator := -1
+	for index, value := range os.Args {
+		if value == "--" {
+			separator = index
+			break
+		}
+	}
+	if separator == -1 || separator+1 >= len(os.Args) {
+		os.Exit(2)
+	}
+	m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+		if phase != "before_write" || entry.ArtifactKind != corem11.ArtifactKindLedger {
+			return nil
+		}
+		if mode == "kill" {
+			if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
+				os.Exit(98)
+			}
+			return nil
+		}
+		os.Exit(97)
+		return nil
+	}
+	os.Exit(runMissionCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
+}
+
+func TestM11ProcessKillAfterJournalBeforeLedgerAppendLeavesJournalForFreshRecovery(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	for _, operation := range []string{"failed", "unknown"} {
+		t.Run(operation, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			attemptedAt := "2026-09-08T00:00:02Z"
+			args := []string{}
+			if operation == "failed" {
+				args = append(args, "m11-record-failed", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "process kill failed fixture")
+			} else {
+				args = append(args, "m11-record-unknown", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "process kill unknown fixture")
+			}
+			command := exec.Command(os.Args[0], append([]string{"-test.run=^TestM11ProcessTerminationChild$", "--"}, args...)...)
+			command.Env = append(os.Environ(), "GO_WANT_M11_PROCESS_TERMINATION=1", "GO_M11_PROCESS_TERMINATION_MODE=kill")
+			var childStdout, childStderr bytes.Buffer
+			command.Stdout, command.Stderr = &childStdout, &childStderr
+			if err := command.Run(); err == nil {
+				t.Fatal("M11 child unexpectedly completed after injected SIGKILL")
+			} else {
+				exited, ok := err.(*exec.ExitError)
+				if !ok {
+					t.Fatal(err)
+				}
+				status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+					t.Fatalf("M11 child did not receive SIGKILL: %v stdout=%q stderr=%q", err, childStdout.String(), childStderr.String())
+				}
+			}
+			var journalPath string
+			if operation == "failed" {
+				journalPath = m11FailedExecutionJournalPath(fixture.dir)
+			} else {
+				journalPath = m11UnknownStopJournalPath(fixture.dir)
+			}
+			if _, err := os.Stat(journalPath); err != nil {
+				entries, readErr := os.ReadDir(fixture.dir)
+				names := make([]string, 0, len(entries))
+				for _, entry := range entries {
+					names = append(names, entry.Name())
+				}
+				t.Fatalf("process kill did not leave the recovery journal: %v entries=%v read_err=%v", err, names, readErr)
+			}
+			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh process exposed the interrupted M11 transition: code=%d response=%+v", code, response)
+			}
+			missingInput := filepath.Join(t.TempDir(), "missing-artifact.json")
+			if code, response := missionCall(t, "m11-register", fixture.dir, corem11.ArtifactKindLease, missingInput); operation == "failed" {
+				if code == 0 || response["status"] != "INPUT_ERROR" {
+					t.Fatalf("locked writer did not recover FAILED journal before input handling: code=%d response=%+v", code, response)
+				}
+			} else if code == 0 || response["status"] != "STOPPED" {
+				t.Fatalf("locked writer did not recover UNKNOWN STOP journal before retaining STOP: code=%d response=%+v", code, response)
+			}
+			if operation == "failed" {
+				if _, err := os.Stat(journalPath); !os.IsNotExist(err) {
+					t.Fatalf("recovered FAILED journal remains: %v", err)
+				}
+				_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+				if err != nil || head.ConsecutiveFailures != 1 || head.LastExecutionAt != attemptedAt || head.UpdatedAt != attemptedAt {
+					t.Fatalf("recovered FAILED ledger mismatch: ledger=%+v err=%v", head, err)
+				}
+			} else {
+				assertM11UnknownStopRecovered(t, fixture, attemptedAt, "process kill unknown fixture")
+			}
+		})
+	}
 }
 
 type m11UnknownStopFixture struct {
