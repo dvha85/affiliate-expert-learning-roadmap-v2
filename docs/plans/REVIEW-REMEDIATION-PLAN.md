@@ -1,12 +1,19 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 1c071ca539de7e77050f43804d91f36884921b58 -->
+<!-- readiness-main-baseline: 65c70409830b0a789d877bf708a0daec6a2a9be6 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #400 (2026-09-16):** PR #400 đã merge vào `main` tại
+`65c70409830b0a789d877bf708a0daec6a2a9be6`, bổ sung process-kill regression
+cho M10 canary/cost-bound sau canonical append. Bản đồng bộ này giữ nguyên
+`NOT_READY_FOR_PRODUCTION`; local SIGKILL evidence không được suy thành proof
+power-loss, atomic multi-file, provider, business outcome, pilot hoặc
+deployment.
 
 **Baseline sync after PR #398 (2026-09-16):** PR #398 đã merge vào `main` tại
 `1c071ca539de7e77050f43804d91f36884921b58`, bổ sung regression process-kill
@@ -2720,6 +2727,19 @@ hoàn tất phần còn lại, xóa journal và giữ đúng một artifact/inde
 power-loss, atomic multi-file, Windows native-lock, distributed/multi-host,
 provider, business outcome, pilot hoặc deployment proof.
 Record: `docs/architecture/EVIDENCE-M10-CANONICAL-APPEND-PROCESS-KILL-20260916.md`.
+
+**Cập nhật M10 execution process-kill sau canonical append (2026-09-16):**
+regression `TestMissionM10ExecutionProcessKillAfterCanonicalAppendRequiresLockedReplay`
+chạy child Bot thật cho hai cạnh của governed execution journal: sau khi
+execution record đã append vào registry và sau khi reservation đã bind
+execution ID vào mission state. Cả hai child đều bị `SIGKILL` trước cleanup;
+process đọc mới trả `RECOVERY_REQUIRED`, không tạo portable output, còn locked
+retry nhận diện phần đã hiện hữu, hoàn tất phần còn lại và để đúng một
+execution record cùng một reservation-to-execution binding. Đây là bounded
+local POSIX process-termination evidence, không phải proof power-loss,
+atomic multi-file, Windows native-lock, distributed/multi-host, provider,
+business outcome, pilot hoặc deployment. Record:
+`docs/architecture/EVIDENCE-M10-EXECUTION-CANONICAL-APPEND-PROCESS-KILL-20260916.md`.
 
 **Cập nhật backup/restore M11 graph guards (2026-09-16):**
 `smoke_br18b_backup_restore.py` tạo backup bằng learner Bot thật, nhân đôi

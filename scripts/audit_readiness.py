@@ -1265,6 +1265,61 @@ def audit_m10_process_kill_after_canonical_append(root, matrix, plan_text):
         fail("M10 post-canonical-append process-kill regression is missing from the real learner/CI path")
 
 
+def audit_m10_execution_process_kill_after_canonical_append(root, matrix, plan_text):
+    """Keep the later M10 execution two-store process-boundary proof discoverable."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-m10-execution-process-kill-after-canonical-append-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks M10 execution post-canonical-append process-kill acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m10_process_kill_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M10-EXECUTION-CANONICAL-APPEND-PROCESS-KILL-20260916.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M10 execution post-canonical-append record lacks implementation, test, evidence or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("SIGKILL", "after an M10 governed execution record", "RECOVERY_REQUIRED", "locked retry", "exactly one")):
+        fail("M10 execution post-canonical-append record lacks a bounded visibility/recovery disclosure")
+    if "Cập nhật M10 execution process-kill sau canonical append" not in plan_text:
+        fail("M10 execution post-canonical-append process-kill lacks a scoped plan marker")
+    mission_path = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/m10_process_kill_test.go"
+    workflow_path = root / ".github/workflows/curriculum-ci.yml"
+    evidence_path = root / "docs/architecture/EVIDENCE-M10-EXECUTION-CANONICAL-APPEND-PROCESS-KILL-20260916.md"
+    mission = mission_path.read_text(encoding="utf-8") if mission_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    workflow = workflow_path.read_text(encoding="utf-8") if workflow_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_source = (
+        "func recoverM10ExecutionJournal",
+        'm10ExecutionJournalPublishFault("after_artifact")',
+        'm10ExecutionJournalPublishFault("after_state")',
+    )
+    required_test = (
+        "TestMissionM10ExecutionProcessKillAfterCanonicalAppendRequiresLockedReplay",
+        "GO_M10_PROCESS_TERMINATION_KIND=execution",
+        "GO_M10_PROCESS_TERMINATION_PHASE=",
+        '[]string{"after_artifact", "after_state"}',
+        "executionCount",
+        "reservation-to-execution",
+        "syscall.SIGKILL",
+        "RECOVERY_REQUIRED",
+        'response["status"] != "APPENDED"',
+    )
+    if (
+        not all(marker in mission for marker in required_source)
+        or not all(marker in test for marker in required_test)
+        or "run_learner_bot_test_shard.py" not in workflow
+        or "## Verification" not in evidence
+    ):
+        fail("M10 execution post-canonical-append process-kill regression is missing from the real learner/CI path")
+
+
 def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
     """Keep exact retries from accumulating target-owned staging debris."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1523,6 +1578,7 @@ def audit(root):
     audit_m11_outcome_process_kill(root, matrix, plan_text)
     audit_m11_process_kill_after_ledger(root, matrix, plan_text)
     audit_m10_process_kill_after_canonical_append(root, matrix, plan_text)
+    audit_m10_execution_process_kill_after_canonical_append(root, matrix, plan_text)
     audit_backup_orphan_staging_recovery(root, matrix, plan_text)
     audit_backup_post_publish_process_kill(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
