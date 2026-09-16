@@ -2330,6 +2330,46 @@ func TestM11LeaseSourceGrantMustResolveActiveM10Grant(t *testing.T) {
 	}
 }
 
+func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	registryPath := m11ArtifactRegistryPath(fixture.dir)
+	before, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertUnchanged := func(label string) {
+		t.Helper()
+		after, readErr := os.ReadFile(registryPath)
+		if readErr != nil || !bytes.Equal(before, after) {
+			t.Fatalf("expired %s changed the M11 registry: err=%v", label, readErr)
+		}
+	}
+
+	expiryHealth := corem11.ProductionHealthSnapshot{SnapshotID: "expiry-health", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ObservedAt: fixture.lease.ExpiresAt, SourceRefs: []string{"fixture:expiry-health"}, DependencyState: "HEALTHY", TelemetryComplete: true, HashVersion: "go-json-v1"}
+	expiryHealth.SnapshotHash = corem11.ComputeProductionHealthHash(expiryHealth)
+	healthInput := filepath.Join(t.TempDir(), "expiry-health.json")
+	writeMissionTestJSON(t, healthInput, expiryHealth)
+	if code, response := missionCall(t, "m11-register", fixture.dir, corem11.ArtifactKindHealth, healthInput); code == 0 || response["status"] == "APPENDED" {
+		t.Fatalf("health at exact lease expiry was accepted: code=%d response=%+v", code, response)
+	}
+	assertUnchanged("health")
+
+	if code, response := missionCall(t, "m11-gate", fixture.dir, fixture.lease.LeaseID, "unknown-journal-health", "unknown-journal-cost", fixture.ledgerEntry.ArtifactID, fixture.lease.ExpiresAt); code == 0 || response["status"] == "ALLOW_PRODUCTION" {
+		t.Fatalf("gate at exact lease expiry was accepted: code=%d response=%+v", code, response)
+	}
+	assertUnchanged("gate")
+
+	if code, response := missionCall(t, "m11-authorize", fixture.dir, fixture.lease.LeaseID, fixture.authorization.ProductionGateID, "fixture_stub", fixture.lease.ExpiresAt); code == 0 || response["status"] == "AUTHORIZED" {
+		t.Fatalf("authorization at exact lease expiry was accepted: code=%d response=%+v", code, response)
+	}
+	assertUnchanged("authorization")
+
+	if code, response := missionCall(t, "m11-record-failed", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, fixture.authorization.ExpiresAt, "expired fixture execution"); code == 0 || response["status"] == "APPENDED" {
+		t.Fatalf("execution at exact authorization expiry was accepted: code=%d response=%+v", code, response)
+	}
+	assertUnchanged("execution")
+}
+
 func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
 	dir := t.TempDir()
 	bound := corem10.TrustedCostBound{CostBoundID: "cost-1", IntentID: "intent-1", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "corr-1", HashVersion: "go-json-v1"}

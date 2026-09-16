@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 8229ad3c8d3490a8780ea987c3a406a3f08cd96c -->
+<!-- readiness-main-baseline: 163f7f54e82e369b506007a6ea127a8221fa2af6 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -10,6 +10,15 @@
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
+
+**M11 expiry authority no-mutation regression (2026-09-16):** regression trên
+đường lệnh thật của learner Bot dùng đúng biên `lease.ExpiresAt` và
+`authorization.ExpiresAt`: đăng ký health, gate, authorization và fixture
+execution đều bị từ chối; sau mỗi lệnh, `m11-artifacts.jsonl` vẫn byte-identical.
+Seam expiry/no-mutation local này bổ sung cho lease rebind và activation-expiry,
+nhưng RP-07 vẫn `PARTIAL`; trusted external time, live executor, provider,
+business outcome, crash/power-loss, atomic multi-file, distributed/multi-host,
+pilot và deployment vẫn còn mở.
 
 **Post-merge regression after PR #381 (2026-09-16):** trên `main`
 `8229ad3c8d3490a8780ea987c3a406a3f08cd96c`, learner Bot test/vet, 113 Python
