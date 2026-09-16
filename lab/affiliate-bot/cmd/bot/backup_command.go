@@ -197,6 +197,53 @@ func acquireBackupTargetGate(target string) (func(), error) {
 	return release, nil
 }
 
+func backupStagingPrefix(target string) string {
+	identity := sha256.Sum256([]byte(filepath.Clean(target)))
+	return ".backup-staging-" + hex.EncodeToString(identity[:16]) + "-"
+}
+
+func restoreStagingPrefix(target string) string {
+	identity := sha256.Sum256([]byte(filepath.Clean(target)))
+	return ".restore-staging-" + hex.EncodeToString(identity[:16]) + "-"
+}
+
+// cleanupStaleStaging removes only private staging directories for the target
+// currently protected by its managed target lock. POSIX process termination
+// releases that lock, so a later exact retry can safely remove a staging tree
+// left by a killed writer. Non-directory entries and symlinks are never
+// followed; an unrelated target's staging remains untouched.
+func cleanupStaleStaging(parent, prefix string) error {
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return err
+	}
+	removed := false
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), prefix) {
+			continue
+		}
+		path := filepath.Join(parent, entry.Name())
+		info, statErr := os.Lstat(path)
+		if os.IsNotExist(statErr) {
+			continue
+		}
+		if statErr != nil {
+			return statErr
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("remove stale staging %s: %w", path, err)
+		}
+		removed = true
+	}
+	if removed {
+		return syncDirectory(parent)
+	}
+	return nil
+}
+
 // restoreTargetGate serializes managed restores to one destination. Rename(2)
 // can replace an empty directory on POSIX, so the preceding exists check alone
 // is not a no-clobber guarantee when two Bot processes restore concurrently.
@@ -1624,7 +1671,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 		} else if !os.IsNotExist(targetErr) {
 			return emit("TARGET_ERROR", nil, targetErr, 1)
 		}
-		staging, stageErr := os.MkdirTemp(parent, ".backup-staging-")
+		if e = cleanupStaleStaging(parent, backupStagingPrefix(args[2])); e != nil {
+			return emit("STORE_ERROR", nil, fmt.Errorf("clean stale backup staging: %w", e), 1)
+		}
+		staging, stageErr := os.MkdirTemp(parent, backupStagingPrefix(args[2]))
 		if stageErr != nil {
 			return emit("STORE_ERROR", nil, stageErr, 1)
 		}
@@ -1744,7 +1794,10 @@ func runBackupCommand(args []string, stdout, stderr io.Writer) int {
 	} else if !os.IsNotExist(statErr) {
 		return emit("TARGET_ERROR", nil, statErr, 1)
 	}
-	staging, stageErr := os.MkdirTemp(parent, ".restore-staging-")
+	if e = cleanupStaleStaging(parent, restoreStagingPrefix(args[2])); e != nil {
+		return emit("STORE_ERROR", nil, fmt.Errorf("clean stale restore staging: %w", e), 1)
+	}
+	staging, stageErr := os.MkdirTemp(parent, restoreStagingPrefix(args[2]))
 	if stageErr != nil {
 		return emit("STORE_ERROR", nil, stageErr, 1)
 	}
