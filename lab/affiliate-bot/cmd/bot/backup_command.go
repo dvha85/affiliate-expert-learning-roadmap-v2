@@ -1143,6 +1143,7 @@ func validateM11BackupGraph(dir string) error {
 	executionsByID := map[string]corem11.ProductionExecutionRecord{}
 	evaluations := map[string]corem11.ProductionOutcomeEvaluation{}
 	cycles := []corem11.ProductionCycleRecord{}
+	cyclesByEvaluation := map[string]int{}
 	admissions := []corem11.ProductionRecoveryAdmission{}
 	admissionNewLeases := map[string]bool{}
 	admissionPriorResolutions := map[string]bool{}
@@ -1445,6 +1446,16 @@ func validateM11BackupGraph(dir string) error {
 		}
 		if !evaluationOK || !executionOK || !recordOK || closedTimeErr != nil || evaluatedTimeErr != nil || cycle.Status != "CLOSED" || cycle.OpenedAt != execution.AttemptedAt || closedAt.Before(evaluatedAt) || evaluation.ExecutionID != cycle.ExecutionID || evaluation.OutcomeID != cycle.OutcomeID || evaluation.LeaseID != cycle.LeaseID || evaluation.LeaseVersion != cycle.LeaseVersion || evaluation.LeaseHash != cycle.LeaseHash || cycle.LeaseID != execution.ProductionLeaseID || cycle.LeaseVersion != execution.ProductionLeaseVersion || cycle.LeaseHash != execution.ProductionLeaseHash || cycle.IntentID != execution.IntentID || cycle.IntentHash != execution.IntentHash || cycle.GateID != execution.ProductionGateID || cycle.AuthorizationID != execution.AuthorizationID || cycle.CorrelationID != execution.CorrelationID || !reflect.DeepEqual(observations, cycleObservations) {
 			return fmt.Errorf("M11 cycle does not resolve its outcome evaluation")
+		}
+		cyclesByEvaluation[cycle.EvaluationID]++
+	}
+	// An evaluation is only a closed-cycle artifact when its cycle is present.
+	// Without this reverse cardinality check, a checksum-valid snapshot could
+	// retain the outcome/evaluation pair while silently dropping the lifecycle
+	// closure that the M11 restore gate promises to replay.
+	for evaluationID := range evaluations {
+		if cyclesByEvaluation[evaluationID] != 1 {
+			return fmt.Errorf("M11 outcome evaluation is missing its restored closed cycle")
 		}
 	}
 	return nil

@@ -129,6 +129,16 @@ alias hệ thống được resolve riêng, không mở rộng quyền cho symli
 distributed lock, power-loss, atomic multi-file, provider, deployment, pilot
 hoặc business outcome.
 
+## BR-18b M11 evaluation-to-cycle closure guard
+
+BR-18b smoke tạo evaluation và closed cycle thật qua learner Bot, sau đó copy
+backup hợp lệ và xóa riêng `PRODUCTION_CYCLE` nhưng cập nhật checksum manifest.
+Restore trả `GRAPH_FAILED` và không publish target; backup gốc vẫn restore được.
+Các snapshot recovery-only không có evaluation vẫn giữ được vì chưa có cycle
+để đóng. Đây là reverse-cardinality guard local cho M11, không phải proof
+power-loss/atomic multi-file, distributed lock, provider, deployment, pilot
+hoặc business outcome.
+
 ## Giới hạn
 
 Các script `validate_*_operated_execution.py` cần execution artifact do n8n
