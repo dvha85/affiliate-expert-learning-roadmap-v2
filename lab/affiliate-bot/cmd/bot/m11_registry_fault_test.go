@@ -390,7 +390,7 @@ func TestM11ProcessTerminationChild(t *testing.T) {
 		return
 	}
 	mode := os.Getenv("GO_M11_PROCESS_TERMINATION_MODE")
-	if mode != "exit" && mode != "kill" && mode != "outcome-after-append-kill" {
+	if mode != "exit" && mode != "kill" && mode != "after-ledger-kill" && mode != "outcome-after-append-kill" {
 		os.Exit(2)
 	}
 	separator := -1
@@ -404,7 +404,7 @@ func TestM11ProcessTerminationChild(t *testing.T) {
 		os.Exit(2)
 	}
 	terminate := func() {
-		if mode == "kill" || mode == "outcome-after-append-kill" {
+		if mode == "kill" || mode == "after-ledger-kill" || mode == "outcome-after-append-kill" {
 			if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
 				os.Exit(98)
 			}
@@ -421,6 +421,13 @@ func TestM11ProcessTerminationChild(t *testing.T) {
 	if mode == "outcome-after-append-kill" {
 		m11OutcomeAppendFault = func(phase string) error {
 			if phase == "after_append" {
+				terminate()
+			}
+			return nil
+		}
+	} else if mode == "after-ledger-kill" {
+		m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+			if phase == "after_sync" && entry.ArtifactKind == corem11.ArtifactKindLedger {
 				terminate()
 			}
 			return nil
@@ -505,6 +512,109 @@ func TestM11ProcessKillAfterJournalBeforeLedgerAppendLeavesJournalForFreshRecove
 			}
 		})
 	}
+}
+
+// TestM11ProcessKillAfterLedgerAppendLeavesJournalForFreshRecovery exercises
+// the later side of the M11 execution transition. The ledger append and its
+// directory sync are visible, but the child dies before journal cleanup. A
+// fresh reader must still fail closed, and a locked writer must recognize the
+// exact execution/ledger pair without appending either side twice.
+func TestM11ProcessKillAfterLedgerAppendLeavesJournalForFreshRecovery(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	for _, operation := range []string{"failed", "unknown"} {
+		t.Run(operation, func(t *testing.T) {
+			fixture := newM11UnknownStopFixture(t)
+			attemptedAt := "2026-09-08T00:00:02Z"
+			args := []string{}
+			if operation == "failed" {
+				args = append(args, "m11-record-failed", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "post-ledger process kill failed fixture")
+			} else {
+				args = append(args, "m11-record-unknown", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, attemptedAt, "post-ledger process kill unknown fixture")
+			}
+			command := exec.Command(os.Args[0], append([]string{"-test.run=^TestM11ProcessTerminationChild$", "--"}, args...)...)
+			command.Env = append(os.Environ(), "GO_WANT_M11_PROCESS_TERMINATION=1", "GO_M11_PROCESS_TERMINATION_MODE=after-ledger-kill")
+			var childStdout, childStderr bytes.Buffer
+			command.Stdout, command.Stderr = &childStdout, &childStderr
+			if err := command.Run(); err == nil {
+				t.Fatal("M11 child unexpectedly completed after injected post-ledger SIGKILL")
+			} else {
+				exited, ok := err.(*exec.ExitError)
+				if !ok {
+					t.Fatal(err)
+				}
+				status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+					t.Fatalf("M11 post-ledger child did not receive SIGKILL: %v stdout=%q stderr=%q", err, childStdout.String(), childStderr.String())
+				}
+			}
+			var journalPath string
+			if operation == "failed" {
+				journalPath = m11FailedExecutionJournalPath(fixture.dir)
+			} else {
+				journalPath = m11UnknownStopJournalPath(fixture.dir)
+			}
+			if _, err := os.Stat(journalPath); err != nil {
+				t.Fatalf("post-ledger process kill did not leave the recovery journal: %v", err)
+			}
+			if code, response := missionCall(t, "status", fixture.dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh process exposed the interrupted post-ledger transition: code=%d response=%+v", code, response)
+			}
+			// The child has already appended the execution and expected ledger.
+			// Assert the visible state before recovery so this test cannot pass by
+			// merely exercising the earlier pre-append branch.
+			entries, err := loadM11ArtifactRegistry(fixture.dir)
+			if err != nil {
+				t.Fatalf("load post-ledger registry: %v", err)
+			}
+			if count := countM11Artifacts(entries, corem11.ArtifactKindExecution); count != 1 {
+				t.Fatalf("post-ledger process kill left %d execution artifacts, want 1", count)
+			}
+			if count := countM11Artifacts(entries, corem11.ArtifactKindLedger); count != 3 {
+				t.Fatalf("post-ledger process kill left %d ledger artifacts, want gate, predecessor and transition", count)
+			}
+			missingInput := filepath.Join(t.TempDir(), "missing-artifact.json")
+			if code, response := missionCall(t, "m11-register", fixture.dir, corem11.ArtifactKindLease, missingInput); operation == "failed" {
+				if code == 0 || response["status"] != "INPUT_ERROR" {
+					t.Fatalf("locked writer did not recover post-ledger FAILED journal before input handling: code=%d response=%+v", code, response)
+				}
+			} else if code == 0 || response["status"] != "STOPPED" {
+				t.Fatalf("locked writer did not recover post-ledger UNKNOWN STOP journal before retaining STOP: code=%d response=%+v", code, response)
+			}
+			if _, err := os.Stat(journalPath); !os.IsNotExist(err) {
+				t.Fatalf("post-ledger recovery journal remains: %v", err)
+			}
+			entries, err = loadM11ArtifactRegistry(fixture.dir)
+			if err != nil {
+				t.Fatalf("reload post-ledger registry: %v", err)
+			}
+			if count := countM11Artifacts(entries, corem11.ArtifactKindExecution); count != 1 {
+				t.Fatalf("post-ledger recovery duplicated execution artifact: count=%d", count)
+			}
+			if count := countM11Artifacts(entries, corem11.ArtifactKindLedger); count != 3 {
+				t.Fatalf("post-ledger recovery duplicated ledger transition: count=%d", count)
+			}
+			if operation == "failed" {
+				_, head, err := m11LedgerHead(fixture.dir, fixture.lease.LeaseID)
+				if err != nil || head.ConsecutiveFailures != 1 || head.LastExecutionAt != attemptedAt || head.UpdatedAt != attemptedAt {
+					t.Fatalf("recovered post-ledger FAILED ledger mismatch: ledger=%+v err=%v", head, err)
+				}
+			} else {
+				assertM11UnknownStopRecovered(t, fixture, attemptedAt, "post-ledger process kill unknown fixture")
+			}
+		})
+	}
+}
+
+func countM11Artifacts(entries []corem11.ArtifactEntry, kind string) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.ArtifactKind == kind {
+			count++
+		}
+	}
+	return count
 }
 
 type m11UnknownStopFixture struct {
