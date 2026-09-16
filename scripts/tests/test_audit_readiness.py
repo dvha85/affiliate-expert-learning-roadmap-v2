@@ -197,12 +197,17 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_missing_managed_lock_path_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
-        source.write_text(source.read_text(encoding="utf-8").replace("syscall.O_NOFOLLOW", "removedNoFollow"), encoding="utf-8")
+        source.write_text(source.read_text(encoding="utf-8").replace("unix.O_NOFOLLOW", "removedNoFollow"), encoding="utf-8")
         self.assertIn("managed lock path-guard regression is missing", self.run_audit(False))
 
     def test_missing_managed_lock_parent_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
         source.write_text(source.read_text(encoding="utf-8").replace("validateManagedLockParent", "removedManagedLockParent"), encoding="utf-8")
+        self.assertIn("managed lock path-guard regression is missing", self.run_audit(False))
+
+    def test_missing_managed_lock_openat_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("unix.Openat", "removedOpenat"), encoding="utf-8")
         self.assertIn("managed lock path-guard regression is missing", self.run_audit(False))
 
     def test_missing_immutable_artifact_parent_recheck_is_rejected(self):

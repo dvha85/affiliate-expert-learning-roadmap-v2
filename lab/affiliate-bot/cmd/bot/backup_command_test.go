@@ -635,6 +635,47 @@ func TestManagedPathLockRejectsSymlinkedParentWithoutTouchingExternal(t *testing
 	}
 }
 
+func TestManagedPathLockRejectsAncestorSwapBeforeOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX openat lock traversal is not the Windows lock implementation")
+	}
+	root := t.TempDir()
+	requestedParent := filepath.Join(root, "requested")
+	externalDir := filepath.Join(root, "external")
+	if err := os.Mkdir(requestedParent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(externalDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(externalDir, "sentinel")
+	sentinel := []byte("ancestor swap sentinel")
+	if err := os.WriteFile(external, sentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(requestedParent, "managed.lock")
+	var hookErr error
+	managedLockBeforeOpenHook = func() {
+		if hookErr = os.Remove(requestedParent); hookErr != nil {
+			return
+		}
+		hookErr = os.Symlink(externalDir, requestedParent)
+	}
+	t.Cleanup(func() { managedLockBeforeOpenHook = nil })
+	if _, err := acquireManagedPathLock(lockPath); err == nil {
+		t.Fatal("managed lock followed an ancestor swapped to a symlink")
+	}
+	if hookErr != nil {
+		t.Fatalf("ancestor swap seam failed: %v", hookErr)
+	}
+	if _, err := os.Lstat(filepath.Join(externalDir, "managed.lock")); !os.IsNotExist(err) {
+		t.Fatalf("managed lock created through swapped ancestor: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, sentinel) {
+		t.Fatalf("external ancestor target changed after swap rejection: %q err=%v", got, err)
+	}
+}
+
 func TestBackupRestoreRejectsExpiredM10AuthorityWithoutMutation(t *testing.T) {
 	binary := buildMissionBinary(t)
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
