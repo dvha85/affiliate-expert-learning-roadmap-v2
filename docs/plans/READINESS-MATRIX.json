@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-16",
-	"main_baseline": "fb201c24243dd7bd901849e2bb3cdab15d2b3595",
+	"main_baseline": "b9890bf4c25ebbb74c09c96b253a6f25c38949e9",
 	"overall": "NOT_READY_FOR_PRODUCTION",
 	"recent_updates": [
 	{"id":"RP-09-local-regression-post-389-20260916","status":"PARTIAL","implementation_refs":["scripts/audit_readiness.py","scripts/run_n8n_engine_regression.py","scripts/run_n8n_m06_schedule_regression.py","docs/plans/READINESS-MATRIX.json","docs/plans/READINESS-EVIDENCE-GRAPH.json","docs/plans/REVIEW-REMEDIATION-PLAN.md"],"test_refs":["docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-389-20260916.md","scripts/tests/test_audit_readiness.py","scripts/smoke_br16a_offline.py","scripts/smoke_br18b_backup_restore.py",".github/workflows/curriculum-ci.yml",".github/workflows/mission-agent-path-ci.yml"],"scope":"On merged main fb201c2 after PR #389, four Go module test/vet suites, 113 Python tests, BR-16a, BR-18b, readiness audit, 98 audit tests and git diff --check passed. Disposable n8n 2.38.1 with Node 24.21.0 also passed M06/M07 engine and M06 Schedule Trigger regressions: append once, exact-deduplicate across n8n/adapter restart and fail closed when the loopback adapter is unavailable. Audit remains NOT_READY_FOR_PRODUCTION and resolves 71 scoped claims. This is fixture/read-only evidence and does not prove provider, business outcome, live executor, clean-machine pilot, target deployment, distributed locking or power-loss/atomic multi-file durability"},
