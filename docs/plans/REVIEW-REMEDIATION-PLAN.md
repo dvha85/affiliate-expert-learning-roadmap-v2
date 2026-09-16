@@ -317,7 +317,7 @@ và regression tương ứng.
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver, n8n node-chain và real Schedule Trigger regressions exist; governed selected-source profile and deployment-operated run remain open |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence, strict untrusted-model JSON decoding and n8n stub path exist; selected-source/provider operated evidence remains open |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
-| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, and fresh-process exact-expiry gate/authorization/reservation/execution rejects are no-mutation checked after restore; multi-file crash seams remain open |
+| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, authorization lineage now must retain the exact gate-evaluated lease/health/cost artifact IDs, hashes and cost minor, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, and fresh-process exact-expiry gate/authorization/reservation/execution rejects are no-mutation checked after restore; multi-file crash seams remain open |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions including M06 Schedule Trigger admission, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured and public entrypoints retain scoped NOT_READY boundary; remote CI and external evidence remain outside local audit |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
@@ -342,6 +342,16 @@ hay multi-host transaction.
   execution ID khi các link còn lại đã được cập nhật nhất quán.
 - Không gọi executor/provider và không suy identifier guard thành proof ledger,
   multi-file transaction, power-loss hoặc multi-host.
+
+**Cập nhật M11 authorization exact gate lineage (2026-09-16):**
+`core/m11.ValidateArtifactGraph` giờ yêu cầu authorization khớp chính xác với
+gate mà nó viện dẫn về lease ID/version/hash, health snapshot ID/hash và cost
+bound ID/hash/minor. Regression tạo health snapshot và cost bound riêng nhưng
+đều checksum-valid, rồi thử chuyển authorization sang hai artifact đó; graph
+phải reject trước khi authorization có thể được dùng. Đây là bằng chứng graph
+offline/read-only cho lineage của authorization, không phải proof ledger,
+executor/provider, business outcome, crash/power-loss, atomic multi-file,
+distributed locking, pilot hoặc deployment.
 
 **Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
 journal là regular file ngay trong runtime. Symlink hoặc special file trả

@@ -849,6 +849,34 @@ def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
         fail("M11 recovery-admission approval regression is missing")
 
 
+def audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text):
+    """Keep authorization evidence bound to the gate's exact artifacts."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-authorization-gate-exact-lineage-20260916")
+    if not isinstance(record, dict) or "exact gate-evaluated lease ID/version/hash" not in record.get("scope", "") or "health snapshot ID/hash" not in record.get("scope", "") or "cost bound ID/hash/minor" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 authorization gate exact-lineage acceptance")
+    if "Cập nhật M11 authorization exact gate lineage" not in plan_text:
+        fail("M11 authorization gate exact-lineage acceptance lacks a scoped plan marker")
+    validator_path = root / "core/m11/artifact_registry.go"
+    test_path = root / "core/m11/artifact_test.go"
+    validator = validator_path.read_text(encoding="utf-8") if validator_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_validator = (
+        "gate.LeaseID != x.ProductionLeaseID",
+        "gate.HealthSnapshotID != x.ProductionHealthSnapshotID",
+        "gate.CostBoundID != x.ProductionCostBoundID",
+        "gate.CostBoundMinor != x.ProductionCostBoundMinor",
+    )
+    required_test = (
+        "func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "authorization switched to health/cost artifacts not evaluated by its gate",
+        "alternateHealth.SnapshotID = \"health-2\"",
+        "alternateCost.CostBoundID = \"cost-2\"",
+    )
+    if any(marker not in validator for marker in required_validator) or any(marker not in test for marker in required_test):
+        fail("M11 authorization gate exact-lineage regression is missing")
+
+
 def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
     """Keep direct M11 JSONL reads aligned with one-outcome-per-execution."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1304,6 +1332,7 @@ def audit(root):
     audit_m11_post_remove_journal_cleanup_ack(root, matrix, plan_text)
     audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
+    audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)

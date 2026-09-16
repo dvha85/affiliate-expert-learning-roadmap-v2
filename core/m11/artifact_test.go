@@ -20,7 +20,7 @@ func m11Entry(t *testing.T, kind string, value any) ArtifactEntry {
 	return entry
 }
 
-func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
+func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.T) {
 	lease := ProductionLease{LeaseID: "lease-1", LeaseVersion: "v1", PolicyVersion: "policy-1", ApprovalRef: "approval-1", ReviewedBy: "human", ReviewerID: "reviewer-1", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review-1", SourceCanaryGrantID: "grant-1", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 10, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "corr-1", HashVersion: "go-json-v1"}
 	lease.LeaseHash = ComputeProductionLeaseHash(lease)
 	approval := ProductionLeaseApproval{ApprovalID: "approval-1", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"e5-1"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
@@ -245,6 +245,30 @@ func TestArtifactGraphAcceptsExactProductionLifecycleLinks(t *testing.T) {
 	brokenAuthorizationGateEntries[6] = m11Entry(t, ArtifactKindGate, brokenAuthorizationGate)
 	if err := ValidateArtifactGraph(brokenAuthorizationGateEntries); err == nil {
 		t.Fatal("authorization from a non-allow gate was accepted")
+	}
+	// An authorization must retain the exact health and cost artifacts that
+	// the gate evaluated. Matching only the self-supplied hashes would allow a
+	// checksum-valid authorization to switch to a different valid snapshot or
+	// cost bound after the gate decision.
+	alternateHealth := health
+	alternateHealth.SnapshotID = "health-2"
+	alternateHealth.SnapshotHash = ComputeProductionHealthHash(alternateHealth)
+	alternateCost := cost
+	alternateCost.CostBoundID = "cost-2"
+	alternateCost.CostBoundHash = corem10.ComputeTrustedCostBoundHash(alternateCost)
+	forgedAuthorizationLineage := authorization
+	forgedAuthorizationLineage.ProductionHealthSnapshotID = alternateHealth.SnapshotID
+	forgedAuthorizationLineage.ProductionHealthSnapshotHash = alternateHealth.SnapshotHash
+	forgedAuthorizationLineage.ProductionCostBoundID = alternateCost.CostBoundID
+	forgedAuthorizationLineage.ProductionCostBoundHash = alternateCost.CostBoundHash
+	forgedAuthorizationLineageEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	forgedAuthorizationLineageEntries = append(forgedAuthorizationLineageEntries,
+		m11Entry(t, ArtifactKindHealth, alternateHealth),
+		m11Entry(t, ArtifactKindCostBound, alternateCost),
+		m11Entry(t, ArtifactKindAuthorization, forgedAuthorizationLineage),
+	)
+	if err := ValidateArtifactGraph(forgedAuthorizationLineageEntries); err == nil {
+		t.Fatal("authorization switched to health/cost artifacts not evaluated by its gate")
 	}
 	unauthorizedExecutor := authorization
 	unauthorizedExecutor.ExecutorID = "rogue-executor"
