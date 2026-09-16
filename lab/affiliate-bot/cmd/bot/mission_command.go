@@ -1581,8 +1581,18 @@ func commitM10ExecutionRecord(dir string, s LearnerMissionState, reservationInde
 	if err := writeJSONAtomic(m10ExecutionJournalPath(dir), journal); err != nil {
 		return err
 	}
+	// This is a test-only process-boundary seam. Production leaves it nil; a
+	// test child may terminate after the journal is visible and before replay
+	// appends the execution record or binds mission state.
+	if m10ExecutionJournalPublishFault != nil {
+		if err := m10ExecutionJournalPublishFault("after_journal_publish"); err != nil {
+			return err
+		}
+	}
 	return recoverM10ExecutionJournal(dir)
 }
+
+var m10ExecutionJournalPublishFault func(phase string) error
 
 // validateM10FixtureOutcome deliberately permits only a terminal no-side-effect
 // record. It is a local fixture measurement, not evidence of business impact.

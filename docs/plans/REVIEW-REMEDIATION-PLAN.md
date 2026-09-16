@@ -2423,6 +2423,18 @@ power-loss, transaction đa-file toàn runtime, multi-host, provider,
 business-outcome, pilot hoặc deployment proof. Record:
 `docs/architecture/EVIDENCE-M10-JOURNAL-PROCESS-KILL-20260916.md`.
 
+**Cập nhật M10 execution journal process-kill recovery (2026-09-16):** learner
+Bot test-binary chuẩn bị governed authorization + reservation rồi kill thật
+child `m10-record-failed` bằng `SIGKILL` ngay sau khi execution recovery
+journal được sync và publish, trước canonical execution registry/state binding.
+Process mới đọc `status` phải trả `RECOVERY_REQUIRED`, không thấy portable
+output hay execution registry entry; writer có lock sau đó replay đúng một lần,
+xóa journal, publish output và bind reservation → execution. Đây là bounded
+local POSIX process-termination evidence, chưa phải power-loss, transaction
+đa-file toàn runtime, multi-host, provider, business-outcome, pilot hoặc
+deployment proof. Record:
+`docs/architecture/EVIDENCE-M10-EXECUTION-PROCESS-KILL-20260916.md`.
+
 **Cập nhật local full regression sau PR #360 (2026-09-16):** trên `main`
 `930a040c80d4295c7dac60980b96030d9b6439eb`, maintainer đã chạy lại bốn Go
 module test/vet, 113 Python regression tests, toàn bộ static semantic
