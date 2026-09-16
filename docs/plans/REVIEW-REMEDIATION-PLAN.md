@@ -1,12 +1,18 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: fb201c24243dd7bd901849e2bb3cdab15d2b3595 -->
+<!-- readiness-main-baseline: b9890bf4c25ebbb74c09c96b253a6f25c38949e9 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #390 (2026-09-16):** PR #390 đã merge thành
+`b9890bf4c25ebbb74c09c96b253a6f25c38949e9`. PR chỉ bổ sung evidence và đồng bộ
+plan/matrix/graph; không thay đổi runtime/CI implementation. Các kết quả local
+ở record post-389 vẫn giữ nguyên phạm vi fixture/read-only và
+`NOT_READY_FOR_PRODUCTION`.
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
