@@ -2412,6 +2412,17 @@ parent sync qua power-loss, transaction đa-file, filesystem crash, Windows
 native lock, multi-host, provider, business outcome, pilot hay deployment.
 Record: `docs/architecture/EVIDENCE-BACKUP-POST-PUBLISH-PROCESS-KILL-20260916.md`.
 
+**Cập nhật M10 journal process-kill recovery (2026-09-16):** learner Bot
+test-binary chạy riêng hai transition canary và trusted cost-bound, kill thật
+child process bằng `SIGKILL` ngay sau khi recovery journal đã được sync và
+publish, trước canonical side effect đầu tiên. Process mới đọc `status` phải
+trả `RECOVERY_REQUIRED`; writer có lock sau đó replay đúng một lần, xóa
+journal và trả ACK/EXACT_DUPLICATE, đồng thời cost-bound resolve được từ M10
+registry. Đây là bounded local POSIX process-termination evidence, chưa phải
+power-loss, transaction đa-file toàn runtime, multi-host, provider,
+business-outcome, pilot hoặc deployment proof. Record:
+`docs/architecture/EVIDENCE-M10-JOURNAL-PROCESS-KILL-20260916.md`.
+
 **Cập nhật local full regression sau PR #360 (2026-09-16):** trên `main`
 `930a040c80d4295c7dac60980b96030d9b6439eb`, maintainer đã chạy lại bốn Go
 module test/vet, 113 Python regression tests, toàn bộ static semantic
