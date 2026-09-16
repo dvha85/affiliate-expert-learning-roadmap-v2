@@ -260,40 +260,13 @@ func acquireRestoreTargetGate(target string) (func(), error) {
 	return release, nil
 }
 
-// ensureOutputParentBeforeCreate rejects a symlink in the missing portion of a
-// caller-selected output path before MkdirAll can follow it. Checking only the
-// direct parent after MkdirAll is too late: a missing child below a symlink can
-// already have been created outside the requested destination. This is a
-// bounded preflight, not an ancestor-path TOCTOU or multi-host guarantee.
+// ensureOutputParentBeforeCreate delegates caller-selected output directory
+// creation to the platform implementation. POSIX uses descriptor-pinned
+// mkdirat/openat traversal so an ancestor swapped after preflight cannot be
+// followed through an external tree; non-POSIX keeps the conservative
+// non-symlink preflight and documents its narrower race boundary.
 func ensureOutputParentBeforeCreate(parent string) error {
-	parent = filepath.Clean(parent)
-	for candidate := parent; ; candidate = filepath.Dir(candidate) {
-		info, err := os.Lstat(candidate)
-		if err == nil {
-			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-				return fmt.Errorf("backup/restore target parent contains a symlink or non-directory")
-			}
-			break
-		}
-		if !os.IsNotExist(err) {
-			return err
-		}
-		next := filepath.Dir(candidate)
-		if next == candidate {
-			return fmt.Errorf("backup/restore target parent has no existing directory ancestor")
-		}
-	}
-	if err := os.MkdirAll(parent, 0700); err != nil {
-		return err
-	}
-	info, err := os.Lstat(parent)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("backup/restore target parent must be a non-symlink directory")
-	}
-	return nil
+	return ensureOutputParentPlatform(filepath.Clean(parent))
 }
 
 // readStableRegularFile reads a file only if the name stayed bound to the same

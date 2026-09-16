@@ -115,6 +115,20 @@ coverage runtime thật cho `m00ToM05BackupFiles` và các loader liên kết; k
 được diễn giải thành atomic multi-file/power-loss, distributed lock, provider,
 deployment, pilot hoặc business-outcome proof.
 
+## BR-18b output-parent ancestor swap guard
+
+Learner Bot test `TestBackupRestoreRejectsAncestorSwapBeforeOutputCreate` chạy
+trên POSIX với backup và restore command thật. Test thay ancestor đã qua
+preflight bằng symlink ngay trước descriptor traversal; cả hai đường phải trả
+`TARGET_ERROR`, không tạo thư mục qua cây `outside`, và không publish target.
+POSIX implementation dùng `openat(O_NOFOLLOW)`/`mkdirat` trên descriptor đã
+pin; Windows và fallback vẫn giữ preflight fail-closed hiện có. macOS `/var`
+alias hệ thống được resolve riêng, không mở rộng quyền cho symlink caller chọn.
+
+Đây là guard path-race local trên backup/restore output, không phải proof
+distributed lock, power-loss, atomic multi-file, provider, deployment, pilot
+hoặc business outcome.
+
 ## Giới hạn
 
 Các script `validate_*_operated_execution.py` cần execution artifact do n8n
