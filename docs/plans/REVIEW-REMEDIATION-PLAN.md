@@ -2435,6 +2435,16 @@ local POSIX process-termination evidence, chưa phải power-loss, transaction
 deployment proof. Record:
 `docs/architecture/EVIDENCE-M10-EXECUTION-PROCESS-KILL-20260916.md`.
 
+**Cập nhật backup/restore M11 duplicate-artifact guard (2026-09-16):**
+`smoke_br18b_backup_restore.py` tạo backup bằng learner Bot thật, nhân đôi
+nguyên `PRODUCTION_EXECUTION_RECORD` trong `m11-artifacts.jsonl` rồi cập nhật
+checksum/size manifest để mutation vượt qua lớp integrity. Restore thực tế trả
+`VERIFY_FAILED` và không publish target; đây là kiểm cardinality/identity của
+canonical M11 registry trên đường backup/restore. Phạm vi vẫn là local
+fixture/read-only, không phải atomic multi-file crash/power-loss,
+multi-host/provider/business-outcome/pilot/deployment proof. Record:
+`docs/architecture/EVIDENCE-BACKUP-M11-DUPLICATE-ARTIFACT-20260916.md`.
+
 **Cập nhật local full regression sau PR #360 (2026-09-16):** trên `main`
 `930a040c80d4295c7dac60980b96030d9b6439eb`, maintainer đã chạy lại bốn Go
 module test/vet, 113 Python regression tests, toàn bộ static semantic

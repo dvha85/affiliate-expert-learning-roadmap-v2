@@ -465,6 +465,14 @@ def main():
             return True
         rewrite_m11_registry(orphan_m11_reservation_backup, orphan_m11_reservation_change)
         assert invoke(bot, "backup", "restore", orphan_m11_reservation_backup, root / "orphan-m11-reservation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        duplicate_m11_artifact_backup = root / "duplicate-m11-artifact-backup"; shutil.copytree(backup, duplicate_m11_artifact_backup)
+        m11_artifact_lines = (duplicate_m11_artifact_backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines()
+        duplicate_execution_line = next(line for line in m11_artifact_lines if json.loads(line)["artifact_kind"] == "PRODUCTION_EXECUTION_RECORD")
+        replace_backup_file(duplicate_m11_artifact_backup, "m11-artifacts.jsonl", ("\n".join(m11_artifact_lines + [duplicate_execution_line]) + "\n").encode())
+        duplicate_m11_artifact_restored = root / "duplicate-m11-artifact-restored"
+        duplicate_m11_artifact_result = invoke(bot, "backup", "restore", duplicate_m11_artifact_backup, duplicate_m11_artifact_restored, expected=1, env=env)
+        assert duplicate_m11_artifact_result["status"] == "VERIFY_FAILED", duplicate_m11_artifact_result
+        assert not duplicate_m11_artifact_restored.exists()
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
@@ -671,7 +679,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, duplicate M11 artifact identity, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":
