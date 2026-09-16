@@ -38,6 +38,22 @@ bố nó là required artifact.
 python3 scripts/smoke_br18b_backup_restore.py  PASS
 ```
 
+## Post-merge verification
+
+Chạy lại trên `main` sau khi PR #369 được squash-merge:
+
+- `main_commit`: `93a0f1e489dc5b6941057c595406de62dcc7ef7a`
+- `python3 scripts/smoke_br18b_backup_restore.py`: **PASS**
+- `python3 scripts/audit_readiness.py`: **PASS as bounded audit**, kết quả cuối
+  vẫn là **NOT_READY_FOR_PRODUCTION**
+- `python3 -m unittest scripts.tests.test_audit_readiness -v`: **98 tests PASS**
+- JSON parse của `READINESS-MATRIX.json` và `READINESS-EVIDENCE-GRAPH.json`:
+  **PASS**
+- `git diff --check`: **PASS**
+
+Run này xác nhận implementation đã merge và evidence được resolve trên
+`main`; nó không mở rộng phạm vi chứng minh nêu ở phần Limits.
+
 ## Limits
 
 Đây là bounded local graph/inventory validation. Nó không chứng minh atomic
