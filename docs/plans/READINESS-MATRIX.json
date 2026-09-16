@@ -1,7 +1,7 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-16",
-	"main_baseline": "f2c01a18ec2b05fbc251f23a103610efb288fbe8",
+	"main_baseline": "eb36a39ceb33eca25eab62ddfc30cdded5c25821",
 	"overall": "NOT_READY_FOR_PRODUCTION",
 	"recent_updates": [
 	{"id":"RP-09-local-regression-post-369-20260916","status":"PARTIAL","implementation_refs":["scripts/audit_readiness.py","lab/affiliate-bot/cmd/bot/mission_command.go","lab/affiliate-bot/cmd/bot/backup_command.go","scripts/run_n8n_engine_regression.py","scripts/run_n8n_m06_schedule_regression.py"],"test_refs":["scripts/tests/test_audit_readiness.py","scripts/smoke_br12d.py","scripts/smoke_br13b.py","scripts/smoke_br16a_offline.py","scripts/smoke_br18b_backup_restore.py","scripts/validate_n8n_m06.py","scripts/validate_n8n_m06_selected_source.py","scripts/validate_n8n_m06_cases.py","scripts/validate_n8n_m07.py","scripts/validate_n8n_m07_adversarial.py","scripts/validate_n8n_m07_output_cases.py","docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md"],"scope":"main 3ebe32e3aa5157c1c89d34d4cd3b86a94b2f66f5 passed four Go module test/vet suites, 113 Python regression tests, static semantic validators, BR-12d, BR-13b, BR-16a and BR-18b smoke plus disposable n8n 2.38.1 M06/M07 engine and Schedule Trigger regressions. Operated-execution validators were not invoked standalone because they require execution JSON/store artifacts; the engine runner invoked the end-to-end path. Audit remained NOT_READY_FOR_PRODUCTION. This is fixture/read-only local evidence; provider, business outcome, live executor, clean-machine pilot, target deployment, distributed locking and power-loss/atomic multi-file durability remain unproved"},
