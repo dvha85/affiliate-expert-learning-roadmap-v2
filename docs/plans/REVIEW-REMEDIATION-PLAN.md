@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: c11880b19be8b979f90f6dcc1d21cc8bd032aaa5 -->
+<!-- readiness-main-baseline: 6ec07065796933d1b9a05019739832e4da72378a -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -26,6 +26,17 @@ Schedule Trigger trên local Darwin arm64 với n8n 2.38.1 và Node 24.21.0.
 Kết quả PASS chỉ là fixture/read-only evidence; provider, business outcome,
 clean-machine pilot, target deployment, power-loss và distributed locking vẫn
 chưa có bằng chứng.
+
+**M11 source canary grant cross-store binding (2026-09-16):** learner Bot nay
+không chấp nhận một `PRODUCTION_LEASE` chỉ vì cặp lease/approval tự nhất quán.
+Trong runtime đã có mission state, lease phải khớp ID/version/domain hash của
+active canonical M10 `CANARY_GRANT`, và registry entry M10 phải resolve/decode
+đúng trước khi append. Backup/restore áp dụng cùng liên kết này; BR-18b tạo
+mutation checksum-valid với source grant hash không liên quan và xác nhận
+`GRAPH_FAILED` trước khi publish target, còn positive path vẫn restore/replay.
+Đây là seam local fixture/read-only có thể nghiệm thu, không đóng RP-07: live
+executor, provider/business outcome, pilot, deployment, distributed lock và
+power-loss/atomic multi-file durability vẫn mở.
 
 **Full local regression after PR #376 (2026-09-16):** trên `main`
 `5bca64f88c1050779ed37882267a1d65d6f5223a`, bốn Go module test/vet, 113 Python

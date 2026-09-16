@@ -23,6 +23,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_377 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md"
         evidence_377.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md", evidence_377)
+        evidence_source_grant = self.root / "docs/architecture/EVIDENCE-M11-SOURCE-CANARY-GRANT-LINEAGE-20260916.md"
+        evidence_source_grant.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-SOURCE-CANARY-GRANT-LINEAGE-20260916.md", evidence_source_grant)
         for relative in ("lab/affiliate-bot/cmd/bot/runtime_gate.go", "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)

@@ -82,10 +82,52 @@ func loadM11ArtifactRegistry(dir string) ([]corem11.ArtifactEntry, error) {
 	return entries, nil
 }
 
+// validateM11LeaseSourceGrant binds a production lease to the canonical M10
+// grant already active in the same learner runtime. A self-consistent M11
+// lease/approval pair is not enough: without this cross-store check a caller
+// could promote an unrelated grant hash while keeping the M11 graph valid.
+// Minimal M11-only fixtures without a mission state remain supported because
+// they have no M10 runtime to bind; a populated learner runtime must resolve
+// the exact immutable M10 registry entry.
+func validateM11LeaseSourceGrant(dir string, lease corem11.ProductionLease) error {
+	state, err := loadMissionState(dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if state.Canary == nil {
+		return nil
+	}
+	grant := state.Canary.CanaryGrant
+	if lease.SourceCanaryGrantID != grant.GrantID || lease.SourceCanaryGrantVersion != grant.GrantVersion || lease.SourceCanaryGrantHash != grant.GrantHash {
+		return fmt.Errorf("M11 lease source canary grant does not match active M10 grant")
+	}
+	entry, err := resolveM10ArtifactByID(dir, corem10.ArtifactKindCanaryGrant, grant.GrantID, "")
+	if err != nil {
+		return fmt.Errorf("M11 lease source canary grant is not registered: %w", err)
+	}
+	registered, status := corem10.DecodeCanaryGrant(entry.Artifact)
+	if status != "VALID" || registered.GrantVersion != grant.GrantVersion || registered.GrantHash != grant.GrantHash {
+		return fmt.Errorf("M11 lease source canary grant is not registered: domain hash mismatch")
+	}
+	return nil
+}
+
 func registerM11Artifact(dir, kind string, raw []byte) (corem11.ArtifactEntry, string, error) {
 	entry, err := corem11.NewArtifactEntry(kind, raw)
 	if err != nil {
 		return entry, "", err
+	}
+	if kind == corem11.ArtifactKindLease {
+		value, status := corem11.DecodeArtifact("lease", entry.Artifact)
+		if status != corem11.Valid {
+			return entry, "", fmt.Errorf("M11 lease artifact is invalid")
+		}
+		if err := validateM11LeaseSourceGrant(dir, *value.(*corem11.ProductionLease)); err != nil {
+			return entry, "", err
+		}
 	}
 	entries, err := loadM11ArtifactRegistry(dir)
 	if err != nil {

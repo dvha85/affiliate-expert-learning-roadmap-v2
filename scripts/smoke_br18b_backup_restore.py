@@ -116,6 +116,25 @@ def replace_m11_health_observed_at(value):
     return change
 
 
+def rewrite_m11_source_grant_mismatch(backup):
+    entries = [json.loads(line) for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines()]
+    lease = next((entry for entry in entries if entry["artifact_kind"] == "PRODUCTION_LEASE"), None)
+    if lease is None:
+        raise AssertionError("missing M11 production lease")
+    bad_hash = "sha256:" + "0" * 64
+    lease["artifact"]["source_canary_grant_hash"] = bad_hash
+    lease_payload = dict(lease["artifact"])
+    lease_payload.pop("lease_hash", None)
+    lease["artifact"]["lease_hash"] = "sha256:" + hashlib.sha256(json.dumps(lease_payload, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    for entry in entries:
+        if entry["artifact_kind"] == "PRODUCTION_LEASE_APPROVAL":
+            entry["artifact"]["lease_hash"] = lease["artifact"]["lease_hash"]
+            entry["artifact"]["source_canary_grant_hash"] = bad_hash
+        canonical = json.dumps(entry["artifact"], separators=(",", ":"), ensure_ascii=False).encode()
+        entry["content_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(json.dumps(entry, separators=(",", ":"), ensure_ascii=False) for entry in entries) + "\n").encode())
+
+
 def write_canary_grant(path, intent, policy, approval, max_executions, max_cost):
     payload = {
         "grant_id": "br18-g", "grant_version": "v1", "policy_version": policy["policy_version"],
@@ -142,13 +161,13 @@ def write_cost_bound(path, intent, amount, expires_at, bound_id):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def write_production_lease(path, max_executions=1, max_cost=4, max_pending_outcomes=1):
+def write_production_lease(path, source_canary_grant_hash, max_executions=1, max_cost=4, max_pending_outcomes=1):
     payload = {
         "lease_id": "br18-production-lease", "lease_version": "v1", "policy_version": "br18-v1",
         "approval_ref": "br18-production-approval", "reviewed_by": "human", "reviewer_id": "pilot-human",
         "reviewed_at": "2026-09-07T01:05:00Z", "promotion_review_ref": "fixture:br18-promotion-review",
         "source_canary_grant_id": "br18-g", "source_canary_grant_version": "v1",
-        "source_canary_grant_hash": "sha256:" + "a" * 64, "valid_from": "2026-09-07T01:05:00Z",
+        "source_canary_grant_hash": source_canary_grant_hash, "valid_from": "2026-09-07T01:05:00Z",
         "expires_at": "2099-09-03T02:50:00Z", "allowed_risk_classes": ["RISK0"],
         "allowed_action_types": ["DRAFT"], "allowed_hosts": ["example.com"], "executor_ids": ["fixture_stub"],
         "max_executions_total": max_executions, "max_executions_per_window": max_executions, "window_seconds": 60,
@@ -250,7 +269,8 @@ def main():
         machine_outcome = root / "machine-outcome.json"
         machine_outcome.write_text(json.dumps({"outcome_id":"br18-machine-o","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":failed["artifact"]["execution_id"]},"observed_at":failed_attempted_at,"status":"CANCELLED","metrics":{},"source_ref":"fixture:m10-outcome/br18-failed"}), encoding="utf-8")
         assert invoke(bot, "mission", "m10-outcome", runtime, machine_outcome, env=env)["status"] == "APPENDED"
-        production_lease = root / "production-lease.json"; write_production_lease(production_lease)
+        grant_hash = json.loads(grant.read_text(encoding="utf-8"))["grant_hash"]
+        production_lease = root / "production-lease.json"; write_production_lease(production_lease, grant_hash)
         production_approval = root / "production-approval.json"; write_production_lease_approval(production_approval, production_lease)
         recovery_runtime = root / "reconciliation-runtime"; recovery_backup = root / "reconciliation-backup"; recovery_restored = root / "reconciliation-restored"
         early_gate_runtime = root / "early-gate-runtime"
@@ -276,7 +296,7 @@ def main():
         # ledger that its gate snapshot authorized.
         stale_gate_runtime = root / "stale-gate-runtime"; stale_lease = root / "stale-gate-lease.json"; stale_approval = root / "stale-gate-approval.json"; stale_health = root / "stale-gate-health.json"
         shutil.copytree(runtime, stale_gate_runtime)
-        write_production_lease(stale_lease, max_executions=2, max_cost=8, max_pending_outcomes=2)
+        write_production_lease(stale_lease, grant_hash, max_executions=2, max_cost=8, max_pending_outcomes=2)
         write_production_lease_approval(stale_approval, stale_lease); write_production_health(stale_health, stale_lease)
         for kind, artifact in (("PRODUCTION_LEASE", stale_lease), ("PRODUCTION_LEASE_APPROVAL", stale_approval), ("PRODUCTION_HEALTH_SNAPSHOT", stale_health), ("TRUSTED_COST_BOUND", cost)):
             assert invoke(bot, "mission", "m11-register", stale_gate_runtime, kind, artifact, env=env)["status"] == "APPENDED"
@@ -379,6 +399,12 @@ def main():
         assert backup_result["status"] == "BACKED_UP"
         assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v3"
         assert {"actions.jsonl", "outcomes.jsonl", "evaluations.jsonl", "proposals.jsonl", "reviews.jsonl", "m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl", "m11-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
+        source_grant_mismatch_backup = root / "source-grant-mismatch-backup"; shutil.copytree(backup, source_grant_mismatch_backup)
+        rewrite_m11_source_grant_mismatch(source_grant_mismatch_backup)
+        source_grant_mismatch_restored = root / "source-grant-mismatch-restored"
+        source_grant_mismatch_result = invoke(bot, "backup", "restore", source_grant_mismatch_backup, source_grant_mismatch_restored, expected=1, env=env)
+        assert source_grant_mismatch_result["status"] == "GRAPH_FAILED", source_grant_mismatch_result
+        assert not source_grant_mismatch_restored.exists()
         invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
         (invalid_source / "m10-outcomes.jsonl").unlink()
         assert invoke(bot, "backup", "create", invalid_source, root / "invalid-source-backup", expected=1, env=env)["status"] == "INPUT_ERROR"
