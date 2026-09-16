@@ -310,6 +310,19 @@ func TestBackupProcessTerminationChild(t *testing.T) {
 			}
 			return nil
 		}
+		backupPublishFault = func(phase, _ string) error {
+			terminationPhase := os.Getenv("GO_BACKUP_PROCESS_TERMINATION_PHASE")
+			if phase == terminationPhase {
+				if mode != "kill" {
+					os.Exit(97)
+				}
+				process, err := os.FindProcess(os.Getpid())
+				if err != nil || process.Kill() != nil {
+					os.Exit(98)
+				}
+			}
+			return nil
+		}
 		os.Exit(runBackupCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
 	}
 }
@@ -413,16 +426,29 @@ func runBackupProcessTerminationRegression(t *testing.T, mode, terminationPhase 
 		t.Fatalf("backup child exited with %d, want 97", code)
 	}
 	if _, err := os.Lstat(crashedBackup); !os.IsNotExist(err) {
-		t.Fatalf("process-terminated backup published a target: %v", err)
+		if terminationPhase != "after_rename_before_parent_sync" {
+			t.Fatalf("process-terminated backup published a target: %v", err)
+		}
+	} else if terminationPhase == "after_rename_before_parent_sync" {
+		t.Fatal("post-rename process termination did not leave the visible backup target")
 	}
-	if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 1 {
-		t.Fatalf("process termination did not leave exactly one target-owned backup staging tree: %v", names)
-	}
-	if code, response := backupCall(t, "create", runtimeDir, crashedBackup); code != 0 || response["status"] != "BACKED_UP" {
-		t.Fatalf("backup retry after process termination failed: code=%d response=%+v", code, response)
-	}
-	if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 0 {
-		t.Fatalf("backup retry left stale target-owned staging trees: %v", names)
+	if terminationPhase == "after_rename_before_parent_sync" {
+		if _, err := verifyBackup(crashedBackup); err != nil {
+			t.Fatalf("visible backup after post-rename process termination is invalid: %v", err)
+		}
+		if code, response := backupCall(t, "create", runtimeDir, crashedBackup); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+			t.Fatalf("visible backup was offered as a retry after post-rename termination: code=%d response=%+v", code, response)
+		}
+	} else {
+		if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 1 {
+			t.Fatalf("process termination did not leave exactly one target-owned backup staging tree: %v", names)
+		}
+		if code, response := backupCall(t, "create", runtimeDir, crashedBackup); code != 0 || response["status"] != "BACKED_UP" {
+			t.Fatalf("backup retry after process termination failed: code=%d response=%+v", code, response)
+		}
+		if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 0 {
+			t.Fatalf("backup retry left stale target-owned staging trees: %v", names)
+		}
 	}
 
 	crashedRestore := filepath.Join(root, "crashed-restore")
@@ -430,16 +456,29 @@ func runBackupProcessTerminationRegression(t *testing.T, mode, terminationPhase 
 		t.Fatalf("restore child exited with %d, want 97", code)
 	}
 	if _, err := os.Lstat(crashedRestore); !os.IsNotExist(err) {
-		t.Fatalf("process-terminated restore published a target: %v", err)
+		if terminationPhase != "after_rename_before_parent_sync" {
+			t.Fatalf("process-terminated restore published a target: %v", err)
+		}
+	} else if terminationPhase == "after_rename_before_parent_sync" {
+		t.Fatal("post-rename process termination did not leave the visible restore target")
 	}
-	if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 1 {
-		t.Fatalf("process termination did not leave exactly one target-owned restore staging tree: %v", names)
-	}
-	if code, response := backupCall(t, "restore", sourceBackup, crashedRestore); code != 0 || response["status"] != "RESTORED" {
-		t.Fatalf("restore retry after process termination failed: code=%d response=%+v", code, response)
-	}
-	if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 0 {
-		t.Fatalf("restore retry left stale target-owned staging trees: %v", names)
+	if terminationPhase == "after_rename_before_parent_sync" {
+		if _, err := loadMissionState(crashedRestore); err != nil {
+			t.Fatalf("visible restore after post-rename process termination is invalid: %v", err)
+		}
+		if code, response := backupCall(t, "restore", sourceBackup, crashedRestore); code == 0 || response["status"] != "TARGET_NOT_EMPTY" {
+			t.Fatalf("visible restore was offered as a retry after post-rename termination: code=%d response=%+v", code, response)
+		}
+	} else {
+		if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 1 {
+			t.Fatalf("process termination did not leave exactly one target-owned restore staging tree: %v", names)
+		}
+		if code, response := backupCall(t, "restore", sourceBackup, crashedRestore); code != 0 || response["status"] != "RESTORED" {
+			t.Fatalf("restore retry after process termination failed: code=%d response=%+v", code, response)
+		}
+		if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 0 {
+			t.Fatalf("restore retry left stale target-owned staging trees: %v", names)
+		}
 	}
 }
 
@@ -462,6 +501,13 @@ func TestBackupProcessKillAfterPartialStagingLeavesNoTargetAndRetrySucceeds(t *t
 		t.Skip("SIGKILL is not a portable Windows process-boundary proof")
 	}
 	runBackupProcessTerminationRegression(t, "kill", "after_file_sync")
+}
+
+func TestBackupProcessKillAfterPublishLeavesVisibleCompleteTarget(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL is not a portable Windows process-boundary proof")
+	}
+	runBackupProcessTerminationRegression(t, "kill", "after_rename_before_parent_sync")
 }
 
 func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {

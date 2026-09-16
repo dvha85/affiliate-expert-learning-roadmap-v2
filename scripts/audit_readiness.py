@@ -1108,6 +1108,42 @@ def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
         fail("backup orphan-staging cleanup regression is missing from the real CLI/test/CI path")
 
 
+def audit_backup_post_publish_process_kill(root, matrix, plan_text):
+    """Keep a visible post-rename target safe from an exact retry."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-backup-post-publish-process-kill-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks backup post-publish process-kill acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("backup post-publish process-kill record lacks implementation, test or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("after", "rename", "SIGKILL", "TARGET_NOT_EMPTY", "POSIX")):
+        fail("backup post-publish process-kill record lacks a bounded visibility disclosure")
+    if "Cập nhật backup/restore post-publish process-kill boundary" not in plan_text:
+        fail("backup post-publish process-kill lacks a scoped plan marker")
+    test = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+    workflow = root / ".github/workflows/curriculum-ci.yml"
+    test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    required_test = (
+        "TestBackupProcessKillAfterPublishLeavesVisibleCompleteTarget",
+        "after_rename_before_parent_sync",
+        "visible backup after post-rename process termination is invalid",
+        "visible restore after post-rename process termination is invalid",
+        "visible backup was offered as a retry after post-rename termination",
+        "visible restore was offered as a retry after post-rename termination",
+    )
+    if not all(token in test_text for token in required_test) or "run_learner_bot_test_shard.py" not in workflow_text:
+        fail("backup post-publish process-kill regression is missing from the real test/CI path")
+
+
 def audit_immutable_artifact_parent_recheck(root, matrix, plan_text):
     """Keep hard-link publication from following a swapped parent directory."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1277,6 +1313,7 @@ def audit(root):
     audit_managed_lock_path_guard(root, matrix, plan_text)
     audit_m11_process_kill_journal(root, matrix, plan_text)
     audit_backup_orphan_staging_recovery(root, matrix, plan_text)
+    audit_backup_post_publish_process_kill(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)

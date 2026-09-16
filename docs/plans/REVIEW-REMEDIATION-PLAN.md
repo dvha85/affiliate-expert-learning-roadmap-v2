@@ -2402,6 +2402,16 @@ power-loss, transaction đa-file, filesystem crash, Windows native lock,
 multi-host, provider, business outcome, pilot hay deployment. Record:
 `docs/architecture/EVIDENCE-BACKUP-ORPHAN-STAGING-20260916.md`.
 
+**Cập nhật backup/restore post-publish process-kill boundary (2026-09-16):**
+regression chạy child Bot thật và kill ngay sau `os.Rename`, trước
+parent-directory acknowledgement. Target backup visible phải qua
+`verifyBackup`, runtime restore visible phải qua `loadMissionState`, và exact
+retry cùng target phải trả `TARGET_NOT_EMPTY` để không ghi đè snapshot đã
+publish. Đây là bounded local rename/process-kill safety seam, không chứng minh
+parent sync qua power-loss, transaction đa-file, filesystem crash, Windows
+native lock, multi-host, provider, business outcome, pilot hay deployment.
+Record: `docs/architecture/EVIDENCE-BACKUP-POST-PUBLISH-PROCESS-KILL-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
