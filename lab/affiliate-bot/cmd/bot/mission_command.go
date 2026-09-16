@@ -1562,10 +1562,20 @@ func recoverM10ExecutionJournal(dir string) error {
 	if _, _, err := registerM10Artifact(dir, corem10.ArtifactKindExecutionRecord, recordRaw); err != nil {
 		return fmt.Errorf("M10 execution journal registry recovery failed: %w", err)
 	}
+	if m10ExecutionJournalPublishFault != nil {
+		if err := m10ExecutionJournalPublishFault("after_artifact"); err != nil {
+			return err
+		}
+	}
 	if bound := s.Reservations[reservationIndex].ExecutionID; bound == "" {
 		s.Reservations[reservationIndex].ExecutionID = journal.Record.ExecutionID
 		if err := saveMissionState(dir, s); err != nil {
 			return err
+		}
+		if m10ExecutionJournalPublishFault != nil {
+			if err := m10ExecutionJournalPublishFault("after_state"); err != nil {
+				return err
+			}
 		}
 	} else if bound != journal.Record.ExecutionID {
 		return fmt.Errorf("M10 execution journal conflicts with bound reservation execution")
@@ -1582,8 +1592,7 @@ func commitM10ExecutionRecord(dir string, s LearnerMissionState, reservationInde
 		return err
 	}
 	// This is a test-only process-boundary seam. Production leaves it nil; a
-	// test child may terminate after the journal is visible and before replay
-	// appends the execution record or binds mission state.
+	// test child may terminate at a selected recovery-journal boundary.
 	if m10ExecutionJournalPublishFault != nil {
 		if err := m10ExecutionJournalPublishFault("after_journal_publish"); err != nil {
 			return err
