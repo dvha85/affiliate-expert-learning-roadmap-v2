@@ -294,7 +294,11 @@ func TestBackupProcessTerminationChild(t *testing.T) {
 			os.Exit(2)
 		}
 		backupStagingWriteFault = func(phase, _ string) error {
-			if phase == "before_write" {
+			terminationPhase := os.Getenv("GO_BACKUP_PROCESS_TERMINATION_PHASE")
+			if terminationPhase == "" {
+				terminationPhase = "before_write"
+			}
+			if phase == terminationPhase {
 				if mode == "kill" {
 					process, err := os.FindProcess(os.Getpid())
 					if err != nil || process.Kill() != nil {
@@ -347,7 +351,7 @@ func TestCleanupStaleStagingOnlyRemovesTargetOwnedDirectories(t *testing.T) {
 	}
 }
 
-func runBackupProcessTerminationRegression(t *testing.T, mode string) {
+func runBackupProcessTerminationRegression(t *testing.T, mode, terminationPhase string) {
 	t.Helper()
 
 	runtimeDir := t.TempDir()
@@ -372,7 +376,7 @@ func runBackupProcessTerminationRegression(t *testing.T, mode string) {
 	runChildExit := func(args ...string) int {
 		t.Helper()
 		command := exec.Command(os.Args[0], append([]string{"-test.run=^TestBackupProcessTerminationChild$", "--"}, args...)...)
-		command.Env = append(os.Environ(), "GO_WANT_BACKUP_PROCESS_TERMINATION="+mode)
+		command.Env = append(os.Environ(), "GO_WANT_BACKUP_PROCESS_TERMINATION="+mode, "GO_BACKUP_PROCESS_TERMINATION_PHASE="+terminationPhase)
 		if err := command.Run(); err == nil {
 			t.Fatalf("backup child unexpectedly completed after injected %s", mode)
 		} else if exited, ok := err.(*exec.ExitError); ok {
@@ -443,14 +447,21 @@ func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing
 	if runtime.GOOS == "windows" {
 		t.Skip("the Windows fallback still requires explicit stale-lock recovery")
 	}
-	runBackupProcessTerminationRegression(t, "exit")
+	runBackupProcessTerminationRegression(t, "exit", "before_write")
 }
 
 func TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("SIGKILL is not a portable Windows process-boundary proof")
 	}
-	runBackupProcessTerminationRegression(t, "kill")
+	runBackupProcessTerminationRegression(t, "kill", "before_write")
+}
+
+func TestBackupProcessKillAfterPartialStagingLeavesNoTargetAndRetrySucceeds(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL is not a portable Windows process-boundary proof")
+	}
+	runBackupProcessTerminationRegression(t, "kill", "after_file_sync")
 }
 
 func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {

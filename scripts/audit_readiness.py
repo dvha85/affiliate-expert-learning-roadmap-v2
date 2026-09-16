@@ -1097,13 +1097,14 @@ def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
     required_test = (
         "TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds",
         "TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds",
+        "TestBackupProcessKillAfterPartialStagingLeavesNoTargetAndRetrySucceeds",
         "TestCleanupStaleStagingOnlyRemovesTargetOwnedDirectories",
         "process termination did not leave exactly one target-owned backup staging tree",
         "backup retry left stale target-owned staging trees",
         "process termination did not leave exactly one target-owned restore staging tree",
         "restore retry left stale target-owned staging trees",
     )
-    if not all(token in source_text for token in required_source) or not all(token in test_text for token in required_test) or "run_learner_bot_test_shard.py" not in workflow_text:
+    if not all(token in source_text for token in required_source) or not all(token in test_text for token in required_test) or "GO_BACKUP_PROCESS_TERMINATION_PHASE" not in test_text or "run_learner_bot_test_shard.py" not in workflow_text:
         fail("backup orphan-staging cleanup regression is missing from the real CLI/test/CI path")
 
 
