@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -271,17 +272,16 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 	}
 }
 
-// TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds uses the
-// real test binary as a child process. The child exits while the output is
-// still private staging, so this covers the process-boundary case that an
-// in-process fault hook cannot prove. It intentionally proves only that no
+// TestBackupProcessTerminationChild is the child entrypoint for the two
+// process-boundary regressions below. It intentionally proves only that no
 // incomplete target is published and that a later exact retry can converge;
 // it does not claim kernel power-loss or orphan-staging cleanup guarantees.
-func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing.T) {
+func TestBackupProcessTerminationChild(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the Windows fallback still requires explicit stale-lock recovery")
 	}
-	if os.Getenv("GO_WANT_BACKUP_PROCESS_EXIT") == "1" {
+	mode := os.Getenv("GO_WANT_BACKUP_PROCESS_TERMINATION")
+	if mode != "" {
 		separator := -1
 		for index, value := range os.Args {
 			if value == "--" {
@@ -294,12 +294,23 @@ func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing
 		}
 		backupStagingWriteFault = func(phase, _ string) error {
 			if phase == "before_write" {
+				if mode == "kill" {
+					process, err := os.FindProcess(os.Getpid())
+					if err != nil || process.Kill() != nil {
+						os.Exit(98)
+					}
+					return nil
+				}
 				os.Exit(97)
 			}
 			return nil
 		}
 		os.Exit(runBackupCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
 	}
+}
+
+func runBackupProcessTerminationRegression(t *testing.T, mode string) {
+	t.Helper()
 
 	runtimeDir := t.TempDir()
 	if _, err := buildBR10AdvisorFixture(runtimeDir); err != nil {
@@ -322,11 +333,18 @@ func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing
 
 	runChildExit := func(args ...string) int {
 		t.Helper()
-		command := exec.Command(os.Args[0], append([]string{"-test.run=^TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds$", "--"}, args...)...)
-		command.Env = append(os.Environ(), "GO_WANT_BACKUP_PROCESS_EXIT=1")
+		command := exec.Command(os.Args[0], append([]string{"-test.run=^TestBackupProcessTerminationChild$", "--"}, args...)...)
+		command.Env = append(os.Environ(), "GO_WANT_BACKUP_PROCESS_TERMINATION="+mode)
 		if err := command.Run(); err == nil {
-			t.Fatal("backup child unexpectedly completed after injected process exit")
+			t.Fatalf("backup child unexpectedly completed after injected %s", mode)
 		} else if exited, ok := err.(*exec.ExitError); ok {
+			if mode == "kill" {
+				status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+					t.Fatalf("backup child did not receive SIGKILL: %v", err)
+				}
+				return -1
+			}
 			return exited.ExitCode()
 		} else {
 			t.Fatalf("backup child did not report an exit status: %v", err)
@@ -335,26 +353,40 @@ func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing
 	}
 
 	crashedBackup := filepath.Join(root, "crashed-backup")
-	if code := runChildExit("create", runtimeDir, crashedBackup); code != 97 {
+	if code := runChildExit("create", runtimeDir, crashedBackup); mode == "exit" && code != 97 {
 		t.Fatalf("backup child exited with %d, want 97", code)
 	}
 	if _, err := os.Lstat(crashedBackup); !os.IsNotExist(err) {
-		t.Fatalf("process-exited backup published a target: %v", err)
+		t.Fatalf("process-terminated backup published a target: %v", err)
 	}
 	if code, response := backupCall(t, "create", runtimeDir, crashedBackup); code != 0 || response["status"] != "BACKED_UP" {
-		t.Fatalf("backup retry after process exit failed: code=%d response=%+v", code, response)
+		t.Fatalf("backup retry after process termination failed: code=%d response=%+v", code, response)
 	}
 
 	crashedRestore := filepath.Join(root, "crashed-restore")
-	if code := runChildExit("restore", sourceBackup, crashedRestore); code != 97 {
+	if code := runChildExit("restore", sourceBackup, crashedRestore); mode == "exit" && code != 97 {
 		t.Fatalf("restore child exited with %d, want 97", code)
 	}
 	if _, err := os.Lstat(crashedRestore); !os.IsNotExist(err) {
-		t.Fatalf("process-exited restore published a target: %v", err)
+		t.Fatalf("process-terminated restore published a target: %v", err)
 	}
 	if code, response := backupCall(t, "restore", sourceBackup, crashedRestore); code != 0 || response["status"] != "RESTORED" {
-		t.Fatalf("restore retry after process exit failed: code=%d response=%+v", code, response)
+		t.Fatalf("restore retry after process termination failed: code=%d response=%+v", code, response)
 	}
+}
+
+func TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the Windows fallback still requires explicit stale-lock recovery")
+	}
+	runBackupProcessTerminationRegression(t, "exit")
+}
+
+func TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL is not a portable Windows process-boundary proof")
+	}
+	runBackupProcessTerminationRegression(t, "kill")
 }
 
 func TestBackupRejectsSourceSymlinkSwapAfterInventory(t *testing.T) {
