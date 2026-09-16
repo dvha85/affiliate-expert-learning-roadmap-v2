@@ -29,6 +29,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_m10_canonical_append = self.root / "docs/architecture/EVIDENCE-M10-CANONICAL-APPEND-PROCESS-KILL-20260916.md"
         evidence_m10_canonical_append.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M10-CANONICAL-APPEND-PROCESS-KILL-20260916.md", evidence_m10_canonical_append)
+        evidence_m10_execution_canonical_append = self.root / "docs/architecture/EVIDENCE-M10-EXECUTION-CANONICAL-APPEND-PROCESS-KILL-20260916.md"
+        evidence_m10_execution_canonical_append.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M10-EXECUTION-CANONICAL-APPEND-PROCESS-KILL-20260916.md", evidence_m10_execution_canonical_append)
         evidence_377 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md"
         evidence_377.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md", evidence_377)
@@ -291,6 +294,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "lab/affiliate-bot/cmd/bot/m10_process_kill_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ProcessKillAfterCanonicalAppendRequiresLockedReplay", "RemovedM10CanonicalAppendProcessKillRegression"), encoding="utf-8")
         self.assertIn("M10 post-canonical-append process-kill regression is missing", self.run_audit(False))
+
+    def test_missing_m10_execution_process_kill_after_canonical_append_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m10_process_kill_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ExecutionProcessKillAfterCanonicalAppendRequiresLockedReplay", "RemovedM10ExecutionCanonicalAppendProcessKillRegression"), encoding="utf-8")
+        self.assertIn("M10 execution post-canonical-append process-kill regression is missing", self.run_audit(False))
 
     def test_missing_backup_orphan_staging_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"

@@ -381,3 +381,127 @@ func TestMissionM10ProcessKillAfterCanonicalAppendRequiresLockedReplay(t *testin
 		})
 	}
 }
+
+// TestMissionM10ExecutionProcessKillAfterCanonicalAppendRequiresLockedReplay
+// covers the two canonical sides of a governed execution transition. The
+// child dies after the execution registry append or reservation binding is
+// visible, but before journal cleanup. A fresh reader must remain fail-closed;
+// a locked retry must preserve one execution record and one reservation link.
+func TestMissionM10ExecutionProcessKillAfterCanonicalAppendRequiresLockedReplay(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	for _, phase := range []string{"after_artifact", "after_state"} {
+		phase := phase
+		t.Run(phase, func(t *testing.T) {
+			runtimeDir, boundPath, gatePath, _ := authorityExpiryFixture(t, "cost")
+			root := filepath.Dir(runtimeDir)
+			authorizationPath := filepath.Join(root, "process-kill-execution-"+phase+"-authorization.json")
+			if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, "2026-09-08T00:00:00Z", "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+				t.Fatalf("execution authorization setup failed: code=%d response=%+v", code, response)
+			}
+			if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "process-kill-execution-"+phase+"-reservation"); code != 0 || response["status"] != "RESERVED" {
+				t.Fatalf("execution reservation setup failed: code=%d response=%+v", code, response)
+			}
+			recordPath := filepath.Join(root, "process-kill-execution-"+phase+"-record.json")
+			journalPath := m10ExecutionJournalPath(runtimeDir)
+			commandArgs := []string{"m10-record-failed", runtimeDir, authorizationPath, recordPath, "2026-09-08T00:00:00Z", "process-kill canonical append fixture"}
+			command := exec.Command(os.Args[0], append([]string{"-test.run=^TestM10ProcessTerminationChild$", "--"}, commandArgs...)...)
+			command.Env = append(os.Environ(),
+				"GO_WANT_M10_PROCESS_TERMINATION=1",
+				"GO_M10_PROCESS_TERMINATION_KIND=execution",
+				"GO_M10_PROCESS_TERMINATION_PHASE="+phase,
+			)
+			var childStdout, childStderr bytes.Buffer
+			command.Stdout, command.Stderr = &childStdout, &childStderr
+			err := command.Run()
+			if err == nil {
+				t.Fatalf("M10 execution child unexpectedly completed after injected %s SIGKILL", phase)
+			}
+			exited, ok := err.(*exec.ExitError)
+			if !ok {
+				t.Fatal(err)
+			}
+			status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+			if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+				t.Fatalf("M10 execution child did not receive SIGKILL at %s: %v stdout=%q stderr=%q", phase, err, childStdout.String(), childStderr.String())
+			}
+			journalRaw, err := os.ReadFile(journalPath)
+			if err != nil {
+				t.Fatalf("%s process kill did not leave the recovery journal: %v", phase, err)
+			}
+			var journal m10ExecutionJournal
+			if err := json.Unmarshal(journalRaw, &journal); err != nil {
+				t.Fatalf("decode execution recovery journal: %v", err)
+			}
+			if journal.Record.ExecutionID == "" {
+				t.Fatal("execution recovery journal has no canonical execution ID")
+			}
+			if _, err := os.Stat(recordPath); !os.IsNotExist(err) {
+				t.Fatalf("execution journal process kill created portable output before replay: %v", err)
+			}
+
+			entries, err := loadM10ArtifactRegistry(runtimeDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			executionCount := 0
+			for _, entry := range entries {
+				if entry.ArtifactKind == corem10.ArtifactKindExecutionRecord {
+					executionCount++
+					if entry.ArtifactID != journal.Record.ExecutionID {
+						t.Fatalf("execution registry contains the wrong canonical ID: entry=%+v journal=%s", entry, journal.Record.ExecutionID)
+					}
+				}
+			}
+			if executionCount != 1 {
+				t.Fatalf("%s process kill left %d canonical execution records, want 1", phase, executionCount)
+			}
+			state, err := loadMissionState(runtimeDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(state.Reservations) != 1 {
+				t.Fatalf("unexpected reservations after %s process kill: %+v", phase, state.Reservations)
+			}
+			if phase == "after_artifact" && state.Reservations[0].ExecutionID != "" {
+				t.Fatalf("execution reservation binding became visible too early: %+v", state.Reservations[0])
+			}
+			if phase == "after_state" && state.Reservations[0].ExecutionID != journal.Record.ExecutionID {
+				t.Fatalf("execution reservation binding was not visible at %s: %+v", phase, state.Reservations[0])
+			}
+
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh read-only status exposed interrupted %s execution: code=%d response=%+v", phase, code, response)
+			}
+			if code, response := missionBinaryCall(t, binary, append([]string{"mission"}, commandArgs...)...); code != 0 || response["status"] != "APPENDED" {
+				t.Fatalf("locked retry did not replay %s execution journal: code=%d response=%+v", phase, code, response)
+			}
+			if _, err := os.Stat(journalPath); !os.IsNotExist(err) {
+				t.Fatalf("%s execution journal remains after locked retry: %v", phase, err)
+			}
+			if _, err := os.Stat(recordPath); err != nil {
+				t.Fatalf("locked retry did not publish portable execution record: %v", err)
+			}
+
+			entries, err = loadM10ArtifactRegistry(runtimeDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			executionCount = 0
+			for _, entry := range entries {
+				if entry.ArtifactKind == corem10.ArtifactKindExecutionRecord && entry.ArtifactID == journal.Record.ExecutionID {
+					executionCount++
+				}
+			}
+			if executionCount != 1 {
+				t.Fatalf("%s locked replay left %d canonical execution records, want 1", phase, executionCount)
+			}
+			state, err = loadMissionState(runtimeDir)
+			if err != nil || len(state.Reservations) != 1 || state.Reservations[0].ExecutionID != journal.Record.ExecutionID {
+				t.Fatalf("%s locked replay did not retain one reservation-to-execution link: state=%+v err=%v", phase, state, err)
+			}
+		})
+	}
+}
