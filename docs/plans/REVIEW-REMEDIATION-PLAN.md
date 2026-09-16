@@ -1858,6 +1858,15 @@ Restore trả `GRAPH_FAILED`; checksum hợp lệ không thay cho kiểm tra qua
 outcome → execution. Đây chỉ bổ sung một negative temporal seam, không đóng
 những malformed-graph hoặc crash seam còn lại của RP-06.
 
+**Cập nhật M11 evaluation→closed-cycle cardinality (2026-09-16):** restore
+graph giờ đòi mỗi `PRODUCTION_OUTCOME_EVALUATION` đã persist phải resolve tới
+đúng một `PRODUCTION_CYCLE` đóng và đã kiểm tra lineage. BR-18b tạo backup thật,
+xóa riêng cycle rồi cập nhật checksum/manifest; restore trả `GRAPH_FAILED` và
+không publish target. Snapshot recovery-only không có evaluation vẫn hợp lệ.
+Đây là reverse-cardinality guard local; crash/power-loss, atomic multi-file,
+distributed/multi-host, provider, deployment, pilot và business outcome vẫn
+mở.
+
 **07b:** thay smoke BR-16a bằng một workspace chung và cùng evidence/decision lineage:
 
 **Cập nhật shared chain (2026-09-09):** `smoke_br16a_offline.py` hiện tạo M00

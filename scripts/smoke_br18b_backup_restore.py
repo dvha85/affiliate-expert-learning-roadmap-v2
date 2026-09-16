@@ -540,6 +540,12 @@ def main():
         orphan_cycle_backup = root / "orphan-cycle-backup"; shutil.copytree(backup, orphan_cycle_backup)
         rewrite_m11_registry(orphan_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "evaluation_id", "missing-evaluation"))
         assert invoke(bot, "backup", "restore", orphan_cycle_backup, root / "orphan-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        missing_cycle_backup = root / "missing-cycle-backup"; shutil.copytree(backup, missing_cycle_backup)
+        remove_m11_entry(missing_cycle_backup, "PRODUCTION_CYCLE", "br18-production-cycle")
+        missing_cycle_restored = root / "missing-cycle-restored"
+        missing_cycle_result = invoke(bot, "backup", "restore", missing_cycle_backup, missing_cycle_restored, expected=1, env=env)
+        assert missing_cycle_result["status"] == "GRAPH_FAILED", missing_cycle_result
+        assert not missing_cycle_restored.exists()
         pending_cycle_backup = root / "pending-cycle-backup"; shutil.copytree(backup, pending_cycle_backup)
         rewrite_m11_registry(pending_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "status", "REVIEW_PENDING"))
         assert invoke(bot, "backup", "restore", pending_cycle_backup, root / "pending-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
