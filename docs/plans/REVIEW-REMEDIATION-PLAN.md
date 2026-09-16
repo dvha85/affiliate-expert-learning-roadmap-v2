@@ -2710,6 +2710,17 @@ local POSIX process-termination evidence, chưa phải power-loss, transaction
 deployment proof. Record:
 `docs/architecture/EVIDENCE-M10-EXECUTION-PROCESS-KILL-20260916.md`.
 
+**Cập nhật M10 process-kill sau canonical append (2026-09-16):** regression
+chạy child Bot thật và gửi `SIGKILL` sau các cạnh canonical append tiếp theo
+của hai transition M10: canary sau immutable artifact và sau state binding,
+trusted cost-bound sau immutable artifact và sau compact index. Process đọc
+mới vẫn trả `RECOVERY_REQUIRED`; writer có lock nhận diện phần đã hiện hữu,
+hoàn tất phần còn lại, xóa journal và giữ đúng một artifact/index entry.
+Đây là bounded local POSIX process-termination evidence, không phải
+power-loss, atomic multi-file, Windows native-lock, distributed/multi-host,
+provider, business outcome, pilot hoặc deployment proof.
+Record: `docs/architecture/EVIDENCE-M10-CANONICAL-APPEND-PROCESS-KILL-20260916.md`.
+
 **Cập nhật backup/restore M11 graph guards (2026-09-16):**
 `smoke_br18b_backup_restore.py` tạo backup bằng learner Bot thật, nhân đôi
 nguyên `PRODUCTION_EXECUTION_RECORD` trong `m11-artifacts.jsonl` rồi cập nhật
