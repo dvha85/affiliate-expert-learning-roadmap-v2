@@ -190,6 +190,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds", "RemovedBackupProcessExitRegression"), encoding="utf-8")
         self.assertIn("backup process-exit lock regression is missing", self.run_audit(False))
 
+    def test_missing_backup_process_kill_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds", "RemovedBackupProcessKillRegression"), encoding="utf-8")
+        self.assertIn("backup process-exit lock regression is missing", self.run_audit(False))
+
     def test_missing_managed_lock_path_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"
         source.write_text(source.read_text(encoding="utf-8").replace("syscall.O_NOFOLLOW", "removedNoFollow"), encoding="utf-8")

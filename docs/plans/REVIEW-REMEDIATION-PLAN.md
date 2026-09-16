@@ -2353,6 +2353,15 @@ phải benchmark GitHub runner. Record:
 outcome, live executor, clean-machine pilot, target-host deployment,
 multi-host hoặc power-loss evidence.
 
+**Cập nhật backup/restore SIGKILL regression (2026-09-16):** backup/restore
+process-boundary test giờ có cả nhánh `os.Exit` và nhánh kill process thật;
+nhánh sau kiểm child kết thúc do `SIGKILL`, target staging chưa từng xuất hiện,
+và retry bằng learner Bot thật tạo/restore được snapshot. Đây vẫn chỉ là
+POSIX local advisory-lock seam; process kill không phải power-loss proof và
+không chứng minh atomic multi-file, Windows native lock, multi-host hay dọn
+staging mồ côi. Record:
+`docs/architecture/EVIDENCE-BACKUP-SIGKILL-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.

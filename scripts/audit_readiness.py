@@ -975,9 +975,11 @@ def audit_backup_process_exit_lock(root, matrix, plan_text):
     required_gate = ("acquireManagedPathLock(runtimeGatePath(dir))", "errManagedPathLockBusy")
     required_test = (
         "TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds",
-        "GO_WANT_BACKUP_PROCESS_EXIT",
-        "backup retry after process exit failed",
-        "restore retry after process exit failed",
+        "TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds",
+        "GO_WANT_BACKUP_PROCESS_TERMINATION",
+        "ProcessState.Sys",
+        "backup retry after process termination failed",
+        "restore retry after process termination failed",
     )
     if not all(token in gate_text for token in required_gate) or "syscall.Flock" not in posix_text or "acquireManagedPathLock(path)" not in backup_text or not all(token in test_text for token in required_test) or "run_learner_bot_test_shard.py" not in workflow_text:
         fail("backup process-exit lock regression is missing from the real CLI/test/CI path")
