@@ -363,6 +363,15 @@ offline/read-only cho lineage của authorization, không phải proof ledger,
 executor/provider, business outcome, crash/power-loss, atomic multi-file,
 distributed locking, pilot hoặc deployment.
 
+**Cập nhật RP-08 M11 authorization lineage mutation proof (2026-09-16):**
+CI có mutation runner tạo bản sao disposable của `core/m11`, tháo toàn bộ
+enforcement nối authorization với đúng artifact mà gate đã đánh giá, rồi chạy
+graph regression thật. Regression phải fail bằng forged-lineage assertion; nếu
+implementation bị làm yếu mà test vẫn xanh thì job fail. Đây là mutation proof
+offline/read-only cho một block validator, không phải proof ledger,
+executor/provider, business outcome, crash/power-loss, atomic multi-file,
+distributed locking, pilot hoặc deployment.
+
 **Cập nhật implementation RP-07 (journal path guard):** M11 chỉ đọc recovery
 journal là regular file ngay trong runtime. Symlink hoặc special file trả
 `RECOVERY_REQUIRED` trước resolver/writer, không đọc target ngoài runtime và
