@@ -15,8 +15,8 @@ import (
 )
 
 // TestM10ProcessTerminationChild is a test-binary-only entrypoint. It kills
-// the child after an M10 recovery journal is synced and visible, but before
-// the first canonical side effect. Production never reads these variables.
+// the child at a selected M10 recovery-journal boundary. Production never
+// reads these variables.
 func TestM10ProcessTerminationChild(t *testing.T) {
 	if os.Getenv("GO_WANT_M10_PROCESS_TERMINATION") != "1" {
 		return
@@ -32,14 +32,29 @@ func TestM10ProcessTerminationChild(t *testing.T) {
 		os.Exit(2)
 	}
 	kind := os.Getenv("GO_M10_PROCESS_TERMINATION_KIND")
+	terminationPhase := os.Getenv("GO_M10_PROCESS_TERMINATION_PHASE")
+	if terminationPhase == "" {
+		// Preserve the original boundary for the existing cases: canary and
+		// cost-bound die before their first canonical artifact, while execution
+		// dies after its journal publish.
+		terminationPhase = "before_artifact"
+		if kind == "execution" {
+			terminationPhase = "after_journal_publish"
+		}
+	}
 	terminate := func(phase string) error {
-		if phase != "before_artifact" && phase != "after_journal_publish" {
+		if phase != terminationPhase {
 			return nil
 		}
 		if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
 			return err
 		}
-		return nil
+		// Keep the child at the injected boundary if signal delivery is deferred
+		// until the next scheduling point on the host. SIGKILL is non-catchable;
+		// this loop only prevents it from crossing the journal cleanup code.
+		for {
+			runtime.Gosched()
+		}
 	}
 	switch kind {
 	case "canary":
@@ -203,6 +218,164 @@ func TestMissionM10ProcessKillAfterJournalPublishRequiresLockedReplay(t *testing
 				raw, err := json.Marshal(bound)
 				if err != nil || !resolveM10Artifact(runtimeDir, corem10.ArtifactKindTrustedCostBound, raw) {
 					t.Fatalf("replayed cost bound is not in canonical registry: err=%v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestMissionM10ProcessKillAfterCanonicalAppendRequiresLockedReplay exercises
+// the later sides of the M10 two-store journal transitions. The child dies
+// after the immutable artifact, or after the mutable state/index, is visible
+// but before journal cleanup. A fresh reader must fail closed and a locked
+// retry must converge without duplicating either store.
+func TestMissionM10ProcessKillAfterCanonicalAppendRequiresLockedReplay(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	base := time.Now().UTC().Truncate(time.Second)
+	for _, scenario := range []struct {
+		name           string
+		kind           string
+		phase          string
+		setupCanary    bool
+		artifactKind   string
+		expectedStatus string
+	}{
+		{name: "canary-after-artifact", kind: "canary", phase: "after_artifact", artifactKind: corem10.ArtifactKindCanaryGrant, expectedStatus: "ACK"},
+		{name: "canary-after-state", kind: "canary", phase: "after_state", artifactKind: corem10.ArtifactKindCanaryGrant, expectedStatus: "ACK"},
+		{name: "cost-bound-after-artifact", kind: "cost-bound", phase: "after_artifact", setupCanary: true, artifactKind: corem10.ArtifactKindTrustedCostBound, expectedStatus: "EXACT_DUPLICATE"},
+		{name: "cost-bound-after-index", kind: "cost-bound", phase: "after_index", setupCanary: true, artifactKind: corem10.ArtifactKindTrustedCostBound, expectedStatus: "EXACT_DUPLICATE"},
+	} {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
+			runtimeDir, inputPath, _, _ := authorityFixtureAt(t, base, "none", scenario.setupCanary, 1)
+			var expectedArtifactID string
+			if scenario.kind == "canary" {
+				var grant corem10.CanaryGrant
+				if err := readJSON(inputPath, &grant); err != nil {
+					t.Fatal(err)
+				}
+				expectedArtifactID = grant.GrantID
+			}
+			if scenario.kind == "cost-bound" {
+				var bound corem10.TrustedCostBound
+				if err := readJSON(inputPath, &bound); err != nil {
+					t.Fatal(err)
+				}
+				bound.CostBoundID = "process-kill-" + scenario.phase
+				bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+				expectedArtifactID = bound.CostBoundID
+				newInput := filepath.Join(filepath.Dir(inputPath), "process-kill-"+scenario.phase+".json")
+				writeMissionTestJSON(t, newInput, bound)
+				inputPath = newInput
+			}
+
+			commandArgs := []string{"m10-canary", runtimeDir, inputPath}
+			journalPath := m10CanaryJournalPath(runtimeDir)
+			if scenario.kind == "cost-bound" {
+				commandArgs = []string{"m10-cost-register", runtimeDir, inputPath}
+				journalPath = m10CostBoundJournalPath(runtimeDir)
+			}
+			command := exec.Command(os.Args[0], append([]string{"-test.run=^TestM10ProcessTerminationChild$", "--"}, commandArgs...)...)
+			command.Env = append(os.Environ(),
+				"GO_WANT_M10_PROCESS_TERMINATION=1",
+				"GO_M10_PROCESS_TERMINATION_KIND="+scenario.kind,
+				"GO_M10_PROCESS_TERMINATION_PHASE="+scenario.phase,
+			)
+			var childStdout, childStderr bytes.Buffer
+			command.Stdout, command.Stderr = &childStdout, &childStderr
+			err := command.Run()
+			if err == nil {
+				t.Fatalf("M10 child unexpectedly completed after injected %s SIGKILL", scenario.phase)
+			}
+			exited, ok := err.(*exec.ExitError)
+			if !ok {
+				t.Fatal(err)
+			}
+			status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+			if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+				t.Fatalf("M10 child did not receive SIGKILL at %s: %v stdout=%q stderr=%q", scenario.phase, err, childStdout.String(), childStderr.String())
+			}
+			if _, err := os.Stat(journalPath); err != nil {
+				t.Fatalf("post-%s process kill did not leave the recovery journal: %v stdout=%q stderr=%q", scenario.phase, err, childStdout.String(), childStderr.String())
+			}
+
+			binary := buildMissionBinary(t)
+			if code, response := missionBinaryCall(t, binary, "mission", "status", runtimeDir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+				t.Fatalf("fresh read-only status exposed interrupted %s transition: code=%d response=%+v", scenario.name, code, response)
+			}
+
+			entries, err := loadM10ArtifactRegistry(runtimeDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			artifactCount := 0
+			for _, entry := range entries {
+				if entry.ArtifactKind == scenario.artifactKind && entry.ArtifactID == expectedArtifactID {
+					artifactCount++
+				}
+			}
+			if scenario.phase == "after_artifact" && artifactCount == 0 {
+				t.Fatalf("post-artifact process kill hid the canonical %s artifact", scenario.kind)
+			}
+
+			if scenario.kind == "canary" {
+				state, err := loadMissionState(runtimeDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario.phase == "after_artifact" && state.Canary != nil {
+					t.Fatal("post-artifact process kill unexpectedly published the canary state binding")
+				}
+				if scenario.phase == "after_state" && state.Canary == nil {
+					t.Fatal("post-state process kill lost the visible canary state binding")
+				}
+			}
+			if scenario.kind == "cost-bound" && scenario.phase == "after_artifact" {
+				bounds, err := loadTrustedCostBounds(runtimeDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, bound := range bounds {
+					if bound.CostBoundID == expectedArtifactID {
+						t.Fatal("post-artifact process kill unexpectedly published the compact cost-bound index")
+					}
+				}
+			}
+
+			if code, response := missionBinaryCall(t, binary, append([]string{"mission"}, commandArgs...)...); code != 0 || response["status"] != scenario.expectedStatus {
+				t.Fatalf("locked retry did not converge %s transition: code=%d response=%+v", scenario.name, code, response)
+			}
+			if _, err := os.Stat(journalPath); !os.IsNotExist(err) {
+				t.Fatalf("%s recovery journal remains after locked retry: %v", scenario.name, err)
+			}
+			entries, err = loadM10ArtifactRegistry(runtimeDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			finalArtifactCount := 0
+			for _, entry := range entries {
+				if entry.ArtifactKind == scenario.artifactKind && entry.ArtifactID == expectedArtifactID {
+					finalArtifactCount++
+				}
+			}
+			if finalArtifactCount != 1 {
+				t.Fatalf("%s recovery left %d canonical %s artifacts, want 1", scenario.name, finalArtifactCount, scenario.artifactKind)
+			}
+			if scenario.kind == "cost-bound" {
+				bounds, err := loadTrustedCostBounds(runtimeDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				count := 0
+				for _, bound := range bounds {
+					if bound.CostBoundID == expectedArtifactID {
+						count++
+					}
+				}
+				if count != 1 {
+					t.Fatalf("%s recovery left %d compact cost-bound index entries, want 1", scenario.name, count)
 				}
 			}
 		})
