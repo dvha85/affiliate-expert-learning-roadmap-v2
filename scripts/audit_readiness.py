@@ -1059,6 +1059,54 @@ def audit_m11_process_kill_journal(root, matrix, plan_text):
         fail("M11 process-kill journal regression is missing from the real learner/CI path")
 
 
+def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
+    """Keep exact retries from accumulating target-owned staging debris."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-backup-orphan-staging-recovery-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks backup orphan-staging recovery acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+    }
+    if required_refs - set(record.get("implementation_refs", [])) - set(record.get("test_refs", [])):
+        fail("backup orphan-staging record lacks implementation, test or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("target-owned", "SIGKILL", "POSIX", "other-target")):
+        fail("backup orphan-staging record lacks a bounded cleanup disclosure")
+    if "Cập nhật backup/restore orphan staging recovery" not in plan_text:
+        fail("backup orphan-staging recovery lacks a scoped plan marker")
+    source = root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+    test = root / "lab/affiliate-bot/cmd/bot/backup_command_test.go"
+    workflow = root / ".github/workflows/curriculum-ci.yml"
+    source_text = source.read_text(encoding="utf-8") if source.is_file() else ""
+    test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
+    workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
+    required_source = (
+        "func backupStagingPrefix(target string) string",
+        "func restoreStagingPrefix(target string) string",
+        "func cleanupStaleStaging(parent, prefix string) error",
+        "cleanupStaleStaging(parent, backupStagingPrefix(args[2]))",
+        "cleanupStaleStaging(parent, restoreStagingPrefix(args[2]))",
+        "os.ModeSymlink",
+        "return syncDirectory(parent)",
+    )
+    required_test = (
+        "TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds",
+        "TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds",
+        "TestCleanupStaleStagingOnlyRemovesTargetOwnedDirectories",
+        "process termination did not leave exactly one target-owned backup staging tree",
+        "backup retry left stale target-owned staging trees",
+        "process termination did not leave exactly one target-owned restore staging tree",
+        "restore retry left stale target-owned staging trees",
+    )
+    if not all(token in source_text for token in required_source) or not all(token in test_text for token in required_test) or "run_learner_bot_test_shard.py" not in workflow_text:
+        fail("backup orphan-staging cleanup regression is missing from the real CLI/test/CI path")
+
+
 def audit_immutable_artifact_parent_recheck(root, matrix, plan_text):
     """Keep hard-link publication from following a swapped parent directory."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1227,6 +1275,7 @@ def audit(root):
     audit_backup_process_exit_lock(root, matrix, plan_text)
     audit_managed_lock_path_guard(root, matrix, plan_text)
     audit_m11_process_kill_journal(root, matrix, plan_text)
+    audit_backup_orphan_staging_recovery(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_parent_recheck(root, matrix, plan_text)
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)

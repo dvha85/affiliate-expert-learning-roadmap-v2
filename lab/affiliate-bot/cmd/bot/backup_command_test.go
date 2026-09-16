@@ -275,7 +275,8 @@ func TestBackupRestoreStagingSyncFailureDoesNotPublishAndRetrySucceeds(t *testin
 // TestBackupProcessTerminationChild is the child entrypoint for the two
 // process-boundary regressions below. It intentionally proves only that no
 // incomplete target is published and that a later exact retry can converge;
-// it does not claim kernel power-loss or orphan-staging cleanup guarantees.
+// the retry also removes only the target-owned staging tree. It does not claim
+// kernel power-loss, multi-file atomicity or cross-target cleanup guarantees.
 func TestBackupProcessTerminationChild(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the Windows fallback still requires explicit stale-lock recovery")
@@ -306,6 +307,43 @@ func TestBackupProcessTerminationChild(t *testing.T) {
 			return nil
 		}
 		os.Exit(runBackupCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
+	}
+}
+
+func TestCleanupStaleStagingOnlyRemovesTargetOwnedDirectories(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "target")
+	prefix := backupStagingPrefix(target)
+	owned := filepath.Join(parent, prefix+"owned")
+	if err := os.MkdirAll(filepath.Join(owned, "nested"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(parent, backupStagingPrefix(filepath.Join(parent, "other-target"))+"keep")
+	if err := os.Mkdir(other, 0700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(parent, prefix+"file")
+	if err := os.WriteFile(file, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	external := t.TempDir()
+	if err := os.WriteFile(filepath.Join(external, "sentinel"), []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(parent, prefix+"link")
+	if err := os.Symlink(external, link); err != nil {
+		t.Skipf("symlink test unavailable: %v", err)
+	}
+	if err := cleanupStaleStaging(parent, prefix); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(owned); !os.IsNotExist(err) {
+		t.Fatalf("owned stale staging remains: %v", err)
+	}
+	for _, kept := range []string{other, file, link, filepath.Join(external, "sentinel")} {
+		if _, err := os.Lstat(kept); err != nil {
+			t.Fatalf("cleanup touched non-owned path %s: %v", kept, err)
+		}
 	}
 }
 
@@ -351,6 +389,20 @@ func runBackupProcessTerminationRegression(t *testing.T, mode string) {
 		}
 		return -1
 	}
+	stagingNames := func(prefix string) []string {
+		t.Helper()
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := make([]string, 0)
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), prefix) {
+				names = append(names, entry.Name())
+			}
+		}
+		return names
+	}
 
 	crashedBackup := filepath.Join(root, "crashed-backup")
 	if code := runChildExit("create", runtimeDir, crashedBackup); mode == "exit" && code != 97 {
@@ -359,8 +411,14 @@ func runBackupProcessTerminationRegression(t *testing.T, mode string) {
 	if _, err := os.Lstat(crashedBackup); !os.IsNotExist(err) {
 		t.Fatalf("process-terminated backup published a target: %v", err)
 	}
+	if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 1 {
+		t.Fatalf("process termination did not leave exactly one target-owned backup staging tree: %v", names)
+	}
 	if code, response := backupCall(t, "create", runtimeDir, crashedBackup); code != 0 || response["status"] != "BACKED_UP" {
 		t.Fatalf("backup retry after process termination failed: code=%d response=%+v", code, response)
+	}
+	if names := stagingNames(backupStagingPrefix(crashedBackup)); len(names) != 0 {
+		t.Fatalf("backup retry left stale target-owned staging trees: %v", names)
 	}
 
 	crashedRestore := filepath.Join(root, "crashed-restore")
@@ -370,8 +428,14 @@ func runBackupProcessTerminationRegression(t *testing.T, mode string) {
 	if _, err := os.Lstat(crashedRestore); !os.IsNotExist(err) {
 		t.Fatalf("process-terminated restore published a target: %v", err)
 	}
+	if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 1 {
+		t.Fatalf("process termination did not leave exactly one target-owned restore staging tree: %v", names)
+	}
 	if code, response := backupCall(t, "restore", sourceBackup, crashedRestore); code != 0 || response["status"] != "RESTORED" {
 		t.Fatalf("restore retry after process termination failed: code=%d response=%+v", code, response)
+	}
+	if names := stagingNames(restoreStagingPrefix(crashedRestore)); len(names) != 0 {
+		t.Fatalf("restore retry left stale target-owned staging trees: %v", names)
 	}
 }
 

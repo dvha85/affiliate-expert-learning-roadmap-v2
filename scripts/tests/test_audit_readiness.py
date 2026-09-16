@@ -215,6 +215,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestM11ProcessKillAfterJournalBeforeLedgerAppendLeavesJournalForFreshRecovery", "RemovedM11ProcessKillRegression"), encoding="utf-8")
         self.assertIn("M11 process-kill journal regression is missing", self.run_audit(False))
 
+    def test_missing_backup_orphan_staging_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func cleanupStaleStaging", "func removedStaleStaging", 1), encoding="utf-8")
+        self.assertIn("backup orphan-staging cleanup regression is missing", self.run_audit(False))
+
     def test_missing_immutable_artifact_parent_recheck_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("if err := requireArtifactOutputDirectory(dir); err != nil {\n\t\treturn \"\", err\n\t}\n\tif err := os.Link(temporary, path);", "if err := os.Link(temporary, path);", 1), encoding="utf-8")

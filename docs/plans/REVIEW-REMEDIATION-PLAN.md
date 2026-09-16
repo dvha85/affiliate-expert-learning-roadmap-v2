@@ -2391,6 +2391,17 @@ bounded local process-termination seam, không phải power-loss, transaction đ
 file, Windows native lock hay multi-host proof. Record:
 `docs/architecture/EVIDENCE-M11-PROCESS-KILL-JOURNAL-20260916.md`.
 
+**Cập nhật backup/restore orphan staging recovery (2026-09-16):** backup và
+restore giờ đặt hash của target vào prefix staging. Sau khi giữ managed target
+lock, lần retry sau process termination chỉ dọn các thư mục staging private
+đúng target đó; symlink, file, staging của target khác và target visible không
+bị theo. Regression chạy child Bot thật cho cả backup và restore với `SIGKILL`,
+xác nhận target chưa publish, staging target-owned còn lại sau kill và biến mất
+sau exact retry. Đây là bounded local POSIX cleanup seam, không phải proof
+power-loss, transaction đa-file, filesystem crash, Windows native lock,
+multi-host, provider, business outcome, pilot hay deployment. Record:
+`docs/architecture/EVIDENCE-BACKUP-ORPHAN-STAGING-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
