@@ -5,22 +5,24 @@ Trạng thái: **local automated verification / fixture-only / read-only**.
 ## Run record
 
 - `run_id`: `local-regression-rerun-20260916`
-- `repo_commit`: `3895cff` (`main` trước khi ghi evidence)
+- `repo_commit`: `3ebe32e3aa5157c1c89d34d4cd3b86a94b2f66f5` (`main` sau PR #370)
 - `host`: local Darwin arm64
 - `n8n`: 2.38.1 disposable engine
 - `node`: 24.21.0
-- `result`: all executed commands PASS
+- `result`: all corrected commands PASS
 
 ## Commands and results
 
 Go modules:
 
 ```text
-core: env GOWORK=off go test -race ./...                         PASS
-contracts: env GOWORK=off go test ./...                          PASS
-lab/mission-runtime: env GOWORK=off go test ./...                PASS
-lab/affiliate-bot: env GOWORK=off go test -race ./...            PASS
+contracts: GOWORK=off go test -count=1 ./... && go vet ./...     PASS
+core: GOWORK=off go test -count=1 ./... && go vet ./...          PASS
+lab/mission-runtime: GOWORK=off go test -count=1 ./... && go vet ./... PASS
+lab/affiliate-bot: GOWORK=off go test -count=1 ./... && go vet ./... PASS
 ```
+
+`python3 -m unittest discover -s scripts/tests -v`: **113 tests PASS**.
 
 Repository and semantic validators:
 
@@ -43,8 +45,9 @@ python3 scripts/smoke_br16a_offline.py
 python3 scripts/smoke_br18b_backup_restore.py
 ```
 
-Kết quả: tất cả PASS; `BR-16a` giữ chung artifact lineage, restart/replay và
-durable STOP; `BR-18b` giữ typed backup/restore, budget/lease-window và STOP.
+Kết quả: tất cả static validator và smoke PASS; BR-12d, BR-13b, BR-16a và
+BR-18b giữ continuity, restart/replay, typed backup/restore, budget/lease-window
+và durable STOP.
 
 Disposable n8n engine:
 

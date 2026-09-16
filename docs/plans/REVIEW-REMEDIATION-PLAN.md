@@ -17,6 +17,18 @@ Schedule Trigger trên local Darwin arm64 với n8n 2.38.1 và Node 24.21.0.
 Kết quả PASS chỉ là fixture/read-only evidence; provider, business outcome,
 clean-machine pilot, target deployment, power-loss và distributed locking vẫn
 chưa có bằng chứng.
+
+**Full local regression after PR #369/#370 (2026-09-16):** trên `main`
+`3ebe32e3aa5157c1c89d34d4cd3b86a94b2f66f5`, chạy lại bốn Go module với
+`GOWORK=off go test -count=1 ./...` và `go vet ./...`, 113 Python regression
+tests, toàn bộ static validators, BR-12d, BR-13b, BR-16a, BR-18b, disposable
+n8n M06/M07 engine và Schedule Trigger. Các lệnh đã chạy đều PASS; readiness
+audit vẫn trả `NOT_READY_FOR_PRODUCTION`. Hai validator
+`*_operated_execution.py` chỉ nhận execution JSON/store artifact nên không
+được gọi độc lập; engine runner đã thực hiện đường end-to-end và PASS. Đây là
+evidence fixture/read-only local; provider, business outcome, live executor,
+clean-machine pilot, target deployment, multi-host và power-loss vẫn mở.
+Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md`.
 - Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
   `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã
