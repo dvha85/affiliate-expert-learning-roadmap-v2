@@ -561,6 +561,11 @@ func missionRuntimeSnapshot(t *testing.T, dir string) map[string][]byte {
 		}
 		result[name] = raw
 	}
+	if raw, err := os.ReadFile(m11ArtifactRegistryPath(dir)); err == nil {
+		result["m11-artifacts.jsonl"] = raw
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("read runtime snapshot m11-artifacts.jsonl: %v", err)
+	}
 	return result
 }
 
@@ -2331,43 +2336,95 @@ func TestM11LeaseSourceGrantMustResolveActiveM10Grant(t *testing.T) {
 }
 
 func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
-	fixture := newM11UnknownStopFixture(t)
-	registryPath := m11ArtifactRegistryPath(fixture.dir)
-	before, err := os.ReadFile(registryPath)
-	if err != nil {
+	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Policy == nil || state.Canary == nil {
+		t.Fatalf("load populated M11 authority fixture: state=%+v err=%v", state, err)
+	}
+	var cost corem10.TrustedCostBound
+	if err := readJSON(boundPath, &cost); err != nil {
 		t.Fatal(err)
 	}
-	assertUnchanged := func(label string) {
+	expiresAt := base.Add(2 * time.Minute)
+	lease := corem11.ProductionLease{LeaseID: "expiry-authority-lease", LeaseVersion: "v1", PolicyVersion: state.Policy.PolicyVersion, ApprovalRef: "expiry-authority-approval", ReviewedBy: "human", ReviewerID: "expiry-reviewer", ReviewedAt: base.Format(time.RFC3339), PromotionReviewRef: "fixture:expiry-authority", SourceCanaryGrantID: state.Canary.GrantID, SourceCanaryGrantVersion: state.Canary.GrantVersion, SourceCanaryGrantHash: state.Canary.GrantHash, ValidFrom: base.Format(time.RFC3339), ExpiresAt: expiresAt.Format(time.RFC3339), AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:expiry-e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	health := corem11.ProductionHealthSnapshot{SnapshotID: "expiry-authority-health", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ObservedAt: base.Format(time.RFC3339), SourceRefs: []string{"fixture:expiry-health"}, DependencyState: "HEALTHY", TelemetryComplete: true, HashVersion: "go-json-v1"}
+	health.SnapshotHash = corem11.ComputeProductionHealthHash(health)
+	for _, artifact := range []struct {
+		kind  string
+		value any
+	}{{corem11.ArtifactKindLease, lease}, {corem11.ArtifactKindLeaseApproval, approval}, {corem11.ArtifactKindHealth, health}, {corem11.ArtifactKindCostBound, cost}} {
+		registerM11TestArtifact(t, runtimeDir, artifact.kind, artifact.value)
+	}
+	if code, response := missionCall(t, "m11-activate", runtimeDir, lease.LeaseID, base.Format(time.RFC3339)); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("activate M11 expiry fixture: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-ledger-init", runtimeDir, lease.LeaseID, base.Format(time.RFC3339)); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("initialize M11 expiry ledger: code=%d response=%+v", code, response)
+	}
+	ledgerID := lease.LeaseID + "/" + base.Format(time.RFC3339)
+	root := filepath.Dir(runtimeDir)
+	backupCheckpoint := func(name string) string {
 		t.Helper()
-		after, readErr := os.ReadFile(registryPath)
-		if readErr != nil || !bytes.Equal(before, after) {
-			t.Fatalf("expired %s changed the M11 registry: err=%v", label, readErr)
+		backupDir := filepath.Join(root, name+"-backup")
+		if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+			t.Fatalf("%s backup failed: code=%d response=%+v", name, code, response)
 		}
+		return backupDir
+	}
+	preGateBackup := backupCheckpoint("pre-gate")
+	gateAt := base.Add(10 * time.Second).Format(time.RFC3339)
+	gateCode, gateResponse := missionCall(t, "m11-gate", runtimeDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, gateAt)
+	if gateCode != 0 || gateResponse["status"] != "ALLOW_PRODUCTION" {
+		t.Fatalf("valid M11 gate failed: code=%d response=%+v", gateCode, gateResponse)
+	}
+	gateArtifact := gateResponse["artifact"].(map[string]any)
+	gateID := gateArtifact["gate_id"].(string)
+	preAuthorizeBackup := backupCheckpoint("pre-authorize")
+	authorizationAt := base.Add(20 * time.Second).Format(time.RFC3339)
+	authorizationCode, authorizationResponse := missionCall(t, "m11-authorize", runtimeDir, lease.LeaseID, gateID, "fixture_stub", authorizationAt)
+	if authorizationCode != 0 || authorizationResponse["status"] != appendAdded {
+		t.Fatalf("valid M11 authorization failed: code=%d response=%+v", authorizationCode, authorizationResponse)
+	}
+	authorizationArtifact := authorizationResponse["artifact"].(map[string]any)
+	authorizationID := authorizationArtifact["authorization_id"].(string)
+	preReserveBackup := backupCheckpoint("pre-reserve")
+	reservationAt := base.Add(30 * time.Second).Format(time.RFC3339)
+	reservationCode, reservationResponse := missionCall(t, "m11-reserve-authorization", runtimeDir, authorizationID, ledgerID, reservationAt)
+	if reservationCode != 0 || reservationResponse["status"] != appendAdded {
+		t.Fatalf("reserve M11 expiry fixture: code=%d response=%+v", reservationCode, reservationResponse)
+	}
+	reservationLedgerID := lease.LeaseID + "/" + reservationAt
+	preExecutionBackup := backupCheckpoint("pre-execution")
+
+	binary := buildMissionBinary(t)
+	assertRejectedAfterRestore := func(name string, backupDir string, commandArgs func(string) []string) {
+		t.Helper()
+		restoredDir := filepath.Join(root, name+"-restored")
+		if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+			t.Fatalf("%s restore failed: code=%d response=%+v", name, code, response)
+		}
+		before := missionRuntimeSnapshot(t, restoredDir)
+		if code, response := missionBinaryCall(t, binary, commandArgs(restoredDir)...); code == 0 || response["status"] == "AUTHORIZED" || response["status"] == "APPENDED" || response["status"] == "ALLOW_PRODUCTION" {
+			t.Fatalf("%s accepted an exact-expiry authority write: code=%d response=%+v", name, code, response)
+		}
+		assertMissionRuntimeUnchanged(t, before, restoredDir)
 	}
 
-	expiryHealth := corem11.ProductionHealthSnapshot{SnapshotID: "expiry-health", LeaseID: fixture.lease.LeaseID, LeaseVersion: fixture.lease.LeaseVersion, LeaseHash: fixture.lease.LeaseHash, ObservedAt: fixture.lease.ExpiresAt, SourceRefs: []string{"fixture:expiry-health"}, DependencyState: "HEALTHY", TelemetryComplete: true, HashVersion: "go-json-v1"}
-	expiryHealth.SnapshotHash = corem11.ComputeProductionHealthHash(expiryHealth)
-	healthInput := filepath.Join(t.TempDir(), "expiry-health.json")
-	writeMissionTestJSON(t, healthInput, expiryHealth)
-	if code, response := missionCall(t, "m11-register", fixture.dir, corem11.ArtifactKindHealth, healthInput); code == 0 || response["status"] == "APPENDED" {
-		t.Fatalf("health at exact lease expiry was accepted: code=%d response=%+v", code, response)
-	}
-	assertUnchanged("health")
-
-	if code, response := missionCall(t, "m11-gate", fixture.dir, fixture.lease.LeaseID, "unknown-journal-health", "unknown-journal-cost", fixture.ledgerEntry.ArtifactID, fixture.lease.ExpiresAt); code == 0 || response["status"] == "ALLOW_PRODUCTION" {
-		t.Fatalf("gate at exact lease expiry was accepted: code=%d response=%+v", code, response)
-	}
-	assertUnchanged("gate")
-
-	if code, response := missionCall(t, "m11-authorize", fixture.dir, fixture.lease.LeaseID, fixture.authorization.ProductionGateID, "fixture_stub", fixture.lease.ExpiresAt); code == 0 || response["status"] == "AUTHORIZED" {
-		t.Fatalf("authorization at exact lease expiry was accepted: code=%d response=%+v", code, response)
-	}
-	assertUnchanged("authorization")
-
-	if code, response := missionCall(t, "m11-record-failed", fixture.dir, fixture.authorization.AuthorizationID, fixture.ledgerEntry.ArtifactID, fixture.authorization.ExpiresAt, "expired fixture execution"); code == 0 || response["status"] == "APPENDED" {
-		t.Fatalf("execution at exact authorization expiry was accepted: code=%d response=%+v", code, response)
-	}
-	assertUnchanged("execution")
+	assertRejectedAfterRestore("gate-expiry", preGateBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-gate", restoredDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, expiresAt.Format(time.RFC3339)}
+	})
+	assertRejectedAfterRestore("authorization-expiry", preAuthorizeBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-authorize", restoredDir, lease.LeaseID, gateID, "fixture_stub", expiresAt.Format(time.RFC3339)}
+	})
+	assertRejectedAfterRestore("reservation-expiry", preReserveBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-reserve-authorization", restoredDir, authorizationID, ledgerID, expiresAt.Format(time.RFC3339)}
+	})
+	assertRejectedAfterRestore("execution-expiry", preExecutionBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-record-failed", restoredDir, authorizationID, reservationLedgerID, expiresAt.Format(time.RFC3339), "expired fixture execution"}
+	})
 }
 
 func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {

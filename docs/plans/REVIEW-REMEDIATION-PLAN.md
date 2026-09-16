@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: c910185c435cbbef576208047487ce1394ec9337 -->
+<!-- readiness-main-baseline: 01c27fbccd0b2d4004c192ec975d9d3d90254fcf -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -22,13 +22,17 @@ clean-machine pilot, target deployment, distributed locking và power-loss/
 atomic multi-file durability chưa được chứng minh.
 
 **M11 expiry authority no-mutation regression (2026-09-16):** regression trên
-đường lệnh thật của learner Bot dùng đúng biên `lease.ExpiresAt` và
-`authorization.ExpiresAt`: đăng ký health, gate, authorization và fixture
-execution đều bị từ chối; sau mỗi lệnh, `m11-artifacts.jsonl` vẫn byte-identical.
-Seam expiry/no-mutation local này bổ sung cho lease rebind và activation-expiry,
-nhưng RP-07 vẫn `PARTIAL`; trusted external time, live executor, provider,
-business outcome, crash/power-loss, atomic multi-file, distributed/multi-host,
-pilot và deployment vẫn còn mở.
+đường lệnh thật của learner Bot dùng fixture M08-M10 đầy đủ, tạo các checkpoint
+backup/restore M11 và chạy fresh Bot binary tại đúng biên `lease.ExpiresAt` hoặc
+`authorization.ExpiresAt`. Gate, authorization, reservation và fixture
+execution đều bị từ chối; `mission-state.json`, M10/cost registries và
+`m11-artifacts.jsonl` của runtime restore vẫn byte-identical sau từng lệnh.
+Health registration không được coi là authority rejection vì đó là evidence
+append, không phải quyết định production authority. Seam expiry/no-mutation
+local này bổ sung cho lease rebind và activation-expiry, nhưng RP-07 vẫn
+`PARTIAL`; trusted external time, live executor, provider, business outcome,
+crash/power-loss, atomic multi-file, distributed/multi-host, pilot và deployment
+vẫn còn mở.
 
 **Post-merge regression after PR #381 (2026-09-16):** trên `main`
 `8229ad3c8d3490a8780ea987c3a406a3f08cd96c`, learner Bot test/vet, 113 Python
@@ -266,7 +270,7 @@ và regression tương ứng.
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver, n8n node-chain và real Schedule Trigger regressions exist; governed selected-source profile and deployment-operated run remain open |
 | RP-05 | M07 grounded output và tool-result lifecycle | RP-04 | L; chia 05a/05b | PARTIAL — adapter-owned trace/proposal persistence, strict untrusted-model JSON decoding and n8n stub path exist; selected-source/provider operated evidence remains open |
 | RP-06 | Snapshot/restore và graph M00–M10, gồm proposal M07 và execution chain | RP-03, RP-04, RP-05 | M | PARTIAL — v3 typed inventory, graph validation and cross-process gate exist; M11 fixture outcome/ledger links are now checked both ways, while broader semantic orphan and crash/host proof remain open |
-| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, and an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, while expiry/rebind and multi-file crash seams remain open |
+| RP-07 | M11 lifecycle + mở rộng restore (07a), rồi full chain/walkthrough (07b) | 07a sau RP-02…RP-06; 07b sau gate lifecycle/restore của 07a | L; chia 07a/07b | PARTIAL — learner lifecycle, UNKNOWN→STOP/reconciliation, admission, shared M00–M11 smoke and restore exist; each M11 gate follows activation and retains its exact budget snapshot, each authorization has a prior ALLOW gate/health snapshot and must reserve against that unchanged ledger, each attempt resolves its prior normal reservation ledger and historical authorization lifetime, each offline evaluation cites exactly its fixture outcome, each M11 chain closes with exact lease/correlation lineage, an UNKNOWN attempt may have only one post-attempt human `NOT_PERFORMED` reconciliation resolution, and fresh-process exact-expiry gate/authorization/reservation/execution rejects are no-mutation checked after restore; multi-file crash seams remain open |
 | RP-08 | CI parity/mutation/cross-process coverage | Bắt đầu cùng RP-01; đóng sau RP-07 | M, xuyên các PR | PARTIAL — required offline smokes, disposable M06/M07 n8n engine regressions including M06 Schedule Trigger admission, and one M11 canonical gate-ID mutation proof run in CI; mutation breadth and operated parity remain open |
 | RP-09 | Readiness audit có dữ liệu/evidence, chốt offline acceptance | RP-06, RP-07, RP-08 | M | PARTIAL — matrix/graph/plan/CI audit is structured and public entrypoints retain scoped NOT_READY boundary; remote CI and external evidence remain outside local audit |
 | RP-10 | n8n operated run, pilot máy sạch, deployment drill | RP-09 và lựa chọn môi trường/quyền cần thiết | M/L | OPEN — requires selected environment, authority and independently recorded operated evidence |
