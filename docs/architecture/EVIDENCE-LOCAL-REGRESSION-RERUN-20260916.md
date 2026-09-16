@@ -100,6 +100,21 @@ artifact graph. Runbook đã được sửa để log/PID của watcher và n8n 
 runtime; lần chạy tươi sau sửa đã pass. Đây là lỗi tài liệu đã được khắc phục,
 không phải nới verifier hoặc bỏ qua artifact.
 
+## BR-18b M00-M05 backup graph guards
+
+BR-18b smoke tiếp tục tạo các store upstream thật trước khi snapshot: một
+`actions.jsonl`, `outcomes.jsonl`, `evaluations.jsonl`, `proposals.jsonl` và
+`reviews.jsonl`, nối lần lượt từ canonical history đến synthetic review. Sau
+đó smoke tạo năm bản sao backup có checksum manifest hợp lệ nhưng làm orphan
+từng liên kết: action→decision, outcome→action, evaluation→outcome,
+proposal→evaluation và review→proposal.
+
+Kết quả: cả năm `backup restore` đều trả `VERIFY_FAILED`, target restore không
+được publish, còn backup gốc vẫn restore được trong cùng lượt chạy. Đây là
+coverage runtime thật cho `m00ToM05BackupFiles` và các loader liên kết; không
+được diễn giải thành atomic multi-file/power-loss, distributed lock, provider,
+deployment, pilot hoặc business-outcome proof.
+
 ## Giới hạn
 
 Các script `validate_*_operated_execution.py` cần execution artifact do n8n
