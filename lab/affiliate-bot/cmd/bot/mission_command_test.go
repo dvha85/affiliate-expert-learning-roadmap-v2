@@ -509,7 +509,11 @@ func TestMissionStateLockRejectsConcurrentMutationWithoutWriting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(dir, ".mission.lock"), 0700); err != nil {
+	missionLock := filepath.Join(dir, ".mission.lock")
+	if err := os.Remove(missionLock); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(missionLock, 0700); err != nil {
 		t.Fatal(err)
 	}
 	if code, response := missionCall(t, "m11-stop", dir, "concurrent-stop"); code == 0 || response["status"] != "BUSY" {

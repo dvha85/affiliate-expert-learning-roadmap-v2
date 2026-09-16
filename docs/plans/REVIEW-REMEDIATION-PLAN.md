@@ -2381,6 +2381,16 @@ hardening cho local ancestor replacement seam trên các POSIX target hỗ trợ
 multi-file atomicity hay multi-host proof. Record:
 `docs/architecture/EVIDENCE-MANAGED-LOCK-OPENAT-20260916.md`.
 
+**Cập nhật M11 process-kill journal recovery (2026-09-16):** learner Bot dùng
+managed lock cho `.mission.lock` trên POSIX, nên SIGKILL sau khi replay journal
+đã publish không để lại cooperative marker chặn writer kế tiếp; backup inventory
+bỏ qua control file regular này. Regression chạy child Bot thật cho cả FAILED và
+UNKNOWN→STOP: fresh read-only process trả `RECOVERY_REQUIRED`, writer lock sau đó
+replay đúng journal và giữ nguyên FAILED ledger hoặc durable STOP. Đây chỉ là
+bounded local process-termination seam, không phải power-loss, transaction đa
+file, Windows native lock hay multi-host proof. Record:
+`docs/architecture/EVIDENCE-M11-PROCESS-KILL-JOURNAL-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.

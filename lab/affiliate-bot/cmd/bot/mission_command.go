@@ -2210,14 +2210,23 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			return emit("BUSY", nil, err, 1)
 		}
 		defer releaseGate()
+		// Keep a second managed lock for compatibility with backup inventory's
+		// active-writer guard. POSIX uses an auto-releasing kernel lock, so a
+		// process killed after acquiring it cannot leave a stale marker that
+		// blocks the next recovery writer. Windows/non-POSIX retains the
+		// cooperative directory implementation until a native lock exists.
 		lockPath := filepath.Join(args[1], ".mission.lock")
-		if err := os.Mkdir(lockPath, 0700); err != nil {
-			if os.IsExist(err) {
+		releaseMissionLock, err := acquireManagedPathLock(lockPath)
+		if err != nil {
+			if errors.Is(err, errManagedPathLockBusy) || os.IsExist(err) {
+				return emit("BUSY", nil, fmt.Errorf("mission state is locked; explicit recovery required after an interrupted writer"), 1)
+			}
+			if info, statErr := os.Lstat(lockPath); statErr == nil && info.IsDir() {
 				return emit("BUSY", nil, fmt.Errorf("mission state is locked; explicit recovery required after an interrupted writer"), 1)
 			}
 			return emit("STORE_ERROR", nil, err, 1)
 		}
-		defer os.Remove(lockPath)
+		defer releaseMissionLock()
 		if err := recoverM10CanaryJournal(args[1]); err != nil {
 			return emit("RECOVERY_REQUIRED", nil, err, 1)
 		}
