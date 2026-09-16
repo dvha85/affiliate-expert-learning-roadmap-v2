@@ -6,7 +6,7 @@ Trạng thái: **local automated verification / synthetic fixture / read-only**.
 
 - `run_id`: `m10-journal-process-kill-20260916`
 - `implementation_commit`: `20a6225a5c17c53aeb15572198b2b0f1459f45be`
-- `merge_commit`: to be recorded after the PR is merged
+- `merge_commit`: `2735de009287d3709a6df45af54aa5abb33642db` (PR #362 squash merge)
 - `host`: local Darwin arm64
 - `scope`: learner Bot M10 canary and trusted cost-bound journal transitions
 
