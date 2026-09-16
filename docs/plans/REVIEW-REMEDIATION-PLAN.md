@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 2a2b22b1452dd48a3c8e5e56b151b6933f502d55 -->
+<!-- readiness-main-baseline: aa16839bd6c6d0e2d24ab3b6d7b9000165c720b6 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -13,6 +13,13 @@
 M11 thật để chứng minh forged authorization-lineage bị bắt. Việc cập nhật
 baseline này chỉ sửa liên kết tracker; không nâng trạng thái readiness và
 không thay thế bằng chứng CI từ GitHub.
+
+**Baseline sync after PR #395 (2026-09-16):** PR #395 đã merge thành
+`aa16839bd6c6d0e2d24ab3b6d7b9000165c720b6`, tách các deterministic smoke thành
+ba job CI độc lập để giảm thời gian chờ mà vẫn giữ các boundary M00-M11.
+Đây là thay đổi thời gian chạy/độ quan sát của CI; không nâng trạng thái
+readiness và không thay thế bằng chứng provider, live executor, business
+outcome, pilot hay deployment.
 
 **Baseline sync after PR #392 (2026-09-16):** PR #392 đã merge thành
 `74c1719ee6fc90014a9e6599ed0837160e8de6a5`, siết authorization M11 phải giữ
@@ -2622,6 +2629,15 @@ replay đúng journal và giữ nguyên FAILED ledger hoặc durable STOP. Đây
 bounded local process-termination seam, không phải power-loss, transaction đa
 file, Windows native lock hay multi-host proof. Record:
 `docs/architecture/EVIDENCE-M11-PROCESS-KILL-JOURNAL-20260916.md`.
+
+**Cập nhật M11 outcome process-kill recovery (2026-09-16):** bổ sung một
+regression riêng trên đường `m11-outcome`: child Bot thật publish outcome
+journal rồi nhận `SIGKILL` trước ledger append; process đọc mới trả
+`RECOVERY_REQUIRED`, locked writer replay đúng transition, retry trả
+`EXACT_DUPLICATE` và store chỉ còn một outcome. Đây là bounded local
+synthetic/read-only process-termination evidence, không phải power-loss,
+atomic multi-file, provider, business outcome, pilot hay deployment proof.
+Record: `docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md`.
 
 **Cập nhật backup/restore orphan staging recovery (2026-09-16):** backup và
 restore giờ đặt hash của target vào prefix staging. Sau khi giữ managed target
