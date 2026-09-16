@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 8baae92352d9165affffd45f6dfb85e7ebdfd7b9 -->
+<!-- readiness-main-baseline: fb201c24243dd7bd901849e2bb3cdab15d2b3595 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -17,6 +17,18 @@ tests, BR-16a, BR-18b, readiness audit và 98 audit tests đều PASS; 10/10 PR
 checks cũng PASS. Audit vẫn trả `NOT_READY_FOR_PRODUCTION` và resolve 70 scoped
 claims. Record:
 `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md`.
+
+**Local regression after PR #389 (2026-09-16):** trên merged `main`
+`fb201c24243dd7bd901849e2bb3cdab15d2b3595`, bốn Go module test/vet, 113 Python
+tests, BR-16a, BR-18b, readiness audit, 98 audit tests và `git diff --check` đều
+PASS. Disposable n8n `2.38.1` với Node `24.21.0` cũng PASS cho M06/M07 engine
+và M06 Schedule Trigger: canonical record được append một lần, retry được
+exact-deduplicate trước/sau restart, và adapter unavailable bị fail-closed.
+Audit vẫn trả `NOT_READY_FOR_PRODUCTION` và resolve 71 scoped claims. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-389-20260916.md`. Đây vẫn là
+fixture/read-only evidence; không đóng provider, live executor, business
+outcome, clean-machine pilot, target-host deployment, distributed locking hay
+power-loss/atomic multi-file durability.
 
 **Re-run after PR #388 (2026-09-16):** trên merged `main`
 `8baae92352d9165affffd45f6dfb85e7ebdfd7b9`, toàn bộ nhóm kiểm tra trên được

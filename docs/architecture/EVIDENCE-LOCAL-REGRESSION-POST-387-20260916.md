@@ -49,3 +49,20 @@ PR #387 ran both required workflows and all 10 checks passed:
 
 These checks validate the repository's fixture and offline regression paths;
 they are not external deployment or business evidence.
+
+## Re-run on main after PR #389
+
+- Merged `main` before this record: `fb201c24243dd7bd901849e2bb3cdab15d2b3595`.
+- Four Go module test/vet suites, 113 Python tests, BR-16a, BR-18b, readiness
+  audit, 98 audit tests and `git diff --check` all passed.
+- Disposable n8n `2.38.1` with Node `24.21.0` passed the M06/M07 engine and
+  M06 Schedule Trigger regressions: one canonical append, exact-deduplicated
+  retries across n8n/adapter restart, and fail-closed adapter-unavailable
+  behavior.
+- The audit remained `NOT_READY_FOR_PRODUCTION` and resolved 71 scoped claims.
+
+This remains local synthetic fixture/read-only evidence. It does not prove
+provider traffic, business outcome, live executor behavior, clean-machine
+self-service, target-host deployment, distributed locking, or power-loss /
+atomic multi-file durability. The standalone command record is also captured
+in `EVIDENCE-LOCAL-REGRESSION-POST-389-20260916.md`.
