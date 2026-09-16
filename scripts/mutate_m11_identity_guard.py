@@ -62,7 +62,7 @@ def run_mutation(name, guard, forged_assertion):
         environment = os.environ.copy()
         environment["GOWORK"] = "off"
         result = subprocess.run(
-            ["go", "test", "./m11", "-run", "TestArtifactGraphAcceptsExactProductionLifecycleLinks", "-count=1"],
+            ["go", "test", "./m11", "-run", "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks", "-count=1"],
             cwd=temp_root / "core",
             env=environment,
             text=True,

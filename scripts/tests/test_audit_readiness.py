@@ -38,6 +38,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_expiry = self.root / "docs/architecture/EVIDENCE-M11-EXPIRY-AUTHORITY-NOMUTATION-20260916.md"
         evidence_expiry.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-EXPIRY-AUTHORITY-NOMUTATION-20260916.md", evidence_expiry)
+        evidence_exact_lineage = self.root / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-GATE-EXACT-LINEAGE-20260916.md"
+        evidence_exact_lineage.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-GATE-EXACT-LINEAGE-20260916.md", evidence_exact_lineage)
         evidence_383 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md"
         evidence_383.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md", evidence_383)
@@ -146,6 +149,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("approval, approvalOK := approvals[x.NewApprovalID]", "approval guard removed", 1), encoding="utf-8")
         self.assertIn("M11 recovery-admission approval regression is missing", self.run_audit(False))
+
+    def test_missing_m11_authorization_gate_exact_lineage_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("gate.HealthSnapshotID != x.ProductionHealthSnapshotID", "health lineage guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 authorization gate exact-lineage regression is missing", self.run_audit(False))
 
     def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
