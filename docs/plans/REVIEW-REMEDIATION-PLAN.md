@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: eb36a39ceb33eca25eab62ddfc30cdded5c25821 -->
+<!-- readiness-main-baseline: 5bca64f88c1050779ed37882267a1d65d6f5223a -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -17,6 +17,14 @@ Schedule Trigger trên local Darwin arm64 với n8n 2.38.1 và Node 24.21.0.
 Kết quả PASS chỉ là fixture/read-only evidence; provider, business outcome,
 clean-machine pilot, target deployment, power-loss và distributed locking vẫn
 chưa có bằng chứng.
+
+**Full local regression after PR #376 (2026-09-16):** trên `main`
+`5bca64f88c1050779ed37882267a1d65d6f5223a`, bốn Go module test/vet, 113 Python
+tests, toàn bộ static validators, BR-16a, BR-18b, disposable n8n M06/M07 engine
+và Schedule Trigger đều PASS. Audit vẫn trả `NOT_READY_FOR_PRODUCTION`. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md`. Đây vẫn là
+fixture/read-only evidence; không đóng provider, business outcome, live
+executor, pilot, target deployment, distributed lock hoặc power-loss proof.
 
 **Full local regression after PR #369/#370 (2026-09-16):** trên `main`
 `3ebe32e3aa5157c1c89d34d4cd3b86a94b2f66f5`, chạy lại bốn Go module với
