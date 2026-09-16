@@ -271,6 +271,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend", "func RemovedM11OutcomeProcessKillRegression", 1), encoding="utf-8")
         self.assertIn("M11 outcome process-kill regression is missing", self.run_audit(False))
 
+    def test_missing_m11_outcome_post_append_process_kill_guard_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_outcome_journal_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func TestM11OutcomeProcessKillAfterOutcomeAppend", "func RemovedM11OutcomePostAppendProcessKillRegression", 1), encoding="utf-8")
+        self.assertIn("M11 outcome process-kill regression is missing", self.run_audit(False))
+
     def test_missing_backup_orphan_staging_guard_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/backup_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("func cleanupStaleStaging", "func removedStaleStaging", 1), encoding="utf-8")
