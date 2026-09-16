@@ -1,12 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 65c70409830b0a789d877bf708a0daec6a2a9be6 -->
+<!-- readiness-main-baseline: a0f8f19854276589dd9f858ef48869691420294c -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
+`main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
+process-kill cho M10 governed execution sau canonical execution-record append
+và reservation binding. Matrix và evidence graph đã được chuyển theo đúng
+head này; trạng thái vẫn `NOT_READY_FOR_PRODUCTION`. Bằng chứng là local
+POSIX synthetic/read-only, không mở rộng thành proof power-loss, atomic
+multi-file, provider, business outcome, pilot hoặc deployment.
 
 **Baseline sync after PR #400 (2026-09-16):** PR #400 đã merge vào `main` tại
 `65c70409830b0a789d877bf708a0daec6a2a9be6`, bổ sung process-kill regression
