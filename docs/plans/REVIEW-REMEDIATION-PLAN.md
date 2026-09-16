@@ -1,12 +1,19 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: aa16839bd6c6d0e2d24ab3b6d7b9000165c720b6 -->
+<!-- readiness-main-baseline: 780bc6bf2ab0774d684f0eb3cc856e6531c32304 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #397 (2026-09-16):** PR #397 đã merge vào `main` tại
+`780bc6bf2ab0774d684f0eb3cc856e6531c32304`, bổ sung process-termination
+regression cho M11 outcome journal sau outcome append. Bản đồng bộ này giữ
+nguyên phạm vi `PARTIAL`/`NOT_READY_FOR_PRODUCTION`; nó không biến local
+SIGKILL evidence thành proof power-loss, atomic multi-file, provider, business
+outcome, pilot hoặc deployment.
 
 **Baseline sync after PR #394 (2026-09-16):** PR #394 đã merge thành
 `2a2b22b1452dd48a3c8e5e56b151b6933f502d55`, bổ sung mutation proof chạy graph
@@ -2639,6 +2646,17 @@ store chỉ còn một outcome. Đây là bounded local synthetic/read-only
 process-termination evidence, không phải power-loss, atomic multi-file,
 provider, business outcome, pilot hay deployment proof.
 Record: `docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md`.
+
+**Cập nhật M11 process-kill sau ledger append (2026-09-16):** regression mới
+chạy child Bot thật cho cả `FAILED` và `UNKNOWN→STOP`, gửi `SIGKILL` sau khi
+ledger transition đã append và directory sync đã hoàn tất nhưng trước cleanup
+journal. Process đọc mới vẫn trả `RECOVERY_REQUIRED`; writer có lock nhận diện
+đúng execution/ledger đã hiện hữu, hoàn tất cleanup đúng một lần, giữ nguyên
+`FAILED` ledger hoặc durable STOP, và không nhân đôi artifact. Đây là bounded
+local POSIX process-termination evidence, không phải power-loss, atomic
+multi-file, Windows native-lock, distributed/multi-host, provider, business
+outcome, pilot hoặc deployment proof.
+Record: `docs/architecture/EVIDENCE-M11-PROCESS-KILL-AFTER-LEDGER-20260916.md`.
 
 **Cập nhật backup/restore orphan staging recovery (2026-09-16):** backup và
 restore giờ đặt hash của target vào prefix staging. Sau khi giữ managed target

@@ -1157,6 +1157,58 @@ def audit_m11_outcome_process_kill(root, matrix, plan_text):
         fail("M11 outcome process-kill regression is missing from the real learner/CI path")
 
 
+def audit_m11_process_kill_after_ledger(root, matrix, plan_text):
+    """Keep the post-ledger M11 recovery boundary executable and discoverable."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-process-kill-after-ledger-20260916")
+    if not isinstance(record, dict):
+        fail("matrix lacks M11 post-ledger process-kill acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-PROCESS-KILL-AFTER-LEDGER-20260916.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 post-ledger process-kill record lacks implementation, test, evidence or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("SIGKILL", "directory-synced", "RECOVERY_REQUIRED", "locked writer", "without duplicate")):
+        fail("M11 post-ledger process-kill record lacks a bounded visibility/recovery disclosure")
+    if "Cập nhật M11 process-kill sau ledger append" not in plan_text:
+        fail("M11 post-ledger process-kill lacks a scoped plan marker")
+    mission_path = root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+    registry_path = root / "lab/affiliate-bot/cmd/bot/m11_registry.go"
+    test_path = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    workflow_path = root / ".github/workflows/curriculum-ci.yml"
+    evidence_path = root / "docs/architecture/EVIDENCE-M11-PROCESS-KILL-AFTER-LEDGER-20260916.md"
+    mission = mission_path.read_text(encoding="utf-8") if mission_path.is_file() else ""
+    registry = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    workflow = workflow_path.read_text(encoding="utf-8") if workflow_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_test = (
+        "TestM11ProcessKillAfterLedgerAppendLeavesJournalForFreshRecovery",
+        "GO_M11_PROCESS_TERMINATION_MODE=after-ledger-kill",
+        'phase == "after_sync"',
+        "ArtifactKindLedger",
+        "countM11Artifacts",
+        "fresh process exposed the interrupted post-ledger transition",
+        "post-ledger recovery duplicated execution artifact",
+        "syscall.SIGKILL",
+    )
+    if (
+        "acquireManagedPathLock(lockPath)" not in mission
+        or "func recordFailedM11Execution" not in registry
+        or "func recordUnknownM11Execution" not in registry
+        or not all(marker in test for marker in required_test)
+        or "run_learner_bot_test_shard.py" not in workflow
+        or "## Verification" not in evidence
+    ):
+        fail("M11 post-ledger process-kill regression is missing from the real learner/CI path")
+
+
 def audit_backup_orphan_staging_recovery(root, matrix, plan_text):
     """Keep exact retries from accumulating target-owned staging debris."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1413,6 +1465,7 @@ def audit(root):
     audit_managed_lock_path_guard(root, matrix, plan_text)
     audit_m11_process_kill_journal(root, matrix, plan_text)
     audit_m11_outcome_process_kill(root, matrix, plan_text)
+    audit_m11_process_kill_after_ledger(root, matrix, plan_text)
     audit_backup_orphan_staging_recovery(root, matrix, plan_text)
     audit_backup_post_publish_process_kill(root, matrix, plan_text)
     audit_immutable_artifact_parent_recheck(root, matrix, plan_text)
