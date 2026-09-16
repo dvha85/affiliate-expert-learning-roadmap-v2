@@ -2362,6 +2362,15 @@ không chứng minh atomic multi-file, Windows native lock, multi-host hay dọn
 staging mồ côi. Record:
 `docs/architecture/EVIDENCE-BACKUP-SIGKILL-20260916.md`.
 
+**Cập nhật managed lock ancestor preflight (2026-09-16):** POSIX managed lock
+giờ kiểm tra các ancestor hiện hữu của lock pathname trước `OpenFile`, nên một
+lock nằm dưới thư mục cha là symlink bị từ chối trước khi chạm file ngoài.
+Regression dùng lock path thật dưới symlink parent, xác nhận external sentinel
+không đổi và external lock không được tạo. Đây là bounded local preflight;
+thay thế ancestor đồng thời vẫn cần directory-handle/openat hardening, và
+Windows native lock, power-loss, multi-host vẫn ngoài phạm vi. Record:
+`docs/architecture/EVIDENCE-MANAGED-LOCK-ANCESTOR-20260916.md`.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
