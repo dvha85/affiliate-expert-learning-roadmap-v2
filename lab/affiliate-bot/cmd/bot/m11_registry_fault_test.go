@@ -2,15 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
@@ -909,6 +912,164 @@ func TestMissionM11RecoveryAdmissionDisclosesRegistryPublishUncertainty(t *testi
 	artifactRegistryPublishFailure = nil
 	if code, response := missionCall(t, "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath); code != 0 || response["status"] != appendDuplicate {
 		t.Fatalf("recovery admission exact retry failed: code=%d response=%+v", code, response)
+	}
+}
+
+// Recovery admission is an immutable link, but it still shares the new
+// runtime registry with every other writer. Run real Bot processes against
+// one new runtime to prove concurrent admission cannot append the same link
+// twice or let a second caller observe a partially published graph.
+func TestMissionM11RecoveryAdmissionSingleWriterAcrossBotProcesses(t *testing.T) {
+	oldRuntime := newM11UnknownStopFixture(t)
+	const attemptedAt = "2026-09-08T00:00:02Z"
+	execution, _, status, err := recordUnknownM11Execution(oldRuntime.dir, oldRuntime.authorization.AuthorizationID, oldRuntime.ledgerEntry.ArtifactID, attemptedAt, "concurrent recovery fixture")
+	if err != nil || status != appendAdded {
+		t.Fatalf("create stopped UNKNOWN fixture: status=%s err=%v", status, err)
+	}
+	stoppedEntry, _, err := m11LedgerHead(oldRuntime.dir, oldRuntime.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve stopped ledger: %v", err)
+	}
+	resolution := corem11.ProductionReconciliationResolution{ResolutionID: "concurrent-recovery-resolution", LeaseID: oldRuntime.lease.LeaseID, LeaseVersion: oldRuntime.lease.LeaseVersion, LeaseHash: oldRuntime.lease.LeaseHash, ExecutionID: execution.ExecutionID, ResolvedBy: "human", ResolverID: "reviewer-1", ResolvedAt: "2026-09-08T00:00:03Z", EffectState: "NOT_PERFORMED", Reason: "human reviewed concurrent fixture timeout"}
+	registerM11TestArtifact(t, oldRuntime.dir, corem11.ArtifactKindReconciliation, resolution)
+	if _, _, status, err := reconcileM11Execution(oldRuntime.dir, resolution.ResolutionID, stoppedEntry.ArtifactID); err != nil || status != appendAdded {
+		t.Fatalf("reconcile old runtime: status=%s err=%v", status, err)
+	}
+	_, reviewedLedger, err := m11LedgerHead(oldRuntime.dir, oldRuntime.lease.LeaseID)
+	if err != nil {
+		t.Fatalf("resolve reviewed stopped ledger: %v", err)
+	}
+	reviewedRaw, err := json.Marshal(reviewedLedger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewedEntry, err := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, reviewedRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff, err := m11RecoveryHandoff(oldRuntime.dir, resolution.ResolutionID, reviewedEntry.ArtifactID)
+	if err != nil {
+		t.Fatalf("build recovery handoff: %v", err)
+	}
+	handoffPath := filepath.Join(t.TempDir(), "concurrent-recovery-handoff.json")
+	handoffRaw, err := json.Marshal(handoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSONAtomic(handoffPath, json.RawMessage(handoffRaw)); err != nil {
+		t.Fatal(err)
+	}
+
+	newRuntime := t.TempDir()
+	if code, response := missionCall(t, "init", newRuntime); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init new runtime: code=%d response=%+v", code, response)
+	}
+	newLease := oldRuntime.lease
+	newLease.LeaseID = "concurrent-recovery-new-lease"
+	newLease.ApprovalRef = "concurrent-recovery-new-approval"
+	newLease.ReviewedAt = "2026-09-08T00:00:04Z"
+	newLease.ValidFrom = "2026-09-08T00:00:04Z"
+	newLease.CorrelationID = "concurrent-recovery-new-correlation"
+	newLease.LeaseHash = corem11.ComputeProductionLeaseHash(newLease)
+	newApproval := corem11.ProductionLeaseApproval{ApprovalID: newLease.ApprovalRef, LeaseID: newLease.LeaseID, LeaseVersion: newLease.LeaseVersion, LeaseHash: newLease.LeaseHash, PromotionReviewRef: newLease.PromotionReviewRef, SourceCanaryGrantID: newLease.SourceCanaryGrantID, SourceCanaryGrantVersion: newLease.SourceCanaryGrantVersion, SourceCanaryGrantHash: newLease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: newLease.ReviewerID, ReviewedAt: newLease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
+	registerM11TestArtifact(t, newRuntime, corem11.ArtifactKindLease, newLease)
+	registerM11TestArtifact(t, newRuntime, corem11.ArtifactKindLeaseApproval, newApproval)
+	if code, response := missionCall(t, "m11-activate", newRuntime, newLease.LeaseID, "2026-09-08T00:00:05Z"); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("activate new runtime: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m11-ledger-init", newRuntime, newLease.LeaseID, "2026-09-08T00:00:05Z"); code != 0 || response["status"] != appendAdded {
+		t.Fatalf("initialize new runtime ledger: code=%d response=%+v", code, response)
+	}
+	oldAbs, newAbs, err := m11DistinctRuntimeDirs(oldRuntime.dir, newRuntime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := corem11.ProductionRecoveryAdmission{RecoveryAdmissionID: "concurrent-recovery-admission", PriorRuntimeDir: oldAbs, PriorLeaseID: oldRuntime.lease.LeaseID, PriorLeaseVersion: oldRuntime.lease.LeaseVersion, PriorLeaseHash: oldRuntime.lease.LeaseHash, PriorApprovalID: oldRuntime.lease.ApprovalRef, ResolutionID: resolution.ResolutionID, NewRuntimeID: "concurrent-recovery-runtime-v2", NewRuntimeDir: newAbs, NewLeaseID: newLease.LeaseID, NewLeaseVersion: newLease.LeaseVersion, NewLeaseHash: newLease.LeaseHash, NewApprovalID: newApproval.ApprovalID, ReviewedBy: "human", ReviewerID: "reviewer-2", ReviewedAt: "2026-09-08T00:00:06Z", ExecutionPermitted: false}
+	admissionRaw, err := json.Marshal(admission)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admissionPath := filepath.Join(t.TempDir(), "concurrent-recovery-admission.json")
+	if err := writeJSONAtomic(admissionPath, json.RawMessage(admissionRaw)); err != nil {
+		t.Fatal(err)
+	}
+
+	binary := buildMissionBinary(t)
+	const contenders = 8
+	root := t.TempDir()
+	readyDir := filepath.Join(root, "recovery-ready")
+	startPath := filepath.Join(root, "recovery-start")
+	if err := os.Mkdir(readyDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := make(chan missionProcessResult, contenders)
+	for index := 0; index < contenders; index++ {
+		command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMissionProcessBarrierHelper$", "--", binary, "mission", "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath)
+		command.Env = append(os.Environ(), "GO_WANT_MISSION_BARRIER=1", "GO_MISSION_READY_DIR="+readyDir, "GO_MISSION_START_PATH="+startPath)
+		var stdout, stderr bytes.Buffer
+		command.Stdout, command.Stderr = &stdout, &stderr
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		id := "recovery-contender-" + strconv.Itoa(index)
+		go func(id string, command *exec.Cmd, stdout, stderr *bytes.Buffer) {
+			err := command.Wait()
+			code := 0
+			if exited, ok := err.(*exec.ExitError); ok {
+				code = exited.ExitCode()
+			}
+			results <- missionProcessResult{id: id, code: code, stdout: stdout.String(), stderr: stderr.String(), err: err}
+		}(id, command, &stdout, &stderr)
+	}
+	waitForMissionContenders(t, readyDir, contenders)
+	if err := os.WriteFile(startPath, []byte("start"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	appended := 0
+	for index := 0; index < contenders; index++ {
+		result := <-results
+		var response map[string]any
+		if err := json.Unmarshal([]byte(result.stdout), &response); err != nil {
+			t.Fatalf("recovery contender %s emitted invalid response %q: %v (stderr: %s, command error: %v)", result.id, result.stdout, err, result.stderr, result.err)
+		}
+		status, _ := response["status"].(string)
+		switch status {
+		case appendAdded:
+			if result.code != 0 {
+				t.Fatalf("successful recovery contender %s returned exit %d: %s", result.id, result.code, result.stderr)
+			}
+			appended++
+		case appendDuplicate, "BUSY":
+			if status == appendDuplicate && result.code != 0 {
+				t.Fatalf("exact recovery contender %s returned exit %d: %s", result.id, result.code, result.stderr)
+			}
+			if status == "BUSY" && result.code == 0 {
+				t.Fatalf("busy recovery contender %s returned success: %+v", result.id, response)
+			}
+		default:
+			t.Fatalf("recovery contender %s returned unexpected status %q: response=%+v stderr=%s command error=%v", result.id, status, response, result.stderr, result.err)
+		}
+	}
+	if appended != 1 {
+		t.Fatalf("concurrent recovery admitted %d immutable links across %d Bot processes", appended, contenders)
+	}
+	entries, err := loadM11ArtifactRegistry(newRuntime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admissions := 0
+	for _, entry := range entries {
+		if entry.ArtifactKind == corem11.ArtifactKindRecoveryAdmission {
+			admissions++
+		}
+	}
+	if admissions != 1 {
+		t.Fatalf("new runtime persisted %d recovery admissions, want exactly one", admissions)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-recovery-admit", newRuntime, oldRuntime.dir, handoffPath, admissionPath); code != 0 || response["status"] != appendDuplicate {
+		t.Fatalf("fresh exact retry did not resolve to duplicate: code=%d response=%+v", code, response)
 	}
 }
 
