@@ -42,6 +42,15 @@ fixture/documentation smoke cho profile tối thiểu, không đóng full M00–
 backup graph, power-loss/atomic multi-file, deployment, provider, pilot hoặc
 business outcome. Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md`.
 
+**Cập nhật backup/restore M00-M05 graph guards (2026-09-16):** BR-18b smoke
+giờ tạo thật `actions.jsonl`, `outcomes.jsonl`, `evaluations.jsonl`,
+`proposals.jsonl` và `reviews.jsonl` trước khi tạo manifest v3. Năm mutation
+checksum-valid lần lượt orphan decision/action/outcome/evaluation/proposal;
+`backup restore` phải trả `VERIFY_FAILED` và không publish target cho từng ca.
+Đây là bằng chứng loader/graph upstream local được gọi trên runtime thật,
+không phải atomic multi-file, power-loss, distributed lock, provider,
+deployment, pilot hay business outcome. Marker: `Cập nhật backup/restore M00-M05 graph guards`.
+
 - Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
   `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã

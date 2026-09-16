@@ -32,6 +32,16 @@ def replace_backup_file(backup, name, content):
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
+def rewrite_first_jsonl_record(backup, name, change):
+    lines = (backup / name).read_text(encoding="utf-8").splitlines()
+    if not lines:
+        raise AssertionError(("empty JSONL store", name))
+    record = json.loads(lines[0])
+    change(record)
+    lines[0] = json.dumps(record, separators=(",", ":"), ensure_ascii=False)
+    replace_backup_file(backup, name, ("\n".join(lines) + "\n").encode())
+
+
 def rewrite_m11_registry(backup, change):
     lines = []
     for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
@@ -348,11 +358,27 @@ def main():
         cycle = invoke(bot, "mission", "m11-close-cycle", runtime, "br18-production-cycle", "br18-production-e", "2026-09-08T00:00:05Z", env=env)
         assert cycle["status"] == "APPENDED" and cycle["artifact"]["status"] == "CLOSED"
         assert invoke(bot, "mission", "m11-close-cycle", runtime, "br18-production-cycle", "br18-production-e", "2026-09-08T00:00:05Z", env=env)["status"] == "EXACT_DUPLICATE"
+        # Complete the real M00-M05 store lineage before taking the snapshot.
+        # These are synthetic review artifacts, but they exercise the same
+        # learner loaders that backup verification uses for every optional
+        # upstream store.
+        human_outcome = root / "human-outcome.json"
+        human_outcome.write_text(json.dumps({"outcome_id":"br18-human-o","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"br18-a"},"observed_at":"2026-09-05T00:00:00Z","status":"PENDING","metrics":{},"source_ref":"fixture:br18-human"}), encoding="utf-8")
+        assert invoke(bot, "outcome", "import", history, runtime / "actions.jsonl", runtime / "outcomes.jsonl", human_outcome, env=env)["status"] == "APPENDED"
+        m05_evaluation = root / "m05-evaluation.json"
+        m05_evaluation.write_text(json.dumps({"evaluation_id":"br18-evaluation","decision_id":"br18-d","effect_ref":{"effect_kind":"HUMAN_ACTION","effect_id":"br18-a"},"outcome_ids":["br18-human-o"],"evaluated_at":"2026-09-06T00:00:00Z"}), encoding="utf-8")
+        assert invoke(bot, "evaluation", "create", history, runtime / "actions.jsonl", runtime / "outcomes.jsonl", runtime / "evaluations.jsonl", m05_evaluation, env=env)["status"] == "APPENDED"
+        m05_proposal = root / "m05-proposal.json"
+        m05_proposal.write_text(json.dumps({"proposal_id":"br18-proposal","evaluation_ids":["br18-evaluation"],"current_version":"fixture/v1","proposed_version":"fixture/v2","change_summary":"Synthetic backup graph proposal","expected_benefit":"Exercise restore lineage","risks":["Fixture only"],"rollback":"Discard synthetic proposal","auto_apply":False}), encoding="utf-8")
+        assert invoke(bot, "proposal", "import", history, runtime / "actions.jsonl", runtime / "outcomes.jsonl", runtime / "evaluations.jsonl", runtime / "proposals.jsonl", m05_proposal, env=env)["status"] == "APPENDED"
+        m05_review = root / "m05-review.json"
+        m05_review.write_text(json.dumps({"review_id":"br18-review","proposal_id":"br18-proposal","reviewed_by":"human","reviewed_at":"2026-09-07T00:00:00Z","decision":"REQUEST_CHANGES","reason":"Synthetic backup graph review"}), encoding="utf-8")
+        assert invoke(bot, "review", "import", history, runtime / "actions.jsonl", runtime / "outcomes.jsonl", runtime / "evaluations.jsonl", runtime / "proposals.jsonl", runtime / "reviews.jsonl", m05_review, env=env)["status"] == "APPENDED"
         invoke(bot, "mission", "m11-stop", runtime, "backup-drill", env=env)
         backup_result = invoke(bot, "backup", "create", runtime, backup, env=env)
         assert backup_result["status"] == "BACKED_UP"
         assert backup_result["artifact"]["version"] == "affiliate-bot-backup/v3"
-        assert {"m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl", "m11-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
+        assert {"actions.jsonl", "outcomes.jsonl", "evaluations.jsonl", "proposals.jsonl", "reviews.jsonl", "m10-artifacts.jsonl", "m10-outcomes.jsonl", "m11-artifacts.jsonl", "m11-outcomes.jsonl"}.issubset(backup_result["artifact"]["required"])
         invalid_source = root / "invalid-source"; shutil.copytree(runtime, invalid_source)
         (invalid_source / "m10-outcomes.jsonl").unlink()
         assert invoke(bot, "backup", "create", invalid_source, root / "invalid-source-backup", expected=1, env=env)["status"] == "INPUT_ERROR"
@@ -364,6 +390,25 @@ def main():
         # never be mistaken for the current snapshot.
         shutil.rmtree(backup)
         invoke(bot, "backup", "create", runtime, backup, env=env)
+        # Each mutation keeps a valid checksum but breaks one upstream link.
+        # verifyBackup must reject the snapshot before publishing any restore
+        # target; a last-write-wins map or skipped optional store would make
+        # one of these cases incorrectly look restorable.
+        m00_m05_orphans = [
+            ("orphan-action-decision", "actions.jsonl", lambda record: record.update({"decision_id": "missing-decision"})),
+            ("orphan-outcome-action", "outcomes.jsonl", lambda record: record["effect_ref"].update({"effect_id": "missing-action"})),
+            ("orphan-evaluation-outcome", "evaluations.jsonl", lambda record: record.update({"outcome_ids": ["missing-outcome"]})),
+            ("orphan-proposal-evaluation", "proposals.jsonl", lambda record: record.update({"evaluation_ids": ["missing-evaluation"]})),
+            ("orphan-review-proposal", "reviews.jsonl", lambda record: record.update({"proposal_id": "missing-proposal"})),
+        ]
+        for label, filename, change in m00_m05_orphans:
+            malformed_backup = root / (label + "-backup")
+            malformed_restored = root / (label + "-restored")
+            shutil.copytree(backup, malformed_backup)
+            rewrite_first_jsonl_record(malformed_backup, filename, change)
+            malformed_result = invoke(bot, "backup", "restore", malformed_backup, malformed_restored, expected=1, env=env)
+            assert malformed_result["status"] == "VERIFY_FAILED", (label, malformed_result)
+            assert not malformed_restored.exists(), label
         missing_manifest_backup = root / "missing-manifest-backup"; shutil.copytree(backup, missing_manifest_backup)
         missing_manifest = json.loads((missing_manifest_backup / "manifest.json").read_text(encoding="utf-8"))
         del missing_manifest["files"]["m10-outcomes.jsonl"]
@@ -698,7 +743,7 @@ def main():
         invalid_manifest["files"]["mission-state.json"]["size_bytes"] = len(invalid_state_bytes)
         (invalid_backup / "manifest.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
         assert invoke(bot, "backup", "restore", invalid_backup, invalid_restored, expected=1, env=env)["status"] == "VERIFY_FAILED"
-    print("BR-18b PASS: runtime-created M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, duplicate M11 artifact identity, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
+    print("BR-18b PASS: runtime-created M00-M05/M10 graph, M11 fixture evaluation/cycle, and UNKNOWN-to-human-reconciliation chain use a typed v3 manifest; checksum, exact inventory, M00-M05 orphan links, duplicate M11 artifact identity, lease-window activation, activation-bound health, broken evaluation/cycle links, reversed cycle time, restart, and durable STOP are verified")
 
 
 if __name__ == "__main__":
