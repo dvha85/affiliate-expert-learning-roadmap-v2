@@ -5,7 +5,8 @@ Trạng thái: **local automated verification / synthetic fixture / read-only**.
 ## Run record
 
 - `run_id`: `m10-journal-process-kill-20260916`
-- `repo_commit`: pending until the implementation PR is merged
+- `implementation_commit`: `20a6225a5c17c53aeb15572198b2b0f1459f45be`
+- `merge_commit`: to be recorded after the PR is merged
 - `host`: local Darwin arm64
 - `scope`: learner Bot M10 canary and trusted cost-bound journal transitions
 
