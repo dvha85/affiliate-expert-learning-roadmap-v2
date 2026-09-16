@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 80a895ed69d339b7c66e69e70466aac52ded6783 -->
+<!-- readiness-main-baseline: b9630a85c060e0b28401d3dc7e8e1ea5a5402586 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -10,6 +10,16 @@
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
+
+**M11 recovery admission concurrent-writer proof (2026-09-16):** regression
+`TestMissionM11RecoveryAdmissionSingleWriterAcrossBotProcesses` khởi chạy tám
+learner Bot process thật cùng lúc trên một recovery handoff đã được human
+review. Runtime gate của new runtime cho phép đúng một immutable
+`PRODUCTION_RECOVERY_ADMISSION`; contender còn lại chỉ nhận `BUSY` hoặc
+`EXACT_DUPLICATE`, registry sau đó có đúng một admission và process mới retry
+vẫn trả exact duplicate. Đây là bằng chứng local fixture/read-only cho seam
+concurrent-writer của RP-07, không đóng crash/power-loss, atomic multi-file,
+distributed lock, live executor, provider, pilot hay deployment.
 
 **Post-merge regression after PR #379 (2026-09-16):** trên `main`
 `80a895ed69d339b7c66e69e70466aac52ded6783`, learner Bot test/vet, 113 Python
