@@ -1,12 +1,18 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 74c1719ee6fc90014a9e6599ed0837160e8de6a5 -->
+<!-- readiness-main-baseline: 2a2b22b1452dd48a3c8e5e56b151b6933f502d55 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #394 (2026-09-16):** PR #394 đã merge thành
+`2a2b22b1452dd48a3c8e5e56b151b6933f502d55`, bổ sung mutation proof chạy graph
+M11 thật để chứng minh forged authorization-lineage bị bắt. Việc cập nhật
+baseline này chỉ sửa liên kết tracker; không nâng trạng thái readiness và
+không thay thế bằng chứng CI từ GitHub.
 
 **Baseline sync after PR #392 (2026-09-16):** PR #392 đã merge thành
 `74c1719ee6fc90014a9e6599ed0837160e8de6a5`, siết authorization M11 phải giữ
@@ -2102,6 +2108,15 @@ sử dụng build và module hợp lệ theo toàn dependency set. Không shard 
 theo thay đổi: mọi PR và push `main` vẫn chạy toàn bộ Go/race, quickstart,
 M00–M11 smoke và mutation proof. Mục tiêu là giảm wall-clock CI, không giảm
 coverage hoặc suy cache hit thành runtime evidence.
+
+**Cập nhật parallel smoke groups (2026-09-16):** nhóm
+`deterministic-smokes-and-mutations` đã được tách thành ba required jobs chạy
+song song: smoke nền tảng M00–M05, smoke M06–M07/BR-16a và backup/mutation/audit
+M11. Tổng cộng workflow có tám job coverage bắt buộc; mỗi nhóm vẫn giữ setup
+Go/Python, toàn bộ lệnh cũ và failure semantics. Audit kiểm tra đủ cả ba job để
+không thể rút ngắn thời gian bằng cách bỏ một nhóm. Đây chỉ là tối ưu
+wall-clock CI, không làm thay đổi phạm vi readiness hay biến cache hit thành
+bằng chứng runtime.
 
 **Cập nhật deterministic-runtime single-build (2026-09-16):** job giữ nguyên
 toàn bộ M01/M02 CLI smoke nhưng build learner Bot một lần vào

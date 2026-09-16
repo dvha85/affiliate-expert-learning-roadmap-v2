@@ -160,8 +160,8 @@ jobs:
       - name: Beginner quickstart isolated-clone smoke
         run: python scripts/smoke_quickstart.py
 
-  deterministic-smokes-and-mutations:
-    name: deterministic-smokes-and-mutations
+  deterministic-smokes-foundations:
+    name: deterministic-smokes-foundations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -192,6 +192,23 @@ jobs:
         run: python scripts/smoke_br11a.py
       - name: BR-12d M00-M05 and isolated regression rollback
         run: python scripts/smoke_br12d.py
+
+  deterministic-smokes-m06-m07:
+    name: deterministic-smokes-m06-m07
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: BR-13b fixture watcher history handoff
         run: python scripts/smoke_br13b.py
       - name: BR-13c pinned HTTPS fixture fetch
@@ -218,6 +235,23 @@ jobs:
             echo "expected a retained non-empty walkthrough workspace to be rejected" >&2
             exit 1
           fi
+
+  deterministic-smokes-backup-mutations:
+    name: deterministic-smokes-backup-mutations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: BR-18b M11 backup, reconciliation and restore
         run: python scripts/smoke_br18b_backup_restore.py
       - name: RP-08 M11 canonical identity mutation proof

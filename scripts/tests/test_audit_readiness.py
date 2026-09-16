@@ -129,6 +129,11 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("learner-bot-tests-shard-1:", "removed-learner-bot-tests-shard-1:", 1), encoding="utf-8")
         self.assertIn("deterministic CI shard/cache is missing", self.run_audit(False))
 
+    def test_deterministic_smoke_group_removal_is_rejected(self):
+        workflow = self.root / ".github/workflows/curriculum-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("deterministic-smokes-m06-m07:", "removed-deterministic-smokes-m06-m07:", 1), encoding="utf-8")
+        self.assertIn("deterministic CI shard/cache is missing", self.run_audit(False))
+
     def test_missing_accesstrade_pending_import_recovery_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/accesstrade_import.go"
         source.write_text(source.read_text(encoding="utf-8").replace('accesstradeJournalCleanupFailure("after_remove_before_parent_sync")', "journalCleanupAcknowledgementRemoved", 1), encoding="utf-8")
