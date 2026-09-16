@@ -2412,6 +2412,17 @@ parent sync qua power-loss, transaction đa-file, filesystem crash, Windows
 native lock, multi-host, provider, business outcome, pilot hay deployment.
 Record: `docs/architecture/EVIDENCE-BACKUP-POST-PUBLISH-PROCESS-KILL-20260916.md`.
 
+**Cập nhật local full regression sau PR #360 (2026-09-16):** trên `main`
+`930a040c80d4295c7dac60980b96030d9b6439eb`, maintainer đã chạy lại bốn Go
+module test/vet, 113 Python regression tests, toàn bộ static semantic
+validators, `smoke_br16a_offline.py`, `smoke_br18b_backup_restore.py` và
+`audit_readiness.py`. Các lệnh đã chạy đều PASS; audit vẫn trả
+`NOT_READY_FOR_PRODUCTION`. Hai validator `*_operated_execution.py` không chạy
+độc lập vì cần execution JSON/store artifact; record đầy đủ nằm tại
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-360-20260916.md`. Đây là
+fixture/read-only local evidence, không phải provider, business outcome,
+clean-machine pilot, target deployment, distributed-lock hoặc power-loss proof.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
