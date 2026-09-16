@@ -1,7 +1,7 @@
 {
   "version": "readiness-evidence-graph/v1",
   "as_of": "2026-09-16",
-  "main_baseline": "6ec07065796933d1b9a05019739832e4da72378a",
+  "main_baseline": "80a895ed69d339b7c66e69e70466aac52ded6783",
   "criteria": [
     {
       "criterion_id": "BR-13",

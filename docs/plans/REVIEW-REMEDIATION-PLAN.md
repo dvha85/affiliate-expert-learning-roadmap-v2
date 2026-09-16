@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: 6ec07065796933d1b9a05019739832e4da72378a -->
+<!-- readiness-main-baseline: 80a895ed69d339b7c66e69e70466aac52ded6783 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -10,6 +10,15 @@
 
 - Mã: RR-2026-09-07; phiên bản kế hoạch: 2.
 - Ngày lập kế hoạch: 08/09/2026; mã kế hoạch theo ngày review baseline.
+
+**Post-merge regression after PR #379 (2026-09-16):** trên `main`
+`80a895ed69d339b7c66e69e70466aac52ded6783`, learner Bot test/vet, 113 Python
+regression tests, BR-18b backup/restore và readiness audit đều PASS. Audit vẫn
+trả `NOT_READY_FOR_PRODUCTION` và resolve 66 scoped claims. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-379-20260916.md`. Đây vẫn là
+fixture/read-only evidence; provider, business outcome, live executor,
+clean-machine pilot, target deployment, distributed locking và
+power-loss/atomic multi-file durability chưa được chứng minh.
 
 **Full local regression after PR #377 (2026-09-16):** trên `main`
 `c11880b19be8b979f90f6dcc1d21cc8bd032aaa5`, bốn Go module test/vet, 113 Python
