@@ -605,6 +605,36 @@ func TestManagedPathLockRejectsSymlinkWithoutTouchingExternal(t *testing.T) {
 	}
 }
 
+func TestManagedPathLockRejectsSymlinkedParentWithoutTouchingExternal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX managed-lock parent preflight is not the Windows lock implementation")
+	}
+	root := t.TempDir()
+	externalDir := filepath.Join(root, "external")
+	if err := os.Mkdir(externalDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(externalDir, "sentinel")
+	sentinel := []byte("external parent sentinel")
+	if err := os.WriteFile(external, sentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(root, "alias")
+	if err := os.Symlink(externalDir, alias); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(alias, "managed.lock")
+	if _, err := acquireManagedPathLock(lockPath); err == nil {
+		t.Fatal("managed lock followed a symlinked parent")
+	}
+	if _, err := os.Lstat(filepath.Join(externalDir, "managed.lock")); !os.IsNotExist(err) {
+		t.Fatalf("managed lock created through symlinked parent: %v", err)
+	}
+	if got, err := os.ReadFile(external); err != nil || !bytes.Equal(got, sentinel) {
+		t.Fatalf("external parent target changed after symlink rejection: %q err=%v", got, err)
+	}
+}
+
 func TestBackupRestoreRejectsExpiredM10AuthorityWithoutMutation(t *testing.T) {
 	binary := buildMissionBinary(t)
 	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
