@@ -74,6 +74,32 @@ Kết quả: một `APPENDED`, các retry là `EXACT_DUPLICATE` sau n8n/adapter
 restart, và adapter unavailable bị chặn trước ACK/report. Đây là loopback
 fixture evidence; không phải deployment hoặc provider proof.
 
+## BR-18A runbook command smoke
+
+- `tested_at_utc`: `2026-09-16T04:50Z–04:52Z`
+- `runtime_binary`: learner Bot build từ main `65dc4e3`
+- `workspace`: disposable directories dưới `/tmp/affiliate-runbook-*.XXXXXX`
+- `result`: **PASS** cho chuỗi lệnh runbook local
+
+Chuỗi thực tế đã chạy gồm `mission init`, `history capture`, `history list`,
+`history replay`, watcher serve trên loopback, `/healthz`, log tail, process
+stop và `mission status`. Kết quả là `APPENDED`, `replay=MATCH`,
+`{"status":"OK","execution_permitted":false}`, rồi `stop: true` và
+`status: VALID` sau STOP.
+
+Backup/restore standalone cũng chạy trên workspace mới: `backup create` trả
+`BACKED_UP` với manifest `affiliate-bot-backup/v3`, `backup restore` trả
+`RESTORED`, replay trả `MATCH`, và status sau restore giữ
+`stop_reason: "backup-drill"`. Hai lệnh `m11-activate` và `m11-gate` bị chặn
+trước khi resolve input, không tạo `m11-artifacts.jsonl`; đây là STOP drill
+đúng chủ đích và đã PASS.
+
+Lần chạy đầu tiên phát hiện runbook cũ ghi `watcher.log` trong canonical
+runtime, khiến strict backup inventory trả `INPUT_ERROR` vì file không thuộc
+artifact graph. Runbook đã được sửa để log/PID của watcher và n8n nằm ngoài
+runtime; lần chạy tươi sau sửa đã pass. Đây là lỗi tài liệu đã được khắc phục,
+không phải nới verifier hoặc bỏ qua artifact.
+
 ## Giới hạn
 
 Các script `validate_*_operated_execution.py` cần execution artifact do n8n

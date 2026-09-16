@@ -23,11 +23,11 @@ mkdir -p /tmp/affiliate-runtime
 
 # start / status / logs / stop cho canonical adapter local
 nohup /tmp/affiliate-bot watcher serve /tmp/affiliate-runtime/history.jsonl \
-  127.0.0.1:8787 >/tmp/affiliate-runtime/watcher.log 2>&1 &
-echo $! >/tmp/affiliate-runtime/watcher.pid
+  127.0.0.1:8787 >/tmp/affiliate-runtime-watcher.log 2>&1 &
+echo $! >/tmp/affiliate-runtime-watcher.pid
 curl --fail http://127.0.0.1:8787/healthz
-tail -n 50 /tmp/affiliate-runtime/watcher.log
-kill "$(cat /tmp/affiliate-runtime/watcher.pid)"
+tail -n 50 /tmp/affiliate-runtime-watcher.log
+kill "$(cat /tmp/affiliate-runtime-watcher.pid)"
 
 # status/logs/stop tương đương cho profile local
 /tmp/affiliate-bot mission status /tmp/affiliate-runtime
@@ -61,12 +61,16 @@ if curl --fail --max-time 2 http://127.0.0.1:5678/healthz; then
 fi
 
 nohup /path/to/node-v24/bin/node /path/to/n8n/bin/n8n start \
-  >/tmp/affiliate-runtime/n8n.log 2>&1 &
-echo $! >/tmp/affiliate-runtime/n8n.pid
+  >/tmp/affiliate-n8n.log 2>&1 &
+echo $! >/tmp/affiliate-n8n.pid
 
 curl --fail --retry 10 --retry-connrefused http://127.0.0.1:5678/healthz
-tail -n 50 /tmp/affiliate-runtime/n8n.log
+tail -n 50 /tmp/affiliate-n8n.log
 ```
+
+Log và PID của process phải nằm ngoài `/tmp/affiliate-runtime`: runtime là
+canonical artifact store có inventory nghiêm ngặt, nên backup sẽ từ chối file
+vận hành không thuộc graph như `watcher.log` hoặc `n8n.log`.
 
 Expected log có `n8n ready`, `n8n Task Broker ready` và `Registered runner
 "JS Task Runner"`. Lỗi Python internal runner chỉ liên quan Code node Python;

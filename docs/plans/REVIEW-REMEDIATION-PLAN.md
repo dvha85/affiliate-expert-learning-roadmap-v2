@@ -29,6 +29,19 @@ audit vẫn trả `NOT_READY_FOR_PRODUCTION`. Hai validator
 evidence fixture/read-only local; provider, business outcome, live executor,
 clean-machine pilot, target deployment, multi-host và power-loss vẫn mở.
 Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md`.
+**BR-18A runbook command smoke (2026-09-16):** chạy chuỗi lệnh runbook bằng
+learner Bot build mới trong workspace tạm: `mission init`, history
+capture/list/replay, watcher loopback health/log/stop, status sau STOP, rồi
+backup v3/restore/replay và hai lệnh M11 bị chặn trước resolve. Kết quả
+`APPENDED`, `replay=MATCH`, health `OK`, `RESTORED`, status giữ
+`stop_reason=backup-drill` và `RUNBOOK BACKUP/RESTORE STOP DRILL PASS`.
+Lần chạy đầu phát hiện ví dụ runbook đặt log/PID trong canonical runtime nên
+strict backup inventory từ chối `watcher.log`; đã sửa tài liệu để process
+log/PID nằm ngoài artifact store và chạy lại pass. Đây chỉ là local
+fixture/documentation smoke cho profile tối thiểu, không đóng full M00–M11
+backup graph, power-loss/atomic multi-file, deployment, provider, pilot hoặc
+business outcome. Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-RERUN-20260916.md`.
+
 - Baseline review gốc: `ece6a32619e5b9a05d0599b87f50023f38931cb9`; snapshot
   `main` hiện hành nằm trong metadata ở đầu file.
 - Trạng thái: **CURRENT_MAIN_TRACKER** — có implementation/test offline đã
