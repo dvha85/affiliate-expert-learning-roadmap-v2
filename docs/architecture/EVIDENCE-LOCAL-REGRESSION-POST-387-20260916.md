@@ -25,8 +25,20 @@ git diff --check: PASS
 
 The BR-18b smoke includes checksum-valid M11 authorization/execution lineage
 mutations and confirms `GRAPH_FAILED` without publishing a restore target. The
-audit resolves 69 scoped claims and intentionally keeps the repository
+audit resolves 70 scoped claims and intentionally keeps the repository
 `NOT_READY_FOR_PRODUCTION`.
+
+## Re-run on main after PR #388
+
+- Current merged `main`: `8baae92352d9165affffd45f6dfb85e7ebdfd7b9`.
+- The same four Go module test/vet suites, 113 Python tests, BR-16a, BR-18b,
+  readiness audit, 98 audit tests and `git diff --check` were run again locally.
+- All rerun commands passed. The audit reported `NOT_READY_FOR_PRODUCTION`
+  and resolved 70 scoped claims.
+- This rerun remains synthetic, fixture/read-only evidence; it does not add
+  provider traffic, live executor, business outcome, clean-machine pilot,
+  target-host deployment, distributed-lock or power-loss / atomic multi-file
+  durability proof.
 
 ## CI evidence
 
