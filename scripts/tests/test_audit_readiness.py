@@ -20,6 +20,9 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        evidence_377 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md"
+        evidence_377.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-377-20260916.md", evidence_377)
         for relative in ("lab/affiliate-bot/cmd/bot/runtime_gate.go", "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
