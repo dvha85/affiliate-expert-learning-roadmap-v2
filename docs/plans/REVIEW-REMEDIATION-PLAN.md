@@ -1,12 +1,22 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-16 -->
-<!-- readiness-main-baseline: b9890bf4c25ebbb74c09c96b253a6f25c38949e9 -->
+<!-- readiness-main-baseline: 74c1719ee6fc90014a9e6599ed0837160e8de6a5 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #392 (2026-09-16):** PR #392 đã merge thành
+`74c1719ee6fc90014a9e6599ed0837160e8de6a5`, siết authorization M11 phải giữ
+đúng lineage của gate, health snapshot và cost bound đã được gate đánh giá.
+Hậu-merge local regression chạy lại bốn Go module, 114 Python tests, BR-16a,
+BR-18b và readiness audit; tất cả PASS. Đây vẫn là bằng chứng
+fixture/read-only và `NOT_READY_FOR_PRODUCTION`.
+
+**Local regression after PR #392 (2026-09-16):** kết quả chi tiết được ghi tại
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md`.
 
 **Baseline sync after PR #390 (2026-09-16):** PR #390 đã merge thành
 `b9890bf4c25ebbb74c09c96b253a6f25c38949e9`. PR chỉ bổ sung evidence và đồng bộ

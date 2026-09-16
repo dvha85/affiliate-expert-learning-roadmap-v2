@@ -41,6 +41,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_exact_lineage = self.root / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-GATE-EXACT-LINEAGE-20260916.md"
         evidence_exact_lineage.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-AUTHORIZATION-GATE-EXACT-LINEAGE-20260916.md", evidence_exact_lineage)
+        evidence_post_392 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md"
+        evidence_post_392.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md", evidence_post_392)
         evidence_383 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md"
         evidence_383.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md", evidence_383)
