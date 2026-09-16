@@ -1147,6 +1147,10 @@ func validateM11BackupGraph(dir string) error {
 	admissions := []corem11.ProductionRecoveryAdmission{}
 	admissionNewLeases := map[string]bool{}
 	admissionPriorResolutions := map[string]bool{}
+	state, stateErr := loadMissionState(dir)
+	if stateErr != nil && !os.IsNotExist(stateErr) {
+		return fmt.Errorf("M11 mission state is invalid: %w", stateErr)
+	}
 	for _, outcome := range outcomes {
 		if prior, exists := outcomeExecutionIDs[outcome.EffectRef.EffectID]; exists && prior != outcome.OutcomeID {
 			return fmt.Errorf("M11 execution has more than one restored fixture outcome")
@@ -1261,6 +1265,9 @@ func validateM11BackupGraph(dir string) error {
 		approval, found := leaseApprovals[lease.ApprovalRef]
 		if !found || approval.LeaseID != lease.LeaseID || approval.LeaseVersion != lease.LeaseVersion || approval.LeaseHash != lease.LeaseHash || approval.PromotionReviewRef != lease.PromotionReviewRef || approval.SourceCanaryGrantID != lease.SourceCanaryGrantID || approval.SourceCanaryGrantVersion != lease.SourceCanaryGrantVersion || approval.SourceCanaryGrantHash != lease.SourceCanaryGrantHash || approval.ReviewerID != lease.ReviewerID || approval.ReviewedAt != lease.ReviewedAt {
 			return fmt.Errorf("M11 lease is orphaned from its restored approval")
+		}
+		if stateErr == nil && state.Canary != nil && (lease.SourceCanaryGrantID != state.Canary.GrantID || lease.SourceCanaryGrantVersion != state.Canary.GrantVersion || lease.SourceCanaryGrantHash != state.Canary.GrantHash) {
+			return fmt.Errorf("M11 lease source canary grant is orphaned from restored M10 grant")
 		}
 	}
 	for _, outcome := range outcomes {

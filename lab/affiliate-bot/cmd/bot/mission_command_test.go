@@ -2304,6 +2304,32 @@ func TestMissionIntentGrantAndCostRebindRejectWithoutMutation(t *testing.T) {
 	assertMissionRuntimeUnchanged(t, before, runtimeDir)
 }
 
+func TestM11LeaseSourceGrantMustResolveActiveM10Grant(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil {
+		t.Fatalf("load populated learner runtime: state=%+v err=%v", state, err)
+	}
+	lease := corem11.ProductionLease{LeaseID: "source-grant-lease", LeaseVersion: "v1", PolicyVersion: state.Policy.PolicyVersion, ApprovalRef: "source-grant-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "fixture:source-grant", SourceCanaryGrantID: state.Canary.GrantID, SourceCanaryGrantVersion: state.Canary.GrantVersion, SourceCanaryGrantHash: "sha256:" + strings.Repeat("0", 64), ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "source-grant-correlation", HashVersion: "go-json-v1"}
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	raw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registerM11Artifact(runtimeDir, corem11.ArtifactKindLease, raw); err == nil || !strings.Contains(err.Error(), "source canary grant") {
+		t.Fatalf("mismatched M11 source grant was accepted: %v", err)
+	}
+	lease.SourceCanaryGrantHash = state.Canary.GrantHash
+	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
+	raw, err = json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status, err := registerM11Artifact(runtimeDir, corem11.ArtifactKindLease, raw); err != nil || status != appendAdded {
+		t.Fatalf("matching M11 source grant was rejected: status=%s err=%v", status, err)
+	}
+}
+
 func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
 	dir := t.TempDir()
 	bound := corem10.TrustedCostBound{CostBoundID: "cost-1", IntentID: "intent-1", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", CorrelationID: "corr-1", HashVersion: "go-json-v1"}
