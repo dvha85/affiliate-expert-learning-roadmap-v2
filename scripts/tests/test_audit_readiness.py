@@ -38,6 +38,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_expiry = self.root / "docs/architecture/EVIDENCE-M11-EXPIRY-AUTHORITY-NOMUTATION-20260916.md"
         evidence_expiry.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-EXPIRY-AUTHORITY-NOMUTATION-20260916.md", evidence_expiry)
+        evidence_383 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md"
+        evidence_383.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-383-20260916.md", evidence_383)
         for relative in ("lab/affiliate-bot/cmd/bot/runtime_gate.go", "lab/affiliate-bot/cmd/bot/runtime_gate_posix.go"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
