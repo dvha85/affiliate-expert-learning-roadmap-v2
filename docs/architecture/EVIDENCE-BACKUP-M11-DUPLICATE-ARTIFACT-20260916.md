@@ -5,8 +5,8 @@ Trạng thái: **local automated verification / synthetic fixture / read-only**.
 ## Run record
 
 - `run_id`: `backup-m11-duplicate-artifact-20260916`
-- `implementation_commit`: to be recorded after the PR is merged
-- `merge_commit`: to be recorded after the PR is merged
+- `implementation_commit`: `9dcd2ef6ab5bd811c15ad1ceb5319be296b1b60a`
+- `merge_commit`: `6edd244a164e4e7e561812852f47bc3e40b56b0f` (PR #366 squash merge)
 - `host`: local Darwin arm64
 - `scope`: learner Bot backup/restore v3 and M11 canonical artifact registry
 
