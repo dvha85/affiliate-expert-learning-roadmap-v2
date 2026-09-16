@@ -1011,7 +1011,7 @@ def audit_managed_lock_path_guard(root, matrix, plan_text):
     test_text = test.read_text(encoding="utf-8") if test.is_file() else ""
     workflow = root / ".github/workflows/curriculum-ci.yml"
     workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
-    if "validateManagedLockParent" not in posix_text or "syscall.O_NOFOLLOW" not in posix_text or "TestManagedPathLockRejectsSymlinkWithoutTouchingExternal" not in test_text or "TestManagedPathLockRejectsSymlinkedParentWithoutTouchingExternal" not in test_text or "external lock target changed after symlink rejection" not in test_text or "external parent target changed after symlink rejection" not in test_text or "run_learner_bot_test_shard.py" not in workflow_text:
+    if "validateManagedLockParent" not in posix_text or "unix.Openat" not in posix_text or "openManagedDirectory" not in posix_text or "unix.O_NOFOLLOW" not in posix_text or "TestManagedPathLockRejectsSymlinkWithoutTouchingExternal" not in test_text or "TestManagedPathLockRejectsSymlinkedParentWithoutTouchingExternal" not in test_text or "TestManagedPathLockRejectsAncestorSwapBeforeOpen" not in test_text or "external lock target changed after symlink rejection" not in test_text or "external parent target changed after symlink rejection" not in test_text or "external ancestor target changed after swap rejection" not in test_text or "run_learner_bot_test_shard.py" not in workflow_text:
         fail("managed lock path-guard regression is missing from the real test/CI path")
 
 

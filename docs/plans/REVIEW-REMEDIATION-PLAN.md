@@ -2363,13 +2363,23 @@ staging mồ côi. Record:
 `docs/architecture/EVIDENCE-BACKUP-SIGKILL-20260916.md`.
 
 **Cập nhật managed lock ancestor preflight (2026-09-16):** POSIX managed lock
-giờ kiểm tra các ancestor hiện hữu của lock pathname trước `OpenFile`, nên một
+kiểm tra các ancestor hiện hữu của lock pathname trước khi mở lock, nên một
 lock nằm dưới thư mục cha là symlink bị từ chối trước khi chạm file ngoài.
 Regression dùng lock path thật dưới symlink parent, xác nhận external sentinel
 không đổi và external lock không được tạo. Đây là bounded local preflight;
 thay thế ancestor đồng thời vẫn cần directory-handle/openat hardening, và
 Windows native lock, power-loss, multi-host vẫn ngoài phạm vi. Record:
 `docs/architecture/EVIDENCE-MANAGED-LOCK-ANCESTOR-20260916.md`.
+
+**Cập nhật managed lock directory-handle/openat hardening (2026-09-16):**
+POSIX lock acquisition giờ mở từng directory component bằng descriptor với
+`O_DIRECTORY|O_NOFOLLOW`, rồi mở entry cuối bằng `openat` trên parent descriptor.
+Regression thay parent thật bằng symlink ngay sau preflight; acquisition bị
+từ chối, external sentinel không đổi và external lock không được tạo. Đây là
+hardening cho local ancestor replacement seam trên các POSIX target hỗ trợ
+`openat`, không phải distributed lock, Windows native lock, power-loss,
+multi-file atomicity hay multi-host proof. Record:
+`docs/architecture/EVIDENCE-MANAGED-LOCK-OPENAT-20260916.md`.
 
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
