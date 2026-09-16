@@ -2342,6 +2342,17 @@ nhận acquisition bị từ chối, bytes external vẫn nguyên vẹn. Đây l
 pathname local cho runtime/backup/restore lock, không thay thế ancestor-path
 TOCTOU, Windows native lock, multi-host hoặc power-loss proof.
 
+**Deterministic runtime re-run trên current main (2026-09-16):** chạy lại đúng
+single-build sequence của `curriculum-ci.yml`: learner internal tests, canonical
+schema test/vet, build learner Bot một lần, M01 baseline, M02 capture/list/
+replay/decision và readiness audit. Tất cả PASS trên `main` `2e86636`; audit
+vẫn trả `NOT_READY_FOR_PRODUCTION`. Run local warm-cache khoảng 0.8 giây không
+phải benchmark GitHub runner. Record:
+`docs/architecture/EVIDENCE-DETERMINISTIC-RUNTIME-RERUN-20260916-2E86636.md`.
+Đây chỉ là fixture/offline/read-only verification; không có provider, business
+outcome, live executor, clean-machine pilot, target-host deployment,
+multi-host hoặc power-loss evidence.
+
 ### RP-10 — Chỉ thực hiện sau khi đóng các code/test gaps
 
 - Chọn phiên bản n8n hỗ trợ, topology kết nối canonical adapter, host/nguồn read-only, provider/model và budget với chủ repo. Không truy cập loopback của host khác qua cấu hình mặc định; có hướng dẫn container/host đúng topology.
