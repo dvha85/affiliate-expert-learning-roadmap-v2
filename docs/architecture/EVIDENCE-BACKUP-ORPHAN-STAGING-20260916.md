@@ -14,6 +14,7 @@ different target, or a visible backup/runtime target.
 - `host`: local macOS arm64
 - `TestBackupProcessExitBeforePublishLeavesNoTargetAndRetrySucceeds`: PASS
 - `TestBackupProcessKillBeforePublishLeavesNoTargetAndRetrySucceeds`: PASS
+- `TestBackupProcessKillAfterPartialStagingLeavesNoTargetAndRetrySucceeds`: PASS
 - `TestCleanupStaleStagingOnlyRemovesTargetOwnedDirectories`: PASS
 
 Each test runs the real learner Bot backup/restore command in a separate child
