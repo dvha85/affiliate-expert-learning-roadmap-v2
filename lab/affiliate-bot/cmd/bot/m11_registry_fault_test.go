@@ -383,15 +383,14 @@ func TestM11InterruptedJournalFreshProcessFailsClosedThenLockedWriterRecovers(t 
 }
 
 // TestM11ProcessTerminationChild is a test-binary-only entrypoint. It kills
-// the child immediately before the new M11 ledger append, after the exact
-// journal has been published, exercising the real process boundary rather
-// than only an in-process error return.
+// the child at a selected M11 journal boundary, exercising the real process
+// boundary rather than only an in-process error return.
 func TestM11ProcessTerminationChild(t *testing.T) {
 	if os.Getenv("GO_WANT_M11_PROCESS_TERMINATION") != "1" {
 		return
 	}
 	mode := os.Getenv("GO_M11_PROCESS_TERMINATION_MODE")
-	if mode != "exit" && mode != "kill" {
+	if mode != "exit" && mode != "kill" && mode != "outcome-after-append-kill" {
 		os.Exit(2)
 	}
 	separator := -1
@@ -404,18 +403,36 @@ func TestM11ProcessTerminationChild(t *testing.T) {
 	if separator == -1 || separator+1 >= len(os.Args) {
 		os.Exit(2)
 	}
-	m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
-		if phase != "before_write" || entry.ArtifactKind != corem11.ArtifactKindLedger {
-			return nil
-		}
-		if mode == "kill" {
+	terminate := func() {
+		if mode == "kill" || mode == "outcome-after-append-kill" {
 			if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
 				os.Exit(98)
 			}
-			return nil
+			// Keep the test child at the injected boundary if signal delivery is
+			// deferred until the next scheduling point. SIGKILL is non-catchable;
+			// this loop is only a defensive fallback against crossing the cleanup
+			// code before the kernel terminates the process.
+			for {
+				runtime.Gosched()
+			}
 		}
 		os.Exit(97)
-		return nil
+	}
+	if mode == "outcome-after-append-kill" {
+		m11OutcomeAppendFault = func(phase string) error {
+			if phase == "after_append" {
+				terminate()
+			}
+			return nil
+		}
+	} else {
+		m11RegistryAppendFault = func(phase string, entry corem11.ArtifactEntry) error {
+			if phase != "before_write" || entry.ArtifactKind != corem11.ArtifactKindLedger {
+				return nil
+			}
+			terminate()
+			return nil
+		}
 	}
 	os.Exit(runMissionCommand(os.Args[separator+1:], os.Stdout, os.Stderr))
 }

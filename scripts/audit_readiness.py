@@ -1144,8 +1144,10 @@ def audit_m11_outcome_process_kill(root, matrix, plan_text):
     workflow_text = workflow.read_text(encoding="utf-8") if workflow.is_file() else ""
     required_test_markers = (
         "func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend",
+        "func TestM11OutcomeProcessKillAfterOutcomeAppend",
         "GO_WANT_M11_PROCESS_TERMINATION",
         "GO_M11_PROCESS_TERMINATION_MODE",
+        "outcome-after-append-kill",
         "syscall.SIGKILL",
         "RECOVERY_REQUIRED",
         "EXACT_DUPLICATE",

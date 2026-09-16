@@ -349,6 +349,69 @@ func TestM11OutcomeProcessKillAfterJournalBeforeLedgerAppend(t *testing.T) {
 	}
 }
 
+// TestM11OutcomeProcessKillAfterOutcomeAppend exercises the second visible
+// side of the two-file command boundary in a separate process. The outcome
+// line and ledger transition must both remain replayable after SIGKILL, while
+// the journal keeps fresh readers fail-closed until a locked exact retry.
+func TestM11OutcomeProcessKillAfterOutcomeAppend(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGKILL process-boundary proof is not portable on Windows")
+	}
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("initialize post-append process-kill fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	input := filepath.Join(dir, "post-append-process-kill-m11-outcome.json")
+	writeMissionTestJSON(t, input, journal.Outcome)
+	childArgs := []string{"-test.run=^TestM11ProcessTerminationChild$", "--", "m11-outcome", dir, input, predecessor.ArtifactID}
+	command := exec.Command(os.Args[0], childArgs...)
+	command.Env = append(os.Environ(), "GO_WANT_M11_PROCESS_TERMINATION=1", "GO_M11_PROCESS_TERMINATION_MODE=outcome-after-append-kill")
+	var childStdout, childStderr strings.Builder
+	command.Stdout, command.Stderr = &childStdout, &childStderr
+	if err := command.Run(); err == nil {
+		t.Fatal("M11 outcome child unexpectedly completed after post-append SIGKILL")
+	} else {
+		exited, ok := err.(*exec.ExitError)
+		if !ok {
+			t.Fatal(err)
+		}
+		status, ok := exited.ProcessState.Sys().(syscall.WaitStatus)
+		if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+			t.Fatalf("M11 post-append child did not receive SIGKILL: %v stdout=%q stderr=%q", err, childStdout.String(), childStderr.String())
+		}
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); err != nil {
+		t.Fatalf("M11 outcome journal was not left for post-append recovery: %v stdout=%q stderr=%q", err, childStdout.String(), childStderr.String())
+	}
+	outcomes, err := loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("post-append process kill did not leave one exact outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err := m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("post-append process kill did not leave the journal ledger transition: ledger=%+v err=%v", head, err)
+	}
+	binary := buildMissionBinary(t)
+	if code, response := missionBinaryCall(t, binary, "mission", "status", dir); code == 0 || response["status"] != "RECOVERY_REQUIRED" {
+		t.Fatalf("fresh read-only process exposed post-append uncertainty: code=%d response=%+v", code, response)
+	}
+	if code, response := missionBinaryCall(t, binary, "mission", "m11-outcome", dir, input, predecessor.ArtifactID); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("locked exact retry did not close post-append outcome journal: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(m11OutcomeJournalPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("post-append outcome journal remains after exact recovery: %v", err)
+	}
+	outcomes, err = loadM11FixtureOutcomes(dir)
+	if err != nil || len(outcomes) != 1 || !reflect.DeepEqual(outcomes[0], journal.Outcome) {
+		t.Fatalf("post-append recovery duplicated or changed outcome: outcomes=%+v err=%v", outcomes, err)
+	}
+	_, head, err = m11LedgerHead(dir, journal.Ledger.LeaseID)
+	if err != nil || !reflect.DeepEqual(head, journal.Ledger) {
+		t.Fatalf("post-append recovery duplicated or changed ledger transition: ledger=%+v err=%v", head, err)
+	}
+}
+
 func TestMissionM11OutcomeDisclosesPublishedJournalCleanupUncertainty(t *testing.T) {
 	dir := t.TempDir()
 	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {

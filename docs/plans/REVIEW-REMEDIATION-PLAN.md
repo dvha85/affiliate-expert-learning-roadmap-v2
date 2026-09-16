@@ -2630,13 +2630,14 @@ bounded local process-termination seam, không phải power-loss, transaction đ
 file, Windows native lock hay multi-host proof. Record:
 `docs/architecture/EVIDENCE-M11-PROCESS-KILL-JOURNAL-20260916.md`.
 
-**Cập nhật M11 outcome process-kill recovery (2026-09-16):** bổ sung một
-regression riêng trên đường `m11-outcome`: child Bot thật publish outcome
-journal rồi nhận `SIGKILL` trước ledger append; process đọc mới trả
-`RECOVERY_REQUIRED`, locked writer replay đúng transition, retry trả
-`EXACT_DUPLICATE` và store chỉ còn một outcome. Đây là bounded local
-synthetic/read-only process-termination evidence, không phải power-loss,
-atomic multi-file, provider, business outcome, pilot hay deployment proof.
+**Cập nhật M11 outcome process-kill recovery (2026-09-16):** bổ sung các
+regression riêng trên đường `m11-outcome`: child Bot thật nhận `SIGKILL` ở
+hai điểm cắt, sau khi journal đã publish nhưng lần lượt trước ledger append và
+sau outcome append trước cleanup. Process đọc mới trả `RECOVERY_REQUIRED`,
+locked writer replay/confirm đúng transition, retry trả `EXACT_DUPLICATE` và
+store chỉ còn một outcome. Đây là bounded local synthetic/read-only
+process-termination evidence, không phải power-loss, atomic multi-file,
+provider, business outcome, pilot hay deployment proof.
 Record: `docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md`.
 
 **Cập nhật backup/restore orphan staging recovery (2026-09-16):** backup và
