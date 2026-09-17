@@ -1,12 +1,22 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-17 -->
-<!-- readiness-main-baseline: a0f8f19854276589dd9f858ef48869691420294c -->
+<!-- readiness-main-baseline: 8b44011465ea0c8afcfcc832b76f045da0811bd4 -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
+`main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
+transport hardening vào learner adapter, blueprint và regression runner. Tất
+cả 12 PR checks PASS, gồm Node 24/n8n 2.38.1 engine regression; local
+re-verification được ghi tại
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-403-20260917.md`. Tracker
+vẫn `NOT_READY_FOR_PRODUCTION`; không suy bằng chứng synthetic/read-only này
+thành provider, live executor, business outcome, pilot, deployment,
+distributed-locking hoặc power-loss/atomic multi-file proof.
 
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
