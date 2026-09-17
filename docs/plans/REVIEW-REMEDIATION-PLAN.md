@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-17 -->
-<!-- readiness-main-baseline: c6debee4b1ef82626eb3e22469886b1f55b45e54 -->
+<!-- readiness-main-baseline: 0cf32660166908a4cb5ab6c45ec36f2a174e64be -->
 
 > Reconcile 17/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -42,6 +42,19 @@ evidence. Tracker vẫn `NOT_READY_FOR_PRODUCTION`; sync này không đóng
 provider, live executor, business outcome, clean-machine pilot, deployment,
 distributed locking hay power-loss/atomic multi-file proof. Record:
 `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md`.
+
+**Baseline sync after PR #410 (2026-09-17):** PR #410 đã squash-merge vào
+`main` tại `0cf32660166908a4cb5ab6c45ec36f2a174e64be`, đưa hardening parent
+guard cho inventory campaign/fixture/backup writers của RP-01 vào baseline.
+Head PR `d03e4ef4ef2a399f553dfa83bc7d5cc04ea4c2e1` đã PASS 12/12 remote checks
+trong Curriculum CI run `35210755354` và Mission Agent Path CI run
+`35210755459`, gồm Go race/vet, learner shards, offline smokes, mission
+runtime, quickstart và Node 24/n8n engine. Hậu kiểm Python/audit được ghi tại
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md`; worktree
+không có Go executable nên không ghi local Go PASS. Tracker vẫn
+`NOT_READY_FOR_PRODUCTION`; sync này không đóng provider, live executor,
+business outcome, clean-machine pilot, deployment, distributed locking hay
+power-loss/atomic multi-file evidence.
 
 **Cập nhật RP-01 advisor campaign writers openat guard (2026-09-17):** inventory
 writer cục bộ còn mở đã được đưa về shared stable append boundary: campaign
