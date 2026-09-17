@@ -77,7 +77,7 @@ func TestAdvisorCampaignInitRejectsParentSwapBeforeManifest(t *testing.T) {
 }
 
 func TestAdvisorReservationRejectsParentSwapBeforeOpenat(t *testing.T) {
-	parent := t.TempDir()
+	parent := filepath.Join(t.TempDir(), "campaign")
 	if err := initAdvisorCampaign(parent); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestAdvisorReservationRejectsParentSwapBeforeOpenat(t *testing.T) {
 }
 
 func TestAdvisorResultRejectsParentSwapBeforeOpenat(t *testing.T) {
-	parent := t.TempDir()
+	parent := filepath.Join(t.TempDir(), "campaign")
 	if err := initAdvisorCampaign(parent); err != nil {
 		t.Fatal(err)
 	}

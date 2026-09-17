@@ -35,9 +35,11 @@ func TestCampaignReportUnknownAndNoMutation(t *testing.T) {
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatal("mutated reservation")
 	}
-	if _, err := os.Stat(filepath.Join(p, "lock")); !os.IsNotExist(err) {
-		t.Fatal("lock not released")
+	release, err := acquireManagedPathLock(filepath.Join(p, "lock"))
+	if err != nil {
+		t.Fatalf("lock not released: %v", err)
 	}
+	release()
 	if err := os.WriteFile(filepath.Join(p, "unexpected"), []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
