@@ -163,6 +163,91 @@ func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T)
 	}
 }
 
+func TestM11RegistryLoaderRejectsMixedCorrelationLineage(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	entries, err := readM11ArtifactRegistry(fixture.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) < 8 {
+		t.Fatalf("fixture registry is unexpectedly short: %d", len(entries))
+	}
+	healthValue, status := corem11.DecodeArtifact("health", entries[2].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode health: %s", status)
+	}
+	costValue, status := corem11.DecodeArtifact("cost", entries[3].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode cost: %s", status)
+	}
+	gateValue, status := corem11.DecodeArtifact("gate", entries[6].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode gate: %s", status)
+	}
+	authValue, status := corem11.DecodeArtifact("authorization", entries[7].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode authorization: %s", status)
+	}
+	health := *healthValue.(*corem11.ProductionHealthSnapshot)
+	foreignCost := costValue.(corem10.TrustedCostBound)
+	foreignCost.CorrelationID = "foreign-correlation"
+	foreignCost.CostBoundHash = corem10.ComputeTrustedCostBoundHash(foreignCost)
+	foreignGate := *gateValue.(*corem11.ProductionGateDecision)
+	foreignGate.CostBoundHash = foreignCost.CostBoundHash
+	ledgerEntry := entries[4]
+	lease := fixture.lease
+	foreignGate.GateID = corem11.ComputeProductionGateID(lease, foreignGate.IntentID, foreignGate.IntentHash, health, foreignCost, ledgerEntry, foreignGate.EvaluatedAt)
+	foreignAuth := *authValue.(*corem11.ProductionExecutionAuthorization)
+	foreignAuth.ProductionGateID = foreignGate.GateID
+	foreignAuth.ProductionCostBoundHash = foreignCost.CostBoundHash
+	foreignAuth.CorrelationID = foreignCost.CorrelationID
+	foreignAuth.AuthorizationID = corem11.ComputeProductionAuthorizationID(foreignGate.GateID, foreignAuth.ExecutorID, foreignAuth.AuthorizedAt)
+
+	// Rewrite only a disposable registry with checksum-valid replacements. The
+	// old loader accepted this shape because all copied IDs/hashes were updated;
+	// the shared runtime loader must now reject the mixed correlation root.
+	mixed := append([]corem11.ArtifactEntry(nil), entries[:8]...)
+	raw, err := json.Marshal(foreignCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed[3], err = corem11.NewArtifactEntry(corem11.ArtifactKindCostBound, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err = json.Marshal(foreignGate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed[6], err = corem11.NewArtifactEntry(corem11.ArtifactKindGate, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err = json.Marshal(foreignAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed[7], err = corem11.NewArtifactEntry(corem11.ArtifactKindAuthorization, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := []byte{}
+	for _, entry := range mixed {
+		line, marshalErr := json.Marshal(entry)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		contents = append(contents, line...)
+		contents = append(contents, '\n')
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(fixture.dir), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(fixture.dir); err == nil {
+		t.Fatal("runtime loader accepted a mixed M11 correlation lineage")
+	}
+}
+
 func TestM11RegistryLoaderRejectsRecoveryAdmissionWithoutRecordedApproval(t *testing.T) {
 	dir := t.TempDir()
 	lease := corem11.ProductionLease{LeaseID: "admission-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "admission-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "admission-correlation", HashVersion: "go-json-v1"}

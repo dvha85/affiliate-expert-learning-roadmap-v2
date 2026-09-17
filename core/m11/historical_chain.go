@@ -73,7 +73,9 @@ func historicalClosedCycle(c HistoricalChain) string {
 		cycle.LeaseHash != c.Lease.LeaseHash || len(cycle.ObservationIDs) == 0 || cycle.DecisionID != c.Intent.DecisionID ||
 		cycle.IntentID != c.Intent.IntentID || cycle.IntentHash != c.Intent.IntentHash || cycle.GateID != c.Gate.GateID ||
 		cycle.AuthorizationID != c.Authorization.AuthorizationID || cycle.ExecutionID != c.Execution.ExecutionID ||
-		cycle.OutcomeID != outcome.OutcomeID || cycle.EvaluationID != evaluation.EvaluationID || cycle.CorrelationID != c.Intent.CorrelationID {
+		cycle.OutcomeID != outcome.OutcomeID || cycle.EvaluationID != evaluation.EvaluationID ||
+		cycle.CorrelationID != c.Intent.CorrelationID || c.Authorization.CorrelationID != c.Intent.CorrelationID ||
+		c.Execution.CorrelationID != c.Intent.CorrelationID {
 		return "BROKEN_LINK"
 	}
 	for _, id := range cycle.ObservationIDs {
@@ -214,7 +216,7 @@ func ValidateHistoricalChain(c HistoricalChain) string {
 	if c.Intent.IntentID != c.Policy.IntentID || c.Intent.IntentHash != c.Policy.IntentHash ||
 		c.Intent.IntentID != c.Gate.IntentID || c.Intent.IntentHash != c.Gate.IntentHash ||
 		c.Intent.IntentID != c.Authorization.IntentID ||
-		c.Intent.CorrelationID != c.Cost.CorrelationID || c.Intent.CorrelationID != c.Authorization.CorrelationID ||
+		c.Intent.CorrelationID != c.Lease.CorrelationID || c.Intent.CorrelationID != c.Cost.CorrelationID || c.Intent.CorrelationID != c.Authorization.CorrelationID || c.Intent.CorrelationID != c.Execution.CorrelationID ||
 		c.Intent.IdempotencyKey != c.Authorization.IdempotencyKey || c.Intent.IdempotencyKey != c.Execution.IdempotencyKey ||
 		c.Intent.IntentID != c.Execution.IntentID || c.Intent.IntentHash != c.Execution.IntentHash {
 		return "BROKEN_LINK"

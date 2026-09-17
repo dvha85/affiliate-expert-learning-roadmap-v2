@@ -965,6 +965,53 @@ def audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text):
         fail("M11 authorization gate exact-lineage regression is missing")
 
 
+def audit_m11_correlation_lineage(root, matrix, plan_text):
+    """Keep the M11 correlation root intact across graph and chain readers."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-correlation-lineage-20260917")
+    if not isinstance(record, dict) or not all(token in record.get("scope", "") for token in ("lease correlation root", "cost-bound", "execution", "historical-chain")):
+        fail("matrix lacks scoped M11 correlation-lineage acceptance")
+    if "Cập nhật M11 correlation lineage" not in plan_text:
+        fail("M11 correlation lineage lacks a scoped plan marker")
+    registry_path = root / "core/m11/artifact_registry.go"
+    historical_path = root / "core/m11/historical_chain.go"
+    artifact_test_path = root / "core/m11/artifact_test.go"
+    registry_test_path = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    chain_test_path = root / "lab/mission-runtime/cmd/demo/m11_chain_test.go"
+    evidence_path = root / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md"
+    registry = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
+    historical = historical_path.read_text(encoding="utf-8") if historical_path.is_file() else ""
+    artifact_test = artifact_test_path.read_text(encoding="utf-8") if artifact_test_path.is_file() else ""
+    registry_test = registry_test_path.read_text(encoding="utf-8") if registry_test_path.is_file() else ""
+    chain_test = chain_test_path.read_text(encoding="utf-8") if chain_test_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_registry = (
+        "bound.CorrelationID != lease.CorrelationID",
+        "x.CorrelationID != lease.CorrelationID",
+        "auth.CorrelationID != x.CorrelationID",
+        "auth.CorrelationID != lease.CorrelationID",
+    )
+    required_historical = (
+        "c.Intent.CorrelationID != c.Execution.CorrelationID",
+        "c.Authorization.CorrelationID != c.Intent.CorrelationID",
+    )
+    required_tests = (
+        "checksum-valid cost bound from another correlation lineage",
+        "TestM11RegistryLoaderRejectsMixedCorrelationLineage",
+        '{"execution", "correlation_id", "other", "BROKEN_LINK"}',
+    )
+    if (
+        any(marker not in registry for marker in required_registry)
+        or any(marker not in historical for marker in required_historical)
+        or any(marker not in artifact_test for marker in required_tests[:1])
+        or required_tests[1] not in registry_test
+        or required_tests[2] not in chain_test
+        or "## Verification" not in evidence
+        or "NOT_READY_FOR_PRODUCTION" not in evidence
+    ):
+        fail("M11 correlation-lineage regression is missing")
+
+
 def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):
     """Require CI mutation coverage for the exact authorization lineage guard."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1652,6 +1699,7 @@ def audit(root):
     audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
+    audit_m11_correlation_lineage(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)

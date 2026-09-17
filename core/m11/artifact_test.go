@@ -45,6 +45,31 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	// A checksum-valid cost bound from another correlation lineage must not be
+	// made admissible merely by updating the gate's copied cost hash and
+	// recomputing its derived gate ID. The lease is the M11 correlation root.
+	foreignCost := cost
+	foreignCost.CorrelationID = "corr-foreign"
+	foreignCost.CostBoundHash = corem10.ComputeTrustedCostBoundHash(foreignCost)
+	foreignCostGate := gate
+	foreignCostGate.CostBoundHash = foreignCost.CostBoundHash
+	foreignCostGate.GateID = ComputeProductionGateID(lease, foreignCostGate.IntentID, foreignCostGate.IntentHash, health, foreignCost, ledgerEntry, foreignCostGate.EvaluatedAt)
+	foreignCostEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	foreignCostEntries[3] = m11Entry(t, ArtifactKindCostBound, foreignCost)
+	foreignCostEntries[6] = m11Entry(t, ArtifactKindGate, foreignCostGate)
+	if err := ValidateArtifactGraph(foreignCostEntries); err == nil {
+		t.Fatal("graph accepted a checksum-valid cost bound from another correlation lineage")
+	}
+	// The same guard must apply at the authorization boundary even when the
+	// cost/lease lineage is valid: a caller cannot replace only the copied
+	// correlation field and then carry that authorization into an execution.
+	foreignAuthorization := authorization
+	foreignAuthorization.CorrelationID = "corr-foreign"
+	foreignAuthorizationEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	foreignAuthorizationEntries = append(foreignAuthorizationEntries, m11Entry(t, ArtifactKindAuthorization, foreignAuthorization))
+	if err := ValidateArtifactGraph(foreignAuthorizationEntries); err == nil {
+		t.Fatal("graph accepted an authorization from another correlation lineage")
+	}
 	laterAuthorization := authorization
 	laterAuthorization.AuthorizedAt = "2026-09-08T00:00:00.500Z"
 	laterAuthorization.AuthorizationID = ComputeProductionAuthorizationID(gate.GateID, laterAuthorization.ExecutorID, laterAuthorization.AuthorizedAt)

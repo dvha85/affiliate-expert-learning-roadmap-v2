@@ -59,6 +59,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_post_403 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-403-20260917.md"
         evidence_post_403.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-403-20260917.md", evidence_post_403)
+        evidence_correlation = self.root / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md"
+        evidence_correlation.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md", evidence_correlation)
         lineage_mutation = self.root / "scripts/mutate_m11_authorization_lineage.py"
         lineage_mutation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_authorization_lineage.py", lineage_mutation)
@@ -183,6 +186,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("gate.HealthSnapshotID != x.ProductionHealthSnapshotID", "health lineage guard removed", 1), encoding="utf-8")
         self.assertIn("M11 authorization gate exact-lineage regression is missing", self.run_audit(False))
+
+    def test_missing_m11_correlation_lineage_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("bound.CorrelationID != lease.CorrelationID", "correlation lineage guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 correlation-lineage regression is missing", self.run_audit(False))
 
     def test_missing_m11_authorization_lineage_mutation_is_rejected(self):
         source = self.root / "scripts/mutate_m11_authorization_lineage.py"
