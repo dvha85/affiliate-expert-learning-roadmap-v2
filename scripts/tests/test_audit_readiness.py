@@ -56,6 +56,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_post_392 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md"
         evidence_post_392.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-392-20260916.md", evidence_post_392)
+        evidence_post_403 = self.root / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-403-20260917.md"
+        evidence_post_403.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-403-20260917.md", evidence_post_403)
         lineage_mutation = self.root / "scripts/mutate_m11_authorization_lineage.py"
         lineage_mutation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_authorization_lineage.py", lineage_mutation)
