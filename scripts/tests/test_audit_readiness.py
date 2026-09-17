@@ -75,6 +75,10 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go", "docs/architecture/EVIDENCE-M11-MANUAL-STOP-PROCESS-KILL-20260917.md"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
         matrix = json.loads((ROOT / "docs/plans/READINESS-MATRIX.json").read_text(encoding="utf-8"))
         for item in matrix["criteria"]:
             for field in ("implementation_refs", "test_refs"):
@@ -191,6 +195,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("bound.CorrelationID != lease.CorrelationID", "correlation lineage guard removed", 1), encoding="utf-8")
         self.assertIn("M11 correlation-lineage regression is missing", self.run_audit(False))
+
+    def test_missing_m11_manual_stop_process_kill_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestM11ManualStopProcessKillRequiresLockedRecovery", "TestM11ManualStopProcessKillCoverageRemoved"), encoding="utf-8")
+        self.assertIn("M11 direct STOP process-kill regression is missing", self.run_audit(False))
 
     def test_missing_m11_authorization_lineage_mutation_is_rejected(self):
         source = self.root / "scripts/mutate_m11_authorization_lineage.py"
