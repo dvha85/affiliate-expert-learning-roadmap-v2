@@ -476,9 +476,9 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
 		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
 	} {
-		forgedEnvelope := entries[0]
-		mutate(&forgedEnvelope)
-		if err := ValidateArtifactGraph([]ArtifactEntry{forgedEnvelope}); err == nil {
+		forgedEnvelopeEntries := append([]ArtifactEntry(nil), entries...)
+		mutate(&forgedEnvelopeEntries[0])
+		if err := ValidateArtifactGraph(forgedEnvelopeEntries); err == nil {
 			t.Fatalf("graph accepted a forged M11 registry %s", name)
 		}
 	}
