@@ -15,6 +15,7 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_registry_graph_envelope_integrity.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_authorization_lineage.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
@@ -1941,6 +1942,44 @@ def audit_registry_graph_envelope_integrity(root, matrix, plan_text):
         fail("registry graph envelope-integrity regression is missing from the core tests")
 
 
+def audit_registry_graph_envelope_mutation(root, matrix, plan_text):
+    """Require CI to prove the graph envelope regression can catch guard removal."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-rp07-registry-graph-envelope-mutation-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks registry graph envelope mutation acceptance record")
+    if "Cập nhật RP-08 registry graph envelope mutation proof" not in plan_text:
+        fail("registry graph envelope mutation lacks a scoped plan marker")
+    required_refs = {
+        "core/m10/artifact_registry.go",
+        "core/m11/artifact_registry.go",
+        "core/m10/cost_bound_test.go",
+        "core/m11/artifact_test.go",
+        "scripts/mutate_registry_graph_envelope_integrity.py",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("registry graph envelope mutation record lacks implementation/test/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("disposable", "M10", "M11", "canonical bytes", "offline")):
+        fail("registry graph envelope mutation record lacks bounded scope disclosure")
+    script_path = root / "scripts/mutate_registry_graph_envelope_integrity.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "remove_graph_envelope_guard",
+        "TestCanaryAuthorizationBindsGateWithoutExecuting",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "mutated {module} graph envelope guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_registry_graph_envelope_integrity.py" not in workflow:
+        fail("registry graph envelope mutation proof is missing or not wired to CI")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1992,6 +2031,7 @@ def audit(root):
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
     audit_m11_correlation_lineage(root, matrix, plan_text)
     audit_m11_reverse_ledger_graph(root, matrix, plan_text)
+    audit_registry_graph_envelope_mutation(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)

@@ -222,6 +222,7 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	for name, mutate := range map[string]func(*ArtifactEntry){
 		"artifact id": func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-grant" },
 		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
+		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
 	} {
 		forgedEnvelope := entries[0]
 		mutate(&forgedEnvelope)

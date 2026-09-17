@@ -104,6 +104,16 @@ power-loss/atomic multi-file, distributed locking, provider, live executor,
 business outcome, pilot hay deployment; readiness vẫn
 `NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật M10/M11 registry graph envelope integrity`.
 
+**Cập nhật RP-08 registry graph envelope mutation proof (2026-09-17):** CI
+thêm mutation trên disposable copy, lần lượt bỏ graph-only envelope guard của
+M10 và M11 rồi chạy đúng core regression thật. Test phải fail với forged
+`artifact_id`, `content_hash` hoặc canonical bytes; vì vậy regression không chỉ
+được audit bằng source marker. Đây là bằng chứng offline/read-only cho test
+được nối với runtime guard, không đóng power-loss, atomic multi-file,
+distributed locking, provider, live executor, business outcome, pilot hay
+deployment; readiness vẫn `NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật RP-08
+registry graph envelope mutation proof`.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
