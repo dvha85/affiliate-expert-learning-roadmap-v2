@@ -71,7 +71,11 @@ def run_mutation(module, relative, test_name, forged_assertion):
         if result.returncode == 0:
             fail(f"mutated {module} graph envelope guard unexpectedly passed the real graph test")
         if forged_assertion not in output:
-            fail(f"{module} envelope mutation caused an unrelated test failure instead of its forged-envelope rejection")
+            diagnostic = output[-4000:].strip()
+            fail(
+                f"{module} envelope mutation caused an unrelated test failure instead of its forged-envelope rejection; "
+                f"go test output tail:\n{diagnostic}"
+            )
 
 
 def main():
