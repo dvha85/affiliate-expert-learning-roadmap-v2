@@ -40,10 +40,11 @@ func readCampaignReport(path string) (campaignReport, error) {
 		return r, errors.New("campaign missing or invalid")
 	}
 	lock := filepath.Join(path, "lock")
-	if err = os.Mkdir(lock, 0700); err != nil {
+	release, err := acquireManagedPathLock(lock)
+	if err != nil {
 		return r, errors.New("campaign locked")
 	}
-	defer os.Remove(lock)
+	defer release()
 	r.Results, err = readCampaignResults(path)
 	if err != nil {
 		return r, err

@@ -184,10 +184,11 @@ func persistCampaignResult(path string, r campaignResult) error {
 		return err
 	}
 	lock := filepath.Join(path, "lock")
-	if err := os.Mkdir(lock, 0700); err != nil {
+	release, err := acquireManagedPathLock(lock)
+	if err != nil {
 		return errors.New("campaign locked")
 	}
-	defer os.Remove(lock)
+	defer release()
 	if _, err := readCampaignResults(path); err != nil {
 		return err
 	}
@@ -197,7 +198,7 @@ func persistCampaignResult(path string, r campaignResult) error {
 		return errors.New("missing reservation")
 	}
 	raw, _ := json.Marshal(r)
-	f, err := os.OpenFile(filepath.Join(path, fmt.Sprintf("result-%03d.json", r.Attempt)), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := openStableRegularFileForAppendPath(filepath.Join(path, fmt.Sprintf("result-%03d.json", r.Attempt)), true)
 	if err != nil {
 		return err
 	}

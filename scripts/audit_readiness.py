@@ -1738,6 +1738,72 @@ def audit_registry_append_parent_guard(root, matrix, plan_text):
         fail("registry append parent-swap regression is missing from the real M10/M11 paths")
 
 
+def audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text):
+    """Keep the remaining advisor and backup writers on the shared append boundary."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-advisor-campaign-writers-openat-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks advisor campaign-writer parent-guard acceptance record")
+    required_impl = {
+        "lab/affiliate-bot/cmd/bot/advisor_budget.go",
+        "lab/affiliate-bot/cmd/bot/advisor_results.go",
+        "lab/affiliate-bot/cmd/bot/advisor_fixture.go",
+        "lab/affiliate-bot/cmd/bot/advisor_report.go",
+        "lab/affiliate-bot/cmd/bot/advisor_canary.go",
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "lab/affiliate-bot/cmd/bot/stable_append_posix.go",
+        "lab/affiliate-bot/cmd/bot/stable_append_other.go",
+    }
+    required_tests = {
+        "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP01-ADVISOR-CAMPAIGN-WRITERS-OPENAT-20260917.md",
+    }
+    if required_impl - set(record.get("implementation_refs", [])):
+        fail("advisor campaign-writer parent-guard record lacks implementation refs")
+    if required_tests - set(record.get("test_refs", [])):
+        fail("advisor campaign-writer parent-guard record lacks regression/evidence refs")
+    scope = record.get("scope")
+    required_scope = ("manifest", "reservation", "result", "fixture", "backup staging", "managed lock", "openat", "O_NOFOLLOW", "external", "CI")
+    if not isinstance(scope, str) or any(marker not in scope for marker in required_scope):
+        fail("advisor campaign-writer parent-guard record lacks bounded scope disclosure")
+    if "Cập nhật RP-01 advisor campaign writers openat guard" not in plan_text:
+        fail("advisor campaign-writer parent guard lacks a scoped plan marker")
+    for relative in required_impl | required_tests:
+        if not (root / relative).is_file():
+            fail(f"advisor campaign-writer parent-guard ref is missing: {relative}")
+    source_paths = {
+        "lab/affiliate-bot/cmd/bot/advisor_budget.go": ("openStableRegularFileForAppendPath", "acquireManagedPathLock"),
+        "lab/affiliate-bot/cmd/bot/advisor_results.go": ("openStableRegularFileForAppendPath", "acquireManagedPathLock"),
+        "lab/affiliate-bot/cmd/bot/advisor_fixture.go": ("openStableRegularFileForAppendPath",),
+        "lab/affiliate-bot/cmd/bot/advisor_report.go": ("acquireManagedPathLock",),
+        "lab/affiliate-bot/cmd/bot/advisor_canary.go": ("acquireManagedPathLock",),
+        "lab/affiliate-bot/cmd/bot/backup_command.go": ("openStableRegularFileForAppendPath",),
+    }
+    for relative, markers in source_paths.items():
+        source = (root / relative).read_text(encoding="utf-8")
+        if any(marker not in source for marker in markers):
+            fail(f"advisor campaign-writer parent guard is missing from {relative}")
+    posix = (root / "lab/affiliate-bot/cmd/bot/stable_append_posix.go").read_text(encoding="utf-8")
+    fallback = (root / "lab/affiliate-bot/cmd/bot/stable_append_other.go").read_text(encoding="utf-8")
+    if any(marker not in posix for marker in ("unix.Openat", "unix.O_NOFOLLOW", "openedParent", "os.SameFile(openedParent, currentParent)")) or "os.O_EXCL" not in fallback:
+        fail("advisor campaign-writer parent guard is missing from the shared append implementations")
+    test = (root / "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go").read_text(encoding="utf-8")
+    required_tests = (
+        "TestAdvisorCampaignInitRejectsParentSwapBeforeManifest",
+        "TestAdvisorReservationRejectsParentSwapBeforeOpenat",
+        "TestAdvisorResultRejectsParentSwapBeforeOpenat",
+        "TestAdvisorFixtureWriterRejectsParentSwapBeforeOpenat",
+        "TestBackupStagingWriterRejectsParentSwapBeforeOpenat",
+        "external directory was changed",
+        "append target was created below the external parent",
+    )
+    if any(marker not in test for marker in required_tests):
+        fail("advisor campaign-writer parent-swap regression is missing from the real writer paths")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1811,6 +1877,7 @@ def audit(root):
     audit_runtime_acceptance(root, matrix)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
+    audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
