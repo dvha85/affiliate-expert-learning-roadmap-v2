@@ -57,7 +57,7 @@ def m07_model_output_from_prompt(payload: dict, mode: str = "valid") -> dict:
     evidence = context.get("evidence")
     if not isinstance(evidence, list):
         raise ValueError("model stub received invalid canonical evidence")
-    field = "price" if mode == "valid" else "commission_rate"
+    field = "price" if mode in {"valid", "exact-number"} else "commission_rate"
     scalar = next((item for item in evidence if isinstance(item, dict) and item.get("field_or_claim") == field and isinstance(item.get("evidence_id"), str)), None)
     if scalar is None:
         raise ValueError(f"model stub could not find canonical {field} evidence")
@@ -72,7 +72,11 @@ def m07_model_output_from_prompt(payload: dict, mode: str = "valid") -> dict:
         "tool_calls": [],
         "authority": "A2-RO",
         "write_permission": False,
-        "proposed_action": {"action_type": "DRAFT", "target": "human_review", "parameters": {}},
+        "proposed_action": {
+            "action_type": "DRAFT",
+            "target": "human_review",
+            "parameters": {"id": 9007199254740993} if mode == "exact-number" else {},
+        },
     }
 
 
@@ -486,9 +490,10 @@ def main() -> None:
             changed_record_id = require_m06_success(execute(prefix, env, "rp08-m06-changed"), "APPENDED")
             if changed_record_id == record_id:
                 raise AssertionError("M06 changed event reused the original canonical record")
-            exact_number_fixture = m06_fixture(correlation_id="event-exact-number", body='{"product_id":"exact-number","product_name":"Exact Number Fixture","currency":"USD","price":9007199254740993,"commission_rate":0.08}')
-            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-exact-number", port, m06_fixture=exact_number_fixture)
-            exact_number_record_id = require_m06_success(execute(prefix, env, "rp08-m06-exact-number"), "APPENDED")
+            # Keep the exact-number probe on the M07 raw transport path. Sending
+            # this value through the M06 fixture JSON would already cross n8n's
+            # JavaScript number boundary before M07 gets a chance to preserve it.
+            exact_number_record_id = record_id
             replay = run([str(bot), "history", "replay", str(history)], env=env)
             if "replay=MATCH" not in replay.stdout:
                 raise AssertionError("canonical history did not replay after n8n M06 execution")
@@ -540,6 +545,7 @@ def main() -> None:
                 proposal_path = history.with_name(history.name + ".m07") / "proposals" / (proposal_id.removeprefix("sha256:") + ".json")
                 if not proposal_path.is_file():
                     raise AssertionError("M07 model-success reported a proposal that was not persisted")
+                model_stub.mode = "exact-number"  # type: ignore[attr-defined]
                 import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-exact-number", port, m07_case="model-exact-number", m07_record_id=exact_number_record_id, m07_model_stub_port=model_stub_port)
                 exact_proposal_id, exact_tool_result_id = require_m07_model_success(execute(prefix, env, "rp08-m07-exact-number"), exact_number_record_id, expected_large_number=True)
                 exact_tool_path = history.with_name(history.name + ".m07") / "tool-results" / (exact_tool_result_id.removeprefix("sha256:") + ".json")
@@ -566,6 +572,7 @@ def main() -> None:
                 status, validated = post_json(f"http://127.0.0.1:{port}/v1/m07/validate", {"record_id": exact_number_record_id, "registry": [{"name": "public_http", "read_only": True, "allowed_methods": ["GET"], "allowed_hosts": ["example.com"], "timeout_ms": 10000, "follow_redirects": False}], "model_output_text": json.dumps(exact_proposal["raw_output"], separators=(",", ":")), "tool_result_id": exact_tool_result_id})
                 if status != 200 or validated.get("status") != "VALID" or validated.get("execution_permitted") is not False:
                     raise AssertionError("M07 exact-number proposal did not revalidate after adapter restart")
+                model_stub.mode = "valid"  # type: ignore[attr-defined]
                 import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-selected-source", port, m07_case="model-success", m07_record_id=selected_record_id, m07_model_stub_port=model_stub_port)
                 selected_proposal_id, _ = require_m07_model_success(execute(prefix, env, "rp08-m07-selected-source"), selected_record_id)
                 selected_proposal_path = history.with_name(history.name + ".m07") / "proposals" / (selected_proposal_id.removeprefix("sha256:") + ".json")
