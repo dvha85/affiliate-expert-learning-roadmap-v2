@@ -1035,6 +1035,7 @@ def audit_m11_reverse_ledger_graph(root, matrix, plan_text):
         "resolutionsByID := map[string]ProductionReconciliationResolution{}",
         "production ledger reconciliation link is orphaned or mismatched",
         "production ledger outcome link does not match its evaluation",
+        "len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID",
     )
     required_artifact = (
         "resolutionIDs := map[string]bool{}",
@@ -1045,10 +1046,14 @@ def audit_m11_reverse_ledger_graph(root, matrix, plan_text):
         "orphan reconciliation resolution link was accepted",
         "ledger outcome link with a swapped outcome ID was accepted",
         "duplicate reconciliation resolution IDs was accepted",
+        "evaluation with evidence unrelated to its fixture outcome was accepted",
+        "evaluation with more than one evidence ID was accepted",
     )
     required_loader = (
         "TestM11RegistryLoaderRejectsOrphanReconciliationLedgerLink",
         "schema-valid orphan reconciliation link reached runtime loader",
+        "TestM11RegistryLoaderRejectsEvaluationWithMismatchedEvidence",
+        "checksum-valid evaluation with mismatched evidence reached runtime loader",
     )
     if (
         any(marker not in registry for marker in required_registry)
@@ -1078,6 +1083,24 @@ def audit_m11_reverse_ledger_graph(root, matrix, plan_text):
     claims = br17.get("claims", []) if isinstance(br17, dict) else []
     if not any(claim.get("id") == "BR-17-test-m11-reverse-ledger-graph-20260917" for claim in claims if isinstance(claim, dict)):
         fail("M11 reverse-ledger graph evidence claim is missing")
+    evaluation_record = updates.get("RP-07-m11-fixture-evaluation-evidence-cardinality-20260917")
+    evaluation_scope = evaluation_record.get("scope", "") if isinstance(evaluation_record, dict) else ""
+    if not isinstance(evaluation_record, dict) or any(token not in evaluation_scope for token in ("exactly one fixture outcome evidence ID", "checksum-valid", "fail closed")):
+        fail("matrix lacks scoped M11 fixture-evaluation evidence cardinality acceptance")
+    evaluation_refs = set(evaluation_record.get("implementation_refs", [])) | set(evaluation_record.get("test_refs", []))
+    required_evaluation_refs = {
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md",
+    }
+    if required_evaluation_refs - evaluation_refs:
+        fail("M11 fixture-evaluation evidence acceptance lacks implementation, test, audit, evidence or CI refs")
+    if not any(claim.get("id") == "BR-17-test-m11-fixture-evaluation-evidence-20260917" for claim in claims if isinstance(claim, dict)):
+        fail("M11 fixture-evaluation evidence claim is missing")
 
 
 def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):

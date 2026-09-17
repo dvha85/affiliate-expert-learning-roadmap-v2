@@ -13,8 +13,11 @@ The decoder rejects empty or duplicate `ReconciliationResolutionIDs` before a
 registry entry is created. The graph validator allows the append-only
 resolution-only intermediate, then rejects a checksum-valid dangling,
 cross-lease, cross-execution or wrong-outcome link during complete inventory
-validation. The learner Bot loader regression exercises the same rejection
-before runtime use.
+validation. Because M11 evaluations are deliberately offline fixture
+evaluations, each evaluation must carry exactly one evidence ID and it must be
+the evaluated fixture `OutcomeID`; schema validation rejects an empty array and
+graph validation rejects a non-singleton or unrelated ID. The learner Bot
+loader regression exercises that rejection before runtime use.
 
 This does not prove ledger durability, power-loss recovery, atomic multi-file
 commit, distributed locking, live execution, provider operation, business
@@ -28,13 +31,15 @@ outcome, pilot or deployment readiness. The repository remains
 - `core/m11/artifact_registry.go` indexes resolutions by immutable ID and
   reverse-checks every ledger resolution link against execution, lease and the
   resolved STOPPED state; it also compares ledger `OutcomeID` links with an
-  available evaluation.
+  available evaluation and rejects an evaluation whose evidence is not exactly
+  the single fixture outcome ID.
 - `core/m11/artifact_test.go` keeps positive coverage for a valid reviewed
   STOPPED ledger and negative coverage for dangling resolution IDs, duplicate
-  resolution IDs and swapped outcome IDs.
-- `lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go` rewrites a disposable
-  registry with a checksum-valid orphan resolution link and requires the real
-  learner loader to reject it before runtime use.
+  resolution IDs, swapped outcome IDs, unrelated evaluation evidence and
+  non-singleton evaluation evidence.
+- `lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go` rewrites disposable
+  registries with checksum-valid orphan resolution and mismatched evaluation
+  links and requires the real learner loader to reject them before runtime use.
 
 ## Verification
 

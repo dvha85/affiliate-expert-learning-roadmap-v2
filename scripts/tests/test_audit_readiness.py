@@ -225,6 +225,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("production ledger reconciliation link is orphaned or mismatched", "reverse ledger graph guard removed", 1), encoding="utf-8")
         self.assertIn("M11 reverse-ledger graph regression is missing", self.run_audit(False))
 
+    def test_missing_m11_evaluation_evidence_guard_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID", "evaluation evidence guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 reverse-ledger graph regression is missing", self.run_audit(False))
+
     def test_missing_m11_manual_stop_process_kill_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestM11ManualStopProcessKillRequiresLockedRecovery", "TestM11ManualStopProcessKillCoverageRemoved"), encoding="utf-8")

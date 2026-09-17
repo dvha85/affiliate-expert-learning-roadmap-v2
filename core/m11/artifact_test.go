@@ -393,6 +393,20 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(preAttemptEvaluationEntries); err == nil {
 		t.Fatal("evaluation before its execution attempt was accepted")
 	}
+	forgedEvaluationEvidence := evaluation
+	forgedEvaluationEvidence.EvidenceIDs = []string{"unrelated-evidence"}
+	forgedEvaluationEvidenceEntries := append([]ArtifactEntry(nil), entries...)
+	forgedEvaluationEvidenceEntries[len(forgedEvaluationEvidenceEntries)-2] = m11Entry(t, ArtifactKindEvaluation, forgedEvaluationEvidence)
+	if err := ValidateArtifactGraph(forgedEvaluationEvidenceEntries); err == nil {
+		t.Fatal("evaluation with evidence unrelated to its fixture outcome was accepted")
+	}
+	nonSingletonEvaluationEvidence := evaluation
+	nonSingletonEvaluationEvidence.EvidenceIDs = []string{evaluation.OutcomeID, "second-evidence"}
+	nonSingletonEvaluationEvidenceEntries := append([]ArtifactEntry(nil), entries...)
+	nonSingletonEvaluationEvidenceEntries[len(nonSingletonEvaluationEvidenceEntries)-2] = m11Entry(t, ArtifactKindEvaluation, nonSingletonEvaluationEvidence)
+	if err := ValidateArtifactGraph(nonSingletonEvaluationEvidenceEntries); err == nil {
+		t.Fatal("evaluation with more than one evidence ID was accepted")
+	}
 	duplicateExecutionEvaluation := evaluation
 	duplicateExecutionEvaluation.EvaluationID = "evaluation-duplicate-execution"
 	duplicateExecutionEvaluationEntries := append([]ArtifactEntry(nil), entries...)

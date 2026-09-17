@@ -339,7 +339,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			execution, executionOK := executions[x.ExecutionID]
 			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
 			attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
-			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
+			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
 				return fmt.Errorf("production outcome evaluation has an orphaned or mismatched link")
 			}
 			if priorEvaluationID, exists := evaluationExecutions[x.ExecutionID]; exists && priorEvaluationID != x.EvaluationID {

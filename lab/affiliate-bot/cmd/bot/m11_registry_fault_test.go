@@ -291,6 +291,70 @@ func TestM11RegistryLoaderRejectsMixedCorrelationLineage(t *testing.T) {
 	}
 }
 
+func TestM11RegistryLoaderRejectsEvaluationWithMismatchedEvidence(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init evaluation fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	raw, err := json.Marshal(journal.Outcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, _, status, err := recordM11FixtureOutcome(dir, predecessor.ArtifactID, raw)
+	if err != nil || status != appendAdded {
+		t.Fatalf("record fixture outcome: status=%s err=%v", status, err)
+	}
+	if _, status, err := evaluateM11FixtureOutcome(dir, outcome.OutcomeID, "loader-evidence-evaluation", "2026-09-08T00:00:03Z"); err != nil || status != appendAdded {
+		t.Fatalf("record fixture evaluation: status=%s err=%v", status, err)
+	}
+
+	entries, err := readM11ArtifactRegistry(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluationIndex := -1
+	for index, entry := range entries {
+		if entry.ArtifactKind == corem11.ArtifactKindEvaluation {
+			evaluationIndex = index
+			break
+		}
+	}
+	if evaluationIndex < 0 {
+		t.Fatal("fixture evaluation was not recorded")
+	}
+	value, decodeStatus := corem11.DecodeArtifact("evaluation", entries[evaluationIndex].Artifact)
+	if decodeStatus != corem11.Valid {
+		t.Fatalf("decode evaluation: %s", decodeStatus)
+	}
+	evaluation := *value.(*corem11.ProductionOutcomeEvaluation)
+	evaluation.EvidenceIDs = []string{"unrelated-evidence"}
+	evaluationRaw, err := json.Marshal(evaluation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries[evaluationIndex], err = corem11.NewArtifactEntry(corem11.ArtifactKindEvaluation, evaluationRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contents := []byte{}
+	for _, entry := range entries {
+		line, marshalErr := json.Marshal(entry)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		contents = append(contents, line...)
+		contents = append(contents, '\n')
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(dir), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(dir); err == nil || !strings.Contains(err.Error(), "outcome evaluation") {
+		t.Fatalf("checksum-valid evaluation with mismatched evidence reached runtime loader: %v", err)
+	}
+}
+
 func TestM11RegistryLoaderRejectsRecoveryAdmissionWithoutRecordedApproval(t *testing.T) {
 	dir := t.TempDir()
 	lease := corem11.ProductionLease{LeaseID: "admission-lease", LeaseVersion: "v1", PolicyVersion: "policy-v1", ApprovalRef: "admission-approval", ReviewedBy: "human", ReviewerID: "reviewer", ReviewedAt: "2026-09-08T00:00:00Z", PromotionReviewRef: "review", SourceCanaryGrantID: "canary", SourceCanaryGrantVersion: "v1", SourceCanaryGrantHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ValidFrom: "2026-09-08T00:00:00Z", ExpiresAt: "2099-09-08T00:00:00Z", AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: "admission-correlation", HashVersion: "go-json-v1"}

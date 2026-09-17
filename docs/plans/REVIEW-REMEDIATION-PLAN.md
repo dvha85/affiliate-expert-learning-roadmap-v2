@@ -80,6 +80,18 @@ graph integrity offline/read-only; không đóng ledger durability, power-loss,
 atomic multi-file, distributed locking, provider, live executor, business
 outcome, pilot hay deployment.
 
+**Cập nhật M11 fixture-evaluation evidence cardinality (2026-09-17):** vì
+`ProductionOutcomeEvaluation` chỉ là đánh giá offline cho fixture, graph
+validator nay yêu cầu `EvidenceIDs` có đúng một phần tử và phần tử đó phải là
+`OutcomeID`; schema boundary đã chặn mảng rỗng, còn graph guard chặn payload
+schema/checksum hợp lệ có nhiều ID hoặc trỏ sang evidence khác trước
+`m11-resolve`/runtime loader. Regression core và learner loader thật tạo rồi
+rewrite payload checksum-valid có evidence lệch và đều yêu cầu fail closed.
+Phạm vi chỉ là liên kết graph local có thể nghiệm thu; không nâng
+`NOT_READY_FOR_PRODUCTION`, không chứng minh live executor, provider, business
+outcome, pilot, deployment, distributed locking, power-loss hay atomic
+multi-file. Marker: `Cập nhật M11 fixture-evaluation evidence cardinality`.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
