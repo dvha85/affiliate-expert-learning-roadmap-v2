@@ -416,6 +416,17 @@ offline/read-only cho lineage của authorization, không phải proof ledger,
 executor/provider, business outcome, crash/power-loss, atomic multi-file,
 distributed locking, pilot hoặc deployment.
 
+**Cập nhật M11 correlation lineage (2026-09-17):**
+`core/m11` coi `ProductionLease.CorrelationID` là correlation root của M11.
+Graph registry không nhận cost bound checksum-valid nhưng thuộc correlation
+khác, cũng không nhận authorization hoặc execution/cycle record mang
+correlation không khớp với lease. Shared historical-chain validator áp dụng
+cùng invariant cho cả `resolved_stop` và `closed_cycle`; learner registry
+loader và mission-runtime `m11-chain-check` đều chạy đúng các guard này trên
+fixture thật. Đây là bằng chứng offline/read-only cho lineage, không phải proof
+provider, live executor, business outcome, crash/power-loss, atomic multi-file,
+distributed locking, pilot hoặc deployment.
+
 **Cập nhật RP-08 M11 authorization lineage mutation proof (2026-09-16):**
 CI có mutation runner tạo bản sao disposable của `core/m11`, tháo toàn bộ
 enforcement nối authorization với đúng artifact mà gate đã đánh giá, rồi chạy

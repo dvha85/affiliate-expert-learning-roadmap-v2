@@ -126,7 +126,7 @@ func TestM11ChainMutations(t *testing.T) {
 		{"approval", "source_canary_grant_id", "other", "BROKEN_LINK"}, {"approval", "reviewer_id", "other", "BROKEN_LINK"},
 		{"approval", "validated_risk_classes", []string{"RISK1"}, "SCOPE_NOT_DELEGATED"},
 		{"activation", "lease_id", "other", "BROKEN_LINK"}, {"activation", "activated_at", "2026-09-03T08:10:00Z", "INVALID_TIME_BINDING"},
-		{"gate", "health_snapshot_id", "other", "BROKEN_LINK"}, {"authorization", "production_cost_bound_minor", 101, "BROKEN_LINK"}, {"execution", "idempotency_key", "other", "BROKEN_LINK"},
+		{"gate", "health_snapshot_id", "other", "BROKEN_LINK"}, {"authorization", "production_cost_bound_minor", 101, "BROKEN_LINK"}, {"execution", "idempotency_key", "other", "BROKEN_LINK"}, {"execution", "correlation_id", "other", "BROKEN_LINK"},
 		{"authorization", "execution_mode", "GOVERNED_CANARY", "INVALID_SCHEMA"},
 		{"pre_ledger", "control_mode", "STOPPED", "SAFETY_BLOCKED"}, {"pre_ledger", "reconciliation_required", true, "SAFETY_BLOCKED"},
 		{"gate", "executions_total_before", 1, "LEDGER_SNAPSHOT_MISMATCH"}, {"post_ledger", "executions_total", 0, "INVALID_LEDGER"},
