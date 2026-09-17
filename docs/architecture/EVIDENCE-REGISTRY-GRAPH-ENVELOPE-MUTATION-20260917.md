@@ -27,5 +27,10 @@ python scripts/mutate_registry_graph_envelope_integrity.py
 ```
 
 The current Windows worktree has no `go.exe`, so the mutation command cannot
-be claimed PASS locally. It is wired to the required Ubuntu Curriculum CI
-job; no remote PASS is claimed until that workflow runs on this head.
+be claimed PASS locally. PR #412 head
+`9b9f01d21dec22c0b7e85f57b4b7846085086747` completed the Ubuntu Curriculum CI
+run `35239183309` and Mission Agent Path CI run `35239183371`; all 12 required
+remote checks passed, including the learner race and this mutation proof. The
+PR remains open pending independent review; this remote CI result is still
+bounded fixture/read-only evidence and does not change
+`NOT_READY_FOR_PRODUCTION`.
