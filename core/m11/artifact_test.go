@@ -45,6 +45,7 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	canonicalEntries := append([]ArtifactEntry(nil), entries...)
 	// A checksum-valid cost bound from another correlation lineage must not be
 	// made admissible merely by updating the gate's copied cost hash and
 	// recomputing its derived gate ID. The lease is the M11 correlation root.
@@ -476,7 +477,7 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
 		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
 	} {
-		forgedEnvelopeEntries := append([]ArtifactEntry(nil), entries...)
+		forgedEnvelopeEntries := append([]ArtifactEntry(nil), canonicalEntries...)
 		mutate(&forgedEnvelopeEntries[0])
 		if err := ValidateArtifactGraph(forgedEnvelopeEntries); err == nil {
 			t.Fatalf("graph accepted a forged M11 registry %s", name)
