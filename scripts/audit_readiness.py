@@ -938,6 +938,24 @@ def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
         fail("M11 recovery-admission approval regression is missing")
 
 
+def audit_m11_recovery_admission_field_integrity(root, matrix, plan_text):
+    """Keep whitespace-only recovery handoff fields out of the canonical decoder."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-recovery-admission-field-integrity-20260917")
+    if not isinstance(record, dict) or "whitespace-only" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 recovery-admission field-integrity acceptance")
+    if "Cập nhật M11 recovery-admission field integrity" not in plan_text:
+        fail("M11 recovery-admission field integrity lacks a scoped plan marker")
+    validator_path = root / "core/m11/artifact.go"
+    test_path = root / "core/m11/artifact_test.go"
+    validator = validator_path.read_text(encoding="utf-8") if validator_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_validator = ("recoveryFields := []string", "anyBlank(recoveryFields)")
+    required_test = ("blank recovery admission", '"resolution":')
+    if any(marker not in validator for marker in required_validator) or any(marker not in test for marker in required_test):
+        fail("M11 recovery-admission field-integrity regression is missing")
+
+
 def audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text):
     """Keep authorization evidence bound to the gate's exact artifacts."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -2028,6 +2046,7 @@ def audit(root):
     audit_m11_post_remove_journal_cleanup_ack(root, matrix, plan_text)
     audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
+    audit_m11_recovery_admission_field_integrity(root, matrix, plan_text)
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
     audit_m11_correlation_lineage(root, matrix, plan_text)
     audit_m11_reverse_ledger_graph(root, matrix, plan_text)

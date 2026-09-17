@@ -618,4 +618,27 @@ func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing
 	if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
 		t.Fatal("prior approval reuse was accepted")
 	}
+	for name, clear := range map[string]func(*ProductionRecoveryAdmission){
+		"admission id":       func(value *ProductionRecoveryAdmission) { value.RecoveryAdmissionID = " " },
+		"prior runtime":      func(value *ProductionRecoveryAdmission) { value.PriorRuntimeDir = " " },
+		"prior lease id":     func(value *ProductionRecoveryAdmission) { value.PriorLeaseID = " " },
+		"prior lease version": func(value *ProductionRecoveryAdmission) { value.PriorLeaseVersion = " " },
+		"prior lease hash":   func(value *ProductionRecoveryAdmission) { value.PriorLeaseHash = " " },
+		"prior approval":     func(value *ProductionRecoveryAdmission) { value.PriorApprovalID = " " },
+		"resolution":         func(value *ProductionRecoveryAdmission) { value.ResolutionID = " " },
+		"new runtime id":     func(value *ProductionRecoveryAdmission) { value.NewRuntimeID = " " },
+		"new runtime":        func(value *ProductionRecoveryAdmission) { value.NewRuntimeDir = " " },
+		"new lease id":       func(value *ProductionRecoveryAdmission) { value.NewLeaseID = " " },
+		"new lease version":  func(value *ProductionRecoveryAdmission) { value.NewLeaseVersion = " " },
+		"new lease hash":     func(value *ProductionRecoveryAdmission) { value.NewLeaseHash = " " },
+		"new approval":       func(value *ProductionRecoveryAdmission) { value.NewApprovalID = " " },
+		"reviewer":           func(value *ProductionRecoveryAdmission) { value.ReviewerID = " " },
+	} {
+		candidate := valid
+		clear(&candidate)
+		raw, _ := json.Marshal(candidate)
+		if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
+			t.Fatalf("blank recovery admission %s was accepted", name)
+		}
+	}
 }

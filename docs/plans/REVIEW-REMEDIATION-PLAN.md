@@ -114,6 +114,16 @@ distributed locking, provider, live executor, business outcome, pilot hay
 deployment; readiness vẫn `NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật RP-08
 registry graph envelope mutation proof`.
 
+**Cập nhật M11 recovery-admission field integrity (2026-09-17):** canonical
+decoder reject các field identity/lineage chỉ chứa whitespace trong
+`PRODUCTION_RECOVERY_ADMISSION`, vì JSON Schema `minLength:1` chưa loại được
+giá trị rỗng về nghĩa. Regression core thử từng field bắt buộc và yêu cầu reject
+trước graph/runtime use; learner vẫn giữ kiểm stopped-runtime, human resolution
+và new-lease riêng. Đây là input integrity offline/read-only, không đóng
+cross-runtime atomicity, power-loss, distributed locking, provider, live
+executor, business outcome, pilot hay deployment; readiness vẫn
+`NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật M11 recovery-admission field integrity`.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
