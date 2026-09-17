@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-17 -->
-<!-- readiness-main-baseline: 7eacb661d2083d97b42ea31207a3e677705d7fea -->
+<!-- readiness-main-baseline: c6debee4b1ef82626eb3e22469886b1f55b45e54 -->
 
 > Reconcile 17/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -30,6 +30,18 @@ artifact không chạy local. Record:
 là evidence fixture/read-only, không đóng provider, live executor, business
 outcome, pilot, deployment, distributed locking hay power-loss/atomic
 multi-file proof.
+
+**Baseline sync after PR #408 (2026-09-17):** PR #408 đã squash-merge vào
+`main` tại `c6debee4b1ef82626eb3e22469886b1f55b45e54`, đưa RP-01 registry
+append parent guard vào baseline. Head trước merge `4360858b0d3c04620838fcd94cfd7df8f0f2e287`
+đã PASS cả 12 remote PR checks trong runs `35202587298` và
+`35202587341`, gồm Go race/vet, learner shards, offline smokes, mission
+runtime và Node 24/n8n engine. Worktree này không có Go executable nên không
+ghi local Go PASS; Python audit/structural checks được chạy riêng trong
+evidence. Tracker vẫn `NOT_READY_FOR_PRODUCTION`; sync này không đóng
+provider, live executor, business outcome, clean-machine pilot, deployment,
+distributed locking hay power-loss/atomic multi-file proof. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md`.
 
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
@@ -2887,7 +2899,8 @@ preflight → open bị từ chối trước khi registry rơi vào external tre
 Windows/OS khác giữ preflight + `O_EXCL` và không claim parity native. Hai
 regression M10/M11 gọi đúng register path và kiểm external sentinel/registry
 không bị ghi. Worktree hiện thiếu Go executable nên chưa có local Go test/vet;
-CI `go test -race ./...` là gate nghiệm thu tiếp theo. Đây là hardening
-pathname offline có phạm vi hẹp, không phải proof writer không hợp tác ngoài
+remote CI `go test -race ./...` trên head trước merge đã PASS trong 12 PR
+checks. Đây là hardening pathname offline có phạm vi hẹp, không phải proof
+writer không hợp tác ngoài
 seam, power-loss, atomic multi-file, distributed locking, provider, business
 outcome, pilot hoặc deployment. Marker: `Cập nhật RP-01 registry append parent openat guard`.
