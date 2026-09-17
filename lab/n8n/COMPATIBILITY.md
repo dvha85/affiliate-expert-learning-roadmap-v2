@@ -86,19 +86,19 @@ là fixture read-only, không phải vận hành Schedule Trigger trên deployme
 
 Kết quả smoke chỉ là **integration evidence (bằng chứng tích hợp)**, tự nó không phải Reality/Operated evidence. Không commit production credential, write scope hay secret vào blueprint hoặc repo này.
 
-## M07 raw JSON transport boundary — 2026-09-17
+## Ranh giới truyền JSON nguyên dạng của M07 — 2026-09-17
 
-The M07 disposable runner sends the adapter-owned tool result through
-tool_result_text instead of parsing it into a JavaScript object. The checked-in
-blueprint passes model output through the string-only Require Raw Model JSON Text
-node and sends model_output_text to the shared adapter. The learner adapter
-rejects a request that supplies both raw text and an object.
+Runner disposable của M07 gửi kết quả tool do adapter sở hữu qua
+`tool_result_text`, thay vì parse thành object JavaScript. Blueprint trong repo
+truyền output của model qua node chỉ nhận chuỗi `Require Raw Model JSON Text`,
+sau đó gửi `model_output_text` tới adapter dùng chung. Adapter của learner từ
+chối request đồng thời cung cấp cả raw text và object.
 
-The regression fixture includes 9007199254740993 and checks the tool sidecar,
-model output, proposal bytes, restart and revalidation; 9007199254740992 is
-treated as evidence of rounding and fails the test. The current worktree has no
-Node or n8n executable, so this change is not recorded as a local engine PASS.
-CI must continue to install n8n 2.38.1 with Node 24 before this path is accepted.
-This boundary is synthetic/read-only/loopback evidence and does not establish
-provider, selected-source, business-outcome, live-executor, pilot or deployment
+Fixture regression có số `9007199254740993` và kiểm tra sidecar tool, output
+model, bytes của proposal, restart và revalidation; `9007199254740992` được xem
+là dấu hiệu làm tròn và phải làm test fail. Worktree hiện không có executable
+Node hoặc n8n, nên thay đổi này chưa được ghi nhận là local engine PASS. CI vẫn
+phải cài n8n 2.38.1 cùng Node 24 trước khi chấp nhận đường chạy này. Ranh giới
+này chỉ là bằng chứng synthetic/read-only/loopback; không chứng minh provider,
+selected-source, business outcome, live executor, pilot hoặc deployment
 readiness.
