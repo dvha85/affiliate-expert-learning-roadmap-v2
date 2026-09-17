@@ -51,7 +51,7 @@ func openStableRegularFileForAppendPath(path string, newFile bool) (*os.File, er
 
 	flags := unix.O_WRONLY | unix.O_APPEND | unix.O_CLOEXEC | unix.O_NOFOLLOW
 	if newFile {
-		flags |= unix.O_CREATE | unix.O_EXCL
+		flags |= unix.O_CREAT | unix.O_EXCL
 	}
 	fd, err := unix.Openat(int(parent.Fd()), name, flags, 0600)
 	if err != nil {
