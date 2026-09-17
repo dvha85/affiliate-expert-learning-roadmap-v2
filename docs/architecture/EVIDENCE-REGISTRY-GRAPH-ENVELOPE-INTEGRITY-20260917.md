@@ -36,4 +36,8 @@ go test -race ./...
 
 The current Windows worktree has no `go.exe`, so local Go test/vet execution
 is unavailable. The Python baseline suite and readiness audit remain local
-checks; no Go PASS is claimed until CI runs on the pushed head.
+checks; no local Go PASS is claimed. The merged PR #412 acceptance runs
+`35241923424` and `35241923430` completed with all 12 checks successful on
+commit `e197f854a9f396bbe1136004b792b2699dc647e6`; this remains bounded
+repository regression evidence. See
+`EVIDENCE-PR412-POST-MERGE-20260917.md` for the exact run record.

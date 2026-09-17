@@ -1998,6 +1998,47 @@ def audit_registry_graph_envelope_mutation(root, matrix, plan_text):
         fail("registry graph envelope mutation proof is missing or not wired to CI")
 
 
+def audit_post_merge_pr412(root, matrix, plan_text):
+    """Keep post-merge PR #412 CI evidence tied to the readiness snapshot."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-09-post-412-merge-ci-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks post-merge PR #412 acceptance evidence")
+    required_refs = {
+        "docs/plans/REVIEW-REMEDIATION-PLAN.md",
+        "docs/plans/READINESS-MATRIX.json",
+        "docs/plans/READINESS-EVIDENCE-GRAPH.json",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        ".github/workflows/mission-agent-path-ci.yml",
+        "docs/architecture/EVIDENCE-PR412-POST-MERGE-20260917.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("post-merge PR #412 record lacks plan, audit, CI or evidence refs")
+    scope = record.get("scope")
+    required_scope = (
+        "PR #412",
+        "e197f854a9f396bbe1136004b792b2699dc647e6",
+        "f3e5a213e5b142d23961443c3af9097ae3e5456e",
+        "35241923424",
+        "35241923430",
+        "12 completed successful checks",
+        "NOT_READY_FOR_PRODUCTION",
+    )
+    if not isinstance(scope, str) or any(marker not in scope for marker in required_scope):
+        fail("post-merge PR #412 record lacks exact merge/CI/readiness scope")
+    marker = "Post-merge PR #412 acceptance evidence"
+    if marker not in plan_text:
+        fail("post-merge PR #412 evidence lacks a scoped plan marker")
+    evidence = root / "docs/architecture/EVIDENCE-PR412-POST-MERGE-20260917.md"
+    evidence_text = evidence.read_text(encoding="utf-8") if evidence.is_file() else ""
+    for required in ("e197f854a9f396bbe1136004b792b2699dc647e6", "35241923424", "35241923430", "12 completed successful checks", "NOT_READY_FOR_PRODUCTION", "no `go.exe`"):
+        if required not in evidence_text:
+            fail("post-merge PR #412 evidence document is incomplete")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -2076,6 +2117,7 @@ def audit(root):
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
     audit_registry_graph_envelope_integrity(root, matrix, plan_text)
+    audit_post_merge_pr412(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)

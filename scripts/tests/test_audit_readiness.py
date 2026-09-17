@@ -88,6 +88,9 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        evidence_post_merge = self.root / "docs/architecture/EVIDENCE-PR412-POST-MERGE-20260917.md"
+        evidence_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR412-POST-MERGE-20260917.md", evidence_post_merge)
         matrix = json.loads((ROOT / "docs/plans/READINESS-MATRIX.json").read_text(encoding="utf-8"))
         for item in matrix["criteria"]:
             for field in ("implementation_refs", "test_refs"):
@@ -131,6 +134,13 @@ class ReadinessAuditTests(unittest.TestCase):
         graph_body = graph_body.replace("entry.ContentHash != expected.ContentHash", "registry graph envelope guard removed", 1)
         source.write_text(graph_prefix + "func ValidateArtifactGraph" + graph_body, encoding="utf-8")
         self.assertIn("registry graph envelope-integrity guard is missing", self.run_audit(False))
+
+    def test_missing_post_merge_pr412_evidence_is_rejected(self):
+        matrix_path = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        matrix["recent_updates"] = [entry for entry in matrix["recent_updates"] if entry.get("id") != "RP-09-post-412-merge-ci-20260917"]
+        matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
+        self.assertIn("post-merge PR #412 acceptance evidence", self.run_audit(False))
 
     def test_snapshot_mismatch_is_rejected(self):
         graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"

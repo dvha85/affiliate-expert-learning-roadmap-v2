@@ -2910,6 +2910,18 @@ clean-machine pilot, target deployment, distributed-lock hoặc power-loss proof
 - Deployment drill trên target được cấp quyền: build/start/health/status/logs/stop, resource limits, backup/restore, restart/expiry/STOP, human-reviewed recovery. Không suy power-loss/24×7 proof từ smoke local vài giây.
 - Ghi riêng operated evidence và business evidence; chưa chọn affiliate platform/channel hoặc live executor thì để phần đó OPEN, không chặn sửa offline đã được xác định.
 
+**Post-merge PR #412 acceptance evidence (2026-09-17):** PR #412 đã được merge
+vào `main` tại `e197f854a9f396bbe1136004b792b2699dc647e6`, từ head
+`f3e5a213e5b142d23961443c3af9097ae3e5456e`. Hai workflow hậu-merge
+`35241923424` (Curriculum CI) và `35241923430` (Mission Agent Path CI) đều
+hoàn tất thành công với 12/12 check-runs PASS, bao gồm learner race, mutation,
+backup/restore và Node 24/n8n. Local Windows chạy lại 132 Python audit tests,
+readiness audit, parse JSON và `git diff --check` đều PASS; không có `go.exe`
+hoặc n8n CLI nên không claim Go/n8n local. Đây chỉ là regression evidence sau
+merge, không phải provider, live executor, business outcome, clean-machine
+pilot, target deployment, distributed locking, power-loss hay atomic multi-file
+proof; readiness vẫn `NOT_READY_FOR_PRODUCTION`. Marker: `Post-merge PR #412 acceptance evidence`.
+
 ## 5. Cách kiểm và giao việc cho từng PR
 
 Các lệnh baseline dưới đây là lệnh đã có trong repo; các negative cases trong từng RP là công việc bổ sung. Chạy từ repo root; dùng Go theo `go.mod`, Python theo CI, quyền loopback cho tests liên quan. Không cần provider credential cho offline suite.
