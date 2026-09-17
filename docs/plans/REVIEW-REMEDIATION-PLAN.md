@@ -2876,3 +2876,18 @@ writer có lock replay đúng journal, giữ nguyên STOP state/marker, xóa jou
 synthetic/read-only cho direct STOP replay, không phải power-loss, atomic
 multi-file, distributed-lock, live-executor, provider, business-outcome, pilot
 hay deployment proof. Marker: `Cập nhật M11 direct STOP process-kill recovery`.
+
+**Cập nhật RP-01 registry append parent openat guard (2026-09-17):** M10 và
+M11 append-only registry không còn mở pathname trực tiếp ở lần tạo entry đầu
+tiên. Trên POSIX, helper mở toàn bộ parent bằng descriptor với
+`O_DIRECTORY|O_NOFOLLOW`, gọi hook regression sau khi parent đã được pin,
+kiểm parent name vẫn cùng inode rồi mới `openat` entry cuối với
+`O_NOFOLLOW|O_EXCL` khi cần. Vì vậy parent bị đổi sang symlink trong khoảng
+preflight → open bị từ chối trước khi registry rơi vào external tree; fallback
+Windows/OS khác giữ preflight + `O_EXCL` và không claim parity native. Hai
+regression M10/M11 gọi đúng register path và kiểm external sentinel/registry
+không bị ghi. Worktree hiện thiếu Go executable nên chưa có local Go test/vet;
+CI `go test -race ./...` là gate nghiệm thu tiếp theo. Đây là hardening
+pathname offline có phạm vi hẹp, không phải proof writer không hợp tác ngoài
+seam, power-loss, atomic multi-file, distributed locking, provider, business
+outcome, pilot hoặc deployment. Marker: `Cập nhật RP-01 registry append parent openat guard`.
