@@ -85,3 +85,20 @@ là fixture read-only, không phải vận hành Schedule Trigger trên deployme
 4. Khi upgrade engine, lặp lại import và execution smoke. Bất kỳ thay đổi hành vi nào ở HTTP Request Tool, AI Agent, credential scope, static-data behavior hoặc node migration đều chặn activation cho tới khi ledger này được review lại.
 
 Kết quả smoke chỉ là **integration evidence (bằng chứng tích hợp)**, tự nó không phải Reality/Operated evidence. Không commit production credential, write scope hay secret vào blueprint hoặc repo này.
+
+## Ranh giới truyền JSON nguyên dạng của M07 — 2026-09-17
+
+Runner disposable của M07 gửi kết quả tool do adapter sở hữu qua
+`tool_result_text`, thay vì parse thành object JavaScript. Blueprint trong repo
+truyền output của model qua node chỉ nhận chuỗi `Require Raw Model JSON Text`,
+sau đó gửi `model_output_text` tới adapter dùng chung. Adapter của learner từ
+chối request đồng thời cung cấp cả raw text và object.
+
+Fixture regression có số `9007199254740993` và kiểm tra sidecar tool, output
+model, bytes của proposal, restart và revalidation; `9007199254740992` được xem
+là dấu hiệu làm tròn và phải làm test fail. Worktree hiện không có executable
+Node hoặc n8n, nên thay đổi này chưa được ghi nhận là local engine PASS. CI vẫn
+phải cài n8n 2.38.1 cùng Node 24 trước khi chấp nhận đường chạy này. Ranh giới
+này chỉ là bằng chứng synthetic/read-only/loopback; không chứng minh provider,
+selected-source, business outcome, live executor, pilot hoặc deployment
+readiness.

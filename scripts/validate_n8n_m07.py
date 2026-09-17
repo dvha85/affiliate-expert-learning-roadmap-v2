@@ -13,6 +13,7 @@ required = {
     "Canonical M07 Context Adapter",
     "Require Canonical M07 Context",
     "Read-only Evidence Agent",
+    "Require Raw Model JSON Text",
     "Validate Grounding Adapter",
     "Require Grounded Proposal",
     "Persist Agent Proposal Adapter",
@@ -85,7 +86,8 @@ expected = [
     ("Require Registered Tool ACK", "Canonical M07 Context Adapter"),
     ("Canonical M07 Context Adapter", "Require Canonical M07 Context"),
     ("Require Canonical M07 Context", "Read-only Evidence Agent"),
-    ("Read-only Evidence Agent", "Validate Grounding Adapter"),
+    ("Read-only Evidence Agent", "Require Raw Model JSON Text"),
+    ("Require Raw Model JSON Text", "Validate Grounding Adapter"),
     ("Validate Grounding Adapter", "Require Grounded Proposal"),
     ("Require Grounded Proposal", "Persist Agent Proposal Adapter"),
     ("Persist Agent Proposal Adapter", "Require Persisted Agent Proposal ACK"),
@@ -95,6 +97,11 @@ for source, target in expected:
     destinations = {item["node"] for branch in connections.get(source, {}).get("main", []) for item in branch}
     if target not in destinations:
         raise SystemExit(f"missing M07 adapter flow {source} -> {target}")
+
+raw_model = nodes["Require Raw Model JSON Text"]["parameters"].get("jsCode", "")
+for marker in ("MODEL_OUTPUT_MUST_BE_RAW_JSON_TEXT", "typeof $json.output==='string'", "typeof $json.text==='string'"):
+    if marker not in raw_model:
+        raise SystemExit(f"raw M07 model-output transport guard is missing: {marker}")
 
 agent_text = nodes["Read-only Evidence Agent"]["parameters"].get("text", "")
 if "artifact_raw_json" not in agent_text or "evidence_raw_json" not in agent_text or "JSON.stringify" in agent_text:

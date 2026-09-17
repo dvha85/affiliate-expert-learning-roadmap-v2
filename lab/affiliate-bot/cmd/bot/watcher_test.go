@@ -537,7 +537,8 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 		t.Fatal("write request passed adapter preflight")
 	}
 	tool := corem07.ToolResult{RecordID: record.RecordID, ToolCall: corem07.ToolRequest{ToolName: "public_http", Method: "GET", Target: "https://example.com/a"}, StatusCode: 200, ReceivedAt: "2026-09-03T00:01:00Z", Body: json.RawMessage(`{"amount":9007199254740993}`)}
-	registered := call("/v1/m07/register-tool-result", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolResult: mustRawJSON(t, tool)})
+	toolRaw := mustRawJSON(t, tool)
+	registered := call("/v1/m07/register-tool-result", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolResultText: string(toolRaw)})
 	if registered.Code != http.StatusOK {
 		t.Fatal(registered.Code, registered.Body.String())
 	}
@@ -554,7 +555,11 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	}
 	claim := corem07.Claim{FieldOrClaim: registration.Evidence.FieldOrClaim, Value: json.RawMessage(`{"amount":9007199254740993}`), EvidenceIDs: []string{registration.Evidence.EvidenceID}}
 	claim.Text = corem07.RenderGroundedAnswer([]corem07.Claim{claim})
-	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: corem07.RenderGroundedAnswer([]corem07.Claim{claim}), Claims: []corem07.Claim{claim}, EvidenceIDs: []string{registration.Evidence.EvidenceID}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{}`)}}
+	model := corem07.AgentOutput{State: "HUMAN_REVIEW", Answer: corem07.RenderGroundedAnswer([]corem07.Claim{claim}), Claims: []corem07.Claim{claim}, EvidenceIDs: []string{registration.Evidence.EvidenceID}, ToolCalls: []corem07.ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &corem07.ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
+	ambiguous := call("/v1/m07/register-tool-result", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ToolResult: toolRaw, ToolResultText: string(toolRaw)})
+	if ambiguous.Code == http.StatusOK || !strings.Contains(ambiguous.Body.String(), `"status":"TOOL_RESULT_AMBIGUOUS"`) {
+		t.Fatalf("adapter accepted ambiguous raw/object tool result transport: status=%d body=%s", ambiguous.Code, ambiguous.Body.String())
+	}
 	valid := call("/v1/m07/validate", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutputText: string(mustRawJSON(t, model)), ToolResultID: registration.ArtifactID})
 	if valid.Code != http.StatusOK {
 		t.Fatal(valid.Code, valid.Body.String())
@@ -578,6 +583,9 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	beforeProposal, err := os.ReadFile(proposalPath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Contains(beforeProposal, []byte("9007199254740993")) {
+		t.Fatalf("proposal persistence rounded raw model JSON: %s", beforeProposal)
 	}
 	model.Answer = "guaranteed profit"
 	rejectedProposal := call("/v1/m07/register-proposal", m07AdapterRequest{RecordID: record.RecordID, Registry: registry, ModelOutput: mustRawJSON(t, model), ToolResultID: registration.ArtifactID})
