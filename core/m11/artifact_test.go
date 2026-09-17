@@ -478,6 +478,13 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(forgedOutcomeEntries); err == nil {
 		t.Fatal("ledger outcome link to an orphan execution was accepted")
 	}
+	forgedOutcomeIDLedger := completedLedger
+	forgedOutcomeIDLedger.OutcomeLinks = []ProductionOutcomeLink{{OutcomeID: "different-outcome", ExecutionID: execution.ExecutionID, ObservedAt: "2026-09-08T00:00:02Z"}}
+	forgedOutcomeIDEntries := append([]ArtifactEntry(nil), entries...)
+	forgedOutcomeIDEntries = append(forgedOutcomeIDEntries, m11Entry(t, ArtifactKindLedger, forgedOutcomeIDLedger))
+	if err := ValidateArtifactGraph(forgedOutcomeIDEntries); err == nil {
+		t.Fatal("ledger outcome link with a swapped outcome ID was accepted")
+	}
 	erasedOutcomeLedger := completedLedger
 	erasedOutcomeLedger.OutcomeLinks = []ProductionOutcomeLink{}
 	erasedOutcomeLedger.UpdatedAt = "2026-09-08T00:00:03Z"
@@ -485,6 +492,33 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	erasedOutcomeEntries = append(erasedOutcomeEntries, m11Entry(t, ArtifactKindLedger, completedLedger), m11Entry(t, ArtifactKindLedger, erasedOutcomeLedger))
 	if err := ValidateArtifactGraph(erasedOutcomeEntries); err == nil {
 		t.Fatal("later ledger erased an immutable outcome link")
+	}
+
+	unknownLedger := unknownReservationLedger
+	unknownLedger.ControlMode, unknownLedger.StopReason, unknownLedger.ReconciliationRequired = "STOPPED", "RECOVERY_REVIEW_REQUIRED", false
+	unknownLedger.UpdatedAt = "2026-09-08T00:00:03Z"
+	unknownLedger.ReconciliationResolutionIDs = []string{resolution.ResolutionID}
+	unknownEntries := append([]ArtifactEntry(nil), entries[:10]...)
+	unknownEntries[9] = m11Entry(t, ArtifactKindExecution, unknownExecution)
+	unknownEntries = append(unknownEntries, m11Entry(t, ArtifactKindReconciliation, resolution), m11Entry(t, ArtifactKindLedger, unknownLedger))
+	if err := ValidateArtifactGraph(unknownEntries); err != nil {
+		t.Fatalf("valid ledger-to-reconciliation reverse link rejected: %v", err)
+	}
+	danglingResolutionLedger := unknownLedger
+	danglingResolutionLedger.ReconciliationResolutionIDs = []string{"missing-resolution"}
+	danglingResolutionEntries := append([]ArtifactEntry(nil), unknownEntries...)
+	danglingResolutionEntries[len(danglingResolutionEntries)-1] = m11Entry(t, ArtifactKindLedger, danglingResolutionLedger)
+	if err := ValidateArtifactGraph(danglingResolutionEntries); err == nil {
+		t.Fatal("ledger with an orphan reconciliation resolution link was accepted")
+	}
+	duplicateResolutionLedger := unknownLedger
+	duplicateResolutionLedger.ReconciliationResolutionIDs = []string{resolution.ResolutionID, resolution.ResolutionID}
+	duplicateRaw, err := json.Marshal(duplicateResolutionLedger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeArtifact("ledger", duplicateRaw); status == Valid {
+		t.Fatal("ledger with duplicate reconciliation resolution IDs was accepted")
 	}
 
 	admission := ProductionRecoveryAdmission{RecoveryAdmissionID: "admission-1", PriorRuntimeDir: "/runtime/old", PriorLeaseID: "lease-old", PriorLeaseVersion: "v1", PriorLeaseHash: lease.SourceCanaryGrantHash, PriorApprovalID: "approval-old", ResolutionID: "resolution-old", NewRuntimeID: "runtime-new", NewRuntimeDir: "/runtime/new", NewLeaseID: lease.LeaseID, NewLeaseVersion: lease.LeaseVersion, NewLeaseHash: lease.LeaseHash, NewApprovalID: approval.ApprovalID, ReviewedBy: "human", ReviewerID: "reviewer-new", ReviewedAt: "2026-09-08T00:00:01Z", ExecutionPermitted: false}

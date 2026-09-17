@@ -478,6 +478,13 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 			}
 			outcomes[link.OutcomeID], executions[link.ExecutionID] = true, true
 		}
+		resolutionIDs := map[string]bool{}
+		for _, id := range x.ReconciliationResolutionIDs {
+			if id == "" || resolutionIDs[id] {
+				return nil, "INVALID_LEDGER"
+			}
+			resolutionIDs[id] = true
+		}
 		for _, id := range x.PendingExecutionIDs {
 			if executions[id] {
 				return nil, "INVALID_LEDGER"

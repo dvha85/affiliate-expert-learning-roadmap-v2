@@ -68,6 +68,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_correlation = self.root / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md"
         evidence_correlation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md", evidence_correlation)
+        evidence_reverse_ledger = self.root / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md"
+        evidence_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md", evidence_reverse_ledger)
         lineage_mutation = self.root / "scripts/mutate_m11_authorization_lineage.py"
         lineage_mutation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_authorization_lineage.py", lineage_mutation)
@@ -216,6 +219,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("bound.CorrelationID != lease.CorrelationID", "correlation lineage guard removed", 1), encoding="utf-8")
         self.assertIn("M11 correlation-lineage regression is missing", self.run_audit(False))
+
+    def test_missing_m11_reverse_ledger_graph_guard_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("production ledger reconciliation link is orphaned or mismatched", "reverse ledger graph guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 reverse-ledger graph regression is missing", self.run_audit(False))
 
     def test_missing_m11_manual_stop_process_kill_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go"

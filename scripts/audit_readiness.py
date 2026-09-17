@@ -1012,6 +1012,74 @@ def audit_m11_correlation_lineage(root, matrix, plan_text):
         fail("M11 correlation-lineage regression is missing")
 
 
+def audit_m11_reverse_ledger_graph(root, matrix, plan_text):
+    """Keep ledger reconciliation and outcome links resolvable in both directions."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-reverse-ledger-graph-guards-20260917")
+    required_scope = ("reverse-resolves", "ReconciliationResolutionIDs", "STOPPED", "OutcomeID", "checksum-valid")
+    if not isinstance(record, dict) or any(token not in record.get("scope", "") for token in required_scope):
+        fail("matrix lacks scoped M11 reverse-ledger graph acceptance")
+    if "Cập nhật M11 reverse-link ledger graph guard" not in plan_text:
+        fail("M11 reverse-ledger graph lacks a scoped plan marker")
+    registry_path = root / "core/m11/artifact_registry.go"
+    artifact_path = root / "core/m11/artifact.go"
+    artifact_test_path = root / "core/m11/artifact_test.go"
+    loader_test_path = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    evidence_path = root / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md"
+    registry = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
+    artifact = artifact_path.read_text(encoding="utf-8") if artifact_path.is_file() else ""
+    artifact_test = artifact_test_path.read_text(encoding="utf-8") if artifact_test_path.is_file() else ""
+    loader_test = loader_test_path.read_text(encoding="utf-8") if loader_test_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_registry = (
+        "resolutionsByID := map[string]ProductionReconciliationResolution{}",
+        "production ledger reconciliation link is orphaned or mismatched",
+        "production ledger outcome link does not match its evaluation",
+    )
+    required_artifact = (
+        "resolutionIDs := map[string]bool{}",
+        'if id == "" || resolutionIDs[id] {',
+    )
+    required_tests = (
+        "valid ledger-to-reconciliation reverse link rejected",
+        "orphan reconciliation resolution link was accepted",
+        "ledger outcome link with a swapped outcome ID was accepted",
+        "duplicate reconciliation resolution IDs was accepted",
+    )
+    required_loader = (
+        "TestM11RegistryLoaderRejectsOrphanReconciliationLedgerLink",
+        "schema-valid orphan reconciliation link reached runtime loader",
+    )
+    if (
+        any(marker not in registry for marker in required_registry)
+        or any(marker not in artifact for marker in required_artifact)
+        or any(marker not in artifact_test for marker in required_tests)
+        or any(marker not in loader_test for marker in required_loader)
+        or "## Verification" not in evidence
+        or "NOT_READY_FOR_PRODUCTION" not in evidence
+    ):
+        fail("M11 reverse-ledger graph regression is missing")
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    required_refs = {
+        "core/m11/artifact.go",
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md",
+    }
+    if required_refs - refs:
+        fail("M11 reverse-ledger graph acceptance lacks implementation, test, audit, evidence or CI refs")
+    graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+    graph = json.loads(graph_path.read_text(encoding="utf-8")) if graph_path.is_file() else {}
+    br17 = next((item for item in graph.get("criteria", []) if item.get("criterion_id") == "BR-17"), {})
+    claims = br17.get("claims", []) if isinstance(br17, dict) else []
+    if not any(claim.get("id") == "BR-17-test-m11-reverse-ledger-graph-20260917" for claim in claims if isinstance(claim, dict)):
+        fail("M11 reverse-ledger graph evidence claim is missing")
+
+
 def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):
     """Require CI mutation coverage for the exact authorization lineage guard."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1854,6 +1922,7 @@ def audit(root):
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
     audit_m11_correlation_lineage(root, matrix, plan_text)
+    audit_m11_reverse_ledger_graph(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)

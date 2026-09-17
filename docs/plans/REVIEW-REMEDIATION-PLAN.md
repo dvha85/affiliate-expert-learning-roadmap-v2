@@ -69,6 +69,17 @@ pathname/writer offline trên một host, không đóng arbitrary writer coopera
 Windows native lock, power-loss/atomic multi-file, distributed lock, provider,
 live executor, business outcome, pilot hay deployment.
 
+**Cập nhật M11 reverse-link ledger graph guard (2026-09-17):** canonical M11
+decode reject `ReconciliationResolutionIDs` rỗng/trùng; graph validator yêu cầu
+mỗi resolution ID mà ledger đã công bố phải resolve ngược về đúng execution,
+lease/version/hash và một stopped head đã hoàn tất review. Khi evaluation đã có
+trong inventory, `OutcomeID` của ledger link cũng phải khớp evaluation của cùng
+execution. Regression core và loader learner Bot thật dựng các payload checksum
+hợp lệ nhưng dangling/mismatched, rồi yêu cầu reject trước runtime use. Đây là
+graph integrity offline/read-only; không đóng ledger durability, power-loss,
+atomic multi-file, distributed locking, provider, live executor, business
+outcome, pilot hay deployment.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append

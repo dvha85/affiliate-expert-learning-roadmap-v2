@@ -163,6 +163,49 @@ func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T)
 	}
 }
 
+func TestM11RegistryLoaderRejectsOrphanReconciliationLedgerLink(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	entries, err := readM11ArtifactRegistry(fixture.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 || entries[len(entries)-1].ArtifactKind != corem11.ArtifactKindLedger {
+		t.Fatalf("fixture registry does not end with a ledger: %d entries", len(entries))
+	}
+	value, status := corem11.DecodeArtifact("ledger", entries[len(entries)-1].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode ledger: %s", status)
+	}
+	ledger := *value.(*corem11.ProductionLedger)
+	ledger.ControlMode = "STOPPED"
+	ledger.StopReason = "RECOVERY_REVIEW_REQUIRED"
+	ledger.ReconciliationRequired = false
+	ledger.ReconciliationResolutionIDs = []string{"missing-resolution"}
+	ledgerRaw, err := json.Marshal(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries[len(entries)-1], err = corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := []byte{}
+	for _, entry := range entries {
+		line, marshalErr := json.Marshal(entry)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		contents = append(contents, line...)
+		contents = append(contents, '\n')
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(fixture.dir), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(fixture.dir); err == nil || !strings.Contains(err.Error(), "reconciliation") {
+		t.Fatalf("schema-valid orphan reconciliation link reached runtime loader: %v", err)
+	}
+}
+
 func TestM11RegistryLoaderRejectsMixedCorrelationLineage(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	entries, err := readM11ArtifactRegistry(fixture.dir)
