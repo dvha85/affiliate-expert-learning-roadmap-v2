@@ -16,7 +16,7 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "scripts/smoke_br16a_offline.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "lab/affiliate-bot/cmd/bot/advisor_fixture.go", "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/cmd/bot/history_schema.go", "lab/affiliate-bot/cmd/bot/watcher_fetch.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go", "lab/affiliate-bot/cmd/bot/advisor_budget.go", "lab/affiliate-bot/cmd/bot/advisor_results.go", "lab/affiliate-bot/cmd/bot/advisor_report.go", "lab/affiliate-bot/cmd/bot/advisor_canary.go", "lab/affiliate-bot/cmd/bot/backup_command.go", "lab/affiliate-bot/cmd/bot/advisor_br10_campaign.go", "lab/affiliate-bot/cmd/bot/advisor_canary_test.go", "lab/affiliate-bot/cmd/bot/accesstrade_import.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/affiliate-bot/cmd/bot/stable_append_posix.go", "lab/affiliate-bot/cmd/bot/stable_append_other.go", "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md", "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md", "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md", "docs/architecture/EVIDENCE-M11-RESTORE-AUTH-EXECUTION-LINEAGE-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        for relative in ("scripts/audit_readiness.py", "scripts/smoke_br16a_offline.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_registry_graph_envelope_integrity.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "lab/affiliate-bot/cmd/bot/advisor_fixture.go", "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/cmd/bot/history_schema.go", "lab/affiliate-bot/cmd/bot/watcher_fetch.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go", "lab/affiliate-bot/cmd/bot/advisor_budget.go", "lab/affiliate-bot/cmd/bot/advisor_results.go", "lab/affiliate-bot/cmd/bot/advisor_report.go", "lab/affiliate-bot/cmd/bot/advisor_canary.go", "lab/affiliate-bot/cmd/bot/backup_command.go", "lab/affiliate-bot/cmd/bot/advisor_br10_campaign.go", "lab/affiliate-bot/cmd/bot/advisor_canary_test.go", "lab/affiliate-bot/cmd/bot/accesstrade_import.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/affiliate-bot/cmd/bot/stable_append_posix.go", "lab/affiliate-bot/cmd/bot/stable_append_other.go", "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md", "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md", "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md", "docs/architecture/EVIDENCE-M11-RESTORE-AUTH-EXECUTION-LINEAGE-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md", "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md", "docs/architecture/EVIDENCE-M11-RECOVERY-ADMISSION-FIELD-INTEGRITY-20260917.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -68,6 +68,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_correlation = self.root / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md"
         evidence_correlation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-CORRELATION-LINEAGE-20260917.md", evidence_correlation)
+        evidence_reverse_ledger = self.root / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md"
+        evidence_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md", evidence_reverse_ledger)
         lineage_mutation = self.root / "scripts/mutate_m11_authorization_lineage.py"
         lineage_mutation.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_authorization_lineage.py", lineage_mutation)
@@ -120,6 +123,14 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go"
         source.write_text(source.read_text(encoding="utf-8").replace("TestAdvisorResultRejectsParentSwapBeforeOpenat", "RemovedAdvisorResultParentSwapRegression", 1), encoding="utf-8")
         self.assertIn("advisor campaign-writer parent-swap regression is missing", self.run_audit(False))
+
+    def test_missing_registry_graph_envelope_integrity_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        original = source.read_text(encoding="utf-8")
+        graph_prefix, graph_body = original.split("func ValidateArtifactGraph", 1)
+        graph_body = graph_body.replace("entry.ContentHash != expected.ContentHash", "registry graph envelope guard removed", 1)
+        source.write_text(graph_prefix + "func ValidateArtifactGraph" + graph_body, encoding="utf-8")
+        self.assertIn("registry graph envelope-integrity guard is missing", self.run_audit(False))
 
     def test_snapshot_mismatch_is_rejected(self):
         graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
@@ -216,6 +227,16 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "core/m11/artifact_registry.go"
         source.write_text(source.read_text(encoding="utf-8").replace("bound.CorrelationID != lease.CorrelationID", "correlation lineage guard removed", 1), encoding="utf-8")
         self.assertIn("M11 correlation-lineage regression is missing", self.run_audit(False))
+
+    def test_missing_m11_reverse_ledger_graph_guard_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("production ledger reconciliation link is orphaned or mismatched", "reverse ledger graph guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 reverse-ledger graph regression is missing", self.run_audit(False))
+
+    def test_missing_m11_evaluation_evidence_guard_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID", "evaluation evidence guard removed", 1), encoding="utf-8")
+        self.assertIn("M11 reverse-ledger graph regression is missing", self.run_audit(False))
 
     def test_missing_m11_manual_stop_process_kill_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go"
@@ -384,6 +405,16 @@ class ReadinessAuditTests(unittest.TestCase):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"
         workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_m10_identity_guard.py", "python scripts/removed.py"), encoding="utf-8")
         self.assertIn("required regression is not wired", self.run_audit(False))
+
+    def test_missing_registry_graph_envelope_mutation_proof_is_rejected(self):
+        workflow = self.root / ".github/workflows/curriculum-ci.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/mutate_registry_graph_envelope_integrity.py", "python scripts/removed.py"), encoding="utf-8")
+        self.assertIn("registry graph envelope mutation proof is missing or not wired to CI", self.run_audit(False))
+
+    def test_missing_m11_recovery_admission_field_integrity_is_rejected(self):
+        source = self.root / "core/m11/artifact.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("anyBlank(recoveryFields)", "false", 1), encoding="utf-8")
+        self.assertIn("M11 recovery-admission field-integrity regression is missing", self.run_audit(False))
 
     def test_missing_backup_source_mutation_proof_is_rejected(self):
         workflow = self.root / ".github/workflows/curriculum-ci.yml"

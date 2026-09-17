@@ -162,9 +162,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]ProductionGateDecision{}
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
-	executionAuthorizations := map[string]string{}
-	resolutions := map[string]ProductionReconciliationResolution{}
-	admissionNewLeases := map[string]string{}
+		executionAuthorizations := map[string]string{}
+		resolutions := map[string]ProductionReconciliationResolution{}
+		resolutionsByID := map[string]ProductionReconciliationResolution{}
+		admissionNewLeases := map[string]string{}
 	admissionPriorResolutions := map[string]string{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	evaluationExecutions := map[string]string{}
@@ -175,6 +176,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	ledgers := []ProductionLedger{}
 	activations := map[string]ProductionActivationRecord{}
 	for _, entry := range entries {
+		expected, err := NewArtifactEntry(entry.ArtifactKind, entry.Artifact)
+		if err != nil {
+			return fmt.Errorf("invalid registered M11 artifact: %w", err)
+		}
+		if entry.ArtifactID != expected.ArtifactID || entry.ContentHash != expected.ContentHash || !bytes.Equal(entry.Artifact, expected.Artifact) {
+			return fmt.Errorf("M11 artifact registry entry integrity mismatch")
+		}
 		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
 		if entryIDs[entryKey] {
 			return fmt.Errorf("duplicate M11 artifact in registry graph")
@@ -310,6 +318,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 				return fmt.Errorf("production execution has more than one reconciliation resolution")
 			}
 			resolutions[x.ExecutionID] = *x
+			resolutionsByID[x.ResolutionID] = *x
 		case *ProductionRecoveryAdmission:
 			lease, leaseOK := leases[x.NewLeaseID]
 			approval, approvalOK := approvals[x.NewApprovalID]
@@ -337,7 +346,7 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			execution, executionOK := executions[x.ExecutionID]
 			evaluatedAt, evaluatedErr := time.Parse(time.RFC3339, x.EvaluatedAt)
 			attemptedAt, attemptedErr := time.Parse(time.RFC3339, execution.AttemptedAt)
-			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
+			if !leaseOK || !executionOK || evaluatedErr != nil || attemptedErr != nil || len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || execution.ProductionLeaseID != x.LeaseID || execution.ProductionLeaseVersion != x.LeaseVersion || execution.ProductionLeaseHash != x.LeaseHash || evaluatedAt.Before(attemptedAt) {
 				return fmt.Errorf("production outcome evaluation has an orphaned or mismatched link")
 			}
 			if priorEvaluationID, exists := evaluationExecutions[x.ExecutionID]; exists && priorEvaluationID != x.EvaluationID {
@@ -394,6 +403,41 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		activatedAt, activatedErr := time.Parse(time.RFC3339, activation.ActivatedAt)
 		if observedErr != nil || activatedErr != nil || activation.LeaseVersion != snapshot.LeaseVersion || activation.LeaseHash != snapshot.LeaseHash || observedAt.Before(activatedAt) {
 			return fmt.Errorf("production health predates its activation")
+		}
+	}
+	// A resolved UNKNOWN transition is published as a new stopped-ledger head
+	// after the resolution artifact. The append-only registry therefore permits
+	// the resolution-only intermediate, but any ledger that claims the
+	// resolution must resolve it back to the same execution and lease. Without
+	// this reverse check a checksum-valid ledger could invent a resolution ID or
+	// attach a real resolution from another lifecycle.
+	for _, ledger := range ledgers {
+		seenResolutionIDs := map[string]bool{}
+		for _, resolutionID := range ledger.ReconciliationResolutionIDs {
+			if seenResolutionIDs[resolutionID] {
+				return fmt.Errorf("production ledger has duplicate reconciliation resolution link")
+			}
+			seenResolutionIDs[resolutionID] = true
+			resolution, resolutionOK := resolutionsByID[resolutionID]
+			execution, executionOK := executions[resolution.ExecutionID]
+			if !resolutionOK || !executionOK || resolution.LeaseID != ledger.LeaseID || resolution.LeaseVersion != ledger.LeaseVersion || resolution.LeaseHash != ledger.LeaseHash || execution.ProductionLeaseID != ledger.LeaseID || execution.ProductionLeaseVersion != ledger.LeaseVersion || execution.ProductionLeaseHash != ledger.LeaseHash || ledger.ControlMode != "STOPPED" || ledger.ReconciliationRequired || ledger.StopReason != "RECOVERY_REVIEW_REQUIRED" {
+				return fmt.Errorf("production ledger reconciliation link is orphaned or mismatched")
+			}
+		}
+	}
+	// If a ledger outcome and its offline evaluation are both present, the
+	// outcome identity is part of the same immutable link. Keep accepting the
+	// historical ledger-before-evaluation intermediate, but reject a later
+	// evaluation that exposes a checksum-valid outcome-ID swap.
+	for _, ledger := range ledgers {
+		for _, link := range ledger.OutcomeLinks {
+			evaluationID, evaluationOK := evaluationExecutions[link.ExecutionID]
+			if !evaluationOK {
+				continue
+			}
+			if evaluation := evaluations[evaluationID]; evaluation.OutcomeID != link.OutcomeID {
+				return fmt.Errorf("production ledger outcome link does not match its evaluation")
+			}
 		}
 	}
 	// A governed execution is only valid after its immutable authorization has

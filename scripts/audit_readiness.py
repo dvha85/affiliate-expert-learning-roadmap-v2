@@ -15,6 +15,7 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_registry_graph_envelope_integrity.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_authorization_lineage.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
@@ -937,6 +938,24 @@ def audit_m11_recovery_admission_approval_guard(root, matrix, plan_text):
         fail("M11 recovery-admission approval regression is missing")
 
 
+def audit_m11_recovery_admission_field_integrity(root, matrix, plan_text):
+    """Keep whitespace-only recovery handoff fields out of the canonical decoder."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-recovery-admission-field-integrity-20260917")
+    if not isinstance(record, dict) or "whitespace-only" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 recovery-admission field-integrity acceptance")
+    if "Cập nhật M11 recovery-admission field integrity" not in plan_text:
+        fail("M11 recovery-admission field integrity lacks a scoped plan marker")
+    validator_path = root / "core/m11/artifact.go"
+    test_path = root / "core/m11/artifact_test.go"
+    validator = validator_path.read_text(encoding="utf-8") if validator_path.is_file() else ""
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    required_validator = ("recoveryFields := []string", "anyBlank(recoveryFields)")
+    required_test = ("blank recovery admission", '"resolution":')
+    if any(marker not in validator for marker in required_validator) or any(marker not in test for marker in required_test):
+        fail("M11 recovery-admission field-integrity regression is missing")
+
+
 def audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text):
     """Keep authorization evidence bound to the gate's exact artifacts."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1010,6 +1029,97 @@ def audit_m11_correlation_lineage(root, matrix, plan_text):
         or "NOT_READY_FOR_PRODUCTION" not in evidence
     ):
         fail("M11 correlation-lineage regression is missing")
+
+
+def audit_m11_reverse_ledger_graph(root, matrix, plan_text):
+    """Keep ledger reconciliation and outcome links resolvable in both directions."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-reverse-ledger-graph-guards-20260917")
+    required_scope = ("reverse-resolves", "ReconciliationResolutionIDs", "STOPPED", "OutcomeID", "checksum-valid")
+    if not isinstance(record, dict) or any(token not in record.get("scope", "") for token in required_scope):
+        fail("matrix lacks scoped M11 reverse-ledger graph acceptance")
+    if "Cập nhật M11 reverse-link ledger graph guard" not in plan_text:
+        fail("M11 reverse-ledger graph lacks a scoped plan marker")
+    registry_path = root / "core/m11/artifact_registry.go"
+    artifact_path = root / "core/m11/artifact.go"
+    artifact_test_path = root / "core/m11/artifact_test.go"
+    loader_test_path = root / "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go"
+    evidence_path = root / "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md"
+    registry = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
+    artifact = artifact_path.read_text(encoding="utf-8") if artifact_path.is_file() else ""
+    artifact_test = artifact_test_path.read_text(encoding="utf-8") if artifact_test_path.is_file() else ""
+    loader_test = loader_test_path.read_text(encoding="utf-8") if loader_test_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_registry = (
+        "resolutionsByID := map[string]ProductionReconciliationResolution{}",
+        "production ledger reconciliation link is orphaned or mismatched",
+        "production ledger outcome link does not match its evaluation",
+        "len(x.EvidenceIDs) != 1 || x.EvidenceIDs[0] != x.OutcomeID",
+    )
+    required_artifact = (
+        "resolutionIDs := map[string]bool{}",
+        'if id == "" || resolutionIDs[id] {',
+    )
+    required_tests = (
+        "valid ledger-to-reconciliation reverse link rejected",
+        "orphan reconciliation resolution link was accepted",
+        "ledger outcome link with a swapped outcome ID was accepted",
+        "duplicate reconciliation resolution IDs was accepted",
+        "evaluation with evidence unrelated to its fixture outcome was accepted",
+        "evaluation with more than one evidence ID was accepted",
+    )
+    required_loader = (
+        "TestM11RegistryLoaderRejectsOrphanReconciliationLedgerLink",
+        "schema-valid orphan reconciliation link reached runtime loader",
+        "TestM11RegistryLoaderRejectsEvaluationWithMismatchedEvidence",
+        "checksum-valid evaluation with mismatched evidence reached runtime loader",
+    )
+    if (
+        any(marker not in registry for marker in required_registry)
+        or any(marker not in artifact for marker in required_artifact)
+        or any(marker not in artifact_test for marker in required_tests)
+        or any(marker not in loader_test for marker in required_loader)
+        or "## Verification" not in evidence
+        or "NOT_READY_FOR_PRODUCTION" not in evidence
+    ):
+        fail("M11 reverse-ledger graph regression is missing")
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    required_refs = {
+        "core/m11/artifact.go",
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md",
+    }
+    if required_refs - refs:
+        fail("M11 reverse-ledger graph acceptance lacks implementation, test, audit, evidence or CI refs")
+    graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
+    graph = json.loads(graph_path.read_text(encoding="utf-8")) if graph_path.is_file() else {}
+    br17 = next((item for item in graph.get("criteria", []) if item.get("criterion_id") == "BR-17"), {})
+    claims = br17.get("claims", []) if isinstance(br17, dict) else []
+    if not any(claim.get("id") == "BR-17-test-m11-reverse-ledger-graph-20260917" for claim in claims if isinstance(claim, dict)):
+        fail("M11 reverse-ledger graph evidence claim is missing")
+    evaluation_record = updates.get("RP-07-m11-fixture-evaluation-evidence-cardinality-20260917")
+    evaluation_scope = evaluation_record.get("scope", "") if isinstance(evaluation_record, dict) else ""
+    if not isinstance(evaluation_record, dict) or any(token not in evaluation_scope for token in ("exactly one fixture outcome evidence ID", "checksum-valid", "fail closed")):
+        fail("matrix lacks scoped M11 fixture-evaluation evidence cardinality acceptance")
+    evaluation_refs = set(evaluation_record.get("implementation_refs", [])) | set(evaluation_record.get("test_refs", []))
+    required_evaluation_refs = {
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-REVERSE-LEDGER-GRAPH-20260917.md",
+    }
+    if required_evaluation_refs - evaluation_refs:
+        fail("M11 fixture-evaluation evidence acceptance lacks implementation, test, audit, evidence or CI refs")
+    if not any(claim.get("id") == "BR-17-test-m11-fixture-evaluation-evidence-20260917" for claim in claims if isinstance(claim, dict)):
+        fail("M11 fixture-evaluation evidence claim is missing")
 
 
 def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):
@@ -1804,6 +1914,90 @@ def audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text):
         fail("advisor campaign-writer parent-swap regression is missing from the real writer paths")
 
 
+def audit_registry_graph_envelope_integrity(root, matrix, plan_text):
+    """Keep direct M10/M11 graph callers from trusting forged envelopes."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-rp07-registry-graph-envelope-integrity-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks registry graph envelope-integrity acceptance record")
+    required_impl = {
+        "core/m10/artifact_registry.go",
+        "core/m11/artifact_registry.go",
+    }
+    required_tests = {
+        "core/m10/cost_bound_test.go",
+        "core/m11/artifact_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-INTEGRITY-20260917.md",
+    }
+    if required_impl - set(record.get("implementation_refs", [])):
+        fail("registry graph envelope-integrity record lacks implementation refs")
+    if required_tests - set(record.get("test_refs", [])):
+        fail("registry graph envelope-integrity record lacks regression/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("M10", "M11", "artifact_id", "content_hash", "offline")):
+        fail("registry graph envelope-integrity record lacks bounded scope disclosure")
+    if "Cập nhật M10/M11 registry graph envelope integrity" not in plan_text:
+        fail("registry graph envelope integrity lacks a scoped plan marker")
+    for relative in required_impl | required_tests:
+        if not (root / relative).is_file():
+            fail(f"registry graph envelope-integrity ref is missing: {relative}")
+    source_markers = (
+        "expected, err := NewArtifactEntry(entry.ArtifactKind, entry.Artifact)",
+        "entry.ArtifactID != expected.ArtifactID",
+        "entry.ContentHash != expected.ContentHash",
+    )
+    for relative in ("core/m10/artifact_registry.go", "core/m11/artifact_registry.go"):
+        source = (root / relative).read_text(encoding="utf-8")
+        graph_source = source.partition("func ValidateArtifactGraph")[2]
+        if any(marker not in graph_source for marker in source_markers):
+            fail(f"registry graph envelope-integrity guard is missing from {relative}")
+    m10_test = (root / "core/m10/cost_bound_test.go").read_text(encoding="utf-8")
+    m11_test = (root / "core/m11/artifact_test.go").read_text(encoding="utf-8")
+    if "graph accepted a forged M10 registry" not in m10_test or "graph accepted a forged M11 registry" not in m11_test:
+        fail("registry graph envelope-integrity regression is missing from the core tests")
+
+
+def audit_registry_graph_envelope_mutation(root, matrix, plan_text):
+    """Require CI to prove the graph envelope regression can catch guard removal."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-rp07-registry-graph-envelope-mutation-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks registry graph envelope mutation acceptance record")
+    if "Cập nhật RP-08 registry graph envelope mutation proof" not in plan_text:
+        fail("registry graph envelope mutation lacks a scoped plan marker")
+    required_refs = {
+        "core/m10/artifact_registry.go",
+        "core/m11/artifact_registry.go",
+        "core/m10/cost_bound_test.go",
+        "core/m11/artifact_test.go",
+        "scripts/mutate_registry_graph_envelope_integrity.py",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("registry graph envelope mutation record lacks implementation/test/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("disposable", "M10", "M11", "canonical bytes", "offline")):
+        fail("registry graph envelope mutation record lacks bounded scope disclosure")
+    script_path = root / "scripts/mutate_registry_graph_envelope_integrity.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "remove_graph_envelope_guard",
+        "TestCanaryAuthorizationBindsGateWithoutExecuting",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "mutated {module} graph envelope guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_registry_graph_envelope_integrity.py" not in workflow:
+        fail("registry graph envelope mutation proof is missing or not wired to CI")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1852,8 +2046,11 @@ def audit(root):
     audit_m11_post_remove_journal_cleanup_ack(root, matrix, plan_text)
     audit_m10_canary_cost_journal_path_guard(root, matrix, plan_text)
     audit_m11_recovery_admission_approval_guard(root, matrix, plan_text)
+    audit_m11_recovery_admission_field_integrity(root, matrix, plan_text)
     audit_m11_authorization_gate_exact_lineage(root, matrix, plan_text)
     audit_m11_correlation_lineage(root, matrix, plan_text)
+    audit_m11_reverse_ledger_graph(root, matrix, plan_text)
+    audit_registry_graph_envelope_mutation(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
@@ -1878,6 +2075,7 @@ def audit(root):
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
+    audit_registry_graph_envelope_integrity(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)

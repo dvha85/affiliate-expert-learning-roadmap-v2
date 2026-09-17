@@ -45,6 +45,7 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(entries); err != nil {
 		t.Fatal(err)
 	}
+	canonicalEntries := append([]ArtifactEntry(nil), entries...)
 	// A checksum-valid cost bound from another correlation lineage must not be
 	// made admissible merely by updating the gate's copied cost hash and
 	// recomputing its derived gate ID. The lease is the M11 correlation root.
@@ -393,6 +394,20 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(preAttemptEvaluationEntries); err == nil {
 		t.Fatal("evaluation before its execution attempt was accepted")
 	}
+	forgedEvaluationEvidence := evaluation
+	forgedEvaluationEvidence.EvidenceIDs = []string{"unrelated-evidence"}
+	forgedEvaluationEvidenceEntries := append([]ArtifactEntry(nil), entries...)
+	forgedEvaluationEvidenceEntries[len(forgedEvaluationEvidenceEntries)-2] = m11Entry(t, ArtifactKindEvaluation, forgedEvaluationEvidence)
+	if err := ValidateArtifactGraph(forgedEvaluationEvidenceEntries); err == nil {
+		t.Fatal("evaluation with evidence unrelated to its fixture outcome was accepted")
+	}
+	nonSingletonEvaluationEvidence := evaluation
+	nonSingletonEvaluationEvidence.EvidenceIDs = []string{evaluation.OutcomeID, "second-evidence"}
+	nonSingletonEvaluationEvidenceEntries := append([]ArtifactEntry(nil), entries...)
+	nonSingletonEvaluationEvidenceEntries[len(nonSingletonEvaluationEvidenceEntries)-2] = m11Entry(t, ArtifactKindEvaluation, nonSingletonEvaluationEvidence)
+	if err := ValidateArtifactGraph(nonSingletonEvaluationEvidenceEntries); err == nil {
+		t.Fatal("evaluation with more than one evidence ID was accepted")
+	}
 	duplicateExecutionEvaluation := evaluation
 	duplicateExecutionEvaluation.EvaluationID = "evaluation-duplicate-execution"
 	duplicateExecutionEvaluationEntries := append([]ArtifactEntry(nil), entries...)
@@ -457,6 +472,17 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(duplicateActivationEntries); err == nil {
 		t.Fatal("duplicate activation artifact was accepted")
 	}
+	for name, mutate := range map[string]func(*ArtifactEntry){
+		"artifact id": func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-lease" },
+		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
+		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
+	} {
+		forgedEnvelopeEntries := append([]ArtifactEntry(nil), canonicalEntries...)
+		mutate(&forgedEnvelopeEntries[0])
+		if err := ValidateArtifactGraph(forgedEnvelopeEntries); err == nil {
+			t.Fatalf("graph accepted a forged M11 registry %s", name)
+		}
+	}
 	pendingSwapLedger := reservationLedger
 	pendingSwapLedger.UpdatedAt = "2026-09-08T00:00:00.750Z"
 	pendingSwapLedger.PendingExecutionIDs = []string{"exec-without-reservation"}
@@ -478,6 +504,13 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(forgedOutcomeEntries); err == nil {
 		t.Fatal("ledger outcome link to an orphan execution was accepted")
 	}
+	forgedOutcomeIDLedger := completedLedger
+	forgedOutcomeIDLedger.OutcomeLinks = []ProductionOutcomeLink{{OutcomeID: "different-outcome", ExecutionID: execution.ExecutionID, ObservedAt: "2026-09-08T00:00:02Z"}}
+	forgedOutcomeIDEntries := append([]ArtifactEntry(nil), entries...)
+	forgedOutcomeIDEntries = append(forgedOutcomeIDEntries, m11Entry(t, ArtifactKindLedger, forgedOutcomeIDLedger))
+	if err := ValidateArtifactGraph(forgedOutcomeIDEntries); err == nil {
+		t.Fatal("ledger outcome link with a swapped outcome ID was accepted")
+	}
 	erasedOutcomeLedger := completedLedger
 	erasedOutcomeLedger.OutcomeLinks = []ProductionOutcomeLink{}
 	erasedOutcomeLedger.UpdatedAt = "2026-09-08T00:00:03Z"
@@ -485,6 +518,33 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	erasedOutcomeEntries = append(erasedOutcomeEntries, m11Entry(t, ArtifactKindLedger, completedLedger), m11Entry(t, ArtifactKindLedger, erasedOutcomeLedger))
 	if err := ValidateArtifactGraph(erasedOutcomeEntries); err == nil {
 		t.Fatal("later ledger erased an immutable outcome link")
+	}
+
+	unknownLedger := unknownReservationLedger
+	unknownLedger.ControlMode, unknownLedger.StopReason, unknownLedger.ReconciliationRequired = "STOPPED", "RECOVERY_REVIEW_REQUIRED", false
+	unknownLedger.UpdatedAt = "2026-09-08T00:00:03Z"
+	unknownLedger.ReconciliationResolutionIDs = []string{resolution.ResolutionID}
+	unknownEntries := append([]ArtifactEntry(nil), entries[:10]...)
+	unknownEntries[9] = m11Entry(t, ArtifactKindExecution, unknownExecution)
+	unknownEntries = append(unknownEntries, m11Entry(t, ArtifactKindReconciliation, resolution), m11Entry(t, ArtifactKindLedger, unknownLedger))
+	if err := ValidateArtifactGraph(unknownEntries); err != nil {
+		t.Fatalf("valid ledger-to-reconciliation reverse link rejected: %v", err)
+	}
+	danglingResolutionLedger := unknownLedger
+	danglingResolutionLedger.ReconciliationResolutionIDs = []string{"missing-resolution"}
+	danglingResolutionEntries := append([]ArtifactEntry(nil), unknownEntries...)
+	danglingResolutionEntries[len(danglingResolutionEntries)-1] = m11Entry(t, ArtifactKindLedger, danglingResolutionLedger)
+	if err := ValidateArtifactGraph(danglingResolutionEntries); err == nil {
+		t.Fatal("ledger with an orphan reconciliation resolution link was accepted")
+	}
+	duplicateResolutionLedger := unknownLedger
+	duplicateResolutionLedger.ReconciliationResolutionIDs = []string{resolution.ResolutionID, resolution.ResolutionID}
+	duplicateRaw, err := json.Marshal(duplicateResolutionLedger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, status := DecodeArtifact("ledger", duplicateRaw); status == Valid {
+		t.Fatal("ledger with duplicate reconciliation resolution IDs was accepted")
 	}
 
 	admission := ProductionRecoveryAdmission{RecoveryAdmissionID: "admission-1", PriorRuntimeDir: "/runtime/old", PriorLeaseID: "lease-old", PriorLeaseVersion: "v1", PriorLeaseHash: lease.SourceCanaryGrantHash, PriorApprovalID: "approval-old", ResolutionID: "resolution-old", NewRuntimeID: "runtime-new", NewRuntimeDir: "/runtime/new", NewLeaseID: lease.LeaseID, NewLeaseVersion: lease.LeaseVersion, NewLeaseHash: lease.LeaseHash, NewApprovalID: approval.ApprovalID, ReviewedBy: "human", ReviewerID: "reviewer-new", ReviewedAt: "2026-09-08T00:00:01Z", ExecutionPermitted: false}
@@ -558,5 +618,28 @@ func TestRecoveryAdmissionIsNonAuthorizingAndCannotReusePriorIdentity(t *testing
 	raw, _ = json.Marshal(reusedApproval)
 	if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
 		t.Fatal("prior approval reuse was accepted")
+	}
+	for name, clear := range map[string]func(*ProductionRecoveryAdmission){
+		"admission id":       func(value *ProductionRecoveryAdmission) { value.RecoveryAdmissionID = " " },
+		"prior runtime":      func(value *ProductionRecoveryAdmission) { value.PriorRuntimeDir = " " },
+		"prior lease id":     func(value *ProductionRecoveryAdmission) { value.PriorLeaseID = " " },
+		"prior lease version": func(value *ProductionRecoveryAdmission) { value.PriorLeaseVersion = " " },
+		"prior lease hash":   func(value *ProductionRecoveryAdmission) { value.PriorLeaseHash = " " },
+		"prior approval":     func(value *ProductionRecoveryAdmission) { value.PriorApprovalID = " " },
+		"resolution":         func(value *ProductionRecoveryAdmission) { value.ResolutionID = " " },
+		"new runtime id":     func(value *ProductionRecoveryAdmission) { value.NewRuntimeID = " " },
+		"new runtime":        func(value *ProductionRecoveryAdmission) { value.NewRuntimeDir = " " },
+		"new lease id":       func(value *ProductionRecoveryAdmission) { value.NewLeaseID = " " },
+		"new lease version":  func(value *ProductionRecoveryAdmission) { value.NewLeaseVersion = " " },
+		"new lease hash":     func(value *ProductionRecoveryAdmission) { value.NewLeaseHash = " " },
+		"new approval":       func(value *ProductionRecoveryAdmission) { value.NewApprovalID = " " },
+		"reviewer":           func(value *ProductionRecoveryAdmission) { value.ReviewerID = " " },
+	} {
+		candidate := valid
+		clear(&candidate)
+		raw, _ := json.Marshal(candidate)
+		if _, status := DecodeArtifact("recovery_admission", raw); status == Valid {
+			t.Fatalf("blank recovery admission %s was accepted", name)
+		}
 	}
 }

@@ -388,6 +388,15 @@ func before(left, right string) bool {
 	return errA == nil && errB == nil && a.Before(b)
 }
 
+func anyBlank(values []string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // DecodeArtifact validates exactly one untrusted M11 artifact. VALID means
 // schema and local integrity checks passed; it never means execution is allowed.
 func DecodeArtifact(kind string, raw []byte) (any, string) {
@@ -450,7 +459,8 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 			return nil, "INVALID_TIME_BINDING"
 		}
 	case *ProductionRecoveryAdmission:
-		if x.ReviewedBy != "human" || x.ExecutionPermitted || x.PriorRuntimeDir == x.NewRuntimeDir || x.PriorLeaseID == x.NewLeaseID || x.PriorLeaseHash == x.NewLeaseHash || x.PriorApprovalID == x.NewApprovalID {
+		recoveryFields := []string{x.RecoveryAdmissionID, x.PriorRuntimeDir, x.PriorLeaseID, x.PriorLeaseVersion, x.PriorLeaseHash, x.PriorApprovalID, x.ResolutionID, x.NewRuntimeID, x.NewRuntimeDir, x.NewLeaseID, x.NewLeaseVersion, x.NewLeaseHash, x.NewApprovalID, x.ReviewerID}
+		if anyBlank(recoveryFields) || x.ReviewedBy != "human" || x.ExecutionPermitted || x.PriorRuntimeDir == x.NewRuntimeDir || x.PriorLeaseID == x.NewLeaseID || x.PriorLeaseHash == x.NewLeaseHash || x.PriorApprovalID == x.NewApprovalID {
 			return nil, "INVALID_RECOVERY_ADMISSION"
 		}
 		if _, err := time.Parse(time.RFC3339, x.ReviewedAt); err != nil {
@@ -477,6 +487,13 @@ func DecodeArtifact(kind string, raw []byte) (any, string) {
 				return nil, "INVALID_LEDGER"
 			}
 			outcomes[link.OutcomeID], executions[link.ExecutionID] = true, true
+		}
+		resolutionIDs := map[string]bool{}
+		for _, id := range x.ReconciliationResolutionIDs {
+			if id == "" || resolutionIDs[id] {
+				return nil, "INVALID_LEDGER"
+			}
+			resolutionIDs[id] = true
 		}
 		for _, id := range x.PendingExecutionIDs {
 			if executions[id] {

@@ -111,6 +111,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	executionAuthorizations := map[string]string{}
 	seenEntries := map[string]bool{}
 	for _, entry := range entries {
+		expected, err := NewArtifactEntry(entry.ArtifactKind, entry.Artifact)
+		if err != nil {
+			return fmt.Errorf("invalid registered M10 artifact: %w", err)
+		}
+		if entry.ArtifactID != expected.ArtifactID || entry.ContentHash != expected.ContentHash || !bytes.Equal(entry.Artifact, expected.Artifact) {
+			return fmt.Errorf("M10 artifact registry entry integrity mismatch")
+		}
 		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
 		if seenEntries[entryKey] {
 			return fmt.Errorf("duplicate M10 artifact in registry graph")

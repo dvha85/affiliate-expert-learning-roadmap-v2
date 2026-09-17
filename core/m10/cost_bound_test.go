@@ -219,6 +219,17 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	if err := ValidateArtifactGraph(append(entries, entries[0])); err == nil {
 		t.Fatal("duplicate immutable grant entry was accepted by canonical M10 graph")
 	}
+	for name, mutate := range map[string]func(*ArtifactEntry){
+		"artifact id": func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-grant" },
+		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
+		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
+	} {
+		forgedEnvelopeEntries := append([]ArtifactEntry(nil), entries...)
+		mutate(&forgedEnvelopeEntries[0])
+		if err := ValidateArtifactGraph(forgedEnvelopeEntries); err == nil {
+			t.Fatalf("graph accepted a forged M10 registry %s", name)
+		}
+	}
 	orphan := auth
 	orphan.CanaryGateID = "missing-gate"
 	if err := ValidateArtifactGraph(append(entries[:3:3], m10Entry(t, ArtifactKindExecutionAuthorization, orphan))); err == nil {

@@ -163,6 +163,49 @@ func TestM11RegistryLoaderRejectsSchemaValidOrphanBeforeRuntimeUse(t *testing.T)
 	}
 }
 
+func TestM11RegistryLoaderRejectsOrphanReconciliationLedgerLink(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	entries, err := readM11ArtifactRegistry(fixture.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 || entries[len(entries)-1].ArtifactKind != corem11.ArtifactKindLedger {
+		t.Fatalf("fixture registry does not end with a ledger: %d entries", len(entries))
+	}
+	value, status := corem11.DecodeArtifact("ledger", entries[len(entries)-1].Artifact)
+	if status != corem11.Valid {
+		t.Fatalf("decode ledger: %s", status)
+	}
+	ledger := *value.(*corem11.ProductionLedger)
+	ledger.ControlMode = "STOPPED"
+	ledger.StopReason = "RECOVERY_REVIEW_REQUIRED"
+	ledger.ReconciliationRequired = false
+	ledger.ReconciliationResolutionIDs = []string{"missing-resolution"}
+	ledgerRaw, err := json.Marshal(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries[len(entries)-1], err = corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := []byte{}
+	for _, entry := range entries {
+		line, marshalErr := json.Marshal(entry)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		contents = append(contents, line...)
+		contents = append(contents, '\n')
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(fixture.dir), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(fixture.dir); err == nil || !strings.Contains(err.Error(), "reconciliation") {
+		t.Fatalf("schema-valid orphan reconciliation link reached runtime loader: %v", err)
+	}
+}
+
 func TestM11RegistryLoaderRejectsMixedCorrelationLineage(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
 	entries, err := readM11ArtifactRegistry(fixture.dir)
@@ -245,6 +288,70 @@ func TestM11RegistryLoaderRejectsMixedCorrelationLineage(t *testing.T) {
 	}
 	if _, err := loadM11ArtifactRegistry(fixture.dir); err == nil {
 		t.Fatal("runtime loader accepted a mixed M11 correlation lineage")
+	}
+}
+
+func TestM11RegistryLoaderRejectsEvaluationWithMismatchedEvidence(t *testing.T) {
+	dir := t.TempDir()
+	if code, response := missionCall(t, "init", dir); code != 0 || response["status"] != "INITIALIZED" {
+		t.Fatalf("init evaluation fixture: code=%d response=%+v", code, response)
+	}
+	journal, predecessor := setupM11OutcomeJournalFixture(t, dir)
+	raw, err := json.Marshal(journal.Outcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, _, status, err := recordM11FixtureOutcome(dir, predecessor.ArtifactID, raw)
+	if err != nil || status != appendAdded {
+		t.Fatalf("record fixture outcome: status=%s err=%v", status, err)
+	}
+	if _, status, err := evaluateM11FixtureOutcome(dir, outcome.OutcomeID, "loader-evidence-evaluation", "2026-09-08T00:00:03Z"); err != nil || status != appendAdded {
+		t.Fatalf("record fixture evaluation: status=%s err=%v", status, err)
+	}
+
+	entries, err := readM11ArtifactRegistry(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluationIndex := -1
+	for index, entry := range entries {
+		if entry.ArtifactKind == corem11.ArtifactKindEvaluation {
+			evaluationIndex = index
+			break
+		}
+	}
+	if evaluationIndex < 0 {
+		t.Fatal("fixture evaluation was not recorded")
+	}
+	value, decodeStatus := corem11.DecodeArtifact("evaluation", entries[evaluationIndex].Artifact)
+	if decodeStatus != corem11.Valid {
+		t.Fatalf("decode evaluation: %s", decodeStatus)
+	}
+	evaluation := *value.(*corem11.ProductionOutcomeEvaluation)
+	evaluation.EvidenceIDs = []string{"unrelated-evidence"}
+	evaluationRaw, err := json.Marshal(evaluation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries[evaluationIndex], err = corem11.NewArtifactEntry(corem11.ArtifactKindEvaluation, evaluationRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contents := []byte{}
+	for _, entry := range entries {
+		line, marshalErr := json.Marshal(entry)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		contents = append(contents, line...)
+		contents = append(contents, '\n')
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(dir), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM11ArtifactRegistry(dir); err == nil || !strings.Contains(err.Error(), "outcome evaluation") {
+		t.Fatalf("checksum-valid evaluation with mismatched evidence reached runtime loader: %v", err)
 	}
 }
 

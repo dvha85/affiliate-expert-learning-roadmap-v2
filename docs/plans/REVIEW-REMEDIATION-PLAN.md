@@ -69,6 +69,61 @@ pathname/writer offline trên một host, không đóng arbitrary writer coopera
 Windows native lock, power-loss/atomic multi-file, distributed lock, provider,
 live executor, business outcome, pilot hay deployment.
 
+**Cập nhật M11 reverse-link ledger graph guard (2026-09-17):** canonical M11
+decode reject `ReconciliationResolutionIDs` rỗng/trùng; graph validator yêu cầu
+mỗi resolution ID mà ledger đã công bố phải resolve ngược về đúng execution,
+lease/version/hash và một stopped head đã hoàn tất review. Khi evaluation đã có
+trong inventory, `OutcomeID` của ledger link cũng phải khớp evaluation của cùng
+execution. Regression core và loader learner Bot thật dựng các payload checksum
+hợp lệ nhưng dangling/mismatched, rồi yêu cầu reject trước runtime use. Đây là
+graph integrity offline/read-only; không đóng ledger durability, power-loss,
+atomic multi-file, distributed locking, provider, live executor, business
+outcome, pilot hay deployment.
+
+**Cập nhật M11 fixture-evaluation evidence cardinality (2026-09-17):** vì
+`ProductionOutcomeEvaluation` chỉ là đánh giá offline cho fixture, graph
+validator nay yêu cầu `EvidenceIDs` có đúng một phần tử và phần tử đó phải là
+`OutcomeID`; schema boundary đã chặn mảng rỗng, còn graph guard chặn payload
+schema/checksum hợp lệ có nhiều ID hoặc trỏ sang evidence khác trước
+`m11-resolve`/runtime loader. Regression core và learner loader thật tạo rồi
+rewrite payload checksum-valid có evidence lệch và đều yêu cầu fail closed.
+Phạm vi chỉ là liên kết graph local có thể nghiệm thu; không nâng
+`NOT_READY_FOR_PRODUCTION`, không chứng minh live executor, provider, business
+outcome, pilot, deployment, distributed locking, power-loss hay atomic
+multi-file. Marker: `Cập nhật M11 fixture-evaluation evidence cardinality`.
+
+**Cập nhật M10/M11 registry graph envelope integrity (2026-09-17):** public
+`ValidateArtifactGraph` giờ canonicalize lại mọi `ArtifactEntry` bằng
+`NewArtifactEntry` trước khi đưa vào lookup map, rồi kiểm exact
+`artifact_id`/`content_hash`/bytes. Vì vậy một caller không thể giữ artifact
+canonical nhưng thay metadata envelope để làm gate trỏ tới parent giả; learner
+loader vẫn giữ lớp kiểm tra JSONL riêng trước graph. Core M10/M11 regression
+truyền envelope checksum-valid-artifact nhưng ID/hash giả và yêu cầu reject,
+đây là guard offline/read-only ở API graph. Không suy thành proof
+power-loss/atomic multi-file, distributed locking, provider, live executor,
+business outcome, pilot hay deployment; readiness vẫn
+`NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật M10/M11 registry graph envelope integrity`.
+
+**Cập nhật RP-08 registry graph envelope mutation proof (2026-09-17):** CI
+thêm mutation trên disposable copy, lần lượt bỏ graph-only envelope guard của
+M10 và M11 rồi chạy đúng core regression thật. Test phải fail với forged
+`artifact_id`, `content_hash` hoặc canonical bytes; vì vậy regression không chỉ
+được audit bằng source marker. Đây là bằng chứng offline/read-only cho test
+được nối với runtime guard, không đóng power-loss, atomic multi-file,
+distributed locking, provider, live executor, business outcome, pilot hay
+deployment; readiness vẫn `NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật RP-08
+registry graph envelope mutation proof`.
+
+**Cập nhật M11 recovery-admission field integrity (2026-09-17):** canonical
+decoder reject các field identity/lineage chỉ chứa whitespace trong
+`PRODUCTION_RECOVERY_ADMISSION`, vì JSON Schema `minLength:1` chưa loại được
+giá trị rỗng về nghĩa. Regression core thử từng field bắt buộc và yêu cầu reject
+trước graph/runtime use; learner vẫn giữ kiểm stopped-runtime, human resolution
+và new-lease riêng. Đây là input integrity offline/read-only, không đóng
+cross-runtime atomicity, power-loss, distributed locking, provider, live
+executor, business outcome, pilot hay deployment; readiness vẫn
+`NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật M11 recovery-admission field integrity`.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
