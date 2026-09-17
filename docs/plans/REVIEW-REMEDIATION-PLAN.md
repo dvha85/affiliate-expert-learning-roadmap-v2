@@ -1,12 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-17 -->
-<!-- readiness-main-baseline: 0cf32660166908a4cb5ab6c45ec36f2a174e64be -->
+<!-- readiness-as-of: 2026-09-18 -->
+<!-- readiness-main-baseline: bdbffb51643f0922e0dcf616f92da26b98f37faf -->
 
-> Reconcile 17/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
+> Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
+
+**Baseline sync after PR #413 (2026-09-18):** PR #413 đã squash-merge vào
+`main` tại `bdbffb51643f0922e0dcf616f92da26b98f37faf`, đưa bản cập nhật
+post-merge evidence của PR #412 vào snapshot hiện hành. Hậu-merge có đủ 12/12
+check-runs PASS; readiness audit vẫn `NOT_READY_FOR_PRODUCTION` và không có
+runtime/provider/pilot/deployment claim mới. Đây là bookkeeping/evidence sync,
+không đóng các blocker external hoặc mở rộng phạm vi crash/power-loss,
+distributed locking và business outcome. Marker: `Baseline sync after PR #413`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
