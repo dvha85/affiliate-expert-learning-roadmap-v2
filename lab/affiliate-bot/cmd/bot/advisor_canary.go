@@ -25,10 +25,11 @@ func runCampaignCanary(ctx context.Context, path string, p *deepSeekProvider) (i
 	// preflight and request: concurrent CLI processes cannot both pass first-run.
 	app := filepath.Dir(path)
 	lock := filepath.Join(app, "deepseek-br11-canary.lock")
-	if err := os.Mkdir(lock, 0700); err != nil {
+	release, err := acquireManagedPathLock(lock)
+	if err != nil {
 		return 0, "LOCKED", errors.New("canary locked; inspect before recovery, do not retry automatically")
 	}
-	defer os.Remove(lock)
+	defer release()
 	if err := syncCampaignDir(app); err != nil {
 		return 0, "IO_ERROR", err
 	}

@@ -149,7 +149,7 @@ func writeBackupStagingFile(root, path string, data []byte) error {
 	if err := backupStagingFailure("before_write", path); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := openStableRegularFileForAppendPath(path, true)
 	if err != nil {
 		return err
 	}

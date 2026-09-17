@@ -43,6 +43,19 @@ provider, live executor, business outcome, clean-machine pilot, deployment,
 distributed locking hay power-loss/atomic multi-file proof. Record:
 `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md`.
 
+**Cập nhật RP-01 advisor campaign writers openat guard (2026-09-17):** inventory
+writer cục bộ còn mở đã được đưa về shared stable append boundary: campaign
+manifest, reservation, result, offline fixture JSON và backup staging; các path
+campaign report/result/canary dùng managed lock. Trên POSIX, helper pin parent
+bằng directory descriptor rồi dùng `openat(O_NOFOLLOW|O_EXCL)` cho file mới;
+fallback giữ `O_EXCL` nhưng không claim native parity. Regression parent-swap
+chạy đường learner Bot thật cho cả năm writer và xác nhận external sentinel/
+target không bị ghi. CI `go test -race ./...` là acceptance gate; worktree này
+không có Go executable nên không ghi local Go PASS. Đây chỉ là hardening
+pathname/writer offline trên một host, không đóng arbitrary writer cooperation,
+Windows native lock, power-loss/atomic multi-file, distributed lock, provider,
+live executor, business outcome, pilot hay deployment.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
@@ -399,7 +412,7 @@ và regression tương ứng.
 | Gói | Phạm vi | Phụ thuộc trước khi merge | Quy mô | Trạng thái |
 |---|---|---|---|---|
 | RP-00 | Lưu kế hoạch/baseline, hạ tuyên bố quá mức | — | S | MERGED (`main` `12a088a`) |
-| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; inventory of every writer remains open |
+| RP-01 | Bảo vệ đường dẫn và file đầu vào | RP-00 | S | PARTIAL — M08/M10/M11 output paths reject alias/overwrite and preserve canonical state before portable output; campaign/fixture/backup writer inventory is covered by the shared append guard, while broader platform and non-cooperating-writer boundaries remain open |
 | RP-02 | Shared M08 decoder/policy, exact-number/hash contract | RP-01 | M | PARTIAL — learner and harness share M08 decoding/policy plus the strict M09 approval boundary; broader authorization/execution conformance and migration remain open |
 | RP-03 | Shared M09/M10 guard, cost-bound/gate/authorization/execution, ledger và STOP | RP-02 | L; chia 03a/03b | PARTIAL — one shared learner-Bot fixture chain now exercises EC-01…EC-05 with byte-level no-mutation rejects, restore and restart; multi-file crash/power-loss, distributed locking and business-execution proof remain open |
 | RP-04 | Canonical M06 builder và resolver M07/M08/HTTP | RP-01; tích hợp M08 sau RP-02 | M | PARTIAL — shared fixture builder/resolver, n8n node-chain và real Schedule Trigger regressions exist; governed selected-source profile and deployment-operated run remain open |

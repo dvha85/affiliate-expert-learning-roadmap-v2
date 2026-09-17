@@ -48,7 +48,7 @@ func initAdvisorCampaign(path string) error {
 	if err := os.Mkdir(path, 0700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(path, "manifest"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := openStableRegularFileForAppendPath(filepath.Join(path, "manifest"), true)
 	if err != nil {
 		return err
 	}
@@ -80,10 +80,11 @@ func reserveAdvisorAttempt(path string) (int, error) {
 		return 0, errors.New("campaign missing or invalid")
 	}
 	lock := filepath.Join(path, "lock")
-	if err = os.Mkdir(lock, 0700); err != nil {
+	release, err := acquireManagedPathLock(lock)
+	if err != nil {
 		return 0, errors.New("campaign locked; inspect interrupted run, do not reset")
 	}
-	defer os.Remove(lock)
+	defer release()
 	manifest, err := readCampaignFile(filepath.Join(path, "manifest"), int64(len(campaignManifest)))
 	if err != nil || string(manifest) != campaignManifest {
 		return 0, errors.New("campaign manifest invalid")
@@ -123,7 +124,7 @@ func reserveAdvisorAttempt(path string) (int, error) {
 	}
 	n := count + 1
 	raw, _ := json.Marshal(campaignReservationRecord{n, campaignReservation})
-	f, err := os.OpenFile(filepath.Join(path, fmt.Sprintf("attempt-%03d.json", n)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := openStableRegularFileForAppendPath(filepath.Join(path, fmt.Sprintf("attempt-%03d.json", n)), true)
 	if err != nil {
 		return 0, err
 	}
