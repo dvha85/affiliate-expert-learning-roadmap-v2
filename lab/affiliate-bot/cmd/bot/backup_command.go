@@ -381,12 +381,7 @@ func readStableRegularFileLimit(path string, limit int64) ([]byte, fs.FileInfo, 
 func openStableRegularFileForAppend(path string) (*os.File, fs.FileInfo, error) {
 	before, err := os.Lstat(path)
 	if os.IsNotExist(err) {
-		if stableRegularFileAppendHook != nil {
-			if err := stableRegularFileAppendHook(path); err != nil {
-				return nil, nil, err
-			}
-		}
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_EXCL, 0600)
+		f, err := openStableRegularFileForAppendPath(path, true)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -406,12 +401,7 @@ func openStableRegularFileForAppend(path string) (*os.File, fs.FileInfo, error) 
 	if !before.Mode().IsRegular() {
 		return nil, nil, fmt.Errorf("%s is not a regular file", path)
 	}
-	if stableRegularFileAppendHook != nil {
-		if err := stableRegularFileAppendHook(path); err != nil {
-			return nil, nil, err
-		}
-	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	f, err := openStableRegularFileForAppendPath(path, false)
 	if err != nil {
 		return nil, nil, err
 	}

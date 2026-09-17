@@ -1694,6 +1694,50 @@ def audit_learner_schema_identity(root, matrix, plan_text):
         fail("learner schema identity regression is missing from the canonical learner path")
 
 
+def audit_registry_append_parent_guard(root, matrix, plan_text):
+    """Keep M10/M11 registry append parent traversal on the safe path."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-01-registry-append-parent-openat-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks registry append parent-guard acceptance record")
+    required_impl = {
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "lab/affiliate-bot/cmd/bot/stable_append_posix.go",
+        "lab/affiliate-bot/cmd/bot/stable_append_other.go",
+    }
+    required_tests = {
+        "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP01-REGISTRY-PARENT-OPENAT-20260917.md",
+    }
+    if required_impl - set(record.get("implementation_refs", [])):
+        fail("registry append parent-guard record lacks implementation refs")
+    if required_tests - set(record.get("test_refs", [])):
+        fail("registry append parent-guard record lacks regression/evidence refs")
+    scope = record.get("scope")
+    required_scope = ("openat", "O_NOFOLLOW", "M10", "M11", "external", "CI")
+    if not isinstance(scope, str) or any(marker not in scope for marker in required_scope):
+        fail("registry append parent-guard record lacks bounded scope disclosure")
+    if "Cập nhật RP-01 registry append parent openat guard" not in plan_text:
+        fail("registry append parent-guard lacks a scoped plan marker")
+    for relative in required_impl | required_tests:
+        if not (root / relative).is_file():
+            fail(f"registry append parent-guard ref is missing: {relative}")
+    source = (root / "lab/affiliate-bot/cmd/bot/backup_command.go").read_text(encoding="utf-8")
+    posix = (root / "lab/affiliate-bot/cmd/bot/stable_append_posix.go").read_text(encoding="utf-8")
+    test = (root / "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go").read_text(encoding="utf-8")
+    required_source = (
+        "openStableRegularFileForAppendPath(path, true)",
+        "openStableRegularFileForAppendPath(path, false)",
+    )
+    if any(marker not in source for marker in required_source) or any(marker not in posix for marker in ("unix.Openat", "unix.O_NOFOLLOW", "openedParent", "os.SameFile(openedParent, currentParent)")):
+        fail("registry append parent-guard is missing from the real append path")
+    if "TestM10RegistryAppendRejectsParentSwapBeforeOpenat" not in test or "TestM11RegistryAppendRejectsParentSwapBeforeOpenat" not in test or "external directory was changed" not in test:
+        fail("registry append parent-swap regression is missing from the real M10/M11 paths")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1766,6 +1810,7 @@ def audit(root):
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     audit_learner_schema_identity(root, matrix, plan_text)
+    audit_registry_append_parent_guard(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
