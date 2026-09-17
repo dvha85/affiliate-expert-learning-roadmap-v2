@@ -29,9 +29,11 @@ go test -race ./...
 ```
 
 The current Windows worktree has no `go.exe`, so no local Go PASS is claimed;
-the Python readiness suite and audit remain local checks. PR #412 head
-`9b9f01d21dec22c0b7e85f57b4b7846085086747` completed the Ubuntu Curriculum CI
-run `35239183309` and Mission Agent Path CI run `35239183371`; all 12 required
-remote checks passed, including the learner race suite. This confirms the
+the Python readiness suite and audit remain local checks. PR #412 was merged
+as `e197f854a9f396bbe1136004b792b2699dc647e6` from source head
+`f3e5a213e5b142d23961443c3af9097ae3e5456e`; Curriculum CI run
+`35241923424` and Mission Agent Path CI run `35241923430` completed with all 12
+checks successful, including the learner race suite. This confirms the
 repository regression gate only; it is not production, provider, live-executor
-or pilot evidence, and readiness remains `NOT_READY_FOR_PRODUCTION`.
+or pilot evidence, and readiness remains `NOT_READY_FOR_PRODUCTION`. See
+`EVIDENCE-PR412-POST-MERGE-20260917.md` for the bounded acceptance record.
