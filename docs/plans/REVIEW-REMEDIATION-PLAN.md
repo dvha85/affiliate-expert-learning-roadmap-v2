@@ -1,9 +1,9 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-17 -->
-<!-- readiness-main-baseline: 8b44011465ea0c8afcfcc832b76f045da0811bd4 -->
+<!-- readiness-main-baseline: 7eacb661d2083d97b42ea31207a3e677705d7fea -->
 
-> Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
+> Reconcile 17/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
 > phát hiện PMR-01…07 ban đầu. Các ghi chú cũ chỉ có giá trị lịch sử; matrix và
 > bảng gói dưới đây là nguồn trạng thái hiện hành.
@@ -17,6 +17,19 @@ re-verification được ghi tại
 vẫn `NOT_READY_FOR_PRODUCTION`; không suy bằng chứng synthetic/read-only này
 thành provider, live executor, business outcome, pilot, deployment,
 distributed-locking hoặc power-loss/atomic multi-file proof.
+
+**Baseline sync after PR #406 (2026-09-17):** PR #406 đã squash-merge vào
+`main` tại `7eacb661d2083d97b42ea31207a3e677705d7fea`, đưa regression
+process-kill cho direct M11 STOP vào đường learner Bot thật và đồng bộ
+evidence/plan/matrix/audit. Hậu-merge local regression chạy bốn Go module
+test/vet, 124 Python tests, các validator standalone, BR-12d, BR-13b, BR-16a,
+BR-18b và readiness audit; tất cả phần có đủ input đều PASS, audit vẫn
+`NOT_READY_FOR_PRODUCTION`. Node/n8n và các operated validator cần execution
+artifact không chạy local. Record:
+`docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-406-20260917.md`. Đây vẫn
+là evidence fixture/read-only, không đóng provider, live executor, business
+outcome, pilot, deployment, distributed locking hay power-loss/atomic
+multi-file proof.
 
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
