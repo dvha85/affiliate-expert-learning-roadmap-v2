@@ -639,6 +639,18 @@ class ReadinessAuditTests(unittest.TestCase):
         matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
         self.assertIn("does not disclose selected-source forged-commission", self.run_audit(False))
 
+    def test_m07_raw_json_transport_guard_is_required(self):
+        runner = self.root / "scripts/run_n8n_engine_regression.py"
+        runner.write_text(
+            runner.read_text(encoding="utf-8").replace(
+                "tool_result_text:$('M07 Adapter Input').item.json.tool_request_json",
+                "tool_result:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        self.assertIn("M07 raw JSON transport regression is missing", self.run_audit(False))
+
     def test_beginner_plan_selected_source_boundary_is_required(self):
         plan = self.root / "docs/plans/BEGINNER-READINESS-PLAN.md"
         plan.write_text(plan.read_text(encoding="utf-8").replace("sanitized/read-only", "unscoped", 1), encoding="utf-8")

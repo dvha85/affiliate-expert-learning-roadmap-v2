@@ -1,6 +1,6 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-16 -->
+<!-- readiness-as-of: 2026-09-17 -->
 <!-- readiness-main-baseline: a0f8f19854276589dd9f858ef48869691420294c -->
 
 > Reconcile 16/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
@@ -2818,3 +2818,16 @@ Mỗi PR implementation phải ghi:
 Conflict với dữ liệu/người dùng, thay đổi schema không có migration rõ, không bảo đảm transaction, chưa có quyền live, chưa có host/provider/budget hoặc reviewer chưa chấp thuận recovery: dừng phần phụ thuộc và ghi blocker. Tiếp tục các phần độc lập đã được cấp phạm vi; không tự mở rộng sang live hoặc reset ledger.
 
 Chỉ đề xuất công bố “đường offline liên tục” sau RP-01…RP-09 đạt nghiệm thu; chỉ đề xuất “người mới tự làm được” sau pilot RP-10 có bằng chứng. Không có cam kết production hoặc business outcome trong kế hoạch này.
+
+**Cập nhật M07 n8n raw JSON transport (2026-09-17):** nhánh regression
+model-stub không còn JSON.parse tool result trước khi gửi vào
+/v1/m07/register-tool-result; nó truyền tool_result_text nguyên dạng tới
+adapter. Blueprint thêm node Require Raw Model JSON Text, chỉ cho phép output
+model dạng chuỗi và gửi model_output_text nguyên dạng tới validate/proposal.
+Ca fixture thật với 9007199254740993 kiểm tool sidecar, model output,
+proposal bytes, restart và revalidation; input raw/object đồng thời bị reject.
+Static validator và readiness audit giữ các cạnh này ở trạng thái có thể kiểm
+tra. Worktree hiện không có Node/n8n để chạy engine, nên chưa ghi PASS local;
+CI Node 24 vẫn là bằng chứng cần thiết. Đây là hardening synthetic/read-only,
+không phải provider diversity, selected-source, business outcome, live
+executor, pilot hay deployment evidence.

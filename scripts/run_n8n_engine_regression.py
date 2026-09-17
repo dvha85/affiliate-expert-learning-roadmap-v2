@@ -33,6 +33,7 @@ BOT_DIR = ROOT / "lab" / "affiliate-bot"
 M06_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-readonly-watcher.blueprint.json"
 M06_SELECTED_SOURCE_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-accesstrade-shopee-readonly.blueprint.json"
 M07_BLUEPRINT = ROOT / "lab" / "n8n" / "M07-readonly-evidence-agent.blueprint.json"
+M07_MODEL_CASES = {"model-success", "model-forged-commission", "model-malformed-output", "model-exact-number"}
 
 
 def m07_model_output_from_prompt(payload: dict, mode: str = "valid") -> dict:
@@ -232,16 +233,19 @@ def import_workflow(prefix: list[str], env: dict[str, str], blueprint: Path, wor
                     assignment["value"] = '{"tool_name":"public_http","method":"POST","target":"https://example.com/br13/offer"}'
                 if m07_case in {"get", "redirect-registry"} and assignment["name"] == "tool_request_json":
                     assignment["value"] = '{"tool_name":"public_http","method":"GET","target":"https://example.com/br13/offer"}'
-                if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and assignment["name"] == "tool_request_json":
+                if m07_case in M07_MODEL_CASES and assignment["name"] == "tool_request_json":
                     if m07_record_id is None:
                         raise AssertionError("M07 model-success requires a canonical record")
-                    assignment["value"] = json.dumps({"record_id": m07_record_id, "tool_call": {"tool_name": "public_http", "method": "GET", "target": "https://example.com/br13/offer"}, "status_code": 200, "received_at": "2026-09-09T00:00:00Z", "redirected": False, "body": {"notice": "synthetic CI fixture; untrusted data"}}, separators=(",", ":"))
+                    tool_result = {"record_id": m07_record_id, "tool_call": {"tool_name": "public_http", "method": "GET", "target": "https://example.com/br13/offer"}, "status_code": 200, "received_at": "2026-09-09T00:00:00Z", "redirected": False, "body": {"notice": "synthetic CI fixture; untrusted data"}}
+                    if m07_case == "model-exact-number":
+                        tool_result["body"] = {"amount": 9007199254740993, "notice": "synthetic CI exact-number fixture; untrusted data"}
+                    assignment["value"] = json.dumps(tool_result, separators=(",", ":"))
                 if m07_case == "redirect-registry" and assignment["name"] == "tool_registry_json":
                     assignment["value"] = '[{"name":"public_http","read_only":true,"allowed_methods":["GET"],"allowed_hosts":["example.com"],"timeout_ms":10000,"follow_redirects":true}]'
-        if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and node["name"] == "Fetch and Register Tool Adapter":
+        if m07_case in M07_MODEL_CASES and node["name"] == "Fetch and Register Tool Adapter":
             node["parameters"]["url"] = "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-tool-result' }}"
-            node["parameters"]["jsonBody"] = "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_result:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)} }}"
-        if m07_case in {"model-success", "model-forged-commission", "model-malformed-output"} and node["name"] == "OpenAI Chat Model - configure credential locally":
+            node["parameters"]["jsonBody"] = "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_result_text:$('M07 Adapter Input').item.json.tool_request_json} }}"
+        if m07_case in M07_MODEL_CASES and node["name"] == "OpenAI Chat Model - configure credential locally":
             if m07_model_stub_port is None:
                 raise AssertionError("M07 model-success requires a loopback model stub")
             node["credentials"] = {"openAiApi": {"id": "rp08-m07-model-stub", "name": "M07 CI Loopback Model Stub"}}
@@ -330,12 +334,17 @@ def require_selected_source_rejection(execution: dict) -> None:
         raise AssertionError("selected-source invalid capture reached an ACK or report")
 
 
-def require_m07_model_success(execution: dict, expected_record_id: str) -> tuple[str, str]:
+def require_m07_model_success(execution: dict, expected_record_id: str, *, expected_large_number: bool = False) -> tuple[str, str]:
     if execution.get("status") != "success" or execution.get("finished") is not True:
         result = execution.get("data", {}).get("resultData", {})
         raise AssertionError(f"M07 model-success did not finish: last_node={result.get('lastNodeExecuted')!r} error={result.get('error')!r}")
-    for node in ("Fetch and Register Tool Adapter", "Canonical M07 Context Adapter", "Read-only Evidence Agent", "Validate Grounding Adapter", "Persist Agent Proposal Adapter", "Report Persisted M07 Proposal"):
+    for node in ("Fetch and Register Tool Adapter", "Canonical M07 Context Adapter", "Read-only Evidence Agent", "Require Raw Model JSON Text", "Validate Grounding Adapter", "Persist Agent Proposal Adapter", "Report Persisted M07 Proposal"):
         node_json(execution, node)
+    raw_model = node_json(execution, "Require Raw Model JSON Text").get("model_output_text")
+    if not isinstance(raw_model, str) or not raw_model.strip():
+        raise AssertionError("M07 model-success did not preserve model output as raw JSON text")
+    if expected_large_number and ("9007199254740993" not in raw_model or "9007199254740992" in raw_model):
+        raise AssertionError("M07 exact-number model output was rounded before adapter validation")
     registered_tool = node_json(execution, "Fetch and Register Tool Adapter").get("body", {})
     tool_result_id = registered_tool.get("artifact_id") if isinstance(registered_tool, dict) else None
     if not isinstance(tool_result_id, str) or not tool_result_id.startswith("sha256:"):
@@ -477,6 +486,9 @@ def main() -> None:
             changed_record_id = require_m06_success(execute(prefix, env, "rp08-m06-changed"), "APPENDED")
             if changed_record_id == record_id:
                 raise AssertionError("M06 changed event reused the original canonical record")
+            exact_number_fixture = m06_fixture(correlation_id="event-exact-number", body='{"product_id":"exact-number","product_name":"Exact Number Fixture","currency":"USD","price":9007199254740993,"commission_rate":0.08}')
+            import_workflow(prefix, env, M06_BLUEPRINT, runtime, "rp08-m06-exact-number", port, m06_fixture=exact_number_fixture)
+            exact_number_record_id = require_m06_success(execute(prefix, env, "rp08-m06-exact-number"), "APPENDED")
             replay = run([str(bot), "history", "replay", str(history)], env=env)
             if "replay=MATCH" not in replay.stdout:
                 raise AssertionError("canonical history did not replay after n8n M06 execution")
@@ -528,16 +540,32 @@ def main() -> None:
                 proposal_path = history.with_name(history.name + ".m07") / "proposals" / (proposal_id.removeprefix("sha256:") + ".json")
                 if not proposal_path.is_file():
                     raise AssertionError("M07 model-success reported a proposal that was not persisted")
+                import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-exact-number", port, m07_case="model-exact-number", m07_record_id=exact_number_record_id, m07_model_stub_port=model_stub_port)
+                exact_proposal_id, exact_tool_result_id = require_m07_model_success(execute(prefix, env, "rp08-m07-exact-number"), exact_number_record_id, expected_large_number=True)
+                exact_tool_path = history.with_name(history.name + ".m07") / "tool-results" / (exact_tool_result_id.removeprefix("sha256:") + ".json")
+                exact_proposal_path = history.with_name(history.name + ".m07") / "proposals" / (exact_proposal_id.removeprefix("sha256:") + ".json")
+                exact_tool_bytes = exact_tool_path.read_bytes() if exact_tool_path.is_file() else b""
+                if not exact_tool_bytes or b"9007199254740993" not in exact_tool_bytes or b"9007199254740992" in exact_tool_bytes:
+                    raise AssertionError("M07 tool-result sidecar rounded the exact JSON number")
+                exact_proposal_before_restart = exact_proposal_path.read_bytes() if exact_proposal_path.is_file() else b""
+                if not exact_proposal_before_restart or b"9007199254740993" not in exact_proposal_before_restart or b"9007199254740992" in exact_proposal_before_restart:
+                    raise AssertionError("M07 proposal sidecar rounded the exact JSON number")
                 stop_adapter(adapter)
                 adapter = None
                 adapter = start_adapter(bot, history, port, env)
                 replay = run([str(bot), "history", "replay", str(history)], env=env)
                 if "replay=MATCH" not in replay.stdout or not proposal_path.is_file():
                     raise AssertionError("M07 persisted proposal or canonical history did not survive adapter restart")
+                if exact_proposal_path.read_bytes() != exact_proposal_before_restart:
+                    raise AssertionError("M07 exact-number proposal changed across adapter restart")
                 proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
                 status, validated = post_json(f"http://127.0.0.1:{port}/v1/m07/validate", {"record_id": record_id, "registry": [{"name": "public_http", "read_only": True, "allowed_methods": ["GET"], "allowed_hosts": ["example.com"], "timeout_ms": 10000, "follow_redirects": False}], "model_output_text": json.dumps(proposal["raw_output"], separators=(",", ":")), "tool_result_id": tool_result_id})
                 if status != 200 or validated.get("status") != "VALID" or validated.get("execution_permitted") is not False:
                     raise AssertionError("M07 persisted proposal did not revalidate after adapter restart")
+                exact_proposal = json.loads(exact_proposal_path.read_text(encoding="utf-8"))
+                status, validated = post_json(f"http://127.0.0.1:{port}/v1/m07/validate", {"record_id": exact_number_record_id, "registry": [{"name": "public_http", "read_only": True, "allowed_methods": ["GET"], "allowed_hosts": ["example.com"], "timeout_ms": 10000, "follow_redirects": False}], "model_output_text": json.dumps(exact_proposal["raw_output"], separators=(",", ":")), "tool_result_id": exact_tool_result_id})
+                if status != 200 or validated.get("status") != "VALID" or validated.get("execution_permitted") is not False:
+                    raise AssertionError("M07 exact-number proposal did not revalidate after adapter restart")
                 import_workflow(prefix, env, M07_BLUEPRINT, runtime, "rp08-m07-selected-source", port, m07_case="model-success", m07_record_id=selected_record_id, m07_model_stub_port=model_stub_port)
                 selected_proposal_id, _ = require_m07_model_success(execute(prefix, env, "rp08-m07-selected-source"), selected_record_id)
                 selected_proposal_path = history.with_name(history.name + ".m07") / "proposals" / (selected_proposal_id.removeprefix("sha256:") + ".json")

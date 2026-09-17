@@ -85,3 +85,20 @@ là fixture read-only, không phải vận hành Schedule Trigger trên deployme
 4. Khi upgrade engine, lặp lại import và execution smoke. Bất kỳ thay đổi hành vi nào ở HTTP Request Tool, AI Agent, credential scope, static-data behavior hoặc node migration đều chặn activation cho tới khi ledger này được review lại.
 
 Kết quả smoke chỉ là **integration evidence (bằng chứng tích hợp)**, tự nó không phải Reality/Operated evidence. Không commit production credential, write scope hay secret vào blueprint hoặc repo này.
+
+## M07 raw JSON transport boundary — 2026-09-17
+
+The M07 disposable runner sends the adapter-owned tool result through
+tool_result_text instead of parsing it into a JavaScript object. The checked-in
+blueprint passes model output through the string-only Require Raw Model JSON Text
+node and sends model_output_text to the shared adapter. The learner adapter
+rejects a request that supplies both raw text and an object.
+
+The regression fixture includes 9007199254740993 and checks the tool sidecar,
+model output, proposal bytes, restart and revalidation; 9007199254740992 is
+treated as evidence of rounding and fails the test. The current worktree has no
+Node or n8n executable, so this change is not recorded as a local engine PASS.
+CI must continue to install n8n 2.38.1 with Node 24 before this path is accepted.
+This boundary is synthetic/read-only/loopback evidence and does not establish
+provider, selected-source, business-outcome, live-executor, pilot or deployment
+readiness.

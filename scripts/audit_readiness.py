@@ -546,6 +546,91 @@ def audit_selected_source_disclosure(root, criteria_by_id, plan_text):
             fail("beginner plan incorrectly treats the selected-source contract as absent")
 
 
+def audit_m07_raw_json_transport(root, matrix, plan_text):
+    """Keep n8n's M07 numeric-value boundary on the raw JSON transport path."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-05-m07-n8n-raw-json-transport-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks M07 n8n raw JSON transport acceptance record")
+    scope = record.get("scope")
+    required_scope = (
+        "tool_result_text",
+        "model_output_text",
+        "9007199254740993",
+        "9007199254740992",
+        "Node 24",
+        "CI",
+    )
+    if not isinstance(scope, str) or any(marker not in scope for marker in required_scope):
+        fail("M07 raw JSON transport record lacks its bounded exact-number/CI scope")
+    if "Cập nhật M07 n8n raw JSON transport" not in plan_text:
+        fail("M07 raw JSON transport lacks a scoped plan marker")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/watcher.go",
+        "lab/affiliate-bot/cmd/bot/watcher_test.go",
+        "lab/n8n/M07-readonly-evidence-agent.blueprint.json",
+        "scripts/run_n8n_engine_regression.py",
+        "scripts/validate_n8n_m07.py",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/mission-agent-path-ci.yml",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M07 raw JSON transport record lacks implementation, regression or CI refs")
+
+    blueprint_path = root / "lab/n8n/M07-readonly-evidence-agent.blueprint.json"
+    blueprint = json.loads(blueprint_path.read_text(encoding="utf-8")) if blueprint_path.is_file() else {}
+    nodes = {node.get("name"): node for node in blueprint.get("nodes", []) if isinstance(node, dict)}
+    raw_node = nodes.get("Require Raw Model JSON Text")
+    if not isinstance(raw_node, dict):
+        fail("M07 raw JSON transport blueprint node is missing")
+    raw_code = raw_node.get("parameters", {}).get("jsCode", "")
+    if not all(marker in raw_code for marker in ("MODEL_OUTPUT_MUST_BE_RAW_JSON_TEXT", "typeof $json.output==='string'", "typeof $json.text==='string'")):
+        fail("M07 raw model-output string guard is missing from the blueprint")
+    for node_name in ("Validate Grounding Adapter", "Persist Agent Proposal Adapter"):
+        body = nodes.get(node_name, {}).get("parameters", {}).get("jsonBody", "")
+        if "model_output_text" not in body or "model_output:JSON.parse" in body:
+            fail(f"{node_name} can reparse model JSON before the adapter")
+    agent_text = nodes.get("Read-only Evidence Agent", {}).get("parameters", {}).get("text", "")
+    if "artifact_raw_json" not in agent_text or "evidence_raw_json" not in agent_text or "JSON.stringify" in agent_text:
+        fail("M07 Agent is not fed adapter-preserved JSON text")
+    connections = blueprint.get("connections", {})
+    raw_destinations = {
+        item.get("node")
+        for branch in connections.get("Read-only Evidence Agent", {}).get("main", [])
+        for item in branch
+        if isinstance(item, dict)
+    }
+    if "Require Raw Model JSON Text" not in raw_destinations:
+        fail("M07 Agent is not connected to the raw model-output guard")
+
+    runner_path = root / "scripts/run_n8n_engine_regression.py"
+    runner = runner_path.read_text(encoding="utf-8") if runner_path.is_file() else ""
+    required_runner = (
+        "M07_MODEL_CASES",
+        '"model-exact-number"',
+        "tool_result_text:$(\'M07 Adapter Input\').item.json.tool_request_json",
+        "expected_large_number=True",
+        'b"9007199254740993" not in exact_tool_bytes',
+        "exact_proposal_path.read_bytes() != exact_proposal_before_restart",
+    )
+    if any(marker not in runner for marker in required_runner) or "tool_result:JSON.parse($(\'M07 Adapter Input\').item.json.tool_request_json)" in runner:
+        fail("M07 raw JSON transport regression is missing from the n8n runner")
+
+    watcher_path = root / "lab/affiliate-bot/cmd/bot/watcher.go"
+    watcher_test_path = root / "lab/affiliate-bot/cmd/bot/watcher_test.go"
+    watcher = watcher_path.read_text(encoding="utf-8") if watcher_path.is_file() else ""
+    watcher_test = watcher_test_path.read_text(encoding="utf-8") if watcher_test_path.is_file() else ""
+    required_watcher = (
+        "ToolResultText string",
+        "toolResult = json.RawMessage(request.ToolResultText)",
+        "TOOL_RESULT_AMBIGUOUS",
+    )
+    if any(marker not in watcher for marker in required_watcher) or not all(marker in watcher_test for marker in ("ToolResultText:", "9007199254740993", "TOOL_RESULT_AMBIGUOUS")):
+        fail("M07 adapter raw tool-result transport regression is missing")
+
+
 def audit_selected_source_operated_run(root, matrix, plan_text):
     """Require a durable, scoped record when local operated evidence is recorded."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1557,6 +1642,7 @@ def audit(root):
     if seen != EXPECTED:
         fail(f"unexpected criterion IDs: {sorted(seen)}")
     audit_selected_source_disclosure(root, criteria_by_id, plan_text)
+    audit_m07_raw_json_transport(root, matrix, plan_text)
     audit_n8n_engine_runtime_compatibility(root, matrix, plan_text)
     audit_deterministic_runtime_sharding(root, matrix, plan_text)
     audit_accesstrade_pending_import_recovery(root, matrix, plan_text)

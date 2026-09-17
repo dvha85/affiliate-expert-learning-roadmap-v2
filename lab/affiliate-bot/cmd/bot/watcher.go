@@ -169,7 +169,10 @@ type m07AdapterRequest struct {
 	Registry    []corem07.ToolSpec   `json:"registry"`
 	ToolRequest *corem07.ToolRequest `json:"tool_request,omitempty"`
 	ToolResult  json.RawMessage      `json:"tool_result,omitempty"`
-	ModelOutput json.RawMessage      `json:"model_output,omitempty"`
+	// ToolResultText preserves the adapter-owned response body through workflow
+	// engines that would otherwise parse nested JSON numbers as IEEE-754 values.
+	ToolResultText string          `json:"tool_result_text,omitempty"`
+	ModelOutput    json.RawMessage `json:"model_output,omitempty"`
 	// ModelOutputText preserves model JSON through workflow engines that would
 	// otherwise parse large JSON numbers as IEEE-754 values before validation.
 	ModelOutputText string `json:"model_output_text,omitempty"`
@@ -624,12 +627,21 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ACK", "artifact_id": registered.TraceID, "artifact": registered, "evidence": evidence, "evidence_raw_json": string(evidenceRaw), "execution_permitted": false})
 		case "/v1/m07/register-tool-result":
-			if len(request.ToolResult) == 0 {
+			toolResult := request.ToolResult
+			if request.ToolResultText != "" {
+				if len(toolResult) != 0 {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_AMBIGUOUS", "execution_permitted": false})
+					return
+				}
+				toolResult = json.RawMessage(request.ToolResultText)
+			}
+			if len(toolResult) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REQUIRED", "execution_permitted": false})
 				return
 			}
-			registered, err := corem07.RegisterToolResult(request.ToolResult, request.Registry)
+			registered, err := corem07.RegisterToolResult(toolResult, request.Registry)
 			if err != nil || registered.RecordID != ctx.RecordID {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "TOOL_RESULT_REJECTED", "execution_permitted": false})

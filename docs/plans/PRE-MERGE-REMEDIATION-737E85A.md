@@ -314,3 +314,12 @@ Chỉ đề xuất merge khi:
 - [ ] Có review lại sau fix; merge/push chỉ thực hiện khi được yêu cầu. Merge không đồng nghĩa production readiness.
 
 Nếu remote vẫn bị chặn, tiếp tục phần local trong phạm vi được giao và ghi rõ thiếu CI/head evidence; không vượt cơ chế duyệt để xác nhận hoặc merge bằng đường khác.
+
+**Cập nhật M07 n8n raw JSON transport (2026-09-17):** runner CI truyền
+tool_result_text nguyên dạng vào adapter và blueprint đưa model output qua
+node Require Raw Model JSON Text trước validate/proposal. Fixture
+9007199254740993 kiểm bytes của tool sidecar/proposal sau restart và
+revalidation; đường raw/object mơ hồ bị reject. Worktree hiện không có
+Node/n8n nên không ghi engine PASS local; chỉ giữ CI Node 24 làm gate. Phạm vi
+vẫn là synthetic/read-only và không chứng minh provider, selected-source,
+business outcome, live executor, pilot hoặc deployment.
