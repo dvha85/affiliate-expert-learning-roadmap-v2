@@ -35,7 +35,10 @@ def fail(message):
 
 
 def remove_graph_envelope_guard(source, module):
-    prefix, graph = source.split("func ValidateArtifactGraph", 1)
+    signature = "func ValidateArtifactGraph(entries []ArtifactEntry)"
+    if source.count(signature) != 1:
+        fail(f"canonical {module} graph function anchor is missing or ambiguous")
+    prefix, graph = source.split(signature, 1)
     guard = (
         "if entry.ArtifactID != expected.ArtifactID || entry.ContentHash != expected.ContentHash || "
         "!bytes.Equal(entry.Artifact, expected.Artifact)"
@@ -43,7 +46,7 @@ def remove_graph_envelope_guard(source, module):
     if graph.count(guard) != 1:
         fail(f"canonical {module} graph envelope guard anchor is missing or ambiguous")
     graph = graph.replace(guard, "if false", 1)
-    return prefix + "func ValidateArtifactGraph" + graph
+    return prefix + signature + graph
 
 
 def run_mutation(module, relative, test_name, forged_assertion):
