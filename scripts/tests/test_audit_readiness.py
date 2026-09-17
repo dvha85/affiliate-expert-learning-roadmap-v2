@@ -124,6 +124,14 @@ class ReadinessAuditTests(unittest.TestCase):
         source.write_text(source.read_text(encoding="utf-8").replace("TestAdvisorResultRejectsParentSwapBeforeOpenat", "RemovedAdvisorResultParentSwapRegression", 1), encoding="utf-8")
         self.assertIn("advisor campaign-writer parent-swap regression is missing", self.run_audit(False))
 
+    def test_missing_registry_graph_envelope_integrity_is_rejected(self):
+        source = self.root / "core/m11/artifact_registry.go"
+        original = source.read_text(encoding="utf-8")
+        graph_prefix, graph_body = original.split("func ValidateArtifactGraph", 1)
+        graph_body = graph_body.replace("entry.ContentHash != expected.ContentHash", "registry graph envelope guard removed", 1)
+        source.write_text(graph_prefix + "func ValidateArtifactGraph" + graph_body, encoding="utf-8")
+        self.assertIn("registry graph envelope-integrity guard is missing", self.run_audit(False))
+
     def test_snapshot_mismatch_is_rejected(self):
         graph_path = self.root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
         graph = json.loads(graph_path.read_text(encoding="utf-8"))

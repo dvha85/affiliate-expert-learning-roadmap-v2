@@ -471,6 +471,16 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(duplicateActivationEntries); err == nil {
 		t.Fatal("duplicate activation artifact was accepted")
 	}
+	for name, mutate := range map[string]func(*ArtifactEntry){
+		"artifact id": func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-lease" },
+		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
+	} {
+		forgedEnvelope := entries[0]
+		mutate(&forgedEnvelope)
+		if err := ValidateArtifactGraph([]ArtifactEntry{forgedEnvelope}); err == nil {
+			t.Fatalf("graph accepted a forged M11 registry %s", name)
+		}
+	}
 	pendingSwapLedger := reservationLedger
 	pendingSwapLedger.UpdatedAt = "2026-09-08T00:00:00.750Z"
 	pendingSwapLedger.PendingExecutionIDs = []string{"exec-without-reservation"}

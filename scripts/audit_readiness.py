@@ -1895,6 +1895,52 @@ def audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text):
         fail("advisor campaign-writer parent-swap regression is missing from the real writer paths")
 
 
+def audit_registry_graph_envelope_integrity(root, matrix, plan_text):
+    """Keep direct M10/M11 graph callers from trusting forged envelopes."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-03-rp07-registry-graph-envelope-integrity-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks registry graph envelope-integrity acceptance record")
+    required_impl = {
+        "core/m10/artifact_registry.go",
+        "core/m11/artifact_registry.go",
+    }
+    required_tests = {
+        "core/m10/cost_bound_test.go",
+        "core/m11/artifact_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-INTEGRITY-20260917.md",
+    }
+    if required_impl - set(record.get("implementation_refs", [])):
+        fail("registry graph envelope-integrity record lacks implementation refs")
+    if required_tests - set(record.get("test_refs", [])):
+        fail("registry graph envelope-integrity record lacks regression/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("M10", "M11", "artifact_id", "content_hash", "offline")):
+        fail("registry graph envelope-integrity record lacks bounded scope disclosure")
+    if "Cập nhật M10/M11 registry graph envelope integrity" not in plan_text:
+        fail("registry graph envelope integrity lacks a scoped plan marker")
+    for relative in required_impl | required_tests:
+        if not (root / relative).is_file():
+            fail(f"registry graph envelope-integrity ref is missing: {relative}")
+    source_markers = (
+        "expected, err := NewArtifactEntry(entry.ArtifactKind, entry.Artifact)",
+        "entry.ArtifactID != expected.ArtifactID",
+        "entry.ContentHash != expected.ContentHash",
+    )
+    for relative in ("core/m10/artifact_registry.go", "core/m11/artifact_registry.go"):
+        source = (root / relative).read_text(encoding="utf-8")
+        graph_source = source.partition("func ValidateArtifactGraph")[2]
+        if any(marker not in graph_source for marker in source_markers):
+            fail(f"registry graph envelope-integrity guard is missing from {relative}")
+    m10_test = (root / "core/m10/cost_bound_test.go").read_text(encoding="utf-8")
+    m11_test = (root / "core/m11/artifact_test.go").read_text(encoding="utf-8")
+    if "graph accepted a forged M10 registry" not in m10_test or "graph accepted a forged M11 registry" not in m11_test:
+        fail("registry graph envelope-integrity regression is missing from the core tests")
+
+
 def audit(root):
     matrix_path = root / "docs/plans/READINESS-MATRIX.json"
     plan_path = root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
@@ -1970,6 +2016,7 @@ def audit(root):
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
+    audit_registry_graph_envelope_integrity(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)

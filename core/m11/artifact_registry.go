@@ -176,6 +176,13 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	ledgers := []ProductionLedger{}
 	activations := map[string]ProductionActivationRecord{}
 	for _, entry := range entries {
+		expected, err := NewArtifactEntry(entry.ArtifactKind, entry.Artifact)
+		if err != nil {
+			return fmt.Errorf("invalid registered M11 artifact: %w", err)
+		}
+		if entry.ArtifactID != expected.ArtifactID || entry.ContentHash != expected.ContentHash || !bytes.Equal(entry.Artifact, expected.Artifact) {
+			return fmt.Errorf("M11 artifact registry entry integrity mismatch")
+		}
 		entryKey := entry.ArtifactKind + "\x00" + entry.ArtifactID
 		if entryIDs[entryKey] {
 			return fmt.Errorf("duplicate M11 artifact in registry graph")

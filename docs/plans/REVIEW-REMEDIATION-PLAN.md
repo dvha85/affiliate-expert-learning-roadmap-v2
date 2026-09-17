@@ -92,6 +92,18 @@ Phạm vi chỉ là liên kết graph local có thể nghiệm thu; không nâng
 outcome, pilot, deployment, distributed locking, power-loss hay atomic
 multi-file. Marker: `Cập nhật M11 fixture-evaluation evidence cardinality`.
 
+**Cập nhật M10/M11 registry graph envelope integrity (2026-09-17):** public
+`ValidateArtifactGraph` giờ canonicalize lại mọi `ArtifactEntry` bằng
+`NewArtifactEntry` trước khi đưa vào lookup map, rồi kiểm exact
+`artifact_id`/`content_hash`/bytes. Vì vậy một caller không thể giữ artifact
+canonical nhưng thay metadata envelope để làm gate trỏ tới parent giả; learner
+loader vẫn giữ lớp kiểm tra JSONL riêng trước graph. Core M10/M11 regression
+truyền envelope checksum-valid-artifact nhưng ID/hash giả và yêu cầu reject,
+đây là guard offline/read-only ở API graph. Không suy thành proof
+power-loss/atomic multi-file, distributed locking, provider, live executor,
+business outcome, pilot hay deployment; readiness vẫn
+`NOT_READY_FOR_PRODUCTION`. Marker: `Cập nhật M10/M11 registry graph envelope integrity`.
+
 **Baseline sync after PR #401 (2026-09-16):** PR #401 đã squash-merge vào
 `main` tại `a0f8f19854276589dd9f858ef48869691420294`, bổ sung regression
 process-kill cho M10 governed execution sau canonical execution-record append
