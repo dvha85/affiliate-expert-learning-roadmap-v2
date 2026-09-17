@@ -2852,3 +2852,14 @@ tra. Worktree hiện không có Node/n8n để chạy engine, nên chưa ghi PAS
 CI Node 24 vẫn là bằng chứng cần thiết. Đây là hardening synthetic/read-only,
 không phải provider diversity, selected-source, business outcome, live
 executor, pilot hay deployment evidence.
+
+**Cập nhật M11 direct STOP process-kill recovery (2026-09-17):** regression
+`TestM11ManualStopProcessKillRequiresLockedRecovery` chạy learner Bot
+test-binary thật và gửi POSIX `SIGKILL` sau lần lượt các atomic rename của
+`m11-manual-stop-journal.json`, `mission-state.json` và `STOP`. Mỗi ca giữ
+journal làm recovery authority; process đọc mới trả `RECOVERY_REQUIRED`, còn
+writer có lock replay đúng journal, giữ nguyên STOP state/marker, xóa journal
+đúng một lần và không cho lần stop khác đổi reason. Đây là bằng chứng local
+synthetic/read-only cho direct STOP replay, không phải power-loss, atomic
+multi-file, distributed-lock, live-executor, provider, business-outcome, pilot
+hay deployment proof. Marker: `Cập nhật M11 direct STOP process-kill recovery`.

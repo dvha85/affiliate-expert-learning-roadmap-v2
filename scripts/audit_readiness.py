@@ -1341,6 +1341,50 @@ def audit_m11_process_kill_after_ledger(root, matrix, plan_text):
         fail("M11 post-ledger process-kill regression is missing from the real learner/CI path")
 
 
+def audit_m11_manual_stop_process_kill(root, matrix, plan_text):
+    """Keep direct M11 STOP recovery tested across a real process boundary."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-07-m11-manual-stop-process-kill-20260917")
+    if not isinstance(record, dict):
+        fail("matrix lacks M11 direct STOP process-kill acceptance record")
+    required_refs = {
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-M11-MANUAL-STOP-PROCESS-KILL-20260917.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 direct STOP process-kill record lacks implementation, test, evidence or CI refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or not all(token in scope for token in ("SIGKILL", "RECOVERY_REQUIRED", "STOPPED", "exact", "POSIX")):
+        fail("M11 direct STOP process-kill record lacks a bounded recovery disclosure")
+    if "Cập nhật M11 direct STOP process-kill recovery" not in plan_text:
+        fail("M11 direct STOP process-kill lacks a scoped plan marker")
+    test_path = root / "lab/affiliate-bot/cmd/bot/m11_manual_stop_process_kill_test.go"
+    workflow_path = root / ".github/workflows/curriculum-ci.yml"
+    evidence_path = root / "docs/architecture/EVIDENCE-M11-MANUAL-STOP-PROCESS-KILL-20260917.md"
+    test = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    workflow = workflow_path.read_text(encoding="utf-8") if workflow_path.is_file() else ""
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    required_test = (
+        "TestM11ManualStopProcessTerminationChild",
+        "TestM11ManualStopProcessKillRequiresLockedRecovery",
+        "GO_WANT_M11_MANUAL_STOP_PROCESS_TERMINATION",
+        "after-journal-rename",
+        "after-state-rename",
+        "after-marker-rename",
+        "syscall.SIGKILL",
+        "RECOVERY_REQUIRED",
+        "different-stop-reason",
+        "bytes.Equal",
+    )
+    if not all(marker in test for marker in required_test) or "run_learner_bot_test_shard.py" not in workflow or "## Verification" not in evidence:
+        fail("M11 direct STOP process-kill regression is missing from the real learner/CI path")
+
+
 def audit_m10_process_kill_after_canonical_append(root, matrix, plan_text):
     """Keep the later M10 two-store process-boundary proof discoverable."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -1711,6 +1755,7 @@ def audit(root):
     audit_m11_process_kill_journal(root, matrix, plan_text)
     audit_m11_outcome_process_kill(root, matrix, plan_text)
     audit_m11_process_kill_after_ledger(root, matrix, plan_text)
+    audit_m11_manual_stop_process_kill(root, matrix, plan_text)
     audit_m10_process_kill_after_canonical_append(root, matrix, plan_text)
     audit_m10_execution_process_kill_after_canonical_append(root, matrix, plan_text)
     audit_backup_orphan_staging_recovery(root, matrix, plan_text)
