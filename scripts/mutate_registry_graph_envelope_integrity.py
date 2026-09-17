@@ -45,7 +45,7 @@ def remove_graph_envelope_guard(source, module):
     )
     if graph.count(guard) != 1:
         fail(f"canonical {module} graph envelope guard anchor is missing or ambiguous")
-    graph = graph.replace(guard, "if false", 1)
+    graph = graph.replace(guard, 'if false && expected.ArtifactID == ""', 1)
     return prefix + signature + graph
 
 
