@@ -27,7 +27,7 @@
 ## Local verification and boundary
 
 - `python scripts/audit_readiness.py` passed with
-  `NOT_READY_FOR_PRODUCTION`; the evidence graph resolves 125 scoped claims.
+  `NOT_READY_FOR_PRODUCTION`; the evidence graph resolves 126 scoped claims.
 - `python -m unittest scripts.tests.test_audit_readiness` passed: 118 tests.
 - `go.exe` is unavailable in the local worktree; hosted CI is the Go/Windows
   runtime acceptance evidence.
