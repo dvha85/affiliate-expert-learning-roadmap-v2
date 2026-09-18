@@ -1505,6 +1505,15 @@ the bound intent. Curriculum CI run `35315240076` and Mission Agent Path CI
 run `35315240089` passed all 13 checks for this change. RP-02/R06/R07 remain
 PARTIAL pending hash-version/migration, persistence/provenance and external
 execution evidence.
+
+**Cập nhật RP-02 intent hash version boundary (2026-09-18):** `core/m08`
+formalizes the existing `sha256:` prefix as V1. Decode, policy evaluation and
+the mission harness reject an unknown prefix with `UNSUPPORTED_HASH_VERSION`
+and never reseal the old intent in place. Hosted Curriculum CI run
+`35316020312` and Mission Agent Path CI run `35316020309` passed all 13 checks.
+This is version recognition/fail-closed evidence only; migration, approval
+review, exact restart persistence and provenance remain open, so RP-02/R06/R07
+stay PARTIAL.
 Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
 
 **Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
