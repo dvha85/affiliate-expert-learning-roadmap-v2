@@ -77,6 +77,18 @@ theo baseline RP-02 mới; record: `docs/architecture/EVIDENCE-PR417-POST-MERGE-
 provenance evidence; hash migration, cross-store persistence, provider/live
 execution và production readiness vẫn mở. Marker: `Baseline sync after PR #417`.
 
+**Cập nhật RP-03 canonical M10 grant registry binding (2026-09-18):** trước
+`m10-gate` hoặc `m10-reserve`, learner state phải resolve exact immutable
+`CANARY_GRANT` từ M10 registry; grant hợp lệ về schema nhưng chỉ xuất hiện
+trong mutable `mission-state.json` bị fail closed trước gate/ledger mutation.
+Regression dùng real Bot fixture, đổi sang grant mới có hash hợp lệ nhưng không
+đăng ký, rồi kiểm `m10-gate` và `m10-reserve` không tạo output, registry entry,
+reservation hay usage-counter change. Worktree không có Go executable nên hosted
+`go test -race ./...` vẫn là acceptance gate. Đây là local offline/read-only
+lineage guard; không đóng multi-file crash/power-loss, distributed locking,
+provider, live executor, business outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 canonical M10 grant registry binding`.
+
 **Baseline sync after PR #416 (2026-09-18):** PR #416 đã squash-merge vào
 `main` tại `cefdb758f70ce36c08bc822ee658737149600bcd`, từ implementation head
 `bbd8aec14e56ba0b484376014b2ab5ec775ce3ec`. Snapshot hiện tại đã đồng bộ plan,

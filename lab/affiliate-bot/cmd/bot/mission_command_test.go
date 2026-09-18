@@ -1416,6 +1416,37 @@ func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T
 	assertMissionRuntimeUnchanged(t, beforeDenied, runtimeDir)
 }
 
+func TestMissionM10RejectsUnregisteredCanaryBeforeGateOrLedgerMutation(t *testing.T) {
+	runtimeDir, boundPath, _, evaluatedAt := authorityExpiryFixture(t, "none")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil {
+		t.Fatalf("load canary fixture: state=%+v err=%v", state, err)
+	}
+	forged := state.Canary.CanaryGrant
+	forged.GrantID = "unregistered-canary"
+	forged.GrantHash = corem10.ComputeCanaryGrantHash(forged)
+	state.Canary = &LearnerCanary{CanaryGrant: forged, Status: "ACTIVE"}
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+
+	gateOutput := filepath.Join(filepath.Dir(runtimeDir), "unregistered-gate.json")
+	beforeGate := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt.Format(time.RFC3339)); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("unregistered canary reached M10 gate: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeGate, runtimeDir)
+	if _, err := os.Stat(gateOutput); !os.IsNotExist(err) {
+		t.Fatalf("rejected gate wrote a portable output: %v", err)
+	}
+
+	beforeReserve := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, "unregistered-canary-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("unregistered canary reached M10 ledger: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeReserve, runtimeDir)
+}
+
 func TestMissionBindRejectsSemanticallyImpossibleM08PolicyWithoutStateMutation(t *testing.T) {
 	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
 	root := filepath.Dir(runtimeDir)
