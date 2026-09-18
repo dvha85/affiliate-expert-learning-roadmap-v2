@@ -98,12 +98,34 @@ type RegisteredToolResult struct {
 // boundary has validated it against a canonical context. It is proposal-only:
 // it grants no approval or execution authority.
 type RegisteredAgentProposal struct {
-	Version      string          `json:"version"`
-	ProposalID   string          `json:"proposal_id"`
-	RecordID     string          `json:"record_id"`
-	OutputDigest string          `json:"output_digest"`
-	RawOutput    json.RawMessage `json:"raw_output"`
+	Version           string                 `json:"version"`
+	ProposalID        string                 `json:"proposal_id"`
+	RecordID          string                 `json:"record_id"`
+	OutputDigest      string                 `json:"output_digest"`
+	ValidationResult  string                 `json:"validation_result"`
+	ValidationVersion string                 `json:"validation_version"`
+	Provenance        AgentProposalProvenance `json:"provenance"`
+	AuthorityCeiling  string                 `json:"authority_ceiling"`
+	RawOutput         json.RawMessage        `json:"raw_output"`
 }
+
+// AgentProposalProvenance is the immutable context binding captured at the
+// M07 boundary. The raw model output remains the source for claim details,
+// while these references make the persisted handoff auditable without
+// trusting a caller to reconstruct its decision/evidence links later.
+type AgentProposalProvenance struct {
+	ContextVersion string   `json:"context_version"`
+	RecordID       string   `json:"record_id"`
+	DecisionID     string   `json:"decision_id"`
+	EvidenceIDs    []string `json:"evidence_ids"`
+}
+
+const (
+	AgentProposalVersion          = "m07-agent-proposal/v1"
+	AgentProposalValidationResult = "VALID_HUMAN_REVIEW"
+	AgentProposalValidationVersion = "m07-output-validation/v1"
+	AgentProposalContextVersion   = "canonical-evidence-context/v1"
+)
 
 func uniqueNonEmpty(values []string) bool {
 	seen := map[string]bool{}
@@ -246,7 +268,10 @@ func canonicalJSONDigest(raw []byte) (string, error) {
 
 // RegisterAgentProposal validates the actual model JSON before persisting it.
 // An ABSTAIN result is intentionally not a proposal that M08 may resolve.
-func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID string) (RegisteredAgentProposal, error) {
+func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID, decisionID string) (RegisteredAgentProposal, error) {
+	if strings.TrimSpace(recordID) == "" || strings.TrimSpace(decisionID) == "" {
+		return RegisteredAgentProposal{}, fmt.Errorf("agent proposal requires record and decision identity")
+	}
 	output, err := ValidateAgentOutput(raw, evidence, registry)
 	if err != nil {
 		return RegisteredAgentProposal{}, err
@@ -262,24 +287,41 @@ func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec,
 	if err != nil {
 		return RegisteredAgentProposal{}, err
 	}
-	return RegisteredAgentProposal{Version: "m07-agent-proposal/v1", ProposalID: outputDigest, RecordID: recordID, OutputDigest: outputDigest, RawOutput: append(json.RawMessage(nil), trimmed...)}, nil
+	return RegisteredAgentProposal{
+		Version: AgentProposalVersion, ProposalID: outputDigest, RecordID: recordID,
+		OutputDigest: outputDigest, ValidationResult: AgentProposalValidationResult,
+		ValidationVersion: AgentProposalValidationVersion,
+		Provenance: AgentProposalProvenance{
+			ContextVersion: AgentProposalContextVersion,
+			RecordID: recordID, DecisionID: decisionID,
+			EvidenceIDs: append([]string(nil), output.EvidenceIDs...),
+		},
+		AuthorityCeiling: output.Authority,
+		RawOutput: append(json.RawMessage(nil), trimmed...),
+	}, nil
 }
 
 // ValidateRegisteredAgentProposal recomputes the raw-output digest and reruns
 // the M07 grounding boundary against the current canonical record context.
-func ValidateRegisteredAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID string) (RegisteredAgentProposal, AgentOutput, error) {
+func ValidateRegisteredAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID, decisionID string) (RegisteredAgentProposal, AgentOutput, error) {
 	var registered RegisteredAgentProposal
 	if err := contracts.DecodeStrict(raw, &registered); err != nil {
 		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal schema: %w", err)
 	}
-	if registered.Version != "m07-agent-proposal/v1" || registered.RecordID != recordID || len(bytes.TrimSpace(registered.RawOutput)) == 0 {
+	if registered.Version != AgentProposalVersion || registered.RecordID != recordID || len(bytes.TrimSpace(registered.RawOutput)) == 0 {
 		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal record binding is invalid")
 	}
-	recomputed, err := RegisterAgentProposal(registered.RawOutput, evidence, registry, recordID)
+	if registered.ValidationResult != AgentProposalValidationResult || registered.ValidationVersion != AgentProposalValidationVersion || registered.AuthorityCeiling != "A2-RO" {
+		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal validation metadata is invalid")
+	}
+	if registered.Provenance.ContextVersion != AgentProposalContextVersion || registered.Provenance.RecordID != recordID || registered.Provenance.DecisionID != decisionID || !uniqueNonEmpty(registered.Provenance.EvidenceIDs) {
+		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal provenance is invalid")
+	}
+	recomputed, err := RegisterAgentProposal(registered.RawOutput, evidence, registry, recordID, decisionID)
 	if err != nil {
 		return RegisteredAgentProposal{}, AgentOutput{}, err
 	}
-	if registered.ProposalID != recomputed.ProposalID || registered.OutputDigest != recomputed.OutputDigest {
+	if !reflect.DeepEqual(registered, recomputed) {
 		return RegisteredAgentProposal{}, AgentOutput{}, fmt.Errorf("registered proposal digest does not match raw output")
 	}
 	var output AgentOutput

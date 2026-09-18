@@ -303,7 +303,7 @@ func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := corem07.ValidateRegisteredAgentProposal(proposalRaw, []corem07.Evidence{registered.Evidence()}, registry, record.RecordID); err != nil {
+	if _, _, err := corem07.ValidateRegisteredAgentProposal(proposalRaw, []corem07.Evidence{registered.Evidence()}, registry, record.RecordID, record.RecordedResult.DecisionID); err != nil {
 		t.Fatal(err)
 	}
 	// M08 must resolve the persisted proposal and refuse a caller-supplied
@@ -334,7 +334,7 @@ func TestM07RegistersToolResultBeforeItCanBeCited(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentProposal, _, err := corem07.ValidateRegisteredAgentProposal(agentProposalRaw, historyCtx.Evidence, registry, record.RecordID)
+	agentProposal, _, err := corem07.ValidateRegisteredAgentProposal(agentProposalRaw, historyCtx.Evidence, registry, record.RecordID, historyCtx.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}

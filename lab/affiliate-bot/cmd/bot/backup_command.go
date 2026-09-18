@@ -970,7 +970,7 @@ func validateM07BackupGraph(dir string) error {
 			return err
 		}
 		ctx.Evidence = append(ctx.Evidence, toolEvidence[record.RecordID]...)
-		proposal, output, err := corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID)
+		proposal, output, err := corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID, ctx.DecisionID)
 		if err != nil {
 			return fmt.Errorf("M07 proposal is not grounded after restore: %w", err)
 		}

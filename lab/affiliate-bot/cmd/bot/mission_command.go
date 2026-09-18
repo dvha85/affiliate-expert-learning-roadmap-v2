@@ -1309,7 +1309,7 @@ func resolveM07Proposal(record HistoryRecord, proposalPath string) (corem07.Regi
 	if err != nil {
 		return corem07.RegisteredAgentProposal{}, corem07.AgentOutput{}, err
 	}
-	return corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID)
+	return corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID, ctx.DecisionID)
 }
 
 func sameParameters(raw json.RawMessage, parameters map[string]any) bool {

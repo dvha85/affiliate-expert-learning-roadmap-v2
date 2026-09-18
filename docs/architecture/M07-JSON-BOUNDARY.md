@@ -70,7 +70,11 @@ Proposal phải có `proposed_action` gồm `action_type`, `target` và paramete
 JSON object. Khi resolve, digest được tính lại và raw output được validate lại
 với canonical context; output `ABSTAIN`, output đã bị sửa hoặc record khác đều
 bị từ chối. Artifact này vẫn proposal-only, không phải approval hoặc execution
-authority.
+authority. Envelope còn giữ `validation_result`, `validation_version`,
+`authority_ceiling` và provenance gồm context version, `record_id`,
+`decision_id` và đúng các evidence IDs mà model đã cite. Resolver phải so sánh
+toàn bộ metadata này với output và canonical context được tính lại; thay đổi
+decision/evidence/provenance hoặc nâng authority ceiling đều bị fail closed.
 
 M08 agent path dùng thêm proposal artifact: `m08-intent HISTORY REQUEST
 M07_PROPOSAL OUT`, và `m08-policy HISTORY INTENT POLICY M07_PROPOSAL OUT`.

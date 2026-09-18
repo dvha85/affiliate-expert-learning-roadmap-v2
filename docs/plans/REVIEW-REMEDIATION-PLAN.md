@@ -1735,6 +1735,15 @@ Các regression chain hiện tại vì thế chạy đúng implementation dùng 
 chỉ là historical canary fixture audit, không cấp quyền, không gọi executor và
 không chứng minh provider, business outcome, crash/power-loss hay multi-host.
 
+**Cập nhật RP-05a proposal metadata (2026-09-18):** `RegisteredAgentProposal`
+giờ persist và resolver kiểm tra lại `validation_result`, `validation_version`,
+`authority_ceiling` cùng provenance của canonical context: `record_id`,
+`decision_id` và evidence IDs đã được model cite. Learner, watcher và restore
+đều truyền decision identity vào cùng resolver; proposal vẫn chỉ là
+`HUMAN_REVIEW` proposal, không cấp approval hay execution authority. Đây vẫn là
+bounded offline/fixture evidence; provider/model operated evidence và n8n
+end-to-end vẫn mở. Marker: `RP-05a proposal metadata`.
+
 ### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
 **Chạm tới:** `backup_command.go`, runtime store inventory, canonical loaders, manifest version và deployment runbook.

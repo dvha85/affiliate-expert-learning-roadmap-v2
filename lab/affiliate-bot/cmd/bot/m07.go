@@ -200,7 +200,7 @@ func runM07(args []string, stdout, stderr io.Writer) int {
 				return emit("TOOL_RESULT_REJECTED", nil, err, 1)
 			}
 		}
-		proposal, err := corem07.RegisterAgentProposal([]byte(text), ctx.Evidence, registry, record.RecordID)
+		proposal, err := corem07.RegisterAgentProposal([]byte(text), ctx.Evidence, registry, record.RecordID, ctx.DecisionID)
 		if err != nil {
 			return emit("PROPOSAL_REJECTED", nil, err, 1)
 		}
