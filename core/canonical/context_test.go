@@ -46,7 +46,7 @@ func TestBuildEvidenceContextRetainsAggregateAndOriginalFieldProvenance(t *testi
 	if ctx.Version != ContextVersion || ctx.Authority != "canonical_history_store" {
 		t.Fatalf("unexpected context envelope: %+v", ctx)
 	}
-	if got, want := strings.Join(ctx.EvidenceIDs, ","), "aggregate-1,field-price-1,field-commission-1"; got != want {
+	if got, want := strings.Join(ctx.EvidenceIDs, ","), "aggregate-1,field-commission-1,field-price-1"; got != want {
 		t.Fatalf("evidence IDs = %s, want %s", got, want)
 	}
 	if ctx.Evidence[1].Value == nil || ctx.Evidence[2].Value == nil {
@@ -85,7 +85,7 @@ func TestBuildEvidenceContextRejectsForgedOrCollidingIDs(t *testing.T) {
 
 func TestBuildEvidenceContextRejectsMalformedSourceProjection(t *testing.T) {
 	_, err := BuildEvidenceContext("record-1", "decision-1", []string{"aggregate-1"}, []ObservationInput{{
-		Raw: []byte(`{"observation_id":"aggregate-1"}`), ObservationID: "aggregate-1", SubjectID: "product-1",
+		Raw: []byte(`{"observation_id":"aggregate-1","subject_id":"product-1","access_method":"local_packet_conversion","transformation_or_method":"{}"}`), ObservationID: "aggregate-1", SubjectID: "product-1",
 	}})
 	if err == nil {
 		t.Fatal("malformed source projection was accepted")
