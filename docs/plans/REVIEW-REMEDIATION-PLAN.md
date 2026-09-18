@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 2acfcfc5a80ad590ce06813940ce9bbff83fd839 -->
+<!-- readiness-main-baseline: 12c50f3337991b533e5ecf363860df1e27bc2217 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -125,6 +125,19 @@ acceptance gate. Đây là bounded local/offline/synthetic/read-only evidence;
 không đóng multi-file crash/power-loss, distributed locking, provider,
 live-executor, business outcome, pilot hay deployment. Marker:
 `Cập nhật RP-03 approval expiry và STOP/reserve boundary`.
+
+**Baseline sync after PR #421 (2026-09-18):** PR #421 đã squash-merge vào
+`main` tại `12c50f3337991b533e5ecf363860df1e27bc2217`, từ implementation head
+`3620b24cc3b51d6490473c40103f328c83bc8c20`. PR có 13/13 checks PASS: Curriculum
+CI run `35323363318` gồm Windows runtime job `105530687600` và learner race job
+`105530687837`, cùng Mission Agent Path CI run `35323363297` với 3/3 job PASS.
+Snapshot đã rebinding plan, readiness matrix và evidence graph về regression
+RP-03 expiry/STOP-reserve sau merge; RP-03 vẫn `PARTIAL`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`. Đây là bounded local/offline/synthetic/read-only
+evidence, không thêm multi-file crash/power-loss, distributed locking,
+provider, live-executor, business outcome, pilot hay deployment claim. Record:
+`docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md`. Marker:
+`Baseline sync after PR #421`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON

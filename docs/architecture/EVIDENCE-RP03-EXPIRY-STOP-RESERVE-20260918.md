@@ -27,6 +27,17 @@ The local pre-edit baseline and post-edit Go execution could not start because
 the current Windows worktree has no `go.exe`; hosted CI is the acceptance gate.
 Readiness audit and its Python unit suite remain separately runnable locally.
 
+## Post-merge evidence
+
+PR #421 was squash-merged into `main` at
+`12c50f3337991b533e5ecf363860df1e27bc2217` from implementation head
+`3620b24cc3b51d6490473c40103f328c83bc8c20`. The hosted acceptance runs passed
+all 13 checks: Curriculum CI run `35323363318` (including Windows runtime job
+`105530687600` and learner race job `105530687837`) and Mission Agent Path CI
+run `35323363297` (3/3 jobs PASS). Post-merge readiness audit and 118 audit
+unit tests pass; local Go execution remains unavailable because `go.exe` is not
+installed in this worktree.
+
 ## Boundary
 
 This is bounded local/offline/synthetic/read-only fail-closed evidence. It does
