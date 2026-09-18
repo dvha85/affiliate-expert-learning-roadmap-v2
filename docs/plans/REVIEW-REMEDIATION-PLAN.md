@@ -1,7 +1,24 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: af2eb0d20d10d8f638480b8cdd8141c8b051ec1c -->
+<!-- readiness-main-baseline: b6010508ed058f8edd828e9bacdcf92fd70e0308 -->
+
+**Baseline sync after PR #437 (2026-09-18):** PR #437 was squash-merged into
+`main` at `b6010508ed058f8edd828e9bacdcf92fd70e0308`, from implementation head
+`156331e4363490ef2e08d29bae6820d4104dc74b`. Curriculum CI run
+`35362296661` and Mission Agent Path CI run `35362296433` both passed all 13
+checks, including Windows runtime `105656245515`, learner race
+`105656245369`, and the required M11 terminal-chain mutation proof
+`105656245417`. The post-merge RP-08 snapshot records that removing the
+evaluation-to-closed-cycle reverse-cardinality guard makes the real BR-18b
+backup/restore smoke fail closed before publishing the missing-cycle restore
+target. This closes one bounded offline mutation gap only; it does not claim
+complete mutation breadth, power-loss/filesystem-crash durability, atomic
+multi-file publication, distributed/multi-host safety, Windows traversal
+parity, provider/live execution, deployment, business outcomes or
+clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md`. Marker:
+`Baseline sync after PR #437`.
 
 **Baseline sync after PR #435 (2026-09-18):** PR #435 was squash-merged into
 `main` at `af2eb0d20d10d8f638480b8cdd8141c8b051ec1c`, from implementation head
