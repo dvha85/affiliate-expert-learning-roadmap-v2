@@ -62,8 +62,8 @@ def main():
         environment = os.environ.copy()
         environment["GOWORK"] = "off"
         core_result = subprocess.run(
-            ["go", "test", "./core/m11", "-run", f"^{CORE_TEST}$", "-count=1"],
-            cwd=temp_root,
+            ["go", "test", "./m11", "-run", f"^{CORE_TEST}$", "-count=1"],
+            cwd=temp_root / "core",
             env=environment,
             text=True,
             capture_output=True,
@@ -72,8 +72,8 @@ def main():
             fail("mutated core M11 reservation-ledger guard unexpectedly passed its focused regression")
 
         backup_result = subprocess.run(
-            ["go", "test", "./lab/affiliate-bot/cmd/bot", "-run", f"^{BACKUP_TEST}$", "-count=1"],
-            cwd=temp_root,
+            ["go", "test", "./cmd/bot", "-run", f"^{BACKUP_TEST}$", "-count=1"],
+            cwd=temp_root / "lab/affiliate-bot",
             env=environment,
             text=True,
             capture_output=True,
