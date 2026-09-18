@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: b7cfe1480973254ad106481d22c142651af3732b -->
+<!-- readiness-main-baseline: dcda7894ad72227c588de0f7077dc18cdab92fea -->
 
 **Baseline sync after PR #425 (2026-09-18):** PR #425 đã squash-merge vào
 `main` tại `b7cfe1480973254ad106481d22c142651af3732b`, từ implementation head
@@ -1743,6 +1743,15 @@ giờ persist và resolver kiểm tra lại `validation_result`, `validation_ver
 `HUMAN_REVIEW` proposal, không cấp approval hay execution authority. Đây vẫn là
 bounded offline/fixture evidence; provider/model operated evidence và n8n
 end-to-end vẫn mở. Marker: `RP-05a proposal metadata`.
+
+**Baseline sync after PR #427 (2026-09-18):** PR #427 đã squash-merge vào
+`main` tại `dcda7894ad72227c588de0f7077dc18cdab92fea` từ implementation head
+`0f9f3aaee9b0e41afd31eaa448df0c59bd7b0504`. Final head đạt đủ 13 hosted
+checks, gồm Windows runtime, learner race, Go vet, backup mutation và n8n
+regression. Evidence post-merge được ghi tại
+`docs/architecture/EVIDENCE-PR427-POST-MERGE-20260918.md`; RP-05 vẫn
+`PARTIAL`, provider/model operated evidence và live execution vẫn mở. Marker:
+`Baseline sync after PR #427`.
 
 ### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
