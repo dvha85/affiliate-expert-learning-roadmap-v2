@@ -25,6 +25,7 @@ CI_REQUIRED = {
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_registry_graph_envelope_integrity.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_authorization_lineage.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_reverse_ledger_graph.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_recovery_journal_path_guard.py": ".github/workflows/curriculum-ci.yml",
@@ -1188,6 +1189,41 @@ def audit_m11_ledger_outcome_reverse_mutation(root, matrix, plan_text):
         fail("M11 ledger-outcome reverse mutation proof is missing or not wired to CI")
 
 
+def audit_m11_reverse_ledger_mutation(root, matrix, plan_text):
+    """Require mutation coverage for the core M11 reverse-ledger graph guard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-m11-reverse-ledger-graph-mutation-20260919")
+    if not isinstance(record, dict) or any(token not in record.get("scope", "") for token in ("disposable", "reverse-ledger", "checksum-valid", "offline")):
+        fail("matrix lacks scoped M11 reverse-ledger mutation acceptance")
+    if "Cập nhật RP-08 M11 reverse-ledger graph mutation proof" not in plan_text:
+        fail("M11 reverse-ledger mutation lacks a scoped plan marker")
+    required_refs = {
+        "scripts/mutate_m11_reverse_ledger_graph.py",
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 reverse-ledger mutation record lacks implementation/test/evidence refs")
+    evidence_path = root / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    script_path = root / "scripts/mutate_m11_reverse_ledger_graph.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "\nCORE_GUARD = '''",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "ledger with an orphan reconciliation resolution link was accepted",
+        "mutated M11 reverse-ledger graph guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_m11_reverse_ledger_graph.py" not in workflow or "## Verification" not in evidence or "NOT_READY_FOR_PRODUCTION" not in evidence:
+        fail("M11 reverse-ledger mutation proof is missing or not wired to CI")
+
+
 def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
     """Keep direct M11 JSONL reads aligned with one-outcome-per-execution."""
     updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
@@ -2138,6 +2174,7 @@ def audit(root):
     audit_registry_graph_envelope_mutation(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
     audit_m11_ledger_outcome_reverse_mutation(root, matrix, plan_text)
+    audit_m11_reverse_ledger_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)

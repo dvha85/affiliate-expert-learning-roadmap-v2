@@ -2692,6 +2692,18 @@ một reverse semantic-orphan seam; mutation breadth đầy đủ, crash/power-l
 atomic multi-file, distributed/multi-host, Windows traversal parity,
 provider/live execution, deployment, pilot và business outcome vẫn mở.
 
+**Cập nhật RP-08 M11 reverse-ledger graph mutation proof (2026-09-19):**
+implementation branch thêm disposable-copy mutation bỏ riêng guard core yêu cầu
+mọi `ReconciliationResolutionIDs` của ledger checksum-valid phải resolve về đúng
+reconciliation execution và lease của stopped lifecycle. Mutation chạy chính
+`TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks` và phải fail ở
+assertion orphan reconciliation resolution; fail ở seam khác hoặc mutation xanh
+đều làm runner fail. Đây là proof offline/read-only cho một reverse-ledger graph
+seam; mutation breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot và business outcome vẫn mở. Marker: `Cập nhật RP-08 M11
+reverse-ledger graph mutation proof`.
+
 **Cập nhật M11 restore authorization/execution lineage (2026-09-16):** BR-18b
 giờ tạo bản sao checksum-valid của backup bằng learner Bot thật rồi làm lệch
 `production_health_snapshot_hash` trong `PRODUCTION_EXECUTION_AUTHORIZATION`
