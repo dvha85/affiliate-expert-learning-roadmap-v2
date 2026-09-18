@@ -1,7 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: f34d8c838bc7a2154e0555c5e12da7c2e06b89ec -->
+<!-- readiness-main-baseline: f1e29560561da1f8757f725f00d39ee50536b763 -->
+
+**Baseline sync after PR #453 (2026-09-19):** PR #453 was squash-merged into
+`main` at `f1e29560561da1f8757f725f00d39ee50536b763`, from implementation head
+`eb36c98a4c4c0bc55ee06857db338e3286dbd0bd`. Curriculum CI run `35391489583`
+and Mission Agent Path CI run `35391489747` passed all 13 hosted checks,
+including deterministic-smokes-backup-mutations job `105750642048`, Windows
+runtime job `105750642188` and learner race job `105750641947`. The new
+disposable mutation removes only the M11 backup restore reverse
+ledger-to-outcome cardinality guard and requires the real BR-18b smoke to fail
+at the checksum-valid orphan-ledger case. This is bounded offline mutation
+evidence; broader mutation breadth, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot, business outcome and production readiness remain open.
 
 **Baseline sync after PR #451 (2026-09-19):** PR #451 was squash-merged into
 `main` at `f34d8c838bc7a2154e0555c5e12da7c2e06b89ec`, from implementation head

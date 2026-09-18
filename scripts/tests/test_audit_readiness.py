@@ -104,6 +104,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_ledger_outcome = self.root / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md"
         evidence_rp08_ledger_outcome.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md", evidence_rp08_ledger_outcome)
+        evidence_rp08_post_merge_pr453 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md"
+        evidence_rp08_post_merge_pr453.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md", evidence_rp08_post_merge_pr453)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
