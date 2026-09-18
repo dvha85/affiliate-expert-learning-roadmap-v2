@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -26,6 +27,13 @@ func openStableRegularFileForAppendPath(path string, newFile bool) (*os.File, er
 	f, err := openWindowsRegularFile(filepath.Clean(path), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ, creation)
 	if err != nil {
 		return nil, fmt.Errorf("open stable append target: %w", err)
+	}
+	// CreateFile starts the file pointer at offset zero; unlike POSIX
+	// O_APPEND, GENERIC_WRITE alone does not append. Seek while the handle is
+	// exclusive for writers so canonical JSONL registries keep their history.
+	if _, err := f.Seek(0, io.SeekEnd); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("seek stable append target: %w", err)
 	}
 	return f, nil
 }
