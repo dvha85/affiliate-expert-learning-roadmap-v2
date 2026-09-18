@@ -658,6 +658,35 @@ def main():
         missing_cycle_result = invoke(bot, "backup", "restore", missing_cycle_backup, missing_cycle_restored, expected=1, env=env)
         assert missing_cycle_result["status"] == "GRAPH_FAILED", missing_cycle_result
         assert not missing_cycle_restored.exists()
+        missing_failed_outcome_backup = root / "missing-failed-outcome-backup"
+        shutil.copytree(backup, missing_failed_outcome_backup)
+        retained_outcomes = []
+        for line in (missing_failed_outcome_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8").splitlines():
+            outcome = json.loads(line)
+            if outcome["outcome_id"] != "br18-production-o":
+                retained_outcomes.append(line)
+        replace_backup_file(
+            missing_failed_outcome_backup,
+            "m11-outcomes.jsonl",
+            ("\n".join(retained_outcomes) + "\n").encode(),
+        )
+        missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
+        missing_failed_outcome_result = invoke(
+            bot,
+            "backup",
+            "restore",
+            missing_failed_outcome_backup,
+            missing_failed_outcome_restored,
+            expected=1,
+            env=env,
+        )
+        if missing_failed_outcome_result["status"] != "GRAPH_FAILED" or missing_failed_outcome_restored.exists():
+            raise AssertionError(
+                (
+                    "missing-failed-outcome restore must fail closed",
+                    missing_failed_outcome_result,
+                )
+            )
         pending_cycle_backup = root / "pending-cycle-backup"; shutil.copytree(backup, pending_cycle_backup)
         rewrite_m11_registry(pending_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "status", "REVIEW_PENDING"))
         assert invoke(bot, "backup", "restore", pending_cycle_backup, root / "pending-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
