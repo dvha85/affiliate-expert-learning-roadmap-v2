@@ -233,7 +233,15 @@ func validateAccesstradeReceiptStore(outcomesPath string, outcomes []m03.Outcome
 // A receipt file on its own is also material: it must not be silently omitted
 // from a backup even if its neighbouring outcome store has been damaged.
 func accesstradeBackupReceiptRequired(dir string) (bool, error) {
+	// Production callers pass the runtime directory. Keep the direct outcome
+	// path form valid as well so this boundary cannot silently skip framing
+	// validation when a caller already resolved outcomes.jsonl.
 	outcomesPath := filepath.Join(dir, "outcomes.jsonl")
+	if info, err := os.Lstat(dir); err == nil && !info.IsDir() {
+		outcomesPath = dir
+	} else if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
 	if err := receiptJournalPresent(outcomesPath); err != nil {
 		return false, err
 	}
