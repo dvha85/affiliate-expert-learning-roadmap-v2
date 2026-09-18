@@ -1,10 +1,10 @@
-"""Prove M11 restore rejects an execution without its reservation ledger link.
+"""Prove M11 validation rejects an execution without its reservation ledger link.
 
 This mutation removes both duplicate offline restore/registry checks for the
-same governed execution-to-reservation invariant from a disposable learner
-Bot checkout. The real BR-18b backup/restore smoke must then fail at the
-checksum-valid orphan-reservation fixture. This is bounded offline mutation
-evidence; it does not prove crash durability, multi-file atomicity,
+same governed execution-to-reservation invariant from a disposable learner Bot
+checkout. The focused core graph and backup graph regressions must then fail on
+their checksum-valid orphan-reservation fixture. This is bounded offline
+mutation evidence; it does not prove crash durability, multi-file atomicity,
 multi-host locking, provider operation, or live execution.
 """
 import os
@@ -18,7 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CORE_TARGET = Path("core/m11/artifact_registry.go")
 BACKUP_TARGET = Path("lab/affiliate-bot/cmd/bot/backup_command.go")
-SMOKE = Path("scripts/smoke_br18b_backup_restore.py")
+CORE_TEST = "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks"
+BACKUP_TEST = "TestBackupRestoreRejectsExecutionMissingReservationLedger"
 CORE_GUARD = '''\t\tif !reserved {
 \t\t\treturn fmt.Errorf("production execution is orphaned from its reservation ledger")
 \t\t}
@@ -27,7 +28,7 @@ BACKUP_GUARD = '''\t\tif !reserved {
 \t\t\treturn fmt.Errorf("M11 execution is orphaned from its restored reservation ledger")
 \t\t}
 '''
-EXPECTED_FAILURE_MARKER = "orphan-m11-reservation guard"
+EXPECTED_FAILURE_MARKER = "M11 reservation-ledger guard"
 
 
 def fail(message):
@@ -62,22 +63,32 @@ def main():
 
         environment = os.environ.copy()
         environment["GOWORK"] = "off"
-        result = subprocess.run(
-            [sys.executable, str(temp_root / SMOKE)],
+        core_result = subprocess.run(
+            ["go", "test", "./core/m11", "-run", f"^{CORE_TEST}$", "-count=1"],
             cwd=temp_root,
             env=environment,
             text=True,
             capture_output=True,
         )
-        output = result.stdout + result.stderr
-        if result.returncode == 0:
-            fail("mutated M11 reservation-ledger guards unexpectedly passed the real BR-18b smoke")
+        if core_result.returncode == 0:
+            fail("mutated core M11 reservation-ledger guard unexpectedly passed its focused regression")
+
+        backup_result = subprocess.run(
+            ["go", "test", "./lab/affiliate-bot/cmd/bot", "-run", f"^{BACKUP_TEST}$", "-count=1"],
+            cwd=temp_root,
+            env=environment,
+            text=True,
+            capture_output=True,
+        )
+        output = backup_result.stdout + backup_result.stderr
+        if backup_result.returncode == 0:
+            fail("mutated backup M11 reservation-ledger guard unexpectedly passed its focused regression")
         if EXPECTED_FAILURE_MARKER not in output:
             fail(
                 "M11 reservation-ledger mutation caused an unrelated failure; "
                 f"missing {EXPECTED_FAILURE_MARKER!r}:\n{output[-6000:]}"
             )
-    print("M11 reservation-ledger mutation detected by real BR-18b restore smoke")
+    print("M11 reservation-ledger mutation detected by focused core and backup graph regressions")
 
 
 if __name__ == "__main__":

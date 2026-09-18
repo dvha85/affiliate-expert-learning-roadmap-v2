@@ -878,6 +878,84 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 	return m11UnknownStopFixture{dir: dir, lease: lease, authorization: authorization, ledgerEntry: ledgerEntry}
 }
 
+func TestBackupRestoreRejectsExecutionMissingReservationLedger(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	execution := corem11.ProductionExecutionRecord{
+		ExecutionID:                  corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID),
+		AuthorizationID:              fixture.authorization.AuthorizationID,
+		ProductionLeaseID:            fixture.authorization.ProductionLeaseID,
+		ProductionLeaseVersion:       fixture.authorization.ProductionLeaseVersion,
+		ProductionLeaseHash:          fixture.authorization.ProductionLeaseHash,
+		ProductionGateID:             fixture.authorization.ProductionGateID,
+		ProductionHealthSnapshotID:   fixture.authorization.ProductionHealthSnapshotID,
+		ProductionHealthSnapshotHash: fixture.authorization.ProductionHealthSnapshotHash,
+		ProductionCostBoundID:        fixture.authorization.ProductionCostBoundID,
+		ProductionCostBoundHash:      fixture.authorization.ProductionCostBoundHash,
+		ProductionCostBoundMinor:     fixture.authorization.ProductionCostBoundMinor,
+		IntentID:                     fixture.authorization.IntentID,
+		IntentHash:                   fixture.authorization.IntentHash,
+		ExecutorID:                   fixture.authorization.ExecutorID,
+		IdempotencyKey:               fixture.authorization.IdempotencyKey,
+		AttemptedAt:                  "2026-09-08T00:00:02Z",
+		Status:                       "CANCELLED",
+		SideEffectState:              "NOT_PERFORMED",
+		CorrelationID:                fixture.authorization.CorrelationID,
+	}
+	registerM11TestArtifact(t, fixture.dir, corem11.ArtifactKindExecution, execution)
+	if err := validateM11BackupGraph(fixture.dir); err != nil {
+		t.Fatalf("valid reserved execution was rejected: %v", err)
+	}
+
+	raw, err := os.ReadFile(m11ArtifactRegistryPath(fixture.dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := make([][]byte, 0)
+	mutated := false
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, entryErr := corem11.ValidateArtifactEntry(line)
+		if entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		if entry.ArtifactKind == corem11.ArtifactKindLedger && entry.ArtifactID == fixture.ledgerEntry.ArtifactID {
+			value, status := corem11.DecodeArtifact("ledger", entry.Artifact)
+			if status != corem11.Valid {
+				t.Fatalf("fixture ledger is invalid: %s", status)
+			}
+			ledger := *value.(*corem11.ProductionLedger)
+			ledger.PendingExecutionIDs = []string{}
+			ledger.PendingOutcomes = 0
+			ledgerRaw, marshalErr := json.Marshal(ledger)
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			replacement, replacementErr := corem11.NewArtifactEntry(corem11.ArtifactKindLedger, ledgerRaw)
+			if replacementErr != nil {
+				t.Fatal(replacementErr)
+			}
+			line, err = json.Marshal(replacement)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutated = true
+		}
+		lines = append(lines, line)
+	}
+	if !mutated {
+		t.Fatal("reservation ledger fixture was not found")
+	}
+	if err := os.WriteFile(m11ArtifactRegistryPath(fixture.dir), append(bytes.Join(lines, []byte{'\n'}), '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateM11BackupGraph(fixture.dir); err == nil || !strings.Contains(err.Error(), "orphaned from its restored reservation ledger") {
+		t.Fatalf("M11 reservation-ledger guard: checksum-valid orphan execution was accepted: %v", err)
+	}
+}
+
 func TestM11UnknownStopJournalRecoversAfterStoppedLedgerWriteFailure(t *testing.T) {
 	for _, phase := range []string{"before_write", "after_write", "after_sync"} {
 		faultPhase := phase

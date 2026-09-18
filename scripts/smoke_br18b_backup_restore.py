@@ -685,8 +685,7 @@ def main():
             entry["artifact"]["pending_outcomes"] = 0
             return True
         rewrite_m11_registry(orphan_m11_reservation_backup, orphan_m11_reservation_change)
-        orphan_m11_reservation_result = invoke(bot, "backup", "restore", orphan_m11_reservation_backup, root / "orphan-m11-reservation-restored", expected=1, env=env)
-        assert orphan_m11_reservation_result["status"] == "GRAPH_FAILED", "orphan-m11-reservation guard: %r" % orphan_m11_reservation_result
+        assert invoke(bot, "backup", "restore", orphan_m11_reservation_backup, root / "orphan-m11-reservation-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
         duplicate_m11_artifact_backup = root / "duplicate-m11-artifact-backup"; shutil.copytree(backup, duplicate_m11_artifact_backup)
         m11_artifact_lines = (duplicate_m11_artifact_backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines()
         duplicate_execution_line = next(line for line in m11_artifact_lines if json.loads(line)["artifact_kind"] == "PRODUCTION_EXECUTION_RECORD")
