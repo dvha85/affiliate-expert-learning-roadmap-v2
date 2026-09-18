@@ -1,7 +1,24 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: aa6ead57f68e91d9824f144ba367e4f8b78dd6bd -->
+<!-- readiness-main-baseline: 2538968b6d9d94c7c33c2573d2b2b09e55afb000 -->
+
+**Baseline sync after PR #447 (2026-09-19):** PR #447 was squash-merged into
+`main` at `2538968b6d9d94c7c33c2573d2b2b09e55afb000`, from implementation head
+`bc32db664bc2c4ebdc71e3affd2b133c0994ea2c`. Curriculum CI run `35382273805`
+and Mission Agent Path CI run `35382273774` passed all 13 hosted checks,
+including the exact M11 lease-expiry mutation job `105720996473`, Windows
+runtime job `105720996711` and learner race job `105720996581`. The post-merge
+RP-08 snapshot records a checksum-valid canonical M11 gate evaluated exactly at
+lease expiry being rejected; the disposable mutation removes only the strict
+lease-expiry comparison and requires the real regression to fail. This closes
+one bounded offline mutation gap only; it does not claim complete mutation
+breadth, power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #447`.
 
 **Baseline sync after PR #445 (2026-09-19):** PR #445 was squash-merged into
 `main` at `aa6ead57f68e91d9824f144ba367e4f8b78dd6bd`, from implementation head
