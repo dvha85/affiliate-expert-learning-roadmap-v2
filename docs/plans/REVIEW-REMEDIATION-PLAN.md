@@ -1,7 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: dcda7894ad72227c588de0f7077dc18cdab92fea -->
+<!-- readiness-main-baseline: 4950b2fd1be80f3c0e58d9f270a44e275c3de0d5 -->
+
+**Baseline sync after PR #429 (2026-09-18):** PR #429 đã squash-merge vào
+`main` tại `4950b2fd1be80f3c0e58d9f270a44e275c3de0d5`, từ implementation head
+`d079dfc3b2d229805b458ec95c92be0fd15b375f`. Hosted Curriculum CI run
+`35340989562` và Mission Agent Path CI run `35340989656` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race, M07 adversarial/output contracts,
+mission-runtime và n8n regression. Post-merge snapshot cập nhật RP-05b với
+request identity adapter-derived, canonical JSON body digest và fail-closed cho
+forged/legacy provenance; readiness vẫn `NOT_READY_FOR_PRODUCTION`, không thêm
+provider/live execution, deployment, business outcome, distributed locking,
+power-loss hay multi-file atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR429-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #429`.
 
 **Baseline sync after PR #425 (2026-09-18):** PR #425 đã squash-merge vào
 `main` tại `b7cfe1480973254ad106481d22c142651af3732b`, từ implementation head
