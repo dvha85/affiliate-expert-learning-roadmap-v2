@@ -1189,6 +1189,13 @@ func TestBackupRestoreValidatesHistoricalM10RegistryWithoutActiveCanary(t *testi
 
 func TestBackupRestoreReplaysM11RecoveryAdmissionAndRejectsOrphanApproval(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
+	historyRecord, err := NewHistoryRecord("restore-admission-history", "2026-09-08T00:00:03Z", "2026-09-08T00:00:03Z", []Observation{historyObservation("restore-admission-history-observation", "restore-admission-product", "Product", 100, .1, "2026-09-08T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(filepath.Join(fixture.dir, "history.jsonl"), historyRecord); err != nil {
+		t.Fatal(err)
+	}
 	newLease := fixture.lease
 	newLease.LeaseID = "restore-admission-new-lease"
 	newLease.ApprovalRef = "restore-admission-new-approval"
