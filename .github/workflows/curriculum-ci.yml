@@ -287,6 +287,8 @@ jobs:
         run: python scripts/mutate_m11_gate_budget_snapshot.py
       - name: RP-08 M11 gate health policy mutation proof
         run: python scripts/mutate_m11_health_policy.py
+      - name: RP-08 M11 exact lease-expiry mutation proof
+        run: python scripts/mutate_m11_expiry_authority.py
       - name: RP-08 M11 canonical identity mutation proof
         run: python scripts/mutate_m11_identity_guard.py
       - name: RP-08 M11 authorization gate lineage mutation proof
