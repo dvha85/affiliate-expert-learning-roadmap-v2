@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: c3d10f83a3cb27ad7389d9b291002f5366be6ddc -->
+<!-- readiness-main-baseline: 2acfcfc5a80ad590ce06813940ce9bbff83fd839 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -100,6 +100,19 @@ business-outcome, pilot, deployment, distributed-locking, power-loss hay
 multi-file atomicity claim. Record:
 `docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md`. Marker:
 `Baseline sync after PR #416`.
+
+**Baseline sync after PR #419 (2026-09-18):** PR #419 đã squash-merge vào
+`main` tại `2acfcfc5a80ad590ce06813940ce9bbff83fd839`, từ implementation head
+`104bd186b0546dd4c3e7d8c6a3eebc44fe639ecc`. PR có 13/13 checks PASS: Curriculum
+CI run `35321402705` gồm Windows runtime job `105524487971` và learner race job
+`105524487897`, cùng Mission Agent Path CI run `35321402712` với 3/3 job PASS.
+Snapshot đã rebinding plan, readiness matrix và evidence graph về RP-03
+canonical M10 grant registry binding sau merge; RP-03 vẫn `PARTIAL`, overall
+vẫn `NOT_READY_FOR_PRODUCTION`. Đây là bounded offline/fixture lineage
+evidence, không thêm provider, live-executor, business-outcome, pilot,
+deployment, distributed-locking, power-loss hay multi-file atomicity claim.
+Record: `docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md`.
+Marker: `Baseline sync after PR #419`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON

@@ -25,6 +25,17 @@ The current Windows worktree has no `go.exe`; the attempted local baseline
 `go test -count=1 ./...` from `lab/affiliate-bot` could not start because the
 binary is absent. Hosted CI remains the acceptance evidence for this change.
 
+## Post-merge evidence
+
+PR #419 was squash-merged into `main` at
+`2acfcfc5a80ad590ce06813940ce9bbff83fd839` from implementation head
+`104bd186b0546dd4c3e7d8c6a3eebc44fe639ecc`. The hosted acceptance runs passed
+all 13 checks: Curriculum CI run `35321402705` (including Windows runtime job
+`105524487971` and learner race job `105524487897`) and Mission Agent Path CI
+run `35321402712` (3/3 jobs PASS). The local audit and 118 readiness-audit
+unit tests also pass on the post-merge evidence branch; the local Go baseline
+remains unavailable because `go.exe` is not installed in this worktree.
+
 ## Boundary
 
 This is a bounded offline/read-only M10 lineage guard. It does not prove
