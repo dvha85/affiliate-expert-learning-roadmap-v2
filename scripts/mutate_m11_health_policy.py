@@ -35,7 +35,7 @@ def main():
             fail("M11 gate health policy guard anchor is missing or ambiguous")
         mutated = source.replace(
             GUARD,
-            "/* MUTATION: gate production-health policy enforcement removed. */",
+            "healthAllowsProduction && !healthAllowsProduction ||",
             1,
         )
         target.write_text(mutated, encoding="utf-8")
