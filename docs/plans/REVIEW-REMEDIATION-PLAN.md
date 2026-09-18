@@ -1,7 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: f1e29560561da1f8757f725f00d39ee50536b763 -->
+<!-- readiness-main-baseline: 8346d676ee9fbacd364025cb9f28f9cac1c40216 -->
+
+**Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
+`main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
+`872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
+and Mission Agent Path CI run `35395007875` passed all 13 hosted checks,
+including the new M11 reverse-ledger graph mutation step, Windows runtime job
+`105761719057`, learner race job `105761719174` and deterministic
+backup/mutations job `105761719050`. The post-merge evidence records 145
+scoped claims and 120 readiness-audit tests. This rebinds readiness bookkeeping
+to the merged PR #455 baseline only; mutation breadth, ledger durability,
+crash/power-loss, atomic multi-file, distributed/multi-host, Windows traversal
+parity, provider/live execution, deployment, pilot, business outcome and
+production readiness remain open.
 
 **Baseline sync after PR #453 (2026-09-19):** PR #453 was squash-merged into
 `main` at `f1e29560561da1f8757f725f00d39ee50536b763`, from implementation head
