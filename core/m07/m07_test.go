@@ -167,4 +167,9 @@ func TestRegisteredAgentProposalRerunsGroundingAndDigest(t *testing.T) {
 	if _, _, err := ValidateRegisteredAgentProposal(tampered, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err == nil {
 		t.Fatal("forged proposal digest accepted")
 	}
+	registered.RecordID = "other-record"
+	wrongRecord, _ := json.Marshal(registered)
+	if _, _, err := ValidateRegisteredAgentProposal(wrongRecord, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err == nil {
+		t.Fatal("proposal from another canonical record accepted")
+	}
 }

@@ -210,7 +210,7 @@ func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 
 // The persisted M07 proposal is an immutable canonical input for an agent
 // intent. A replacement after open must fail before M08 can write the intent.
-func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
+func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAndProvenanceMismatch(t *testing.T) {
 	dir := t.TempDir()
 	history := filepath.Join(dir, "history.jsonl")
 	fixture := watchFixture()
@@ -283,6 +283,23 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	}
 	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
 		t.Fatalf("M08 intent wrote output after M07 proposal swap: %v", err)
+	}
+	if err := os.Remove(proposalPath); err != nil {
+		t.Fatal(err)
+	}
+	var mismatched corem07.RegisteredAgentProposal
+	if err := json.Unmarshal(proposalBytes, &mismatched); err != nil {
+		t.Fatal(err)
+	}
+	mismatched.RecordID = "different-canonical-record"
+	if _, err := writeNewJSON(proposalPath, mismatched); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, requestPath, proposalPath, outputPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("M08 intent accepted a proposal with mismatched canonical record provenance: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("M08 intent wrote output after proposal provenance mismatch: %v", err)
 	}
 }
 
