@@ -240,7 +240,7 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal, err := corem07.RegisterAgentProposal(modelRaw, ctx.Evidence, nil, records[0].RecordID)
+	proposal, err := corem07.RegisterAgentProposal(modelRaw, ctx.Evidence, nil, records[0].RecordID, ctx.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}

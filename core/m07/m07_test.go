@@ -3,6 +3,7 @@ package m07
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -154,22 +155,37 @@ func TestRegisteredAgentProposalRerunsGroundingAndDigest(t *testing.T) {
 	output := AgentOutput{State: "HUMAN_REVIEW", Claims: []Claim{claim}, EvidenceIDs: []string{"e1"}, ToolCalls: []ToolRequest{}, Authority: "A2-RO", WritePermission: false, ProposedAction: &ProposedAction{ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: json.RawMessage(`{"id":9007199254740993}`)}}
 	output.Answer = RenderGroundedAnswer(output.Claims)
 	raw, _ := json.Marshal(output)
-	registered, err := RegisterAgentProposal(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1")
+	registered, err := RegisterAgentProposal(raw, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if registered.ValidationResult != AgentProposalValidationResult || registered.ValidationVersion != AgentProposalValidationVersion || registered.AuthorityCeiling != "A2-RO" || registered.Provenance.ContextVersion != AgentProposalContextVersion || registered.Provenance.RecordID != "r1" || registered.Provenance.DecisionID != "d1" || !reflect.DeepEqual(registered.Provenance.EvidenceIDs, []string{"e1"}) {
+		t.Fatalf("proposal metadata was not persisted: %+v", registered)
+	}
 	stored, _ := json.Marshal(registered)
-	if _, _, err := ValidateRegisteredAgentProposal(stored, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err != nil {
+	if _, _, err := ValidateRegisteredAgentProposal(stored, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1"); err != nil {
 		t.Fatal(err)
 	}
 	registered.OutputDigest = "sha256:forged"
 	tampered, _ := json.Marshal(registered)
-	if _, _, err := ValidateRegisteredAgentProposal(tampered, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err == nil {
+	if _, _, err := ValidateRegisteredAgentProposal(tampered, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1"); err == nil {
 		t.Fatal("forged proposal digest accepted")
 	}
 	registered.RecordID = "other-record"
 	wrongRecord, _ := json.Marshal(registered)
-	if _, _, err := ValidateRegisteredAgentProposal(wrongRecord, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1"); err == nil {
+	if _, _, err := ValidateRegisteredAgentProposal(wrongRecord, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1"); err == nil {
 		t.Fatal("proposal from another canonical record accepted")
+	}
+	registered.RecordID = "r1"
+	registered.Provenance.DecisionID = "other-decision"
+	wrongDecision, _ := json.Marshal(registered)
+	if _, _, err := ValidateRegisteredAgentProposal(wrongDecision, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1"); err == nil {
+		t.Fatal("proposal from another canonical decision accepted")
+	}
+	registered.Provenance.DecisionID = "d1"
+	registered.Provenance.EvidenceIDs = []string{"forged-evidence"}
+	wrongEvidence, _ := json.Marshal(registered)
+	if _, _, err := ValidateRegisteredAgentProposal(wrongEvidence, []Evidence{{EvidenceID: "e1", FieldOrClaim: "price", Value: 100, ClaimKind: "assumption", Limitation: "synthetic"}}, registry(), "r1", "d1"); err == nil {
+		t.Fatal("proposal with forged evidence provenance accepted")
 	}
 }

@@ -1894,7 +1894,7 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal, err := corem07.RegisterAgentProposal(modelRaw, []corem07.Evidence{evidence}, registry, record.RecordID)
+	proposal, err := corem07.RegisterAgentProposal(modelRaw, []corem07.Evidence{evidence}, registry, record.RecordID, record.RecordedResult.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}

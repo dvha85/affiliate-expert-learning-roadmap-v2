@@ -690,7 +690,7 @@ func TestM07HTTPAdapterReportsUnconfirmedVisibleProposal(t *testing.T) {
 	if first.Code != http.StatusInternalServerError || !strings.Contains(first.Body.String(), `"status":"PUBLISHED_RECOVERY_REQUIRED"`) {
 		t.Fatalf("adapter did not disclose unconfirmed visible proposal: status=%d body=%s", first.Code, first.Body.String())
 	}
-	proposal, err := corem07.RegisterAgentProposal(mustRawJSON(t, model), ctx.Evidence, registry, records[0].RecordID)
+	proposal, err := corem07.RegisterAgentProposal(mustRawJSON(t, model), ctx.Evidence, registry, records[0].RecordID, ctx.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}

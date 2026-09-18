@@ -698,7 +698,7 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "VALID", "artifact": output, "execution_permitted": false})
 				return
 			}
-			proposal, err := corem07.RegisterAgentProposal(modelOutput, ctx.Evidence, request.Registry, ctx.RecordID)
+			proposal, err := corem07.RegisterAgentProposal(modelOutput, ctx.Evidence, request.Registry, ctx.RecordID, ctx.DecisionID)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "PROPOSAL_REJECTED", "execution_permitted": false})
