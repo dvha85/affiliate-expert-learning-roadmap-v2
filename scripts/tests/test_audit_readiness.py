@@ -20,6 +20,9 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        mutation_terminal_chain = self.root / "scripts/mutate_backup_m11_terminal_chain.py"
+        mutation_terminal_chain.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_backup_m11_terminal_chain.py", mutation_terminal_chain)
         evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
         evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
