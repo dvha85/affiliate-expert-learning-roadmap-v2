@@ -1265,7 +1265,7 @@ func missionAuthorityActive(s LearnerMissionState, now time.Time) error {
 // restored historical grant may be expired yet still be a valid record to
 // replay and audit; only an operation that would create new authority or a
 // reservation must require it to be active now.
-func missionCanaryActive(s LearnerMissionState, now time.Time) error {
+func missionCanaryActive(dir string, s LearnerMissionState, now time.Time) error {
 	if err := missionAuthorityActive(s, now); err != nil {
 		return err
 	}
@@ -1274,6 +1274,10 @@ func missionCanaryActive(s LearnerMissionState, now time.Time) error {
 	}
 	if status := corem10.ValidCanaryGrantFor(s.Canary.CanaryGrant, s.Intent.IntentID, s.Intent.IntentHash, s.Policy.PolicyVersion, s.Approval.ApprovalID, s.Approval.ApproverID, s.Intent.CorrelationID, s.Policy.RiskClass, s.Intent.ActionType, s.Intent.Target, now); status != "VALID" {
 		return fmt.Errorf("canary grant: %s", status)
+	}
+	grantRaw, err := json.Marshal(s.Canary.CanaryGrant)
+	if err != nil || !resolveM10Artifact(dir, corem10.ArtifactKindCanaryGrant, grantRaw) {
+		return fmt.Errorf("canary grant is not a registered canonical artifact")
 	}
 	return nil
 }
@@ -2523,7 +2527,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		raw, err := readMissionPortableInput(args[2])
@@ -2574,7 +2578,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		boundRaw, err := readMissionPortableInput(args[2])
@@ -2647,7 +2651,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		authorizationRaw, err := readMissionPortableInput(args[2])
@@ -3110,7 +3114,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionCanaryActive(s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)

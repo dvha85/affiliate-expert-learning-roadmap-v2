@@ -35,6 +35,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_pr417 = self.root / "docs/architecture/EVIDENCE-PR417-POST-MERGE-20260918.md"
         evidence_pr417.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR417-POST-MERGE-20260918.md", evidence_pr417)
+        evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
+        evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
         evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
         evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)
