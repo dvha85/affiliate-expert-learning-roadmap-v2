@@ -114,6 +114,18 @@ deployment, distributed-locking, power-loss hay multi-file atomicity claim.
 Record: `docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md`.
 Marker: `Baseline sync after PR #419`.
 
+**Cập nhật RP-03 approval expiry và STOP/reserve boundary (2026-09-18):**
+learner `m10-reserve` nay có regression trực tiếp cho cả bốn authority expiry:
+before boundary phải reserve được, tại/sau boundary phải `REJECTED` và giữ
+nguyên canonical runtime snapshot. Regression riêng persist durable M11 STOP
+rồi chứng minh M10 reserve trả `STOPPED` không đổi state, counter, reservation
+hay registry; synchronized offline smoke tiếp tục cover race thật giữa STOP và
+reserve qua các Bot process. Worktree không có `go.exe`, nên hosted race CI là
+acceptance gate. Đây là bounded local/offline/synthetic/read-only evidence;
+không đóng multi-file crash/power-loss, distributed locking, provider,
+live-executor, business outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 approval expiry và STOP/reserve boundary`.
+
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
 transport hardening vào learner adapter, blueprint và regression runner. Tất
