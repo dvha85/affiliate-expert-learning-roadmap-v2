@@ -660,6 +660,10 @@ def main():
         assert not missing_cycle_restored.exists()
         missing_failed_outcome_backup = root / "missing-failed-outcome-backup"
         shutil.copytree(backup, missing_failed_outcome_backup)
+        rewrite_m11_registry(
+            missing_failed_outcome_backup,
+            replace_m11_field("PRODUCTION_EXECUTION_RECORD", "status", "FAILED"),
+        )
         retained_outcomes = []
         for line in (missing_failed_outcome_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8").splitlines():
             outcome = json.loads(line)
