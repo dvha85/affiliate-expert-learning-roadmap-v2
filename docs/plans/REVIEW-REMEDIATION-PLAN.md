@@ -1494,6 +1494,17 @@ learner race, Windows runtime and mission-runtime test/vet jobs. This records
 offline/fixture acceptance for the shared decoder seam; RP-02/R06/R07 remain
 PARTIAL for shared conformance, hash-version/migration, provenance/persistence
 and external execution requirements.
+
+**Cập nhật RP-02 shared M08 conformance table (2026-09-18):**
+`core/m08/conformance.go` now owns one scenario table with expected decision,
+risk, reason and non-authorizing flags. Core, mission-runtime and learner
+regressions consume that table; learner cases that require an independently
+trusted missing decision/evidence registry are marked as an explicit parity
+boundary because the learner policy-input contract derives those links from
+the bound intent. Curriculum CI run `35315240076` and Mission Agent Path CI
+run `35315240089` passed all 13 checks for this change. RP-02/R06/R07 remain
+PARTIAL pending hash-version/migration, persistence/provenance and external
+execution evidence.
 Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
 
 **Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.

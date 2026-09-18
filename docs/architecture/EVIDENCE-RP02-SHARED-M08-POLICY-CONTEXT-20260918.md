@@ -12,7 +12,12 @@ The shared boundary rejects missing/null fields, duplicate or unknown/case
 variant keys, invalid RFC3339 time, duplicate identity lists, unknown risk
 classes and blank idempotency entries before policy evaluation. A human context
 may have no proposal set; an agent intent still requires a resolvable
-`proposal_ref` during policy evaluation.
+`proposal_ref` during policy evaluation. `core/m08` now also publishes one
+deterministic conformance table covering allow/review/wait/expiry/link,
+proposal, target, idempotency and tamper outcomes. Harness tests run every
+scenario; learner tests run the scenarios expressible by its trusted
+decision/evidence binding and explicitly leave missing-link registry states as
+a documented parity boundary.
 
 ## Regression coverage
 
@@ -23,6 +28,9 @@ may have no proposal set; an agent intent still requires a resolvable
   boundary with the canonical core decoder for valid and invalid contexts.
 - `lab/affiliate-bot/cmd/bot/mission_command_test.go` covers learner rejection
   of invalid shared context semantics.
+- `core/m08/conformance.go` is the shared scenario/expected-result table;
+  `core/m08/conformance_test.go`, the harness test and the learner test consume
+  it rather than maintaining separate expected reasons.
 - Existing intent/policy tests remain in place for exact JSON numbers,
   `parameters:null`, proposal-only authority and non-authorizing decisions.
 
@@ -31,15 +39,15 @@ may have no proposal set; an agent intent still requires a resolvable
 The current worktree has no Go executable, so no local Go test or vet PASS is
 claimed. Hosted CI is now green for PR #417:
 
-- [Curriculum CI run 35314331386](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35314331386)
+- [Curriculum CI run 35315240076](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35315240076)
   passed the learner full tests/vet, `go test -race ./...`, deterministic
-  runtime/smoke jobs and `windows-runtime` job 105502656378.
-- [Mission Agent Path CI run 35314331378](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35314331378)
-  passed the mission runtime job 105502656431, including its Go test/vet
+  runtime/smoke jobs and `windows-runtime` job 105505358592.
+- [Mission Agent Path CI run 35315240089](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35315240089)
+  passed the mission runtime job 105505358588, including its Go test/vet
   coverage.
 - The shared M08-specific learner and harness regressions are included in
-  learner jobs 105502656457/105502656411 and mission job 105502656431; the
-  learner race regression is job 105502656474.
+  learner jobs 105505358745/105505358755 and mission job 105505358588; the
+  learner race regression is job 105505358836.
 
 This is hosted offline/fixture evidence for the decoder and policy boundary;
 it does not claim provider access, live execution or production readiness. The
