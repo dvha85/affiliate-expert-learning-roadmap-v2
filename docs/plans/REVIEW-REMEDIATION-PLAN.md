@@ -1523,6 +1523,14 @@ checks. Đây là local fixture/restart evidence bounded; crash/power-loss,
 multi-process persistence and distributed storage remain open, nên R07 và
 RP-02 vẫn PARTIAL.
 
+**Cập nhật RP-02 persisted M07 proposal provenance (2026-09-18):** learner
+resolver revalidate digest, grounding và canonical `record_id` khi bind
+`proposal_ref`; regression reject proposal có digest hợp lệ nhưng provenance
+khác và không ghi M08 intent. Curriculum CI run `35317820062` và Mission Agent
+Path CI run `35317820048` đã PASS toàn bộ 13 checks. Đây là bounded local
+resolver/read-only evidence; cross-store transactionality, distributed
+persistence and live execution remain open, nên RP-02/R06/R07 vẫn `PARTIAL`.
+
 Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
 
 **Nghiệm thu:** R06/R07 vẫn `PARTIAL`; output vẫn đúng schema và

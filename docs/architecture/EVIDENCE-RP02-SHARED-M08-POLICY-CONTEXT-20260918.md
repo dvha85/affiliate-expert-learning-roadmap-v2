@@ -31,6 +31,12 @@ reloads its artifact through the `UseNumber` reader and recomputes the intent
 hash. Both retain `9007199254740993` as `json.Number`; this is exact local
 restart/fixture evidence, not distributed or power-loss durability evidence.
 
+The learner's persisted M07 proposal resolver now has an integration regression
+for provenance mismatch: a proposal with a valid digest but a different
+canonical `record_id` is rejected before M08 intent output is created. This
+revalidates the proposal digest, record binding and grounding context at resolve
+time; it does not claim cross-store transactionality or production persistence.
+
 ## Regression coverage
 
 - `core/m08/m08_test.go` covers valid full-context decode plus missing, null,
@@ -48,6 +54,9 @@ restart/fixture evidence, not distributed or power-loss durability evidence.
   intent.
 - The harness and learner M08 parameter-number regressions now write/read the
   intent artifact before checking the exact number and hash.
+- `lab/affiliate-bot/cmd/bot/mission_command_test.go` rejects a persisted M07
+  proposal whose digest is valid but whose canonical `record_id` provenance was
+  changed, and confirms that no M08 intent is written.
 - Existing intent/policy tests remain in place for exact JSON numbers,
   `parameters:null`, proposal-only authority and non-authorizing decisions.
 
@@ -56,15 +65,16 @@ restart/fixture evidence, not distributed or power-loss durability evidence.
 The current worktree has no Go executable, so no local Go test or vet PASS is
 claimed. Hosted CI is now green for PR #417:
 
-- [Curriculum CI run 35316418613](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35316418613)
+- [Curriculum CI run 35317820062](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35317820062)
   passed the learner full tests/vet, `go test -race ./...`, deterministic
-  runtime/smoke jobs and `windows-runtime` job 105508926281.
-- [Mission Agent Path CI run 35316418619](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35316418619)
-  passed the mission runtime job 105508926366, including its Go test/vet
+  runtime/smoke jobs, `windows-runtime` job 105513259104 and learner race job
+  105513257233.
+- [Mission Agent Path CI run 35317820048](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35317820048)
+  passed the mission runtime job 105513256974, including its Go test/vet
   coverage.
 - The shared M08-specific learner and harness regressions are included in
-  learner jobs in the two hosted workflows; the learner race regression is job
-  105508926341.
+  learner jobs in the two hosted workflows; the latest learner race regression
+  is job 105513257233.
 
 This is hosted offline/fixture evidence for the decoder and policy boundary;
 it does not claim provider access, live execution or production readiness. The
