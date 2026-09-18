@@ -930,8 +930,7 @@ func TestBackupRestoreRejectsExecutionMissingReservationLedger(t *testing.T) {
 				t.Fatalf("fixture ledger is invalid: %s", status)
 			}
 			ledger := *value.(*corem11.ProductionLedger)
-			ledger.PendingExecutionIDs = []string{}
-			ledger.PendingOutcomes = 0
+			ledger.PendingExecutionIDs = []string{"orphan-pending-execution"}
 			ledgerRaw, marshalErr := json.Marshal(ledger)
 			if marshalErr != nil {
 				t.Fatal(marshalErr)
