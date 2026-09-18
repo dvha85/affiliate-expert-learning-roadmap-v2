@@ -485,6 +485,13 @@ func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.
 	if err != nil || !bytes.Contains(stored, []byte(`9007199254740993`)) {
 		t.Fatalf("large number was not preserved: %s, %v", stored, err)
 	}
+	var reloaded LearnerIntent
+	if err := readJSON(intent, &reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := reloaded.Parameters["id"].(json.Number); !ok || got.String() != "9007199254740993" || learnerIntentHash(reloaded) != reloaded.IntentHash {
+		t.Fatalf("large number changed across learner restart/hash reload: intent=%+v", reloaded)
+	}
 	if err := os.WriteFile(request, bytes.Replace(valid, []byte(`"parameters":{"id":9007199254740993}`), []byte(`"parameters":null`), 1), 0600); err != nil {
 		t.Fatal(err)
 	}

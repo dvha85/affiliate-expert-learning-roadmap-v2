@@ -166,9 +166,21 @@ func TestM08ParameterNumbers(t *testing.T) {
 	i.Parameters = map[string]any{"id": json.Number("9007199254740993")}
 	i = SealShadowActionIntent(i)
 	raw, _ := json.Marshal(i)
-	decoded, s := DecodeM08Intent(raw)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "intent.json")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, s := DecodeM08Intent(persisted)
 	if s != missionValid || ComputeShadowIntentHash(decoded) != i.IntentHash {
 		t.Fatal("number rounded", s)
+	}
+	if got, ok := decoded.Parameters["id"].(json.Number); !ok || got.String() != "9007199254740993" {
+		t.Fatalf("large number changed after persisted reload: %#v", decoded.Parameters["id"])
 	}
 }
 func TestM08CLI(t *testing.T) {
