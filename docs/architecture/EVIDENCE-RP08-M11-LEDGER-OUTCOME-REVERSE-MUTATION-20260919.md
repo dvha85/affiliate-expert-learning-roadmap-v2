@@ -1,8 +1,9 @@
 # RP-08 evidence: M11 ledger-outcome reverse mutation proof
 
 - Snapshot date: 2026-09-19
-- Implementation branch: `codex/rp08-m11-ledger-outcome-mutation`
-- Implementation PR: pending hosted review
+- Implementation PR: #453
+- Implementation head: `eb36c98a4c4c0bc55ee06857db338e3286dbd0bd`
+- Merge commit: `f1e29560561da1f8757f725f00d39ee50536b763`
 - Status: `NOT_READY_FOR_PRODUCTION`
 
 ## Scope
@@ -24,11 +25,19 @@ publication, distributed or multi-host locking, Windows traversal parity,
 provider/live execution, deployment, pilot acceptance, business outcome or
 production readiness.
 
-## Verification boundary
+## Hosted verification
 
-- Local Python syntax and readiness tests are required on the implementation
-  head.
-- The BR-18b smoke and mutation runner require Go and are therefore accepted
-  through the exact-head hosted Curriculum CI run when local `go.exe` is absent.
-- Hosted run IDs and the merged-main baseline are recorded in a separate
-  post-merge evidence synchronization change.
+- Curriculum CI run `35391489583` and Mission Agent Path CI run `35391489747`
+  passed all 13 required hosted checks on the exact implementation head.
+- Deterministic backup/mutation job `105750642048` passed the BR-18b smoke and
+  the new ledger-outcome reverse mutation proof.
+- Windows runtime job `105750642188` and learner race job `105750641947` passed.
+
+## Local verification
+
+- `python scripts/audit_readiness.py`: PASS; 144 claims; remains
+  `NOT_READY_FOR_PRODUCTION`.
+- `python -m unittest scripts.tests.test_audit_readiness`: PASS (119 tests).
+- Python compilation, readiness JSON parsing and `git diff --check`: PASS.
+- Local Go execution remains unavailable because `go.exe` is absent; hosted
+  Linux and Windows jobs provide the executable Go acceptance evidence.
