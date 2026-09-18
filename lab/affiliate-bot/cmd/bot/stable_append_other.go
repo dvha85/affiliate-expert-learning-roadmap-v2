@@ -1,13 +1,11 @@
-//go:build !aix && !android && !darwin && !dragonfly && !freebsd && !hurd && !illumos && !ios && !linux && !netbsd && !openbsd && !solaris
+//go:build !aix && !android && !darwin && !dragonfly && !freebsd && !hurd && !illumos && !ios && !linux && !netbsd && !openbsd && !solaris && !windows
 
 package main
 
 import "os"
 
-// Platforms without the POSIX descriptor traversal keep the existing
-// regular-file and O_EXCL checks. Their native lock/path hardening remains a
-// separate compatibility boundary until a platform-specific stable parent
-// primitive is available.
+// Platforms without a descriptor traversal keep the existing regular-file and
+// O_EXCL checks. Their native path hardening remains a separate boundary.
 func openStableRegularFileForAppendPath(path string, newFile bool) (*os.File, error) {
 	if stableRegularFileAppendHook != nil {
 		if err := stableRegularFileAppendHook(path); err != nil {
