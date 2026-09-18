@@ -21,13 +21,13 @@ PR #416 hardens the remaining Windows pathname readers and writers at head
 
 - [PR #416](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/416)
   is open from the clean branch `codex/rp01-windows-ancestor-race-v2`.
-- [Curriculum CI run 35305634308](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35305634308): overall `Success`.
-- [windows-runtime job 105477137808](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35305634308/job/105477137808): `succeeded`.
+- [Curriculum CI run 35306191800](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35306191800): overall `Success` on the evidence-bearing head.
+- [windows-runtime job 105478750919](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35306191800/job/105478750919): `succeeded`.
 - `go test ./...`: PASS on `windows-latest`.
 - `go vet ./...`: PASS on `windows-latest`.
 - `go test -count=1 ./cmd/bot -run "Test(ManagedPathLock|RuntimeGate|Backup|Restore)"`: PASS on `windows-latest`.
-- [learner-bot-race job 105477138018](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35305634308/job/105477138018): `succeeded`; `go test -race ./...` PASS.
-- [Mission Agent Path CI run 35305634305](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35305634305): all three jobs PASS.
+- [learner-bot-race job 105478751048](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35306191800/job/105478751048): `succeeded`; `go test -race ./...` PASS.
+- [Mission Agent Path CI run 35306191794](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35306191794): all three jobs PASS.
 
 The Windows full package run includes these controlled post-preflight
 ancestor-replacement regressions:

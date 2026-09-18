@@ -57,10 +57,11 @@ JSONL reader. Existing ancestors được mở với `OPEN_REPARSE_POINT`, khôn
 delete; component còn thiếu được tạo và pin từng bước. Regression Windows thay
 ancestor sau preflight bằng junction/reparse point cho các đường backup/restore,
 stable reader/append và store reader đều fail closed, không đổi external tree.
-Curriculum CI run `35305634308` PASS; `windows-runtime` job
-`105477137808` PASS với `go test ./...`, `go vet ./...` và targeted
-lock/backup/restore; learner race job `105477138018` PASS với
-`go test -race ./...`. Vì Windows không có portable `openat`/`mkdirat` cho
+Curriculum CI run `35306191800` PASS; `windows-runtime` job
+`105478750919` PASS với `go test ./...`, `go vet ./...` và targeted
+lock/backup/restore; learner race job `105478751048` PASS với
+`go test -race ./...`. Mission Agent Path CI run `35306191794` cũng PASS cả
+ba job. Vì Windows không có portable `openat`/`mkdirat` cho
 traversal nhiều component trong boundary này, implementation chỉ claim
 conservative local single-host boundary, không claim POSIX parity, distributed
 locking, power-loss, multi-file atomicity, provider/live execution hoặc
