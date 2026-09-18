@@ -1,7 +1,19 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 35ebabc2f068cda0a4eef1dd479fc102d03a7a53 -->
+<!-- readiness-main-baseline: b7cfe1480973254ad106481d22c142651af3732b -->
+
+**Baseline sync after PR #425 (2026-09-18):** PR #425 đã squash-merge vào
+`main` tại `b7cfe1480973254ad106481d22c142651af3732b`, từ implementation head
+`d3127b99dda310be3620ff54ea0b3add0cd6d44b`. Hosted Curriculum CI run
+`35329168897` và Mission Agent Path CI run `35329168855` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race, Go vet và n8n/mission regressions. Hậu-
+merge snapshot chỉ rebinding RP-04 shared canonical context về merge baseline;
+readiness vẫn `NOT_READY_FOR_PRODUCTION`, không thêm provider/live execution,
+deployment, business outcome, distributed locking, power-loss hay multi-file
+atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR425-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #425`.
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
