@@ -134,6 +134,65 @@ def rewrite_m11_registry(backup, change):
     replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
 
 
+def append_m11_registry_entry(backup, kind, artifact):
+    canonical = json.dumps(artifact, separators=(",", ":"), ensure_ascii=False).encode()
+    entry = {
+        "artifact_kind": kind,
+        "artifact_id": artifact["authorization_id"] if kind == "PRODUCTION_EXECUTION_AUTHORIZATION" else artifact["execution_id"] if kind == "PRODUCTION_EXECUTION_RECORD" else artifact["lease_id"] + "/" + artifact["updated_at"],
+        "content_hash": "sha256:" + hashlib.sha256(canonical).hexdigest(),
+        "artifact": artifact,
+    }
+    path = backup / "m11-artifacts.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
+def add_m11_failed_execution_without_outcome(backup):
+    entries = m11_entries(backup)
+    authorization = next(entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_EXECUTION_AUTHORIZATION")
+    execution = next(entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_EXECUTION_RECORD")
+    ledger = max(
+        (entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_LEDGER"),
+        key=lambda item: item["updated_at"],
+    )
+    authorized_at = "2026-09-08T00:00:04Z"
+    attempted_at = "2026-09-08T00:00:07Z"
+    authorization_id = "prod-auth-" + hashlib.sha256(
+        (authorization["production_gate_id"] + "\x00" + authorization["executor_id"] + "\x00" + authorized_at).encode()
+    ).digest()[:16].hex()
+    new_authorization = json.loads(json.dumps(authorization))
+    new_authorization.update({
+        "authorization_id": authorization_id,
+        "authorized_at": authorized_at,
+        "idempotency_key": "br18-mutation-failed-outcome",
+    })
+    execution_id = "prod-exec-" + authorization_id
+    new_execution = json.loads(json.dumps(execution))
+    new_execution.update({
+        "execution_id": execution_id,
+        "authorization_id": authorization_id,
+        "idempotency_key": new_authorization["idempotency_key"],
+        "attempted_at": attempted_at,
+        "status": "FAILED",
+        "side_effect_state": "NOT_PERFORMED",
+        "error": "fixture-secondary-dispatch-failed-without-outcome",
+    })
+    new_ledger = json.loads(json.dumps(ledger))
+    new_ledger.update({
+        "updated_at": attempted_at,
+        "last_execution_at": attempted_at,
+        "executions_total": ledger["executions_total"] + 1,
+        "executions_in_window": ledger["executions_in_window"] + 1,
+        "cost_minor_total": ledger["cost_minor_total"] + new_authorization["production_cost_bound_minor"],
+        "pending_outcomes": 1,
+        "pending_execution_ids": [execution_id],
+    })
+    append_m11_registry_entry(backup, "PRODUCTION_LEDGER", new_ledger)
+    append_m11_registry_entry(backup, "PRODUCTION_EXECUTION_AUTHORIZATION", new_authorization)
+    append_m11_registry_entry(backup, "PRODUCTION_EXECUTION_RECORD", new_execution)
+
+
 def remove_m11_entry(backup, kind, artifact_id):
     lines, removed = [], False
     for line in (backup / "m11-artifacts.jsonl").read_text(encoding="utf-8").splitlines():
@@ -665,34 +724,11 @@ def main():
         assert not missing_cycle_restored.exists()
         missing_failed_outcome_backup = root / "missing-failed-outcome-backup"
         shutil.copytree(backup, missing_failed_outcome_backup)
-        rewrite_m11_registry(
-            missing_failed_outcome_backup,
-            replace_m11_field("PRODUCTION_EXECUTION_RECORD", "status", "FAILED"),
-        )
-        retained_outcomes = []
-        for line in (missing_failed_outcome_backup / "m11-outcomes.jsonl").read_text(encoding="utf-8").splitlines():
-            outcome = json.loads(line)
-            if outcome["outcome_id"] != "br18-production-o":
-                retained_outcomes.append(line)
-        replace_backup_file(
-            missing_failed_outcome_backup,
-            "m11-outcomes.jsonl",
-            ("\n".join(retained_outcomes) + "\n").encode(),
-        )
-        def remove_failed_outcome_ledger_link(entry):
-            if entry["artifact_kind"] != "PRODUCTION_LEDGER":
-                return False
-            links = entry["artifact"].get("outcome_links", [])
-            filtered = [link for link in links if link.get("outcome_id") != "br18-production-o"]
-            entry["artifact"]["outcome_links"] = filtered
-            return len(filtered) != len(links)
-
-        rewrite_m11_registry(missing_failed_outcome_backup, remove_failed_outcome_ledger_link)
-        # Remove downstream consumers as well so the mutation isolates the
-        # FAILED-execution invariant rather than tripping evaluation/cycle
-        # lineage checks first.
-        remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_OUTCOME_EVALUATION", "br18-production-e")
-        remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_CYCLE", "br18-production-cycle")
+        # Keep the original failed execution/outcome pair valid, then append a
+        # second checksum-valid FAILED execution whose outcome is absent. This
+        # reaches the semantic restore guard without failing in the outcome
+        # loader or an unrelated terminal-lineage check first.
+        add_m11_failed_execution_without_outcome(missing_failed_outcome_backup)
         missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
         missing_failed_outcome_result, missing_failed_outcome_error = invoke_with_stderr(
             bot,
