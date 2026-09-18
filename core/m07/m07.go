@@ -409,6 +409,9 @@ func ValidateRegisteredToolResult(raw []byte, registry []ToolSpec, recordID stri
 	if registered.Version != "m07-tool-result/v1" || registered.RecordID != recordID || registered.Result.RecordID != recordID || !reflect.DeepEqual(registered.Registry, registry) {
 		return RegisteredToolResult{}, fmt.Errorf("registered tool result record binding is invalid")
 	}
+	if registered.Result.RequestID == "" || registered.Result.ContentDigest == "" {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result provenance is incomplete")
+	}
 	resultRaw, err := json.Marshal(registered.Result)
 	if err != nil {
 		return RegisteredToolResult{}, err
