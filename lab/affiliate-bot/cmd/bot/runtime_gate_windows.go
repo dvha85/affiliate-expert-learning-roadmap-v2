@@ -15,9 +15,10 @@ var managedLockBeforeOpenHook func()
 
 // Windows uses an exclusive native file handle. The kernel releases the
 // handle when the owning process exits, so a crashed writer cannot leave a
-// stale directory claim that blocks recovery. Ancestor validation remains a
-// bounded pathname preflight; full multi-host/distributed locking is out of
-// scope for this local runtime gate.
+// stale directory claim that blocks recovery. Existing ancestors are pinned
+// with native directory handles before the final file open; Windows still has
+// no openat-equivalent for arbitrary multi-component creation, so this is a
+// conservative local boundary rather than distributed-lock parity.
 func acquireManagedPathLock(path string) (func(), error) {
 	f, err := openWindowsRegularFile(path, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, windows.OPEN_ALWAYS)
 	if err != nil {
@@ -30,8 +31,8 @@ func acquireManagedPathLock(path string) (func(), error) {
 }
 
 // openWindowsRegularFile opens a final regular file without following a
-// final reparse point. It keeps the existing caller-owned ancestor preflight;
-// Windows lacks a direct openat equivalent in this boundary.
+// final reparse point. It pins every existing parent directory before the
+// final CreateFile call so an ancestor replacement is blocked or rejected.
 func openWindowsRegularFile(path string, access, share, creation uint32) (*os.File, error) {
 	clean := filepath.Clean(path)
 	if err := validateWindowsPathParent(clean); err != nil {
@@ -40,6 +41,11 @@ func openWindowsRegularFile(path string, access, share, creation uint32) (*os.Fi
 	if managedLockBeforeOpenHook != nil && access == windows.GENERIC_READ|windows.GENERIC_WRITE && share == 0 && creation == windows.OPEN_ALWAYS {
 		managedLockBeforeOpenHook()
 	}
+	handles, err := pinWindowsDirectoryChain(filepath.Dir(clean), false)
+	if err != nil {
+		return nil, fmt.Errorf("open Windows parent chain: %w", err)
+	}
+	defer closeWindowsDirectoryChain(handles)
 	name, err := windows.UTF16PtrFromString(clean)
 	if err != nil {
 		return nil, err

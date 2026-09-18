@@ -12,6 +12,11 @@ import (
 
 func openStableRegularFileForRead(path string) (*os.File, error) {
 	clean := filepath.Clean(path)
+	parents, err := pinWindowsReadParent(filepath.Dir(clean))
+	if err != nil {
+		return nil, err
+	}
+	defer closeWindowsReadParents(parents)
 	name, err := windows.UTF16PtrFromString(clean)
 	if err != nil {
 		return nil, err
