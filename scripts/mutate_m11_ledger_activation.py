@@ -35,7 +35,7 @@ def main():
             fail("M11 ledger activation guard anchor is missing or ambiguous")
         mutated = source.replace(
             GUARD,
-            "windowStartedAt.Equal(windowStartedAt) /* MUTATION: ledger activation timing enforcement removed. */",
+            "!windowStartedAt.IsZero() && false /* MUTATION: ledger activation timing enforcement removed. */",
             1,
         )
         target.write_text(mutated, encoding="utf-8")
