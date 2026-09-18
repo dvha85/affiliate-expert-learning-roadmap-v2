@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: bdbffb51643f0922e0dcf616f92da26b98f37faf -->
+<!-- readiness-main-baseline: 3eb1a9670a7e5ff005427d1af7d49c549953d926 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -15,6 +15,16 @@ check-runs PASS; readiness audit vẫn `NOT_READY_FOR_PRODUCTION` và không có
 runtime/provider/pilot/deployment claim mới. Đây là bookkeeping/evidence sync,
 không đóng các blocker external hoặc mở rộng phạm vi crash/power-loss,
 distributed locking và business outcome. Marker: `Baseline sync after PR #413`.
+
+**Baseline sync after portability fix (2026-09-18):** commit
+`3eb1a9670a7e5ff005427d1af7d49c549953d926` sửa stable append trên macOS để
+canonicalize alias hệ thống `/var` → `/private/var` trước descriptor traversal,
+trong khi vẫn từ chối symlink do caller kiểm soát. Regression parent-swap chạy
+PASS với `TMPDIR` mặc định; learner race/vet, các smoke/readiness local và
+Windows cross-compile cũng PASS. Đây là hardening pathname và test portability
+có phạm vi hẹp; không đóng Windows native lock/path parity, crash/power-loss,
+distributed locking, provider, live executor, business outcome, pilot hoặc
+deployment. Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-3EB1A96-20260918.md`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
