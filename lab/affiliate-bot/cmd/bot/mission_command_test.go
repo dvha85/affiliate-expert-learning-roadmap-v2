@@ -2931,6 +2931,30 @@ func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	}
 }
 
+func TestLearnerM08UsesSharedPolicyConformanceTable(t *testing.T) {
+	for _, scenario := range corem08.PolicyConformanceCases() {
+		if !scenario.LearnerEquivalent {
+			continue
+		}
+		t.Run(scenario.Name, func(t *testing.T) {
+			dir := t.TempDir()
+			policyPath := filepath.Join(dir, "policy-input.json")
+			writeMissionTestJSON(t, policyPath, learnerPolicyRequest{
+				PolicyVersion: scenario.Context.PolicyVersion, Now: scenario.Context.Now,
+				AllowedHosts: scenario.Context.AllowedHosts, ActionRisk: scenario.Context.ActionRisk,
+				SeenIdempotency: scenario.Context.SeenIdempotency,
+			})
+			got, err := evaluateLearnerPolicy(LearnerIntent(scenario.Intent), policyPath, scenario.Context.KnownProposalIDs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Decision != scenario.Decision || got.RiskClass != scenario.RiskClass || got.Reason != scenario.Reason || got.PolicyReviewRequired != scenario.PolicyReview || got.ExecutionAuthorized != scenario.ExecutionAuth {
+				t.Fatalf("learner drifted from shared table: got=%+v want decision=%s risk=%s reason=%s review=%v authority=%v", got, scenario.Decision, scenario.RiskClass, scenario.Reason, scenario.PolicyReview, scenario.ExecutionAuth)
+			}
+		})
+	}
+}
+
 func TestEvaluateLearnerPolicyUsesSharedContextValidation(t *testing.T) {
 	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
 	i.IntentHash = learnerIntentHash(i)

@@ -130,6 +130,24 @@ func TestM08BoundaryPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestM08HarnessUsesSharedPolicyConformanceTable(t *testing.T) {
+	for _, scenario := range corem08.PolicyConformanceCases() {
+		t.Run(scenario.Name, func(t *testing.T) {
+			got := EvaluateShadowPolicy(ShadowActionIntent{
+				IntentID: scenario.Intent.IntentID, DecisionID: scenario.Intent.DecisionID, EvidenceIDs: scenario.Intent.EvidenceIDs,
+				ActionType: scenario.Intent.ActionType, Target: scenario.Intent.Target, Parameters: scenario.Intent.Parameters,
+				ProposedBy: scenario.Intent.ProposedBy, ProposalRef: scenario.Intent.ProposalRef, CreatedAt: scenario.Intent.CreatedAt,
+				ExpiresAt: scenario.Intent.ExpiresAt, CorrelationID: scenario.Intent.CorrelationID, IdempotencyKey: scenario.Intent.IdempotencyKey,
+				IntentHash: scenario.Intent.IntentHash, IntentMode: scenario.Intent.IntentMode, ExecutionAuthorized: scenario.Intent.ExecutionAuthorized,
+			}, ShadowPolicyContext(scenario.Context))
+			if got.Decision != scenario.Decision || got.RiskClass != scenario.RiskClass || got.Reason != scenario.Reason || got.PolicyReviewRequired != scenario.PolicyReview || got.ExecutionAuthorized != scenario.ExecutionAuth {
+				t.Fatalf("harness drifted from shared table: got=%+v want decision=%s risk=%s reason=%s review=%v authority=%v", got, scenario.Decision, scenario.RiskClass, scenario.Reason, scenario.PolicyReview, scenario.ExecutionAuth)
+			}
+		})
+	}
+}
+
 func TestM08ParameterNumbers(t *testing.T) {
 	i, _ := m08BoundaryFixture()
 	i.Parameters = map[string]any{"id": json.Number("9007199254740993")}
