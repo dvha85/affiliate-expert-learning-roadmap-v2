@@ -36,6 +36,19 @@ full ancestor-race parity, distributed locking, crash/power-loss, provider,
 live executor, business outcome, pilot and deployment evidence remain open.
 Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-598BB21-20260918.md`.
 
+**Cập nhật RP-01 Windows runtime CI (2026-09-18):** PR #415 bổ sung job
+`windows-runtime` trên `windows-latest` chạy thật `go test ./...`, `go vet ./...`
+và nhóm regression managed lock/backup/restore. Các run đầu tiên đã bắt được
+directory sync không tương thích Windows, stable reader chưa share-delete,
+append bắt đầu ở offset 0 và kiểm tra incomplete outcome path bị bỏ qua; các
+seam này đã được sửa trong các commit `822cd83`, `f043d3f` và `dad7d4c`.
+Curriculum CI run `35302232344`, head `dad7d4c`, PASS toàn bộ; riêng job
+`windows-runtime` PASS trong 2m48s. Đây là runtime filesystem một máy trên
+hosted Windows, không đóng full ancestor-race parity, distributed locking,
+crash/power-loss, provider, live executor, business outcome, pilot hoặc
+deployment. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
+Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md`.
+
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
 transport hardening vào learner adapter, blueprint và regression runner. Tất
