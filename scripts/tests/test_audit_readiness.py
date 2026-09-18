@@ -38,6 +38,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_expiry_authority = self.root / "scripts/mutate_m11_expiry_authority.py"
         mutation_expiry_authority.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_expiry_authority.py", mutation_expiry_authority)
+        mutation_ledger_activation = self.root / "scripts/mutate_m11_ledger_activation.py"
+        mutation_ledger_activation.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_ledger_activation.py", mutation_ledger_activation)
         evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
         evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
