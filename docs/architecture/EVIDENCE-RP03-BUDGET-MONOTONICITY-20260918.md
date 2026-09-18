@@ -29,6 +29,19 @@ the current Windows worktree has no `go.exe`. The local readiness audit and
 118-test Python audit suite remain runnable; hosted Windows runtime and race CI
 are the acceptance gate for the Go regression.
 
+## Post-merge evidence
+
+PR #423 squash-merged the regression into `main` at
+`35ebabc2f068cda0a4eef1dd479fc102d03a7a53` from implementation head
+`425a78a884247756d8c2202997e5075bc04fc3d2`. Hosted CI passed all 13 checks:
+Curriculum CI run `35326131724` included Windows runtime job
+`105539484848` and learner race job `105539484967`; Mission Agent Path CI
+run `35326131948` passed all 3 jobs. The post-merge readiness audit and
+118-test Python audit suite pass on the synchronized snapshot. This rebinds
+the bounded exhausted-budget evidence to `main`; it does not add a
+multi-file crash/power-loss, distributed-locking, provider, live-executor,
+business-outcome, pilot or deployment claim.
+
 ## Boundary
 
 This is bounded local/offline/synthetic/read-only fail-closed evidence. It does

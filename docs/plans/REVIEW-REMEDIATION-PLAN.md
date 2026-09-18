@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 12c50f3337991b533e5ecf363860df1e27bc2217 -->
+<!-- readiness-main-baseline: 35ebabc2f068cda0a4eef1dd479fc102d03a7a53 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -153,6 +153,21 @@ local/offline/synthetic/read-only evidence; không claim multi-file
 crash/power-loss, distributed locking, provider, live executor, business
 outcome, pilot hay deployment. Marker:
 `Cập nhật RP-03 exhausted-budget monotonicity`.
+
+**Baseline sync after PR #423 (2026-09-18):** PR #423 đã squash-merge regression
+RP-03 exhausted-budget monotonicity vào `main` tại
+`35ebabc2f068cda0a4eef1dd479fc102d03a7a53`, từ implementation head
+`425a78a884247756d8c2202997e5075bc04fc3d2`. PR có 13/13 checks PASS:
+Curriculum CI run `35326131724` gồm Windows runtime job `105539484848` và
+learner race job `105539484967`, cùng Mission Agent Path CI run `35326131948`
+với 3/3 job PASS. Post-merge readiness audit và 118 audit unit tests PASS;
+snapshot đã rebinding plan, readiness matrix và evidence graph về main.
+RP-03 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`. Đây là bounded
+local/offline/synthetic/read-only evidence, không thêm multi-file
+crash/power-loss, distributed locking, provider, live executor, business
+outcome, pilot hay deployment claim. Record:
+`docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md`. Marker:
+`Baseline sync after PR #423`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
