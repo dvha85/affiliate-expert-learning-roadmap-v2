@@ -53,6 +53,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp07b = self.root / "docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md"
         evidence_rp07b.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md", evidence_rp07b)
+        evidence_rp08 = self.root / "docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md"
+        evidence_rp08.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md", evidence_rp08)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
