@@ -284,6 +284,23 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
 		t.Fatalf("M08 intent wrote output after M07 proposal swap: %v", err)
 	}
+	if err := os.Remove(proposalPath); err != nil {
+		t.Fatal(err)
+	}
+	var mismatched corem07.RegisteredAgentProposal
+	if err := json.Unmarshal(proposalBytes, &mismatched); err != nil {
+		t.Fatal(err)
+	}
+	mismatched.RecordID = "different-canonical-record"
+	if _, err := writeNewJSON(proposalPath, mismatched); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, requestPath, proposalPath, outputPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("M08 intent accepted a proposal with mismatched canonical record provenance: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("M08 intent wrote output after proposal provenance mismatch: %v", err)
+	}
 }
 
 // An authorization supplied back to the learner is portable input until the
@@ -484,6 +501,13 @@ func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.
 	stored, err := os.ReadFile(intent)
 	if err != nil || !bytes.Contains(stored, []byte(`9007199254740993`)) {
 		t.Fatalf("large number was not preserved: %s, %v", stored, err)
+	}
+	var reloaded LearnerIntent
+	if err := readJSON(intent, &reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := reloaded.Parameters["id"].(json.Number); !ok || got.String() != "9007199254740993" || learnerIntentHash(reloaded) != reloaded.IntentHash {
+		t.Fatalf("large number changed across learner restart/hash reload: intent=%+v", reloaded)
 	}
 	if err := os.WriteFile(request, bytes.Replace(valid, []byte(`"parameters":{"id":9007199254740993}`), []byte(`"parameters":null`), 1), 0600); err != nil {
 		t.Fatal(err)
@@ -2928,6 +2952,50 @@ func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	}
 	if p.Decision != "HUMAN_REVIEW" || !p.PolicyReviewRequired || p.ExecutionAuthorized {
 		t.Fatalf("unexpected risk-two policy: %+v", p)
+	}
+}
+
+func TestLearnerM08UsesSharedPolicyConformanceTable(t *testing.T) {
+	for _, scenario := range corem08.PolicyConformanceCases() {
+		if !scenario.LearnerEquivalent {
+			continue
+		}
+		t.Run(scenario.Name, func(t *testing.T) {
+			dir := t.TempDir()
+			policyPath := filepath.Join(dir, "policy-input.json")
+			writeMissionTestJSON(t, policyPath, learnerPolicyRequest{
+				PolicyVersion: scenario.Context.PolicyVersion, Now: scenario.Context.Now,
+				AllowedHosts: scenario.Context.AllowedHosts, ActionRisk: scenario.Context.ActionRisk,
+				SeenIdempotency: scenario.Context.SeenIdempotency,
+			})
+			got, err := evaluateLearnerPolicy(LearnerIntent(scenario.Intent), policyPath, scenario.Context.KnownProposalIDs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Decision != scenario.Decision || got.RiskClass != scenario.RiskClass || got.Reason != scenario.Reason || got.PolicyReviewRequired != scenario.PolicyReview || got.ExecutionAuthorized != scenario.ExecutionAuth {
+				t.Fatalf("learner drifted from shared table: got=%+v want decision=%s risk=%s reason=%s review=%v authority=%v", got, scenario.Decision, scenario.RiskClass, scenario.Reason, scenario.PolicyReview, scenario.ExecutionAuth)
+			}
+		})
+	}
+}
+
+func TestEvaluateLearnerPolicyUsesSharedContextValidation(t *testing.T) {
+	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
+	i.IntentHash = learnerIntentHash(i)
+	for name, raw := range map[string]string{
+		"invalid time": `{"policy_version":"v1","now":"tomorrow","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+		"invalid risk": `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK9"},"seen_idempotency":{}}`,
+		"null hosts":   `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":null,"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "policy.json")
+			if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := evaluateLearnerPolicy(i, path, nil); err == nil {
+				t.Fatal("invalid policy context accepted")
+			}
+		})
 	}
 }
 

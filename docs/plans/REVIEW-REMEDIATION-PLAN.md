@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 598bb21801d44d9f2a1bf5ed56fbcb522aa2c0e9 -->
+<!-- readiness-main-baseline: cefdb758f70ce36c08bc822ee658737149600bcd -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -67,6 +67,18 @@ conservative local single-host boundary, không claim POSIX parity, distributed
 locking, power-loss, multi-file atomicity, provider/live execution hoặc
 business outcome. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
 Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md`.
+
+**Baseline sync after PR #416 (2026-09-18):** PR #416 đã squash-merge vào
+`main` tại `cefdb758f70ce36c08bc822ee658737149600bcd`, từ implementation head
+`bbd8aec14e56ba0b484376014b2ab5ec775ce3ec`. Snapshot hiện tại đã đồng bộ plan,
+readiness matrix và evidence graph về merge baseline này; CI evidence được giữ
+theo các run đã review của PR gồm Windows runtime, targeted lock/backup/restore,
+learner race và Mission Agent Path. RP-01 vẫn `PARTIAL`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`; record này không thêm provider, live-executor,
+business-outcome, pilot, deployment, distributed-locking, power-loss hay
+multi-file atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #416`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
@@ -1466,7 +1478,65 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 - Policy kiểm created_at/expires_at, schema, authority, risk, proposal/evidence/decision links và idempotency context. Thiếu dependency phải trả trạng thái đóng, không ALLOW.
 - Conformance tests cùng payload/expected result cho CLI và harness: thiếu proposal, proposal không tồn tại, parameters null, future intent, expired, risk không biết, authority tamper, duplicate keys, exact large number qua restart.
 
-**Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
+**Cập nhật RP-02 shared M08 policy context decoder (2026-09-18):**
+`core/m08` hiện sở hữu full policy-context decoder và semantic validator.
+Mission-runtime dùng decoder này; learner giữ input contract rút gọn nhưng gọi
+cùng validator sau khi bind decision/evidence/proposal IDs. Regression bao phủ
+missing/null/duplicate/unknown/case-variant fields, RFC3339 time, duplicate
+IDs, unknown risk và blank idempotency. Local worktree không có Go executable,
+nên CI hosted vẫn là acceptance gate; RP-02/R06/R07 chưa đóng do còn hash
+version/migration, provenance/conformance và external execution blockers.
+Record: `docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md`.
+
+Hosted verification is complete: PR #417 passed all 13 checks in Curriculum CI
+run `35314331386` and Mission Agent Path CI run `35314331378`, including the
+learner race, Windows runtime and mission-runtime test/vet jobs. This records
+offline/fixture acceptance for the shared decoder seam; RP-02/R06/R07 remain
+PARTIAL for shared conformance, hash-version/migration, provenance/persistence
+and external execution requirements.
+
+**Cập nhật RP-02 shared M08 conformance table (2026-09-18):**
+`core/m08/conformance.go` now owns one scenario table with expected decision,
+risk, reason and non-authorizing flags. Core, mission-runtime and learner
+regressions consume that table; learner cases that require an independently
+trusted missing decision/evidence registry are marked as an explicit parity
+boundary because the learner policy-input contract derives those links from
+the bound intent. Curriculum CI run `35315240076` and Mission Agent Path CI
+run `35315240089` passed all 13 checks for this change. RP-02/R06/R07 remain
+PARTIAL pending hash-version/migration, persistence/provenance and external
+execution evidence.
+
+**Cập nhật RP-02 intent hash version boundary (2026-09-18):** `core/m08`
+formalizes the existing `sha256:` prefix as V1. Decode, policy evaluation and
+the mission harness reject an unknown prefix with `UNSUPPORTED_HASH_VERSION`
+and never reseal the old intent in place. Hosted Curriculum CI run
+`35316020312` and Mission Agent Path CI run `35316020309` passed all 13 checks.
+This is version recognition/fail-closed evidence only; migration, approval
+review, exact restart persistence and provenance remain open, so RP-02/R06/R07
+stay PARTIAL.
+
+**Cập nhật RP-02 exact-number restart conformance (2026-09-18):** learner và
+mission-runtime đều ghi/đọc lại intent có `9007199254740993`, giữ
+`json.Number` và xác nhận hash không đổi sau reload. Curriculum CI run
+`35316418613` và Mission Agent Path CI run `35316418619` đã PASS toàn bộ 13
+checks. Đây là local fixture/restart evidence bounded; crash/power-loss,
+multi-process persistence and distributed storage remain open, nên R07 và
+RP-02 vẫn PARTIAL.
+
+**Cập nhật RP-02 persisted M07 proposal provenance (2026-09-18):** learner
+resolver revalidate digest, grounding và canonical `record_id` khi bind
+`proposal_ref`; regression reject proposal có digest hợp lệ nhưng provenance
+khác và không ghi M08 intent. Curriculum CI run `35317820062` và Mission Agent
+Path CI run `35317820048` đã PASS toàn bộ 13 checks. Đây là bounded local
+resolver/read-only evidence; cross-store transactionality, distributed
+persistence and live execution remain open, nên RP-02/R06/R07 vẫn `PARTIAL`.
+
+Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
+
+**Nghiệm thu:** R06/R07 vẫn `PARTIAL`; output vẫn đúng schema và
+proposal-only trong boundary offline hiện tại. **Migration:** báo version/hash
+không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite
+approval cũ để khớp hash mới.
 
 ### RP-03a/03b — Guard approval, ledger và STOP có tính bền vững
 
