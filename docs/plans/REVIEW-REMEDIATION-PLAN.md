@@ -1755,7 +1755,7 @@ regression. Evidence post-merge được ghi tại
 
 **Cập nhật RP-05b tool trace provenance (2026-09-18):** registered tool trace
 giờ lưu riêng `request_id` do adapter tính từ canonical record/tool request và
-`content_digest` tính từ exact JSON body. Nếu caller gửi metadata forged,
+`content_digest` tính từ canonical JSON body (ổn định qua serialize/restore). Nếu caller gửi metadata forged,
 registration/restore từ chối; evidence body gắn `SubjectID` với request ID,
 trong khi `TraceID` vẫn bao phủ toàn bộ result. Trace cũ thiếu metadata vì vậy
 fail closed thay vì được tự động nâng cấp. Đây vẫn là bounded offline/fixture

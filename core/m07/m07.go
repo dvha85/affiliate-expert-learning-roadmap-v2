@@ -375,7 +375,14 @@ func RegisterToolResult(raw []byte, registry []ToolSpec) (RegisteredToolResult, 
 	if err != nil {
 		return RegisteredToolResult{}, err
 	}
-	contentDigest := digest(result.Body)
+	// Digest the canonical JSON value rather than the adapter's input
+	// whitespace. The registered envelope is serialized and restored through
+	// encoding/json, which may compact a RawMessage; canonicalizing here keeps
+	// the provenance stable across that durable round trip.
+	contentDigest, err := canonicalJSONDigest(result.Body)
+	if err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result body digest: %w", err)
+	}
 	if result.RequestID != "" && result.RequestID != requestID {
 		return RegisteredToolResult{}, fmt.Errorf("tool result request_id does not match request")
 	}

@@ -134,8 +134,14 @@ func TestRegisteredToolResultIsBoundToRequestAndRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if registered.Result.RequestID == "" || registered.Result.ContentDigest != digest(registered.Result.Body) {
+	canonicalDigest, _ := canonicalJSONDigest(registered.Result.Body)
+	if registered.Result.RequestID == "" || registered.Result.ContentDigest != canonicalDigest {
 		t.Fatalf("adapter provenance was not normalized: %+v", registered.Result)
+	}
+	whitespaceVariant := []byte(`{"record_id":"r1","tool_call":{"tool_name":"public_http","method":"GET","target":"https://example.com/a"},"status_code":200,"received_at":"2026-09-08T00:00:00Z","redirected":false,"body": { "price" : 100 }}`)
+	variant, err := RegisterToolResult(whitespaceVariant, registry())
+	if err != nil || variant.Result.ContentDigest != registered.Result.ContentDigest {
+		t.Fatalf("equivalent JSON body changed its provenance digest: %v", err)
 	}
 	stored, _ := json.Marshal(registered)
 	resolved, err := ValidateRegisteredToolResult(stored, registry(), "r1")
