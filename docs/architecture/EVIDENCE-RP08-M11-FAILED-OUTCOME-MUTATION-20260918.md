@@ -33,9 +33,8 @@ readiness.
 - `python -m py_compile scripts/smoke_br18b_backup_restore.py scripts/mutate_backup_m11_failed_outcome.py`: PASS.
 - `python scripts/audit_readiness.py`: PASS; the tracker remains
   `NOT_READY_FOR_PRODUCTION`.
-- `python -m unittest scripts.tests.test_audit_readiness`: run on the
-  post-merge evidence branch; local Go execution remains unavailable because
-  `go.exe` is absent.
+- `python -m unittest scripts.tests.test_audit_readiness`: PASS (118 tests);
+  local Go execution remains unavailable because `go.exe` is absent.
 - `git diff --check`: PASS.
 
 ## Boundary
