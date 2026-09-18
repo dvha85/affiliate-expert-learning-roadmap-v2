@@ -698,7 +698,11 @@ def main():
             expected=1,
             env=env,
         )
-        if missing_failed_outcome_result["status"] != "GRAPH_FAILED" or missing_failed_outcome_restored.exists():
+        if (
+            missing_failed_outcome_result["status"] != "GRAPH_FAILED"
+            or "failed M11 execution is missing restored fixture outcome" not in missing_failed_outcome_result.get("error", "")
+            or missing_failed_outcome_restored.exists()
+        ):
             raise AssertionError(
                 (
                     "missing-failed-outcome restore must fail closed",
