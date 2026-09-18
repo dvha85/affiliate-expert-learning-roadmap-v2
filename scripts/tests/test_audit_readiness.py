@@ -41,6 +41,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp03_expiry_stop = self.root / "docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md"
         evidence_rp03_expiry_stop.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md", evidence_rp03_expiry_stop)
+        evidence_rp03_budget = self.root / "docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md"
+        evidence_rp03_budget.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md", evidence_rp03_budget)
         evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
         evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)

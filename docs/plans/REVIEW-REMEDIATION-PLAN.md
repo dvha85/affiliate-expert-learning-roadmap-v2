@@ -139,6 +139,21 @@ provider, live-executor, business outcome, pilot hay deployment claim. Record:
 `docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md`. Marker:
 `Baseline sync after PR #421`.
 
+**Cập nhật RP-03 exhausted-budget monotonicity (2026-09-18):** R08 nay có
+regression trực tiếp sau khi một grant cap=1 đã được tiêu thụ bởi fresh Bot
+process. Exact replay của M09 approval và exact re-import của M10 grant chỉ
+trả acknowledgement, không reset usage counter. Các payload checksum-valid
+nhưng tăng execution cap, đổi currency của cùng grant, hoặc đăng ký cost bound
+khác currency đều bị reject; `mission-state.json`, usage/reservation state,
+M10 artifact registry và trusted-cost-bound registry giữ byte-identical. Một
+reservation mới vẫn nhận `BUDGET_DENIED`. Cùng chuỗi này được chạy lại trên
+runtime mới sau backup/restore. Local worktree vẫn thiếu `go.exe`, nên hosted
+Windows runtime/race CI là acceptance gate. Đây là bounded
+local/offline/synthetic/read-only evidence; không claim multi-file
+crash/power-loss, distributed locking, provider, live executor, business
+outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 exhausted-budget monotonicity`.
+
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
 transport hardening vào learner adapter, blueprint và regression runner. Tất
