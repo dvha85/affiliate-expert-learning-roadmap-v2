@@ -1,7 +1,24 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 08319c7998895a54efbcd6a39458c6abdcd28311 -->
+<!-- readiness-main-baseline: e95cc321a37e3f8f239a594fa0e23412cbb43571 -->
+
+**Baseline sync after PR #443 (2026-09-19):** PR #443 was squash-merged into
+`main` at `e95cc321a37e3f8f239a594fa0e23412cbb43571`, from implementation head
+`536a9029033020c14e5960aeca641ca304f60392`. Curriculum CI run `35375980090`
+and Mission Agent Path CI run `35375980154` passed all 13 checks, including
+the new M11 gate budget snapshot mutation job `105700643729`, Windows runtime
+job `105700644179` and learner race job `105700643942`. The post-merge RP-08
+snapshot records a checksum-valid M11 gate whose execution counter is drifted
+from the referenced ledger; the real core graph regression rejects it, and a
+disposable mutation removing that comparison fails the same regression. This
+closes one bounded offline mutation gap only; it does not claim complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or clean-machine/
+target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-GATE-BUDGET-SNAPSHOT-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #443`.
 
 **Baseline sync after PR #441 (2026-09-19):** PR #441 was squash-merged into
 `main` at `08319c7998895a54efbcd6a39458c6abdcd28311`, from implementation head
