@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 3eb1a9670a7e5ff005427d1af7d49c549953d926 -->
+<!-- readiness-main-baseline: 598bb21801d44d9f2a1bf5ed56fbcb522aa2c0e9 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -25,6 +25,16 @@ Windows cross-compile cũng PASS. Đây là hardening pathname và test portabil
 có phạm vi hẹp; không đóng Windows native lock/path parity, crash/power-loss,
 distributed locking, provider, live executor, business outcome, pilot hoặc
 deployment. Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-3EB1A96-20260918.md`.
+
+**Baseline sync after Windows native lock hardening (2026-09-18):** commit
+`598bb21801d44d9f2a1bf5ed56fbcb522aa2c0e9` replaces the Windows cooperative
+directory claim with an exclusive native file handle that the kernel releases
+on process exit, and opens stable append targets with
+`FILE_FLAG_OPEN_REPARSE_POINT`. GitHub CI completed 12/12 PASS; local learner
+race/vet and Windows amd64 cross-compile also PASS. Windows runtime execution,
+full ancestor-race parity, distributed locking, crash/power-loss, provider,
+live executor, business outcome, pilot and deployment evidence remain open.
+Record: `docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-598BB21-20260918.md`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
