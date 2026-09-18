@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/canonical"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
 
@@ -22,6 +23,28 @@ func writeM07File(t *testing.T, path string, value any) {
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestM07EvidenceContextUsesSharedCanonicalEnvelope(t *testing.T) {
+	record, err := NewHistoryRecord("shared-context-r1", "2026-09-01T01:00:00Z", "2026-09-01T00:01:00Z", []Observation{historyObservation("shared-context-o1", "p", "P", 100, .1, "2026-09-01T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := m07EvidenceContext(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.Version != canonical.ContextVersion || ctx.Authority != "canonical_history_store" {
+		t.Fatalf("M07 did not use shared canonical context: %+v", ctx)
+	}
+	if len(ctx.EvidenceIDs) != len(record.RecordedResult.EvidenceIDs) || ctx.EvidenceIDs[0] != record.RecordedResult.EvidenceIDs[0] {
+		t.Fatalf("shared context changed canonical aggregate IDs: %+v", ctx.EvidenceIDs)
+	}
+
+	record.RecordedResult.EvidenceIDs = []string{"forged-observation-id"}
+	if _, err := m07EvidenceContext(record); err == nil {
+		t.Fatal("forged recorded evidence ID was accepted by shared context")
 	}
 }
 
