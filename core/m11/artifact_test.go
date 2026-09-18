@@ -210,6 +210,7 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	degradedHealth.SnapshotHash = ComputeProductionHealthHash(degradedHealth)
 	degradedHealthGate := gate
 	degradedHealthGate.HealthSnapshotHash = degradedHealth.SnapshotHash
+	degradedHealthGate.GateID = ComputeProductionGateID(lease, degradedHealthGate.IntentID, degradedHealthGate.IntentHash, degradedHealth, cost, ledgerEntry, degradedHealthGate.EvaluatedAt)
 	degradedHealthGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
 	degradedHealthGateEntries[2] = m11Entry(t, ArtifactKindHealth, degradedHealth)
 	degradedHealthGateEntries[6] = m11Entry(t, ArtifactKindGate, degradedHealthGate)
