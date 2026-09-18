@@ -1,7 +1,21 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 2538968b6d9d94c7c33c2573d2b2b09e55afb000 -->
+<!-- readiness-main-baseline: 3938b129cfc4e8bdf7929bed397fc8083e706699 -->
+
+**Baseline sync after PR #448 (2026-09-19):** PR #448 was squash-merged into
+`main` at `3938b129cfc4e8bdf7929bed397fc8083e706699`, from implementation head
+`699b99be182ea3b93e7cd73e2fe925c876b47c7f`. Curriculum CI run `35383498350`
+and Mission Agent Path CI run `35383498300` passed all 13 hosted checks,
+including Windows runtime job `105724942268` and learner race job
+`105724944658`. This post-merge RP-08 snapshot rebinds the readiness
+bookkeeping to the merged evidence/audit baseline only; it does not close
+complete mutation breadth, power-loss/filesystem-crash durability, atomic
+multi-file publication, distributed/multi-host safety, Windows traversal
+parity, provider/live execution, deployment, business outcomes or
+clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR448-20260919.md`.
+Marker: `Baseline sync after PR #448`.
 
 **Baseline sync after PR #447 (2026-09-19):** PR #447 was squash-merged into
 `main` at `2538968b6d9d94c7c33c2573d2b2b09e55afb000`, from implementation head
