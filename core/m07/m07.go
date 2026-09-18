@@ -71,12 +71,14 @@ type Evidence struct {
 // preflighted request. Body is JSON data (a JSON string is valid for an HTML
 // response); it is never interpreted as policy or instructions.
 type ToolResult struct {
-	RecordID   string          `json:"record_id"`
-	ToolCall   ToolRequest     `json:"tool_call"`
-	StatusCode int             `json:"status_code"`
-	ReceivedAt string          `json:"received_at"`
-	Redirected bool            `json:"redirected"`
-	Body       json.RawMessage `json:"body"`
+	RecordID      string          `json:"record_id"`
+	ToolCall      ToolRequest     `json:"tool_call"`
+	RequestID     string          `json:"request_id"`
+	ContentDigest string          `json:"content_digest"`
+	StatusCode    int             `json:"status_code"`
+	ReceivedAt    string          `json:"received_at"`
+	Redirected    bool            `json:"redirected"`
+	Body          json.RawMessage `json:"body"`
 }
 
 // RegisteredToolResult is the durable, immutable handoff from the tool
@@ -301,6 +303,18 @@ func RegisterAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec,
 	}, nil
 }
 
+func toolRequestID(result ToolResult) (string, error) {
+	request := struct {
+		RecordID string      `json:"record_id"`
+		ToolCall ToolRequest `json:"tool_call"`
+	}{RecordID: result.RecordID, ToolCall: result.ToolCall}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+	return digest(raw), nil
+}
+
 // ValidateRegisteredAgentProposal recomputes the raw-output digest and reruns
 // the M07 grounding boundary against the current canonical record context.
 func ValidateRegisteredAgentProposal(raw []byte, evidence []Evidence, registry []ToolSpec, recordID, decisionID string) (RegisteredAgentProposal, AgentOutput, error) {
@@ -357,6 +371,26 @@ func RegisterToolResult(raw []byte, registry []ToolSpec) (RegisteredToolResult, 
 	if _, err := contracts.Decode(result.Body); err != nil {
 		return RegisteredToolResult{}, fmt.Errorf("tool result body must be JSON data: %w", err)
 	}
+	requestID, err := toolRequestID(result)
+	if err != nil {
+		return RegisteredToolResult{}, err
+	}
+	// Digest the canonical JSON value rather than the adapter's input
+	// whitespace. The registered envelope is serialized and restored through
+	// encoding/json, which may compact a RawMessage; canonicalizing here keeps
+	// the provenance stable across that durable round trip.
+	contentDigest, err := canonicalJSONDigest(result.Body)
+	if err != nil {
+		return RegisteredToolResult{}, fmt.Errorf("tool result body digest: %w", err)
+	}
+	if result.RequestID != "" && result.RequestID != requestID {
+		return RegisteredToolResult{}, fmt.Errorf("tool result request_id does not match request")
+	}
+	if result.ContentDigest != "" && result.ContentDigest != contentDigest {
+		return RegisteredToolResult{}, fmt.Errorf("tool result content_digest does not match body")
+	}
+	result.RequestID = requestID
+	result.ContentDigest = contentDigest
 	id, err := traceID(result)
 	if err != nil {
 		return RegisteredToolResult{}, err
@@ -374,6 +408,9 @@ func ValidateRegisteredToolResult(raw []byte, registry []ToolSpec, recordID stri
 	}
 	if registered.Version != "m07-tool-result/v1" || registered.RecordID != recordID || registered.Result.RecordID != recordID || !reflect.DeepEqual(registered.Registry, registry) {
 		return RegisteredToolResult{}, fmt.Errorf("registered tool result record binding is invalid")
+	}
+	if registered.Result.RequestID == "" || registered.Result.ContentDigest == "" {
+		return RegisteredToolResult{}, fmt.Errorf("registered tool result provenance is incomplete")
 	}
 	resultRaw, err := json.Marshal(registered.Result)
 	if err != nil {
@@ -412,9 +449,10 @@ func (registered RegisteredToolResult) Evidence() Evidence {
 		body = nil
 	}
 	return Evidence{
-		EvidenceID: registered.TraceID + "#body", FieldOrClaim: "tool_result.body", Value: body,
+		EvidenceID: registered.TraceID + "#body", SubjectID: registered.Result.RequestID,
+		FieldOrClaim: "tool_result.body", Value: body,
 		ClaimKind: "unknown", SourceAuthorityOrRole: "registered_readonly_tool",
-		Limitation: "Untrusted tool response; only the exact registered JSON body is available for citation.",
+		Limitation: "Untrusted tool response; request identity and exact body digest are adapter-derived, and only the registered JSON body is available for citation.",
 	}
 }
 
