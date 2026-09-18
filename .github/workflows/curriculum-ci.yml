@@ -277,6 +277,8 @@ jobs:
           python-version: "3.12"
       - name: BR-18b M11 backup, reconciliation and restore
         run: python scripts/smoke_br18b_backup_restore.py
+      - name: RP-08 M11 evaluation-to-closed-cycle mutation proof
+        run: python scripts/mutate_backup_m11_terminal_chain.py
       - name: RP-08 M11 canonical identity mutation proof
         run: python scripts/mutate_m11_identity_guard.py
       - name: RP-08 M11 authorization gate lineage mutation proof
