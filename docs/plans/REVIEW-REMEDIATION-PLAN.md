@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 4950b2fd1be80f3c0e58d9f270a44e275c3de0d5 -->
+<!-- readiness-main-baseline: ad5347bf1aae4c0770e0471b668c94bf8621b141 -->
 
 **Baseline sync after PR #429 (2026-09-18):** PR #429 đã squash-merge vào
 `main` tại `4950b2fd1be80f3c0e58d9f270a44e275c3de0d5`, từ implementation head
@@ -15,6 +15,19 @@ provider/live execution, deployment, business outcome, distributed locking,
 power-loss hay multi-file atomicity claim. Record:
 `docs/architecture/EVIDENCE-PR429-POST-MERGE-20260918.md`. Marker:
 `Baseline sync after PR #429`.
+
+**Baseline sync after PR #431 (2026-09-18):** PR #431 đã squash-merge vào
+`main` tại `ad5347bf1aae4c0770e0471b668c94bf8621b141`, từ implementation head
+`321eb74b91e991ab319c784205d3f587ef0b01bc`. Hosted Curriculum CI run
+`35344493952` và Mission Agent Path CI run `35344493969` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race và backup/restore mutation smoke. RP-06
+giờ validate mọi M10 registry hiện hữu ngay cả khi mutable state không còn active
+canary, vẫn restore được registry lịch sử hợp lệ và reject orphan registry trước
+publish. Evidence vẫn bounded offline/fixture/read-only; không claim power-loss,
+atomic multi-file, distributed/multi-host, provider, live execution, deployment
+hay business outcome. Record:
+`docs/architecture/EVIDENCE-PR431-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #431`.
 
 **Baseline sync after PR #425 (2026-09-18):** PR #425 đã squash-merge vào
 `main` tại `b7cfe1480973254ad106481d22c142651af3732b`, từ implementation head
