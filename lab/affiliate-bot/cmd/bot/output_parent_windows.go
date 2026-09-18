@@ -4,41 +4,23 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 )
 
 var outputParentBeforeOpenHook func()
 
 func ensureOutputParentPlatform(parent string) error {
-	for candidate := parent; ; candidate = filepath.Dir(candidate) {
-		info, err := os.Lstat(candidate)
-		if err == nil {
-			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-				return fmt.Errorf("backup/restore target parent contains a symlink or non-directory")
-			}
-			break
-		}
-		if !os.IsNotExist(err) {
-			return err
-		}
-		next := filepath.Dir(candidate)
-		if next == candidate {
-			return fmt.Errorf("backup/restore target parent has no existing directory ancestor")
-		}
+	clean := filepath.Clean(parent)
+	if _, _, err := windowsExistingDirectoryPrefix(clean); err != nil {
+		return fmt.Errorf("backup/restore target parent preflight: %w", err)
 	}
 	if outputParentBeforeOpenHook != nil {
 		outputParentBeforeOpenHook()
 	}
-	if err := os.MkdirAll(parent, 0700); err != nil {
-		return err
-	}
-	info, err := os.Lstat(parent)
+	handles, err := pinWindowsDirectoryChain(clean, true)
 	if err != nil {
-		return err
+		return fmt.Errorf("backup/restore target parent traversal: %w", err)
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("backup/restore target parent must be a non-symlink directory")
-	}
+	closeWindowsDirectoryChain(handles)
 	return nil
 }

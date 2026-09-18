@@ -49,6 +49,25 @@ crash/power-loss, provider, live executor, business outcome, pilot hoặc
 deployment. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
 Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md`.
 
+**Cập nhật RP-01 Windows ancestor-race hardening (2026-09-18):** PR #416 tại
+head `bbd8aec14e56ba0b484376014b2ab5ec775ce3ec` rà lại các Windows reader/
+writer còn đi qua pathname trực tiếp và thêm native parent-chain pinning cho
+backup/restore output, managed lock, stable reader/append và internal/store
+JSONL reader. Existing ancestors được mở với `OPEN_REPARSE_POINT`, không share
+delete; component còn thiếu được tạo và pin từng bước. Regression Windows thay
+ancestor sau preflight bằng junction/reparse point cho các đường backup/restore,
+stable reader/append và store reader đều fail closed, không đổi external tree.
+Curriculum CI run `35306191800` PASS; `windows-runtime` job
+`105478750919` PASS với `go test ./...`, `go vet ./...` và targeted
+lock/backup/restore; learner race job `105478751048` PASS với
+`go test -race ./...`. Mission Agent Path CI run `35306191794` cũng PASS cả
+ba job. Vì Windows không có portable `openat`/`mkdirat` cho
+traversal nhiều component trong boundary này, implementation chỉ claim
+conservative local single-host boundary, không claim POSIX parity, distributed
+locking, power-loss, multi-file atomicity, provider/live execution hoặc
+business outcome. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
+Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md`.
+
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
 transport hardening vào learner adapter, blueprint và regression runner. Tất

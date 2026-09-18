@@ -71,6 +71,12 @@ var backupPublishFault func(phase, path string) error
 // copy path.
 var stableRegularFileReadHook func(path string) error
 
+// stableRegularFileBeforeOpenHook is a test-only seam for replacing an
+// ancestor after the final pathname preflight but before the platform reader
+// binds its handle. Windows uses it to prove that reparse traversal fails
+// closed; production callers cannot select this seam.
+var stableRegularFileBeforeOpenHook func(path string) error
+
 // stableRegularFileContentHook runs in tests only after the shared reader has
 // captured its first descriptor snapshot and before it verifies that snapshot.
 // It proves a same-inode content rewrite is rejected on the real runtime-store
@@ -296,6 +302,11 @@ func readStableRegularFileLimit(path string, limit int64) ([]byte, fs.FileInfo, 
 	}
 	if limit >= 0 && before.Size() > limit {
 		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
+	}
+	if stableRegularFileBeforeOpenHook != nil {
+		if err := stableRegularFileBeforeOpenHook(path); err != nil {
+			return nil, nil, err
+		}
 	}
 	f, err := openStableRegularFileForRead(path)
 	if err != nil {
