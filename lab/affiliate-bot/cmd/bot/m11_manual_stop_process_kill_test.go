@@ -45,7 +45,11 @@ func TestM11ManualStopProcessTerminationChild(t *testing.T) {
 		if writes != targetWrite {
 			return nil
 		}
-		if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
+		process, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			os.Exit(98)
+		}
+		if err := process.Kill(); err != nil {
 			os.Exit(98)
 		}
 		// SIGKILL is non-catchable. Keep the child at the injected boundary if

@@ -597,7 +597,11 @@ func TestM11ProcessTerminationChild(t *testing.T) {
 	}
 	terminate := func() {
 		if mode == "kill" || mode == "after-ledger-kill" || mode == "outcome-after-append-kill" {
-			if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
+			process, err := os.FindProcess(os.Getpid())
+			if err != nil {
+				os.Exit(98)
+			}
+			if err := process.Kill(); err != nil {
 				os.Exit(98)
 			}
 			// Keep the test child at the injected boundary if signal delivery is

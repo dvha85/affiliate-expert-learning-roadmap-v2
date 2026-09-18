@@ -46,7 +46,11 @@ func TestM10ProcessTerminationChild(t *testing.T) {
 		if phase != terminationPhase {
 			return nil
 		}
-		if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
+		process, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			return err
+		}
+		if err := process.Kill(); err != nil {
 			return err
 		}
 		// Keep the child at the injected boundary if signal delivery is deferred

@@ -19,7 +19,10 @@ import (
 func openStableRegularFileForAppendPath(path string, newFile bool) (*os.File, error) {
 	clean := filepath.Clean(path)
 	parentPath, name := filepath.Dir(clean), filepath.Base(clean)
-	parentFD, err := openManagedDirectory(parentPath)
+	// macOS exposes /var as the system alias /private/var. Resolve that
+	// platform-owned alias before descriptor traversal; caller-controlled
+	// symlinked ancestors remain rejected by openManagedDirectory.
+	parentFD, err := openManagedDirectory(outputParentOpenPath(parentPath))
 	if err != nil {
 		return nil, fmt.Errorf("open append parent %q: %w", parentPath, err)
 	}

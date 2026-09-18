@@ -4,6 +4,8 @@ package main
 
 import "os"
 
+var managedLockBeforeOpenHook func()
+
 // Windows keeps the existing cooperative directory claim. The POSIX
 // regression is intentionally not advertised for this fallback until a
 // native auto-releasing Windows lock is implemented.
