@@ -29,11 +29,23 @@ may have no proposal set; an agent intent still requires a resolvable
 ## Verification status and boundary
 
 The current worktree has no Go executable, so no local Go test or vet PASS is
-claimed. Hosted Curriculum CI remains the acceptance gate for `go test -race
-./...`, full package tests and vet. The readiness audit remains
-`NOT_READY_FOR_PRODUCTION`; RP-02, R06 and R07 remain `PARTIAL` until hosted
-conformance and the remaining hash-version/migration/provenance requirements
-are evidenced.
+claimed. Hosted CI is now green for PR #417:
+
+- [Curriculum CI run 35313604149](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35313604149)
+  passed the learner full tests/vet, `go test -race ./...`, deterministic
+  runtime/smoke jobs and `windows-runtime` job 105500467992.
+- [Mission Agent Path CI run 35313604150](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35313604150)
+  passed the mission runtime job 105500468044, including its Go test/vet
+  coverage.
+- The shared M08-specific learner and harness regressions are included in
+  learner jobs 105500467986/105500468008 and mission job 105500468044; the
+  learner race regression is job 105500467964.
+
+This is hosted offline/fixture evidence for the decoder and policy boundary;
+it does not claim provider access, live execution or production readiness. The
+readiness audit remains `NOT_READY_FOR_PRODUCTION`; RP-02, R06 and R07 remain
+`PARTIAL` because shared scenario conformance, exact hash-version/migration,
+provenance/persistence and external execution requirements are still open.
 
 This change is decoder/policy hardening only. It does not add provider access,
 live execution authority, approval migration, proposal persistence, business

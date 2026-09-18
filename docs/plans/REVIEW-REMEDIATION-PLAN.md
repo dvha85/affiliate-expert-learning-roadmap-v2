@@ -1487,6 +1487,13 @@ IDs, unknown risk và blank idempotency. Local worktree không có Go executable
 nên CI hosted vẫn là acceptance gate; RP-02/R06/R07 chưa đóng do còn hash
 version/migration, provenance/conformance và external execution blockers.
 Record: `docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md`.
+
+Hosted verification is complete: PR #417 passed all 13 checks in Curriculum CI
+run `35313604149` and Mission Agent Path CI run `35313604150`, including the
+learner race, Windows runtime and mission-runtime test/vet jobs. This records
+offline/fixture acceptance for the shared decoder seam; RP-02/R06/R07 remain
+PARTIAL for shared conformance, hash-version/migration, provenance/persistence
+and external execution requirements.
 Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
 
 **Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
