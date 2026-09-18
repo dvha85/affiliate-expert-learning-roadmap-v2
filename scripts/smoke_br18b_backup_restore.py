@@ -683,6 +683,11 @@ def main():
             return len(filtered) != len(links)
 
         rewrite_m11_registry(missing_failed_outcome_backup, remove_failed_outcome_ledger_link)
+        # Remove downstream consumers as well so the mutation isolates the
+        # FAILED-execution invariant rather than tripping evaluation/cycle
+        # lineage checks first.
+        remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_OUTCOME_EVALUATION", "br18-production-e")
+        remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_CYCLE", "br18-production-cycle")
         missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
         missing_failed_outcome_result = invoke(
             bot,
