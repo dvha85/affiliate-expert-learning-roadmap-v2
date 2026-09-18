@@ -1,7 +1,23 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: c8fe14218ef2a22f6faf0cbd1c9a335c1073dffb -->
+<!-- readiness-main-baseline: af2eb0d20d10d8f638480b8cdd8141c8b051ec1c -->
+
+**Baseline sync after PR #435 (2026-09-18):** PR #435 was squash-merged into
+`main` at `af2eb0d20d10d8f638480b8cdd8141c8b051ec1c`, from implementation head
+`f398c6e5782803eed494fd9a5a609c4aec1320ca`. Curriculum CI run
+`35359232122` and Mission Agent Path CI run `35359232042` both passed all 13
+checks, including Windows runtime, learner race, full Go test/vet and the
+backup/restore mutation smoke. The post-merge RP-07b snapshot records explicit
+assertions for a restored `CLOSED` M11 cycle with matching execution,
+outcome/evaluation/cycle lineage and a `NORMAL` post-ledger, plus the reviewed
+UNKNOWN-to-STOP reconciliation boundary. This remains bounded
+offline/fixture/read-only evidence; it does not claim prior-runtime
+availability, live recovery, power-loss/filesystem-crash durability, atomic
+multi-file, distributed/multi-host, provider/live execution, deployment,
+business outcomes or clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md`. Marker:
+`Baseline sync after PR #435`.
 
 **Baseline sync after PR #433 (2026-09-18):** PR #433 was squash-merged into
 `main` at `c8fe14218ef2a22f6faf0cbd1c9a335c1073dffb`, from implementation head
