@@ -47,8 +47,6 @@ def main():
         temp_root = Path(temp_dir)
         for directory in ("core", "contracts", "examples", "lab/affiliate-bot"):
             shutil.copytree(ROOT / directory, temp_root / directory)
-        (temp_root / "scripts").mkdir()
-        shutil.copy2(ROOT / SMOKE, temp_root / SMOKE)
 
         remove_guard(
             temp_root / CORE_TARGET,
