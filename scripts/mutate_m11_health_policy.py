@@ -53,7 +53,10 @@ def main():
         if result.returncode == 0:
             fail("mutated M11 health policy guard unexpectedly passed the real graph test")
         if EXPECTED_FAILURE not in output:
-            fail("health policy mutation caused an unrelated test failure instead of the degraded-health rejection")
+            fail(
+                "health policy mutation caused an unrelated test failure instead of the degraded-health rejection:\n"
+                + output
+            )
 
     print("M11 gate health policy mutation detected by the real graph regression")
 
