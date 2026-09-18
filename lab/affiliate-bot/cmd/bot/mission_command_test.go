@@ -210,7 +210,7 @@ func TestMissionM08IntentFailsClosedWhileHistoryWriterIsActive(t *testing.T) {
 
 // The persisted M07 proposal is an immutable canonical input for an agent
 // intent. A replacement after open must fail before M08 can write the intent.
-func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAndProvenanceMismatch(t *testing.T) {
+func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	dir := t.TempDir()
 	history := filepath.Join(dir, "history.jsonl")
 	fixture := watchFixture()
