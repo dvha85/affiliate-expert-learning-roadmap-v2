@@ -674,6 +674,15 @@ def main():
             "m11-outcomes.jsonl",
             ("\n".join(retained_outcomes) + "\n").encode(),
         )
+        def remove_failed_outcome_ledger_link(entry):
+            if entry["artifact_kind"] != "PRODUCTION_LEDGER":
+                return False
+            links = entry["artifact"].get("outcome_links", [])
+            filtered = [link for link in links if link.get("outcome_id") != "br18-production-o"]
+            entry["artifact"]["outcome_links"] = filtered
+            return len(filtered) != len(links)
+
+        rewrite_m11_registry(missing_failed_outcome_backup, remove_failed_outcome_ledger_link)
         missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
         missing_failed_outcome_result = invoke(
             bot,
