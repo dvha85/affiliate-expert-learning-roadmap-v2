@@ -1,7 +1,25 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: b6010508ed058f8edd828e9bacdcf92fd70e0308 -->
+<!-- readiness-main-baseline: 4032bb238bb121a90d451628a333fab8ff2f623d -->
+
+**Baseline sync after PR #439 (2026-09-18):** PR #439 was squash-merged into
+`main` at `4032bb238bb121a90d451628a333fab8ff2f623d`, from implementation head
+`b2762358405135db2b2dc7c07e412d823f0d1cae`. Curriculum CI run `35367101749`
+and Mission Agent Path CI run `35367101788` both passed all 13 checks,
+including Windows runtime job `105672103306`, learner race job `105672102842`,
+and the required `deterministic-smokes-backup-mutations` job `105672102565`.
+The post-merge RP-08 snapshot records a checksum-valid second FAILED M11
+execution without its fixture outcome; restore fails closed with
+`GRAPH_FAILED` before publishing the target, and a disposable mutation that
+removes the semantic guard makes the real smoke fail. This closes one bounded
+offline mutation gap only; it does not claim complete mutation breadth,
+power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md`.
+Marker: `Baseline sync after PR #439`.
 
 **Baseline sync after PR #437 (2026-09-18):** PR #437 was squash-merged into
 `main` at `b6010508ed058f8edd828e9bacdcf92fd70e0308`, from implementation head
