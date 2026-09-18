@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 598bb21801d44d9f2a1bf5ed56fbcb522aa2c0e9 -->
+<!-- readiness-main-baseline: cefdb758f70ce36c08bc822ee658737149600bcd -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -67,6 +67,18 @@ conservative local single-host boundary, không claim POSIX parity, distributed
 locking, power-loss, multi-file atomicity, provider/live execution hoặc
 business outcome. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
 Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md`.
+
+**Baseline sync after PR #416 (2026-09-18):** PR #416 đã squash-merge vào
+`main` tại `cefdb758f70ce36c08bc822ee658737149600bcd`, từ implementation head
+`bbd8aec14e56ba0b484376014b2ab5ec775ce3ec`. Snapshot hiện tại đã đồng bộ plan,
+readiness matrix và evidence graph về merge baseline này; CI evidence được giữ
+theo các run đã review của PR gồm Windows runtime, targeted lock/backup/restore,
+learner race và Mission Agent Path. RP-01 vẫn `PARTIAL`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`; record này không thêm provider, live-executor,
+business-outcome, pilot, deployment, distributed-locking, power-loss hay
+multi-file atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #416`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON

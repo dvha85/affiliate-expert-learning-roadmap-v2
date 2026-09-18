@@ -26,6 +26,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_windows_ancestor_race = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
         evidence_windows_ancestor_race.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md", evidence_windows_ancestor_race)
+        evidence_post_416 = self.root / "docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md"
+        evidence_post_416.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md", evidence_post_416)
         evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
         evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)
