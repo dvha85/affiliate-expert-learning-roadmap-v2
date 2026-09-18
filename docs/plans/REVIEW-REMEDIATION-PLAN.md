@@ -1514,9 +1514,21 @@ and never reseal the old intent in place. Hosted Curriculum CI run
 This is version recognition/fail-closed evidence only; migration, approval
 review, exact restart persistence and provenance remain open, so RP-02/R06/R07
 stay PARTIAL.
+
+**Cập nhật RP-02 exact-number restart conformance (2026-09-18):** learner và
+mission-runtime đều ghi/đọc lại intent có `9007199254740993`, giữ
+`json.Number` và xác nhận hash không đổi sau reload. Curriculum CI run
+`35316418613` và Mission Agent Path CI run `35316418619` đã PASS toàn bộ 13
+checks. Đây là local fixture/restart evidence bounded; crash/power-loss,
+multi-process persistence and distributed storage remain open, nên R07 và
+RP-02 vẫn PARTIAL.
+
 Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
 
-**Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
+**Nghiệm thu:** R06/R07 vẫn `PARTIAL`; output vẫn đúng schema và
+proposal-only trong boundary offline hiện tại. **Migration:** báo version/hash
+không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite
+approval cũ để khớp hash mới.
 
 ### RP-03a/03b — Guard approval, ledger và STOP có tính bền vững
 
