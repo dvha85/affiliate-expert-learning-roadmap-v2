@@ -480,8 +480,9 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(duplicateExecutionCycleEntries); err == nil {
 		t.Fatal("two closed cycles for one execution were accepted")
 	}
-	entries[len(entries)-1].Artifact = json.RawMessage(`{"execution_id":"orphan"}`)
-	if err := ValidateArtifactGraph(entries); err == nil {
+	invalidCycleEntries := append([]ArtifactEntry(nil), entries...)
+	invalidCycleEntries[len(invalidCycleEntries)-1].Artifact = json.RawMessage(`{"execution_id":"orphan"}`)
+	if err := ValidateArtifactGraph(invalidCycleEntries); err == nil {
 		t.Fatal("invalid cycle entry accepted")
 	}
 	spentLedger := ledger
