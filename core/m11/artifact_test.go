@@ -251,6 +251,42 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(brokenGateWindowEntries); err == nil {
 		t.Fatal("gate at lease expiry was accepted")
 	}
+	// Keep the gate ID canonical while moving the lease expiry close to the
+	// fixture clock. This isolates the strict lease boundary from the separate
+	// cost-bound expiry guard and proves that a checksum-valid gate at the exact
+	// lease expiry is still rejected.
+	expiryLease := lease
+	expiryLease.ExpiresAt = "2026-09-08T00:00:10Z"
+	expiryLease.LeaseHash = ComputeProductionLeaseHash(expiryLease)
+	expiryApproval := approval
+	expiryApproval.LeaseHash = expiryLease.LeaseHash
+	expiryHealth := health
+	expiryHealth.LeaseHash = expiryLease.LeaseHash
+	expiryHealth.SnapshotHash = ComputeProductionHealthHash(expiryHealth)
+	expiryLedger := ledger
+	expiryLedger.LeaseHash = expiryLease.LeaseHash
+	expiryLedgerEntry := m11Entry(t, ArtifactKindLedger, expiryLedger)
+	expiryActivation := activation
+	expiryActivation.LeaseHash = expiryLease.LeaseHash
+	expiryGate := gate
+	expiryGate.LeaseHash = expiryLease.LeaseHash
+	expiryGate.HealthSnapshotHash = expiryHealth.SnapshotHash
+	expiryGate.LedgerArtifactID = expiryLedgerEntry.ArtifactID
+	expiryGate.LedgerContentHash = expiryLedgerEntry.ContentHash
+	expiryGate.EvaluatedAt = expiryLease.ExpiresAt
+	expiryGate.GateID = ComputeProductionGateID(expiryLease, expiryGate.IntentID, expiryGate.IntentHash, expiryHealth, cost, expiryLedgerEntry, expiryGate.EvaluatedAt)
+	expiryEntries := []ArtifactEntry{
+		m11Entry(t, ArtifactKindLease, expiryLease),
+		m11Entry(t, ArtifactKindLeaseApproval, expiryApproval),
+		m11Entry(t, ArtifactKindHealth, expiryHealth),
+		m11Entry(t, ArtifactKindCostBound, cost),
+		expiryLedgerEntry,
+		m11Entry(t, ArtifactKindActivation, expiryActivation),
+		m11Entry(t, ArtifactKindGate, expiryGate),
+	}
+	if err := ValidateArtifactGraph(expiryEntries); err == nil {
+		t.Fatal("canonical gate at lease expiry was accepted")
+	}
 	brokenGateCostWindow := gate
 	brokenGateCostWindow.EvaluatedAt = cost.ExpiresAt
 	brokenGateCostWindowEntries := append([]ArtifactEntry(nil), entries...)
