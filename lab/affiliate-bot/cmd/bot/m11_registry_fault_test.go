@@ -880,6 +880,9 @@ func newM11UnknownStopFixture(t *testing.T) m11UnknownStopFixture {
 
 func TestBackupRestoreRejectsExecutionMissingReservationLedger(t *testing.T) {
 	fixture := newM11UnknownStopFixture(t)
+	if err := os.WriteFile(filepath.Join(fixture.dir, "history.jsonl"), []byte{}, 0600); err != nil {
+		t.Fatal(err)
+	}
 	execution := corem11.ProductionExecutionRecord{
 		ExecutionID:                  corem11.ComputeProductionExecutionID(fixture.authorization.AuthorizationID),
 		AuthorizationID:              fixture.authorization.AuthorizationID,
