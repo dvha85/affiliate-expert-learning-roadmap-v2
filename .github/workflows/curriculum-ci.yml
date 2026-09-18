@@ -281,6 +281,8 @@ jobs:
         run: python scripts/mutate_backup_m11_terminal_chain.py
       - name: RP-08 M11 failed-execution outcome mutation proof
         run: python scripts/mutate_backup_m11_failed_outcome.py
+      - name: RP-08 M11 reservation lineage mutation proof
+        run: python scripts/mutate_m11_reservation_lineage.py
       - name: RP-08 M11 canonical identity mutation proof
         run: python scripts/mutate_m11_identity_guard.py
       - name: RP-08 M11 authorization gate lineage mutation proof

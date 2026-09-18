@@ -15,6 +15,7 @@ CI_REQUIRED = {
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_m11_terminal_chain.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_m11_failed_outcome.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_reservation_lineage.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_registry_graph_envelope_integrity.py": ".github/workflows/curriculum-ci.yml",
