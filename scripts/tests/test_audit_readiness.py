@@ -95,6 +95,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_post_merge_pr449 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR449-20260919.md"
         evidence_rp08_post_merge_pr449.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR449-20260919.md", evidence_rp08_post_merge_pr449)
+        evidence_rp08_post_merge_pr451 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md"
+        evidence_rp08_post_merge_pr451.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md", evidence_rp08_post_merge_pr451)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)

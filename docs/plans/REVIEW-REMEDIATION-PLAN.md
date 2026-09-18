@@ -1,7 +1,24 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 33e993029fbe52b0dd97435f9ab96cb1050a0404 -->
+<!-- readiness-main-baseline: f34d8c838bc7a2154e0555c5e12da7c2e06b89ec -->
+
+**Baseline sync after PR #451 (2026-09-19):** PR #451 was squash-merged into
+`main` at `f34d8c838bc7a2154e0555c5e12da7c2e06b89ec`, from implementation head
+`810a4bafc5fb58774c7ca1bfa505c75421bfc590`. Curriculum CI run `35388186329`
+and Mission Agent Path CI run `35388186527` passed all 13 hosted checks,
+including the M11 ledger-activation mutation job `105739978015`, Windows
+runtime job `105739977805` and learner race job `105739978038`. The disposable
+mutation removes only the M11 ledger-to-activation timing predicate in a
+temporary copy and requires the real lifecycle graph regression to reject the
+pre-activation ledger. This post-merge RP-08 snapshot rebinds readiness
+bookkeeping to the merged PR #451 baseline only; it does not close complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or production
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md`.
+Marker: `Baseline sync after PR #451`.
 
 **Baseline sync after PR #449 (2026-09-19):** PR #449 was squash-merged into
 `main` at `33e993029fbe52b0dd97435f9ab96cb1050a0404`, from implementation head
