@@ -1671,6 +1671,17 @@ approval cũ để khớp hash mới.
 
 **Nghiệm thu:** R02/R03/R04 đóng; record hợp lệ được ACK phải replay MATCH; field ID thật đi từ context đến intent. **Compatibility:** giữ endpoint lịch sử nếu cần diagnostic nhưng tách rõ envelope/trust level; không tự sửa history đã DRIFT.
 
+**Cập nhật RP-04 shared canonical evidence context (2026-09-18):**
+`core/canonical` nay tạo envelope `canonical-evidence-context/v1` dùng chung
+cho M07/M08 từ canonical history observations. Aggregate IDs phải khớp đúng
+recorded observations; field IDs/provenance được lấy lại từ raw M00 projection,
+reject malformed/forged/duplicate/collision IDs và giữ nguyên missing/null.
+Learner M07 không còn tự dựng field evidence riêng. Đây vẫn là bounded
+offline/fixture/read-only evidence; resolver chỉ nhận record resolve đúng một
+lần và replay `MATCH`, còn provider/live execution, deployment, distributed
+locking, power-loss và multi-file atomicity vẫn mở. Marker:
+`RP-04 shared canonical context`.
+
 ### RP-05a/05b — Grounding và vòng đời tool evidence M07
 
 **Chạm tới:** `core/m07/m07.go`, learner M07 entrypoint, blueprint M07, proposal/output contracts, registry/request adapter và tests.

@@ -8,17 +8,11 @@ import (
 	"strings"
 
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts"
-	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m00"
+	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/canonical"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 )
 
-type m07Context struct {
-	RecordID    string             `json:"record_id"`
-	DecisionID  string             `json:"decision_id"`
-	EvidenceIDs []string           `json:"evidence_ids"`
-	Evidence    []corem07.Evidence `json:"evidence"`
-	Authority   string             `json:"authority"`
-}
+type m07Context = canonical.Context
 
 const maxM07PortableInputBytes int64 = 1 << 20
 
@@ -32,32 +26,19 @@ func readM07PortableInput(path string) ([]byte, error) {
 }
 
 func m07EvidenceContext(record HistoryRecord) (m07Context, error) {
-	ctx := m07Context{RecordID: record.RecordID, DecisionID: record.RecordID, Authority: "canonical_history_store"}
-	ctx.EvidenceIDs = append(ctx.EvidenceIDs, record.RecordedResult.EvidenceIDs...)
+	inputs := make([]canonical.ObservationInput, 0, len(record.Observations))
 	for _, observation := range record.Observations {
-		ctx.Evidence = append(ctx.Evidence, corem07.Evidence{
-			EvidenceID: observation.ObservationID, SubjectID: observation.SubjectID,
-			FieldOrClaim: "product snapshot", Value: observation, ClaimKind: observation.ClaimKind,
-			SourceAuthorityOrRole: observation.SourceAuthorityOrRole, Limitation: observation.Limitation,
-		})
 		raw, err := json.Marshal(observation)
 		if err != nil {
 			return m07Context{}, err
 		}
-		fields, err := m00.SourceFields(raw)
-		if err != nil {
-			return m07Context{}, err
-		}
-		for _, field := range fields {
-			ctx.EvidenceIDs = append(ctx.EvidenceIDs, field.ObservationID)
-			ctx.Evidence = append(ctx.Evidence, corem07.Evidence{
-				EvidenceID: field.ObservationID, SubjectID: field.SubjectID,
-				FieldOrClaim: field.Field, Value: field.Value, ClaimKind: field.ClaimKind,
-				SourceAuthorityOrRole: field.Role, Limitation: field.Limitation,
-			})
-		}
+		inputs = append(inputs, canonical.ObservationInput{
+			Raw: raw, ObservationID: observation.ObservationID, SubjectID: observation.SubjectID,
+			ClaimKind: observation.ClaimKind, SourceAuthorityOrRole: observation.SourceAuthorityOrRole,
+			Limitation: observation.Limitation, Value: observation,
+		})
 	}
-	return ctx, nil
+	return canonical.BuildEvidenceContext(record.RecordID, record.RecordedResult.DecisionID, record.RecordedResult.EvidenceIDs, inputs)
 }
 
 func appendRegisteredToolEvidence(ctx m07Context, raw []byte, registry []corem07.ToolSpec) (m07Context, error) {
