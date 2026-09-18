@@ -1125,6 +1125,67 @@ func TestBackupRestoreRejectsStateCanaryMissingRegistryGrant(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreValidatesHistoricalM10RegistryWithoutActiveCanary(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "none")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Canary == nil {
+		t.Fatal("authority fixture did not create an active canary")
+	}
+	state.Canary = nil
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+
+	root := filepath.Dir(runtimeDir)
+	backup := filepath.Join(root, "historical-m10-backup")
+	restored := filepath.Join(root, "historical-m10-restored")
+	if code, response := backupCall(t, "create", runtimeDir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("historical M10 registry was not backed up: code=%d response=%+v", code, response)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(backup, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	requiredRegistry := false
+	for _, name := range manifest.Required {
+		if name == "m10-artifacts.jsonl" {
+			requiredRegistry = true
+			break
+		}
+	}
+	if !requiredRegistry {
+		t.Fatalf("historical M10 registry was omitted from required inventory: %+v", manifest.Required)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("historical M10 registry was not restored: code=%d response=%+v", code, response)
+	}
+
+	broken := filepath.Join(root, "historical-m10-broken")
+	copyFlatBackup(t, backup, broken)
+	removeM10ArtifactEntry(t, filepath.Join(broken, "m10-artifacts.jsonl"), corem10.ArtifactKindCanaryGrant, "expiry-grant")
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(broken, "m10-artifacts.jsonl")
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	brokenRestored := filepath.Join(root, "historical-m10-broken-restored")
+	if code, response := backupCall(t, "restore", broken, brokenRestored); code == 0 || response["status"] == "RESTORED" {
+		t.Fatalf("checksum-valid historical M10 registry orphan was restored: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(brokenRestored); !os.IsNotExist(err) {
+		t.Fatalf("invalid historical M10 registry published a restore target: %v", err)
+	}
+}
+
 func removeM10ArtifactEntry(t *testing.T, path, kind, artifactID string) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
