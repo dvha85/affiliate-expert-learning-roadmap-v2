@@ -3018,6 +3018,110 @@ func TestMissionM10ReserveRejectsDurableStopWithoutMutation(t *testing.T) {
 	assertMissionRuntimeUnchanged(t, before, runtimeDir)
 }
 
+func TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	grantPath := filepath.Join(root, "grant.json")
+	approvalPath := filepath.Join(root, "approval.json")
+	binary := buildMissionBinary(t)
+
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", runtimeDir, boundPath, "budget-exhausted"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("fresh Bot did not consume the cap=1 budget: code=%d response=%+v", code, response)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 || len(state.Reservations) != 1 {
+		t.Fatalf("cap=1 budget ledger is not exhausted exactly once: state=%+v err=%v", state, err)
+	}
+
+	assertRejectedWithoutMutation := func(dir, name string, args ...string) {
+		t.Helper()
+		before := missionRuntimeSnapshot(t, dir)
+		code, response := missionBinaryCall(t, binary, args...)
+		if code == 0 || response["status"] != "REJECTED" {
+			t.Fatalf("%s reopened exhausted authority: code=%d response=%+v", name, code, response)
+		}
+		assertMissionRuntimeUnchanged(t, before, dir)
+	}
+
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m09-approval", runtimeDir, approvalPath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("approval replay did not remain an exact duplicate after exhaustion: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	before = missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("exact grant re-import did not remain an ACK after exhaustion: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	var originalGrant corem10.CanaryGrant
+	if err := readJSON(grantPath, &originalGrant); err != nil {
+		t.Fatal(err)
+	}
+	increasedCap := originalGrant
+	increasedCap.MaxExecutionsTotal = 2
+	increasedCap.MaxExecutionsPerWindow = 2
+	increasedCap.GrantHash = corem10.ComputeCanaryGrantHash(increasedCap)
+	increasedCapPath := filepath.Join(root, "increased-cap-grant.json")
+	writeMissionTestJSON(t, increasedCapPath, increasedCap)
+	assertRejectedWithoutMutation(runtimeDir, "same-ID cap increase", "mission", "m10-canary", runtimeDir, increasedCapPath)
+
+	changedCurrency := originalGrant
+	changedCurrency.Currency = "VND"
+	changedCurrency.GrantHash = corem10.ComputeCanaryGrantHash(changedCurrency)
+	changedCurrencyPath := filepath.Join(root, "changed-currency-grant.json")
+	writeMissionTestJSON(t, changedCurrencyPath, changedCurrency)
+	assertRejectedWithoutMutation(runtimeDir, "same-ID currency change", "mission", "m10-canary", runtimeDir, changedCurrencyPath)
+
+	var originalBound corem10.TrustedCostBound
+	if err := readJSON(boundPath, &originalBound); err != nil {
+		t.Fatal(err)
+	}
+	changedBound := originalBound
+	changedBound.Currency = "VND"
+	changedBound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(changedBound)
+	changedBoundPath := filepath.Join(root, "changed-currency-cost.json")
+	writeMissionTestJSON(t, changedBoundPath, changedBound)
+	assertRejectedWithoutMutation(runtimeDir, "cost-bound currency change", "mission", "m10-cost-register", runtimeDir, changedBoundPath)
+
+	before = missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", runtimeDir, boundPath, "budget-replay-after-approval"); code == 0 || response["status"] != "BUDGET_DENIED" {
+		t.Fatalf("approval/grant replay reopened exhausted budget: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	backupDir := filepath.Join(root, "budget-exhausted-backup")
+	restoredDir := filepath.Join(root, "budget-exhausted-restored")
+	if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("exhausted budget backup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("exhausted budget restore failed: code=%d response=%+v", code, response)
+	}
+
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m09-approval", restoredDir, approvalPath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("restored approval replay was not an exact duplicate: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-canary", restoredDir, grantPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("restored exact grant re-import was not an ACK: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+	assertRejectedWithoutMutation(restoredDir, "restored same-ID cap increase", "mission", "m10-canary", restoredDir, increasedCapPath)
+	assertRejectedWithoutMutation(restoredDir, "restored same-ID currency change", "mission", "m10-canary", restoredDir, changedCurrencyPath)
+	assertRejectedWithoutMutation(restoredDir, "restored cost-bound currency change", "mission", "m10-cost-register", restoredDir, changedBoundPath)
+
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", restoredDir, boundPath, "restored-budget-replay"); code == 0 || response["status"] != "BUDGET_DENIED" {
+		t.Fatalf("restored approval/grant replay reopened exhausted budget: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+}
+
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
 	i.IntentHash = learnerIntentHash(i)
