@@ -22,6 +22,11 @@ def invoke(bot, *args, expected=0, env=None):
     return json.loads(run([bot, *args], expected=expected, env=env).stdout)
 
 
+def invoke_with_stderr(bot, *args, expected=0, env=None):
+    result = run([bot, *args], expected=expected, env=env)
+    return json.loads(result.stdout), result.stderr
+
+
 def m11_entries(runtime):
     path = runtime / "m11-artifacts.jsonl"
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -689,7 +694,7 @@ def main():
         remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_OUTCOME_EVALUATION", "br18-production-e")
         remove_m11_entry(missing_failed_outcome_backup, "PRODUCTION_CYCLE", "br18-production-cycle")
         missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
-        missing_failed_outcome_result = invoke(
+        missing_failed_outcome_result, missing_failed_outcome_error = invoke_with_stderr(
             bot,
             "backup",
             "restore",
@@ -700,13 +705,14 @@ def main():
         )
         if (
             missing_failed_outcome_result["status"] != "GRAPH_FAILED"
-            or "failed M11 execution is missing restored fixture outcome" not in missing_failed_outcome_result.get("error", "")
+            or "failed M11 execution is missing restored fixture outcome" not in missing_failed_outcome_error
             or missing_failed_outcome_restored.exists()
         ):
             raise AssertionError(
                 (
                     "missing-failed-outcome restore must fail closed",
                     missing_failed_outcome_result,
+                    missing_failed_outcome_error,
                 )
             )
         pending_cycle_backup = root / "pending-cycle-backup"; shutil.copytree(backup, pending_cycle_backup)
