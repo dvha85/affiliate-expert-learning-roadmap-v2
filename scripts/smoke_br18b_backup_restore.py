@@ -22,6 +22,11 @@ def invoke(bot, *args, expected=0, env=None):
     return json.loads(run([bot, *args], expected=expected, env=env).stdout)
 
 
+def invoke_with_stderr(bot, *args, expected=0, env=None):
+    result = run([bot, *args], expected=expected, env=env)
+    return json.loads(result.stdout), result.stderr
+
+
 def m11_entries(runtime):
     path = runtime / "m11-artifacts.jsonl"
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -127,6 +132,65 @@ def rewrite_m11_registry(backup, change):
             entry["content_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
         lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
     replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
+def append_m11_registry_entry(backup, kind, artifact):
+    canonical = json.dumps(artifact, separators=(",", ":"), ensure_ascii=False).encode()
+    entry = {
+        "artifact_kind": kind,
+        "artifact_id": artifact["authorization_id"] if kind == "PRODUCTION_EXECUTION_AUTHORIZATION" else artifact["execution_id"] if kind == "PRODUCTION_EXECUTION_RECORD" else artifact["lease_id"] + "/" + artifact["updated_at"],
+        "content_hash": "sha256:" + hashlib.sha256(canonical).hexdigest(),
+        "artifact": artifact,
+    }
+    path = backup / "m11-artifacts.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    lines.append(json.dumps(entry, separators=(",", ":"), ensure_ascii=False))
+    replace_backup_file(backup, "m11-artifacts.jsonl", ("\n".join(lines) + "\n").encode())
+
+
+def add_m11_failed_execution_without_outcome(backup):
+    entries = m11_entries(backup)
+    authorization = next(entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_EXECUTION_AUTHORIZATION")
+    execution = next(entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_EXECUTION_RECORD")
+    ledger = max(
+        (entry["artifact"] for entry in entries if entry["artifact_kind"] == "PRODUCTION_LEDGER"),
+        key=lambda item: item["updated_at"],
+    )
+    authorized_at = "2026-09-08T00:00:04Z"
+    attempted_at = "2026-09-08T00:00:07Z"
+    authorization_id = "prod-auth-" + hashlib.sha256(
+        (authorization["production_gate_id"] + "\x00" + authorization["executor_id"] + "\x00" + authorized_at).encode()
+    ).digest()[:16].hex()
+    new_authorization = json.loads(json.dumps(authorization))
+    new_authorization.update({
+        "authorization_id": authorization_id,
+        "authorized_at": authorized_at,
+        "idempotency_key": "br18-mutation-failed-outcome",
+    })
+    execution_id = "prod-exec-" + authorization_id
+    new_execution = json.loads(json.dumps(execution))
+    new_execution.update({
+        "execution_id": execution_id,
+        "authorization_id": authorization_id,
+        "idempotency_key": new_authorization["idempotency_key"],
+        "attempted_at": attempted_at,
+        "status": "FAILED",
+        "side_effect_state": "NOT_PERFORMED",
+        "error": "fixture-secondary-dispatch-failed-without-outcome",
+    })
+    new_ledger = json.loads(json.dumps(ledger))
+    new_ledger.update({
+        "updated_at": attempted_at,
+        "last_execution_at": attempted_at,
+        "executions_total": ledger["executions_total"] + 1,
+        "executions_in_window": ledger["executions_in_window"] + 1,
+        "cost_minor_total": ledger["cost_minor_total"] + new_authorization["production_cost_bound_minor"],
+        "pending_outcomes": 1,
+        "pending_execution_ids": [execution_id],
+    })
+    append_m11_registry_entry(backup, "PRODUCTION_LEDGER", new_ledger)
+    append_m11_registry_entry(backup, "PRODUCTION_EXECUTION_AUTHORIZATION", new_authorization)
+    append_m11_registry_entry(backup, "PRODUCTION_EXECUTION_RECORD", new_execution)
 
 
 def remove_m11_entry(backup, kind, artifact_id):
@@ -658,6 +722,35 @@ def main():
         missing_cycle_result = invoke(bot, "backup", "restore", missing_cycle_backup, missing_cycle_restored, expected=1, env=env)
         assert missing_cycle_result["status"] == "GRAPH_FAILED", missing_cycle_result
         assert not missing_cycle_restored.exists()
+        missing_failed_outcome_backup = root / "missing-failed-outcome-backup"
+        shutil.copytree(backup, missing_failed_outcome_backup)
+        # Keep the original failed execution/outcome pair valid, then append a
+        # second checksum-valid FAILED execution whose outcome is absent. This
+        # reaches the semantic restore guard without failing in the outcome
+        # loader or an unrelated terminal-lineage check first.
+        add_m11_failed_execution_without_outcome(missing_failed_outcome_backup)
+        missing_failed_outcome_restored = root / "missing-failed-outcome-restored"
+        missing_failed_outcome_result, missing_failed_outcome_error = invoke_with_stderr(
+            bot,
+            "backup",
+            "restore",
+            missing_failed_outcome_backup,
+            missing_failed_outcome_restored,
+            expected=1,
+            env=env,
+        )
+        if (
+            missing_failed_outcome_result["status"] != "GRAPH_FAILED"
+            or "failed M11 execution is missing restored fixture outcome" not in missing_failed_outcome_error
+            or missing_failed_outcome_restored.exists()
+        ):
+            raise AssertionError(
+                (
+                    "missing-failed-outcome restore must fail closed",
+                    missing_failed_outcome_result,
+                    missing_failed_outcome_error,
+                )
+            )
         pending_cycle_backup = root / "pending-cycle-backup"; shutil.copytree(backup, pending_cycle_backup)
         rewrite_m11_registry(pending_cycle_backup, replace_m11_field("PRODUCTION_CYCLE", "status", "REVIEW_PENDING"))
         assert invoke(bot, "backup", "restore", pending_cycle_backup, root / "pending-cycle-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
