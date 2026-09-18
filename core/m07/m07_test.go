@@ -134,9 +134,12 @@ func TestRegisteredToolResultIsBoundToRequestAndRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if registered.Result.RequestID == "" || registered.Result.ContentDigest != digest(registered.Result.Body) {
+		t.Fatalf("adapter provenance was not normalized: %+v", registered.Result)
+	}
 	stored, _ := json.Marshal(registered)
 	resolved, err := ValidateRegisteredToolResult(stored, registry(), "r1")
-	if err != nil || resolved.Evidence().EvidenceID != registered.TraceID+"#body" {
+	if err != nil || resolved.Evidence().EvidenceID != registered.TraceID+"#body" || resolved.Evidence().SubjectID != registered.Result.RequestID {
 		t.Fatalf("registered result did not resolve: %v", err)
 	}
 	tampered := string(stored)
@@ -146,6 +149,24 @@ func TestRegisteredToolResultIsBoundToRequestAndRecord(t *testing.T) {
 	}
 	if _, err := ValidateRegisteredToolResult(stored, registry(), "other"); err == nil {
 		t.Fatal("cross-record result accepted")
+	}
+	for name, mutate := range map[string]func(*RegisteredToolResult){
+		"request id": func(value *RegisteredToolResult) { value.Result.RequestID = "sha256:forged" },
+		"content digest": func(value *RegisteredToolResult) { value.Result.ContentDigest = "sha256:forged" },
+	} {
+		forged := registered
+		mutate(&forged)
+		forgedRaw, _ := json.Marshal(forged)
+		if _, err := ValidateRegisteredToolResult(forgedRaw, registry(), "r1"); err == nil {
+			t.Fatalf("forged %s accepted", name)
+		}
+	}
+	legacy := registered
+	legacy.Result.RequestID = ""
+	legacy.Result.ContentDigest = ""
+	legacyRaw, _ := json.Marshal(legacy)
+	if _, err := ValidateRegisteredToolResult(legacyRaw, registry(), "r1"); err == nil {
+		t.Fatal("legacy trace without explicit request/content provenance accepted")
 	}
 }
 
