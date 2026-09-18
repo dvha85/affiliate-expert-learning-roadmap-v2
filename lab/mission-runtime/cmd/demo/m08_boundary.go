@@ -12,7 +12,7 @@ import (
 func DecodeM08Intent(raw []byte) (ShadowActionIntent, string) {
 	decoded, status := corem08.DecodeIntent(raw)
 	if status != "VALID" {
-		return ShadowActionIntent{}, "INVALID_SCHEMA"
+		return ShadowActionIntent{}, status
 	}
 	i := ShadowActionIntent{IntentID: decoded.IntentID, DecisionID: decoded.DecisionID, EvidenceIDs: decoded.EvidenceIDs, ActionType: decoded.ActionType, Target: decoded.Target, Parameters: decoded.Parameters, ProposedBy: decoded.ProposedBy, ProposalRef: decoded.ProposalRef, CreatedAt: decoded.CreatedAt, ExpiresAt: decoded.ExpiresAt, CorrelationID: decoded.CorrelationID, IdempotencyKey: decoded.IdempotencyKey, IntentHash: decoded.IntentHash, IntentMode: decoded.IntentMode, ExecutionAuthorized: decoded.ExecutionAuthorized}
 	i.ShadowOnly = i.IntentMode == "PROPOSAL_ONLY" && !i.ExecutionAuthorized

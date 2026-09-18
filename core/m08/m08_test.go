@@ -84,3 +84,27 @@ func TestDecodeIntentRejectsNullParametersAndDuplicateKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestIntentHashVersionRejectsUnsupportedPrefixWithoutResealing(t *testing.T) {
+	intent := SealIntent(Intent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "DRAFT", Target: "https://example.com", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k"})
+	originalHash := intent.IntentHash
+	intent.IntentHash = "sha256-v2:" + originalHash[len("sha256:"):]
+	raw, err := json.Marshal(intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, status := DecodeIntent(raw)
+	if status != "UNSUPPORTED_HASH_VERSION" {
+		t.Fatalf("unsupported hash version was not rejected explicitly: %s", status)
+	}
+	if decoded.IntentHash != "" || intent.IntentHash == originalHash {
+		t.Fatalf("unsupported hash was resealed or unexpectedly decoded: decoded=%+v intent=%+v", decoded, intent)
+	}
+	if status := ValidateIntentHash(intent); status != "UNSUPPORTED_HASH_VERSION" {
+		t.Fatalf("direct evaluator did not reject unsupported hash version: %s", status)
+	}
+	decision := EvaluatePolicy(intent, PolicyConformanceCases()[0].Context)
+	if decision.Reason != "UNSUPPORTED_HASH_VERSION" || intent.IntentHash == originalHash {
+		t.Fatalf("policy evaluation did not fail closed without resealing: decision=%+v intent=%+v", decision, intent)
+	}
+}

@@ -148,6 +148,19 @@ func TestM08HarnessUsesSharedPolicyConformanceTable(t *testing.T) {
 	}
 }
 
+func TestM08HarnessRejectsUnsupportedHashVersionWithoutResealing(t *testing.T) {
+	i, _ := m08BoundaryFixture()
+	raw, err := json.Marshal(i)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = bytes.Replace(raw, []byte(`"sha256:`), []byte(`"sha256-v2:`), 1)
+	decoded, status := DecodeM08Intent(raw)
+	if status != "UNSUPPORTED_HASH_VERSION" || decoded.IntentHash != "" {
+		t.Fatalf("harness accepted or resealed unsupported hash version: status=%s decoded=%+v", status, decoded)
+	}
+}
+
 func TestM08ParameterNumbers(t *testing.T) {
 	i, _ := m08BoundaryFixture()
 	i.Parameters = map[string]any{"id": json.Number("9007199254740993")}

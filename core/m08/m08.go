@@ -56,12 +56,49 @@ type PolicyDecision struct {
 	PolicyCheckedAt      string `json:"policy_checked_at"`
 }
 
+// IntentHashVersionV1 is the persisted hash prefix used by the current M08
+// canonicalization. A future canonicalization must use a new prefix and an
+// explicit migration; it must never reseal an already approved intent in
+// place.
+const IntentHashVersionV1 = "sha256"
+
+// IntentHashVersion returns the version prefix carried by a persisted intent
+// hash. The existing sha256: prefix is treated as version one for backward
+// compatibility; unknown prefixes fail closed.
+func IntentHashVersion(hash string) string {
+	separator := strings.IndexByte(hash, ':')
+	if separator <= 0 {
+		return ""
+	}
+	return hash[:separator]
+}
+
+func ValidateIntentHash(i Intent) string {
+	if strings.TrimSpace(i.IntentHash) == "" {
+		return "TAMPERED_INTENT"
+	}
+	if IntentHashVersion(i.IntentHash) != IntentHashVersionV1 {
+		return "UNSUPPORTED_HASH_VERSION"
+	}
+	if i.IntentHash != ComputeIntentHash(i) {
+		return "TAMPERED_INTENT"
+	}
+	return "VALID"
+}
+
 // DecodeIntent validates original bytes before typed decoding, so duplicate,
 // unknown, case-variant fields and null required fields cannot be hidden by a
 // Go struct conversion. Parameters are restored from contracts.Decode to keep
 // json.Number values exact for hashing.
 func DecodeIntent(raw []byte) (Intent, string) {
 	var i Intent
+	if value, err := contracts.Decode(raw); err == nil {
+		if object, ok := value.(map[string]any); ok {
+			if hash, ok := object["intent_hash"].(string); ok && IntentHashVersion(hash) != "" && IntentHashVersion(hash) != IntentHashVersionV1 {
+				return i, "UNSUPPORTED_HASH_VERSION"
+			}
+		}
+	}
 	if contracts.ValidateRaw("action-intent.schema.json", raw) != nil || contracts.DecodeStrict(raw, &i) != nil {
 		return i, "INVALID_SCHEMA"
 	}
@@ -161,7 +198,13 @@ func validContextList(values []string, required bool) bool {
 // from using a decision/risk combination that the canonical evaluator could
 // never emit for a successful proposal.
 func ValidatePolicyForIntent(i Intent, p PolicyDecision) string {
-	if i.IntentHash == "" || i.IntentHash != ComputeIntentHash(i) || i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
+	if status := ValidateIntentHash(i); status != "VALID" {
+		if status == "UNSUPPORTED_HASH_VERSION" {
+			return status
+		}
+		return "INVALID_INTENT"
+	}
+	if i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
 		return "INVALID_INTENT"
 	}
 	if p.PolicyVersion == "" || p.IntentID != i.IntentID || p.IntentHash != i.IntentHash || p.PolicyMode != "NON_AUTHORIZING" || p.ExecutionAuthorized {
@@ -220,7 +263,7 @@ func ComputeIntentHash(i Intent) string {
 		return ""
 	}
 	s := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(s[:])
+	return IntentHashVersionV1 + ":" + hex.EncodeToString(s[:])
 }
 
 func SealIntent(i Intent) Intent {
@@ -267,8 +310,8 @@ func EvaluatePolicy(i Intent, ctx PolicyContext) PolicyDecision {
 		p.Reason = "INTENT_AUTHORITY_FORBIDDEN"
 		return p
 	}
-	if i.IntentHash == "" || i.IntentHash != ComputeIntentHash(i) {
-		p.Reason = "TAMPERED_INTENT"
+	if status := ValidateIntentHash(i); status != "VALID" {
+		p.Reason = status
 		return p
 	}
 	risk, ok := ctx.ActionRisk[i.ActionType]
