@@ -1489,7 +1489,7 @@ version/migration, provenance/conformance và external execution blockers.
 Record: `docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md`.
 
 Hosted verification is complete: PR #417 passed all 13 checks in Curriculum CI
-run `35313604149` and Mission Agent Path CI run `35313604150`, including the
+run `35314331386` and Mission Agent Path CI run `35314331378`, including the
 learner race, Windows runtime and mission-runtime test/vet jobs. This records
 offline/fixture acceptance for the shared decoder seam; RP-02/R06/R07 remain
 PARTIAL for shared conformance, hash-version/migration, provenance/persistence

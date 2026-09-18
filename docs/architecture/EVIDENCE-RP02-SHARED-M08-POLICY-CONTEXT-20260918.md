@@ -31,15 +31,15 @@ may have no proposal set; an agent intent still requires a resolvable
 The current worktree has no Go executable, so no local Go test or vet PASS is
 claimed. Hosted CI is now green for PR #417:
 
-- [Curriculum CI run 35313604149](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35313604149)
+- [Curriculum CI run 35314331386](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35314331386)
   passed the learner full tests/vet, `go test -race ./...`, deterministic
-  runtime/smoke jobs and `windows-runtime` job 105500467992.
-- [Mission Agent Path CI run 35313604150](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35313604150)
-  passed the mission runtime job 105500468044, including its Go test/vet
+  runtime/smoke jobs and `windows-runtime` job 105502656378.
+- [Mission Agent Path CI run 35314331378](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35314331378)
+  passed the mission runtime job 105502656431, including its Go test/vet
   coverage.
 - The shared M08-specific learner and harness regressions are included in
-  learner jobs 105500467986/105500468008 and mission job 105500468044; the
-  learner race regression is job 105500467964.
+  learner jobs 105502656457/105502656411 and mission job 105502656431; the
+  learner race regression is job 105502656474.
 
 This is hosted offline/fixture evidence for the decoder and policy boundary;
 it does not claim provider access, live execution or production readiness. The
