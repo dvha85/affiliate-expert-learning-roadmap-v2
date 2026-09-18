@@ -1,7 +1,24 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: e95cc321a37e3f8f239a594fa0e23412cbb43571 -->
+<!-- readiness-main-baseline: aa6ead57f68e91d9824f144ba367e4f8b78dd6bd -->
+
+**Baseline sync after PR #445 (2026-09-19):** PR #445 was squash-merged into
+`main` at `aa6ead57f68e91d9824f144ba367e4f8b78dd6bd`, from implementation head
+`cce98b4d7ddf0e122da5db5f853ddcd070608066`. Curriculum CI run `35379166920`
+and Mission Agent Path CI run `35379166826` passed all 13 hosted checks,
+including deterministic-smokes-backup-mutations job `105710955207`, Windows
+runtime job `105710955118` and learner race job `105710955837`. The post-merge
+RP-08 snapshot records that a checksum-valid M11 gate with a degraded health
+snapshot is rejected, and a disposable mutation removing the production-health
+admission predicate fails the real graph regression. This closes one bounded
+offline mutation gap only; it does not claim complete mutation breadth,
+power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #445`.
 
 **Baseline sync after PR #443 (2026-09-19):** PR #443 was squash-merged into
 `main` at `e95cc321a37e3f8f239a594fa0e23412cbb43571`, from implementation head
