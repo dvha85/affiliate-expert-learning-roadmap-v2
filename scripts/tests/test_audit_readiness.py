@@ -35,6 +35,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_health_policy = self.root / "scripts/mutate_m11_health_policy.py"
         mutation_health_policy.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_health_policy.py", mutation_health_policy)
+        mutation_expiry_authority = self.root / "scripts/mutate_m11_expiry_authority.py"
+        mutation_expiry_authority.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_expiry_authority.py", mutation_expiry_authority)
         evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
         evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
@@ -80,6 +83,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_health_policy = self.root / "docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md"
         evidence_rp08_health_policy.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md", evidence_rp08_health_policy)
+        evidence_rp08_expiry = self.root / "docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md"
+        evidence_rp08_expiry.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md", evidence_rp08_expiry)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
