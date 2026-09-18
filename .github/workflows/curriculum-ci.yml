@@ -279,6 +279,8 @@ jobs:
         run: python scripts/smoke_br18b_backup_restore.py
       - name: RP-08 M11 evaluation-to-closed-cycle mutation proof
         run: python scripts/mutate_backup_m11_terminal_chain.py
+      - name: RP-08 M11 ledger-outcome reverse mutation proof
+        run: python scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py
       - name: RP-08 M11 failed-execution outcome mutation proof
         run: python scripts/mutate_backup_m11_failed_outcome.py
       - name: RP-08 M11 reservation lineage mutation proof
