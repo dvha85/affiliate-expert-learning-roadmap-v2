@@ -20,6 +20,9 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
+        evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
         evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
         evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)

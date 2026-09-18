@@ -297,7 +297,7 @@ func readStableRegularFileLimit(path string, limit int64) ([]byte, fs.FileInfo, 
 	if limit >= 0 && before.Size() > limit {
 		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
 	}
-	f, err := os.Open(path)
+	f, err := openStableRegularFileForRead(path)
 	if err != nil {
 		return nil, nil, err
 	}

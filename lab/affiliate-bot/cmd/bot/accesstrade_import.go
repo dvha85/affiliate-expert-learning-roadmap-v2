@@ -311,16 +311,7 @@ func appendJSONLLinesAtomically(path string, records [][]byte) error {
 			return err
 		}
 	}
-	directoryHandle, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	err = directoryHandle.Sync()
-	closeErr := directoryHandle.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return syncDirectory(directory)
 }
 
 func appendOutcomesAtomically(path string, records [][]byte) error {

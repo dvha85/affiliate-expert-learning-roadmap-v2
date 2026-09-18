@@ -35,12 +35,7 @@ func readCampaignFile(path string, limit int64) ([]byte, error) {
 }
 
 func syncCampaignDir(path string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return f.Sync()
+	return syncDirectory(path)
 }
 
 // Explicit setup only. Never recreate a missing ledger on the request path.

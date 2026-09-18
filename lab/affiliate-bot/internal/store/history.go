@@ -84,7 +84,7 @@ func ReadStableRegularFileLimit(path string, limit int64) ([]byte, error) {
 	if !before.Mode().IsRegular() || limit >= 0 && before.Size() > limit {
 		return nil, fmt.Errorf("portable input is not an allowed regular file")
 	}
-	f, err := os.Open(path)
+	f, err := openStableRegularFileForRead(path)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (JSONL) Open(path string) (io.ReadCloser, error) {
 			return nil, err
 		}
 	}
-	f, err := os.Open(path)
+	f, err := openStableRegularFileForRead(path)
 	if err != nil {
 		return nil, err
 	}
@@ -325,17 +325,8 @@ func (JSONL) AppendLine(path string, record []byte) error {
 		}
 		return fmt.Errorf("history path changed while appending")
 	}
-	d, e := os.Open(filepath.Dir(path))
-	if e != nil {
+	if e = syncDirectory(filepath.Dir(path)); e != nil {
 		return e
-	}
-	e = d.Sync()
-	closeErr := d.Close()
-	if e != nil {
-		return e
-	}
-	if closeErr != nil {
-		return closeErr
 	}
 	// Directory sync is part of the acknowledgement boundary. Recheck the
 	// name afterwards so callers do not receive success for a replaced path.

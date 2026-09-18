@@ -1166,16 +1166,7 @@ func missionWriteFault(phase string) error {
 // boundary before its caller reports success. It is local-filesystem only and
 // deliberately makes no multi-host or power-loss claim beyond that syscall.
 func syncDirectory(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	err = d.Sync()
-	closeErr := d.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return syncDirectoryPlatform(dir)
 }
 
 // recoveryJournalCleanupFault is test-only. It models the narrow window after
@@ -1886,17 +1877,8 @@ func recoverM11OutcomeJournal(dir string) error {
 	if err := m11OutcomeWriteFault("after_remove_before_parent_sync"); err != nil {
 		return &visibleAppendUncertainError{err: err}
 	}
-	parent, err := os.Open(dir)
-	if err != nil {
+	if err := syncDirectory(dir); err != nil {
 		return &visibleAppendUncertainError{err: err}
-	}
-	err = parent.Sync()
-	closeErr := parent.Close()
-	if err != nil {
-		return &visibleAppendUncertainError{err: err}
-	}
-	if closeErr != nil {
-		return &visibleAppendUncertainError{err: closeErr}
 	}
 	return nil
 }
@@ -2005,17 +1987,8 @@ func recoverM11FailedExecutionJournal(dir string) error {
 	if err := m11JournalCleanupWriteFault("failed_after_remove_before_parent_sync"); err != nil {
 		return &visibleAppendUncertainError{err: err}
 	}
-	parent, err := os.Open(dir)
-	if err != nil {
+	if err := syncDirectory(dir); err != nil {
 		return &visibleAppendUncertainError{err: err}
-	}
-	err = parent.Sync()
-	closeErr := parent.Close()
-	if err != nil {
-		return &visibleAppendUncertainError{err: err}
-	}
-	if closeErr != nil {
-		return &visibleAppendUncertainError{err: closeErr}
 	}
 	return nil
 }
@@ -2114,17 +2087,8 @@ func recoverM11UnknownStopJournal(dir string) error {
 	if err := m11JournalCleanupWriteFault("unknown_after_remove_before_parent_sync"); err != nil {
 		return &visibleAppendUncertainError{err: err}
 	}
-	parent, err := os.Open(dir)
-	if err != nil {
+	if err := syncDirectory(dir); err != nil {
 		return &visibleAppendUncertainError{err: err}
-	}
-	err = parent.Sync()
-	closeErr := parent.Close()
-	if err != nil {
-		return &visibleAppendUncertainError{err: err}
-	}
-	if closeErr != nil {
-		return &visibleAppendUncertainError{err: closeErr}
 	}
 	return nil
 }
