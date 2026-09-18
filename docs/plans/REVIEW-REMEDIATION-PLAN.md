@@ -2669,6 +2669,16 @@ không publish target. Snapshot recovery-only không có evaluation vẫn hợp 
 distributed/multi-host, provider, deployment, pilot và business outcome vẫn
 mở.
 
+**Cập nhật RP-08 M11 ledger-outcome reverse mutation proof (2026-09-19):**
+BR-18b đã có negative case checksum-valid xoá toàn bộ `outcome_links` khỏi
+`PRODUCTION_LEDGER`. Thêm mutation runner tạo learner Bot disposable, tháo
+riêng reverse `ledgerOutcomeLinks` cardinality guard trong backup restore rồi
+đòi smoke thật fail tại marker `orphan-ledger-outcome-restored`; runner cũng
+fail nếu smoke xanh hoặc fail ở seam khác. Đây là proof offline/read-only cho
+một reverse semantic-orphan seam; mutation breadth đầy đủ, crash/power-loss,
+atomic multi-file, distributed/multi-host, Windows traversal parity,
+provider/live execution, deployment, pilot và business outcome vẫn mở.
+
 **Cập nhật M11 restore authorization/execution lineage (2026-09-16):** BR-18b
 giờ tạo bản sao checksum-valid của backup bằng learner Bot thật rồi làm lệch
 `production_health_snapshot_hash` trong `PRODUCTION_EXECUTION_AUTHORIZATION`

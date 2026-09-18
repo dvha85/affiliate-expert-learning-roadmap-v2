@@ -23,6 +23,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_terminal_chain = self.root / "scripts/mutate_backup_m11_terminal_chain.py"
         mutation_terminal_chain.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_terminal_chain.py", mutation_terminal_chain)
+        mutation_ledger_outcome_reverse = self.root / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py"
+        mutation_ledger_outcome_reverse.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py", mutation_ledger_outcome_reverse)
         mutation_failed_outcome = self.root / "scripts/mutate_backup_m11_failed_outcome.py"
         mutation_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_failed_outcome.py", mutation_failed_outcome)
@@ -98,6 +101,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_post_merge_pr451 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md"
         evidence_rp08_post_merge_pr451.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md", evidence_rp08_post_merge_pr451)
+        evidence_rp08_ledger_outcome = self.root / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md"
+        evidence_rp08_ledger_outcome.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md", evidence_rp08_ledger_outcome)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
@@ -347,6 +353,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "scripts/mutate_m11_authorization_lineage.py"
         source.write_text(source.read_text(encoding="utf-8").replace("LINEAGE_GUARDS", "REMOVED_GUARD_SET"), encoding="utf-8")
         self.assertIn("M11 authorization lineage mutation proof is missing", self.run_audit(False))
+
+    def test_missing_m11_ledger_outcome_reverse_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("orphan-ledger-outcome-restored", "removed-ledger-outcome-marker", 1), encoding="utf-8")
+        self.assertIn("M11 ledger-outcome reverse mutation proof is missing", self.run_audit(False))
 
     def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"

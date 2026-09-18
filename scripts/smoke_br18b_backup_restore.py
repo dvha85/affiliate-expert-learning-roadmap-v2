@@ -610,7 +610,11 @@ def main():
             entry["artifact"]["outcome_links"] = []
             return True
         rewrite_m11_registry(orphan_ledger_outcome_backup, orphan_ledger_outcome_change)
-        assert invoke(bot, "backup", "restore", orphan_ledger_outcome_backup, root / "orphan-ledger-outcome-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
+        orphan_ledger_outcome_result = invoke(bot, "backup", "restore", orphan_ledger_outcome_backup, root / "orphan-ledger-outcome-restored", expected=1, env=env)
+        assert orphan_ledger_outcome_result["status"] == "GRAPH_FAILED", (
+            "orphan-ledger-outcome-restored",
+            orphan_ledger_outcome_result,
+        )
         expired_m11_execution_backup = root / "expired-m11-execution-backup"; shutil.copytree(backup, expired_m11_execution_backup)
         rewrite_m11_registry(expired_m11_execution_backup, replace_m11_field("PRODUCTION_EXECUTION_RECORD", "attempted_at", "2026-09-08T00:01:00Z"))
         assert invoke(bot, "backup", "restore", expired_m11_execution_backup, root / "expired-m11-execution-restored", expected=1, env=env)["status"] == "GRAPH_FAILED"
