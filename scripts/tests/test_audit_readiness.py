@@ -29,6 +29,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_reservation_lineage = self.root / "scripts/mutate_m11_reservation_lineage.py"
         mutation_reservation_lineage.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_reservation_lineage.py", mutation_reservation_lineage)
+        mutation_budget_snapshot = self.root / "scripts/mutate_m11_gate_budget_snapshot.py"
+        mutation_budget_snapshot.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_gate_budget_snapshot.py", mutation_budget_snapshot)
         evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
         evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
