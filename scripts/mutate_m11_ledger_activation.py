@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GUARD_PATH = Path("core/m11/artifact_registry.go")
 TEST_NAME = "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks"
 EXPECTED_FAILURE = "ledger before its activation was accepted"
-GUARD = " || windowStartedAt.Before(activatedAt) ||"
+GUARD = "windowStartedAt.Before(activatedAt)"
 
 
 def fail(message):
@@ -35,7 +35,7 @@ def main():
             fail("M11 ledger activation guard anchor is missing or ambiguous")
         mutated = source.replace(
             GUARD,
-            " ||\n\t\t\t// MUTATION: ledger activation timing enforcement removed.\n\t\t\t",
+            "false /* MUTATION: ledger activation timing enforcement removed. */",
             1,
         )
         target.write_text(mutated, encoding="utf-8")
