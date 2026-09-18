@@ -18,8 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = Path("lab/affiliate-bot/cmd/bot/backup_command.go")
 SMOKE = Path("scripts/smoke_br18b_backup_restore.py")
-GUARD = '''\tfor _, record := range executions {
-\t\tif record.Status == "FAILED" && !linked[record.ExecutionID] {
+GUARD = '''\t\tif record.Status == "FAILED" && !linked[record.ExecutionID] {
 \t\t\treturn fmt.Errorf("failed M11 execution is missing restored fixture outcome")
 \t\t}
 '''
