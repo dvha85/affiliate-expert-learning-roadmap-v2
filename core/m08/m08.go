@@ -85,6 +85,75 @@ func DecodePolicy(raw []byte) (PolicyDecision, string) {
 	return p, "VALID"
 }
 
+// DecodePolicyContext is the canonical decoder for the full M08 policy
+// context consumed by the mission harness. It keeps the original JSON
+// presence/null/duplicate/unknown-key boundary before typed decoding, then
+// applies the same semantic checks used by learner-generated contexts.
+func DecodePolicyContext(raw []byte) (PolicyContext, string) {
+	var ctx PolicyContext
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return ctx, "INVALID_CONTEXT"
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return ctx, "INVALID_CONTEXT"
+	}
+	for _, key := range []string{"policy_version", "now", "known_decision_ids", "known_evidence_ids", "known_proposal_ids", "allowed_hosts", "action_risk", "seen_idempotency"} {
+		if value, exists := object[key]; !exists || value == nil {
+			return ctx, "INVALID_CONTEXT"
+		}
+	}
+	if err := contracts.DecodeStrict(raw, &ctx); err != nil || ValidatePolicyContext(ctx) != "VALID" {
+		return ctx, "INVALID_CONTEXT"
+	}
+	return ctx, "VALID"
+}
+
+// ValidatePolicyContext applies the non-authorizing context invariants shared
+// by the learner and mission harness. A nil known-proposal list is valid for a
+// human intent; agent intents still fail closed later when the proposal link
+// is evaluated against the list.
+func ValidatePolicyContext(ctx PolicyContext) string {
+	if strings.TrimSpace(ctx.PolicyVersion) == "" {
+		return "INVALID_CONTEXT"
+	}
+	if _, err := time.Parse(time.RFC3339, ctx.Now); err != nil {
+		return "INVALID_CONTEXT"
+	}
+	if ctx.AllowedHosts == nil || ctx.ActionRisk == nil || ctx.SeenIdempotency == nil {
+		return "INVALID_CONTEXT"
+	}
+	if !validContextList(ctx.KnownDecisionIDs, false) || !validContextList(ctx.KnownEvidenceIDs, false) || !validContextList(ctx.KnownProposalIDs, false) || !validContextList(ctx.AllowedHosts, true) {
+		return "INVALID_CONTEXT"
+	}
+	for action, risk := range ctx.ActionRisk {
+		if strings.TrimSpace(action) == "" || strings.TrimSpace(risk) == "" || (risk != "RISK0" && risk != "RISK1" && risk != "RISK2") {
+			return "INVALID_CONTEXT"
+		}
+	}
+	for key, intentHash := range ctx.SeenIdempotency {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(intentHash) == "" {
+			return "INVALID_CONTEXT"
+		}
+	}
+	return "VALID"
+}
+
+func validContextList(values []string, required bool) bool {
+	if required && values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" || value != strings.TrimSpace(value) || seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
 // ValidatePolicyForIntent checks the semantic invariants which are available
 // from the two immutable artifacts alone. It intentionally does not replace
 // EvaluatePolicy: a caller that still owns its PolicyContext must re-evaluate

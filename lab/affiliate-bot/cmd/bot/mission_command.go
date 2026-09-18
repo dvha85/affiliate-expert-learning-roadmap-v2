@@ -1422,6 +1422,9 @@ func evaluateLearnerPolicy(i LearnerIntent, path string, knownProposalIDs []stri
 		return LearnerPolicy{}, err
 	}
 	ctx := corem08.PolicyContext{PolicyVersion: req.PolicyVersion, Now: req.Now, KnownDecisionIDs: []string{i.DecisionID}, KnownEvidenceIDs: append([]string(nil), i.EvidenceIDs...), KnownProposalIDs: knownProposalIDs, AllowedHosts: req.AllowedHosts, ActionRisk: req.ActionRisk, SeenIdempotency: req.SeenIdempotency}
+	if status := corem08.ValidatePolicyContext(ctx); status != "VALID" {
+		return LearnerPolicy{}, fmt.Errorf("invalid M08 policy context: %s", status)
+	}
 	return LearnerPolicy(corem08.EvaluatePolicy(corem08.Intent(i), ctx)), nil
 }
 

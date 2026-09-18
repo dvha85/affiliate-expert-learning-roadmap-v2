@@ -2931,6 +2931,26 @@ func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	}
 }
 
+func TestEvaluateLearnerPolicyUsesSharedContextValidation(t *testing.T) {
+	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
+	i.IntentHash = learnerIntentHash(i)
+	for name, raw := range map[string]string{
+		"invalid time": `{"policy_version":"v1","now":"tomorrow","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+		"invalid risk": `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK9"},"seen_idempotency":{}}`,
+		"null hosts":   `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":null,"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "policy.json")
+			if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := evaluateLearnerPolicy(i, path, nil); err == nil {
+				t.Fatal("invalid policy context accepted")
+			}
+		})
+	}
+}
+
 func TestLoadMissionStateRejectsUnreflectedStopMarker(t *testing.T) {
 	dir := t.TempDir()
 	state, _ := json.Marshal(LearnerMissionState{Version: missionStateVersion})

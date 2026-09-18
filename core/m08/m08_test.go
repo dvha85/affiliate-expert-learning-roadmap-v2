@@ -5,6 +5,36 @@ import (
 	"testing"
 )
 
+func TestDecodePolicyContextSharesStrictAndSemanticBoundary(t *testing.T) {
+	valid := []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`)
+	if _, status := DecodePolicyContext(valid); status != "VALID" {
+		t.Fatalf("valid context rejected: %s", status)
+	}
+	for name, raw := range map[string][]byte{
+		"missing field":       []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"}}`),
+		"null field":          []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":null,"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`),
+		"duplicate key":       []byte(`{"policy_version":"v1","policy_version":"v2","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`),
+		"unknown key":         []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{},"Policy_Version":"v2"}`),
+		"invalid time":        []byte(`{"policy_version":"v1","now":"tomorrow","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`),
+		"invalid risk":        []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK9"},"seen_idempotency":{}}`),
+		"duplicate known ID":   []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d","d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{}}`),
+		"blank idempotency":    []byte(`{"policy_version":"v1","now":"2026-09-03T02:00:00Z","known_decision_ids":["d"],"known_evidence_ids":["e"],"known_proposal_ids":[],"allowed_hosts":["example.com"],"action_risk":{"DRAFT":"RISK0"},"seen_idempotency":{" ":"sha256:x"}}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, status := DecodePolicyContext(raw); status != "INVALID_CONTEXT" {
+				t.Fatalf("invalid context accepted: %s", status)
+			}
+		})
+	}
+}
+
+func TestValidatePolicyContextAllowsHumanWithoutProposalSet(t *testing.T) {
+	ctx := PolicyContext{PolicyVersion: "v1", Now: "2026-09-03T02:00:00Z", KnownDecisionIDs: []string{"d"}, KnownEvidenceIDs: []string{"e"}, AllowedHosts: []string{"example.com"}, ActionRisk: map[string]string{"DRAFT": "RISK0"}, SeenIdempotency: map[string]string{}}
+	if status := ValidatePolicyContext(ctx); status != "VALID" {
+		t.Fatalf("human context with no proposal set rejected: %s", status)
+	}
+}
+
 func TestDecodeIntentPreservesLargeJSONNumberForHash(t *testing.T) {
 	intent := SealIntent(Intent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e2", "e1"}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{"id": json.Number("9007199254740993")}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "c", IdempotencyKey: "k"})
 	raw, err := json.Marshal(intent)

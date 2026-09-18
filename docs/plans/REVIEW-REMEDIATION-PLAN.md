@@ -1478,6 +1478,17 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 - Policy kiểm created_at/expires_at, schema, authority, risk, proposal/evidence/decision links và idempotency context. Thiếu dependency phải trả trạng thái đóng, không ALLOW.
 - Conformance tests cùng payload/expected result cho CLI và harness: thiếu proposal, proposal không tồn tại, parameters null, future intent, expired, risk không biết, authority tamper, duplicate keys, exact large number qua restart.
 
+**Cập nhật RP-02 shared M08 policy context decoder (2026-09-18):**
+`core/m08` hiện sở hữu full policy-context decoder và semantic validator.
+Mission-runtime dùng decoder này; learner giữ input contract rút gọn nhưng gọi
+cùng validator sau khi bind decision/evidence/proposal IDs. Regression bao phủ
+missing/null/duplicate/unknown/case-variant fields, RFC3339 time, duplicate
+IDs, unknown risk và blank idempotency. Local worktree không có Go executable,
+nên CI hosted vẫn là acceptance gate; RP-02/R06/R07 chưa đóng do còn hash
+version/migration, provenance/conformance và external execution blockers.
+Record: `docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md`.
+Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
+
 **Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
 
 ### RP-03a/03b — Guard approval, ledger và STOP có tính bền vững

@@ -7,12 +7,36 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 )
 
 func m08BoundaryFixture() (ShadowActionIntent, ShadowPolicyContext) {
 	i := SealShadowActionIntent(ShadowActionIntent{IntentID: "syn-i", DecisionID: "syn-d", EvidenceIDs: []string{"syn-e"}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "syn-c", IdempotencyKey: "syn-k"})
 	c := ShadowPolicyContext{PolicyVersion: "test-v1", Now: "2026-09-03T02:00:00Z", KnownDecisionIDs: []string{"syn-d"}, KnownEvidenceIDs: []string{"syn-e"}, KnownProposalIDs: []string{}, AllowedHosts: []string{"example.com"}, ActionRisk: map[string]string{"DRAFT": "RISK0"}, SeenIdempotency: map[string]string{}}
 	return i, c
+}
+
+func TestM08ContextUsesCanonicalCoreDecoder(t *testing.T) {
+	_, context := m08BoundaryFixture()
+	valid, _ := json.Marshal(context)
+	if _, status := DecodeM08Context(valid); status != missionValid {
+		t.Fatalf("harness rejected valid context: %s", status)
+	}
+	if _, status := corem08.DecodePolicyContext(valid); status != "VALID" {
+		t.Fatalf("core rejected valid context: %s", status)
+	}
+	for _, raw := range [][]byte{
+		[]byte(strings.Replace(string(valid), `"now":"2026-09-03T02:00:00Z"`, `"now":"tomorrow"`, 1)),
+		[]byte(strings.Replace(string(valid), `"action_risk":{"DRAFT":"RISK0"}`, `"action_risk":{"DRAFT":"RISK9"}`, 1)),
+		[]byte(strings.Replace(string(valid), `"known_decision_ids":["syn-d"]`, `"known_decision_ids":["syn-d","syn-d"]`, 1)),
+	} {
+		_, harnessStatus := DecodeM08Context(raw)
+		_, coreStatus := corem08.DecodePolicyContext(raw)
+		if harnessStatus != "INVALID_CONTEXT" || coreStatus != "INVALID_CONTEXT" {
+			t.Fatalf("context decoder disagreement: harness=%s core=%s", harnessStatus, coreStatus)
+		}
+	}
 }
 func TestM08RawSchema(t *testing.T) {
 	i, c := m08BoundaryFixture()
