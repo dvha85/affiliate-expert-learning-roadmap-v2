@@ -1375,6 +1375,43 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReserveAuthorityExpiryBoundariesWithoutMutation(t *testing.T) {
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		for _, boundaryCase := range []struct {
+			name   string
+			delta  time.Duration
+			status string
+			code   int
+		}{
+			{name: "before", delta: -time.Nanosecond, status: "RESERVED", code: 0},
+			{name: "at", delta: 0, status: "REJECTED", code: 1},
+			{name: "after", delta: time.Nanosecond, status: "REJECTED", code: 1},
+		} {
+			t.Run(expiring+"/"+boundaryCase.name, func(t *testing.T) {
+				runtimeDir, boundPath, _, boundary := authorityExpiryFixture(t, expiring)
+				clock := boundary.Add(boundaryCase.delta)
+				previousClock := missionClock
+				missionClock = func() time.Time { return clock }
+				t.Cleanup(func() { missionClock = previousClock })
+				before := missionRuntimeSnapshot(t, runtimeDir)
+				reservationID := "expiry-reservation-" + expiring + "-" + boundaryCase.name
+				code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, reservationID)
+				if code != boundaryCase.code || response["status"] != boundaryCase.status {
+					t.Fatalf("%s %s reserve boundary mismatch: code=%d response=%+v", expiring, boundaryCase.name, code, response)
+				}
+				if boundaryCase.code != 0 {
+					assertMissionRuntimeUnchanged(t, before, runtimeDir)
+					return
+				}
+				state, err := loadMissionState(runtimeDir)
+				if err != nil || state.Canary == nil || len(state.Reservations) != 1 || state.Reservations[0].ReservationID != reservationID || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 {
+					t.Fatalf("valid pre-expiry reserve did not produce one canonical reservation: state=%+v err=%v", state, err)
+				}
+			})
+		}
+	}
+}
+
 func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T) {
 	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "cost")
 	root := filepath.Dir(runtimeDir)
@@ -2967,6 +3004,18 @@ func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	if _, err := os.Stat(m11OutcomeStorePath(dir)); !os.IsNotExist(err) {
 		t.Fatalf("stopped lifecycle command wrote an M11 outcome artifact: %v", err)
 	}
+}
+
+func TestMissionM10ReserveRejectsDurableStopWithoutMutation(t *testing.T) {
+	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "none")
+	if code, response := missionCall(t, "m11-stop", runtimeDir, "reserve-stop-boundary"); code != 0 || response["status"] != "STOPPED" {
+		t.Fatalf("durable STOP setup failed: code=%d response=%+v", code, response)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, "reserve-after-stop"); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("M10 reserve crossed durable STOP: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
 }
 
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
