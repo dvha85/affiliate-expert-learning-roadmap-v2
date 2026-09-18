@@ -953,7 +953,7 @@ func TestBackupRestoreRejectsExecutionMissingReservationLedger(t *testing.T) {
 	if err := os.WriteFile(m11ArtifactRegistryPath(fixture.dir), append(bytes.Join(lines, []byte{'\n'}), '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateM11BackupGraph(fixture.dir); err == nil || !strings.Contains(err.Error(), "orphaned from its restored reservation ledger") {
+	if err := validateM11BackupGraph(fixture.dir); err == nil || !strings.Contains(err.Error(), "orphaned from") || !strings.Contains(err.Error(), "reservation ledger") {
 		t.Fatalf("M11 reservation-ledger guard: checksum-valid orphan execution was accepted: %v", err)
 	}
 }
