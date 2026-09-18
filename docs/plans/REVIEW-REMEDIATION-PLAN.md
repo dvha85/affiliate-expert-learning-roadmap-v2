@@ -1,7 +1,23 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: ad5347bf1aae4c0770e0471b668c94bf8621b141 -->
+<!-- readiness-main-baseline: c8fe14218ef2a22f6faf0cbd1c9a335c1073dffb -->
+
+**Baseline sync after PR #433 (2026-09-18):** PR #433 was squash-merged into
+`main` at `c8fe14218ef2a22f6faf0cbd1c9a335c1073dffb`, from implementation head
+`e406e405b43c954353c6fe58c21f096f28a5ea1f`. Hosted Curriculum CI run
+`35350741433` and Mission Agent Path CI run `35350741436` both passed all 13
+checks, including Windows runtime `105618004234`, learner race `105618003984`
+and the new backup/restore regression. The post-merge RP-07a snapshot records
+that backup/restore v3 preserves a valid M11 `ProductionRecoveryAdmission` and
+fails closed when a checksum-valid registry is missing the immutable new-runtime
+approval, without publishing a restore target. This remains bounded
+offline/fixture/read-only evidence; it does not claim prior-runtime availability,
+live recovery, power-loss/filesystem-crash durability, atomic multi-file,
+distributed/multi-host, provider/live execution, deployment or business
+outcomes. Record:
+`docs/architecture/EVIDENCE-RP07A-M11-ADMISSION-RESTORE-20260918.md`. Marker:
+`Baseline sync after PR #433`.
 
 **Baseline sync after PR #429 (2026-09-18):** PR #429 đã squash-merge vào
 `main` tại `4950b2fd1be80f3c0e58d9f270a44e275c3de0d5`, từ implementation head
