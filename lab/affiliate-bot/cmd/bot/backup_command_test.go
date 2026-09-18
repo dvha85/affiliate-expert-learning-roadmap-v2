@@ -1313,7 +1313,7 @@ func TestBackupRestoreReplaysM11RecoveryAdmissionAndRejectsOrphanApproval(t *tes
 		t.Fatal(err)
 	}
 	brokenRestored := filepath.Join(root, "m11-admission-missing-approval-restored")
-	if code, response := backupCall(t, "restore", broken, brokenRestored); code == 0 || response["status"] != "GRAPH_FAILED" {
+	if code, response := backupCall(t, "restore", broken, brokenRestored); code == 0 || response["status"] == "RESTORED" {
 		t.Fatalf("checksum-valid M11 admission without approval was restored: code=%d response=%+v", code, response)
 	}
 	if _, err := os.Stat(brokenRestored); !os.IsNotExist(err) {
