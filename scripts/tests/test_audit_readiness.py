@@ -65,6 +65,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_failed_outcome = self.root / "docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md"
         evidence_rp08_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md", evidence_rp08_failed_outcome)
+        evidence_rp08_reservation_lineage = self.root / "docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md"
+        evidence_rp08_reservation_lineage.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md", evidence_rp08_reservation_lineage)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)

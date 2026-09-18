@@ -1,7 +1,25 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 4032bb238bb121a90d451628a333fab8ff2f623d -->
+<!-- readiness-as-of: 2026-09-19 -->
+<!-- readiness-main-baseline: 08319c7998895a54efbcd6a39458c6abdcd28311 -->
+
+**Baseline sync after PR #441 (2026-09-19):** PR #441 was squash-merged into
+`main` at `08319c7998895a54efbcd6a39458c6abdcd28311`, from implementation head
+`64bf4cb7858ed4670ed40aa61d3b0c9c24a93f96`. Curriculum CI run `35373009084`
+and Mission Agent Path CI run `35373009156` passed all 13 checks, including
+Windows runtime job `105691163624`, learner race job `105691163542` and the
+required `deterministic-smokes-backup-mutations` job `105691163529`. The
+post-merge RP-08 snapshot records a checksum-valid M11 execution whose
+reservation-ledger pending ID is replaced with an unrelated ID; the focused
+core graph and backup/restore regressions fail closed, and a disposable
+mutation removing both guards fails inside both Go module boundaries. This
+closes one bounded offline mutation gap only; it does not claim complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or clean-machine/
+target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #441`.
 
 **Baseline sync after PR #439 (2026-09-18):** PR #439 was squash-merged into
 `main` at `4032bb238bb121a90d451628a333fab8ff2f623d`, from implementation head
