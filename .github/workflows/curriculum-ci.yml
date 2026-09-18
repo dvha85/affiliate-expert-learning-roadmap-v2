@@ -79,6 +79,29 @@ jobs:
           "$RUNNER_TEMP/learner-bot" history replay /tmp/m02-history.jsonl | grep -q "replay=MATCH"
           "$RUNNER_TEMP/learner-bot" history decision /tmp/m02-history.jsonl ci-demo data/m02-decision-context.json | grep -q '"action": null'
 
+  windows-runtime:
+    name: windows-runtime
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            lab/affiliate-bot/go.sum
+            contracts/go.sum
+            core/go.sum
+            lab/mission-runtime/go.sum
+      - name: Learner Bot full Windows tests
+        working-directory: lab/affiliate-bot
+        run: go test ./...
+      - name: Learner Bot Windows vet
+        working-directory: lab/affiliate-bot
+        run: go vet ./...
+      - name: Windows managed-lock and backup/restore regressions
+        working-directory: lab/affiliate-bot
+        run: go test -count=1 ./cmd/bot -run "Test(ManagedPathLock|RuntimeGate|Backup|Restore)"
+
   learner-bot-tests-shard-0:
     name: learner-bot-tests-shard-0
     runs-on: ubuntu-latest
