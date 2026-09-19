@@ -114,6 +114,8 @@ go run ./cmd/bot watcher serve /tmp/affiliate-runtime/history.jsonl 127.0.0.1:87
 go run ./cmd/bot watcher history-handoff HISTORY.jsonl HISTORY-RECORD.json
 ```
 
+PowerShell tương đương: `$env:CANONICAL_ADAPTER_TOKEN = 'replace-with-a-random-32-byte-local-token'`.
+
 `CANONICAL_ADAPTER_TOKEN` is required for stateful `/v1/*` endpoints. The n8n
 blueprints send `Authorization: Bearer` from `$env.CANONICAL_ADAPTER_TOKEN`;
 only `/healthz` is public for health checks. Never commit this token.
