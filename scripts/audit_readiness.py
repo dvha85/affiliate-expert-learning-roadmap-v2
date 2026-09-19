@@ -552,6 +552,85 @@ def audit_m08_shared_decoder_policy(root, plan_text):
         fail("RP-02 M08 hosted CI acceptance is missing")
 
 
+def audit_m09_shared_approval_boundary(root, matrix, plan_text):
+    """Keep the RP-02 shared M09 approval/decoder boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật shared M09 approval boundary",
+        "Cập nhật RP-02 M09 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-02 M09 shared decoder audit plan markers are incomplete")
+
+    record = next(
+        (item for item in matrix.get("recent_updates", []) if isinstance(item, dict) and item.get("id") == "RP-02-shared-m09-approval-boundary"),
+        None,
+    )
+    if not isinstance(record, dict):
+        fail("RP-02 M09 shared approval record is missing")
+    source_paths = (
+        "core/m09/m09.go",
+        "lab/mission-runtime/cmd/demo/m09.go",
+        "lab/mission-runtime/cmd/demo/m09_boundary.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+    )
+    test_paths = (
+        "core/m09/m09_test.go",
+        "lab/mission-runtime/cmd/demo/m09_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+    )
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if set(source_paths + test_paths) - refs:
+        fail("RP-02 M09 shared approval record lacks implementation/test refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("strict M09 approval", "APPROVED_LIVE", "migration", "live executor", "multi-file crash")):
+        fail("RP-02 M09 bounded approval/execution boundary is missing")
+
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-02 M09 shared decoder implementation source is missing")
+    core_source = sources["core/m09/m09.go"]
+    if any(marker not in core_source for marker in ("func DecodeApproval", "func DecodeAuthorization", "func DecodeExecution", "func ValidateHistoricalChain", "APPROVED_LIVE")):
+        fail("RP-02 M09 core decoder/chain boundary is missing")
+    boundary_source = sources["lab/mission-runtime/cmd/demo/m09_boundary.go"]
+    if any(marker not in boundary_source for marker in ("corem09.DecodeApproval", "corem09.DecodeAuthorization", "corem09.DecodeExecution", "corem09.ValidateHistoricalChain")):
+        fail("RP-02 M09 mission-runtime shared decoder use is missing")
+    learner_source = sources["lab/affiliate-bot/cmd/bot/mission_command.go"]
+    if any(marker not in learner_source for marker in ("type LearnerApproval = corem09.ApprovalRecord", "corem09.ValidateApproval", "corem09.DecodeApproval")):
+        fail("RP-02 M09 learner shared approval use is missing")
+
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-02 M09 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodeApprovalRejectsDuplicateAndUnknownFields",
+        "TestDecodeAuthorizationUsesM09Profile",
+        "TestDecodeExecutionRejectsSchemaAmbiguity",
+        "TestValidateHistoricalChainBindsEveryM09Artifact",
+    )
+    if any(marker not in tests["core/m09/m09_test.go"] for marker in required_core_tests):
+        fail("RP-02 M09 core decoder regressions are missing")
+    required_runtime_tests = (
+        "TestM09EvalPack",
+        "TestM09DurableResumeRevalidates",
+        "TestM09ControlledExecutorConsumesApprovalAndIdempotency",
+    )
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m09_test.go"] for marker in required_runtime_tests) or "TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload" not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"]:
+        fail("RP-02 M09 mission/runtime/learner regressions are missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-02 M09 hosted CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -2361,6 +2440,7 @@ def audit(root):
     audit_runtime_acceptance(root, matrix)
     audit_windows_ancestor_race(root, plan_text)
     audit_m08_shared_decoder_policy(root, plan_text)
+    audit_m09_shared_approval_boundary(root, matrix, plan_text)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
