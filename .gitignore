@@ -18,6 +18,15 @@ secrets/
 
 # Go
 lab/affiliate-bot/bin/
+**/bin/
+**/obj/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Learner runtime coordination control files
 .runtime-gate.lock

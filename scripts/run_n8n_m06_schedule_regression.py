@@ -33,6 +33,8 @@ from run_n8n_engine_regression import (
 from n8n_cli_preflight import command_prefix, validate_n8n_command
 from validate_n8n_m06_operated_execution import validate_success
 
+ADAPTER_TOKEN = "n8n-regression-canonical-adapter-token-20260919"
+
 
 def import_scheduled_workflow(prefix: list[str], env: dict[str, str], runtime: Path, workflow_id: str, adapter_port: int) -> None:
     """Import a one-second Schedule Trigger copy without changing the blueprint."""
@@ -213,7 +215,7 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
     try:
         n8n_home = runtime / "n8n"
         env = dict(os.environ)
-        env.update({"N8N_USER_FOLDER": str(n8n_home), "N8N_ENCRYPTION_KEY": "n8n-ci-isolated-fixture-key-not-a-secret", "N8N_DIAGNOSTICS_ENABLED": "false", "N8N_PERSONALIZATION_ENABLED": "false", "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false", "N8N_RUNNERS_BROKER_PORT": str(choose_port()), "GOWORK": "off", "GOCACHE": str(runtime / "go-cache")})
+        env.update({"N8N_USER_FOLDER": str(n8n_home), "N8N_ENCRYPTION_KEY": "n8n-ci-isolated-fixture-key-not-a-secret", "N8N_DIAGNOSTICS_ENABLED": "false", "N8N_PERSONALIZATION_ENABLED": "false", "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false", "N8N_BLOCK_ENV_ACCESS_IN_NODE": "false", "N8N_RUNNERS_BROKER_PORT": str(choose_port()), "GOWORK": "off", "GOCACHE": str(runtime / "go-cache"), "CANONICAL_ADAPTER_TOKEN": ADAPTER_TOKEN})
         if args.n8n_node:
             env["PATH"] = str(Path(args.n8n_node).resolve().parent) + os.pathsep + env.get("PATH", "")
         bot = runtime / "bot"

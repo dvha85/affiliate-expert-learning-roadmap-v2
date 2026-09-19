@@ -602,6 +602,57 @@ func TestM07HTTPAdapterRegistersThenResolvesToolEvidence(t *testing.T) {
 	}
 }
 
+func TestCanonicalAdaptersRejectOversizedBodiesBeforeMutation(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	oversized := bytes.NewReader([]byte(`{"fixture":"` + strings.Repeat("x", m06MaxAdapterRequestBytes) + `"}`))
+	response := httptest.NewRecorder()
+	m06AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m06/fixture-import", oversized))
+	if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+		t.Fatalf("M06 oversized body status=%d body=%s", response.Code, response.Body.String())
+	}
+	if _, err := os.Stat(history); !os.IsNotExist(err) {
+		t.Fatalf("oversized M06 request changed canonical history: %v", err)
+	}
+
+	response = httptest.NewRecorder()
+	m07AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m07/context", bytes.NewReader([]byte(`{"record_id":"`+strings.Repeat("x", m07MaxAdapterRequestBytes)+`"}`))))
+	if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+		t.Fatalf("M07 oversized body status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	response = httptest.NewRecorder()
+	historyHandoffHTTPHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/history/append", bytes.NewReader([]byte(strings.Repeat("x", historyMaxAdapterRequestBytes+1)))))
+	if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+		t.Fatalf("history oversized body status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCanonicalAdapterAuthRequiresBearerToken(t *testing.T) {
+	const token = "canonical-adapter-fixture-token-0123456789"
+	handler := canonicalAdapterAuthHandler(token, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for name, authorization := range map[string]string{"missing": "", "wrong": "Bearer another-token"} {
+		t.Run(name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/v1/history", nil)
+			request.Header.Set("Authorization", authorization)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+	request := httptest.NewRequest(http.MethodGet, "/v1/history", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("valid bearer status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 // The HTTP adapter must not describe a tool trace as merely unpersisted when
 // the immutable sidecar is already visible but its directory-sync completion
 // is uncertain. A retry for the exact trace is safe and produces the normal

@@ -12,10 +12,44 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReadinessAuditTests(unittest.TestCase):
+    def _git_fixture(self):
+        root = Path(tempfile.mkdtemp(dir=self.temp.name))
+        subprocess.run(["git", "init", str(root)], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "audit@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Readiness Audit"], check=True)
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "fixture"], check=True, capture_output=True, text=True)
+        return root, subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+
+    def test_product_baseline_git_rejects_missing_commit(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, _ = self._git_fixture()
+        with self.assertRaisesRegex(AssertionError, "not a resolvable Git commit"):
+            audit_product_baseline_git(root, "0" * 40)
+
+    def test_product_baseline_git_rejects_undocumented_code_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        (root / "source.go").write_text("package fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "source.go"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "code"], check=True, capture_output=True, text=True)
+        with self.assertRaisesRegex(AssertionError, "non-doc drift"):
+            audit_product_baseline_git(root, baseline)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        full_plan_source = ROOT / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target = self.root / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(full_plan_source, full_plan_target)
+        evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md", evidence)
         for relative in ("scripts/audit_readiness.py", "scripts/smoke_br16a_offline.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_registry_graph_envelope_integrity.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "scripts/mutate_m11_reverse_ledger_graph.py", "lab/affiliate-bot/cmd/bot/advisor_fixture.go", "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/cmd/bot/history_schema.go", "lab/affiliate-bot/cmd/bot/watcher_fetch.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go", "lab/affiliate-bot/cmd/bot/advisor_budget.go", "lab/affiliate-bot/cmd/bot/advisor_results.go", "lab/affiliate-bot/cmd/bot/advisor_report.go", "lab/affiliate-bot/cmd/bot/advisor_canary.go", "lab/affiliate-bot/cmd/bot/backup_command.go", "lab/affiliate-bot/cmd/bot/advisor_br10_campaign.go", "lab/affiliate-bot/cmd/bot/advisor_canary_test.go", "lab/affiliate-bot/cmd/bot/accesstrade_import.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/affiliate-bot/cmd/bot/stable_append_posix.go", "lab/affiliate-bot/cmd/bot/stable_append_other.go", "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md", "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md", "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md", "docs/architecture/EVIDENCE-M11-RESTORE-AUTH-EXECUTION-LINEAGE-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md", "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md", "docs/architecture/EVIDENCE-M11-RECOVERY-ADMISSION-FIELD-INTEGRITY-20260917.md", "docs/architecture/EVIDENCE-RP04-SHARED-CANONICAL-CONTEXT-20260918.md", "docs/architecture/EVIDENCE-PR425-POST-MERGE-20260918.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -261,13 +295,13 @@ class ReadinessAuditTests(unittest.TestCase):
         self.assertIn("NOT_READY_FOR_PRODUCTION", self.run_audit(True))
 
     def test_stale_post_merge_evidence_claim_count_is_rejected(self):
-        evidence = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
-        evidence.write_text(evidence.read_text(encoding="utf-8").replace("150 scoped claims", "149 scoped claims", 1), encoding="utf-8")
+        evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("151 scoped claims", "150 scoped claims", 1), encoding="utf-8")
         self.assertIn("current post-merge evidence claim count does not match the evidence graph", self.run_audit(False))
 
     def test_stale_remediation_plan_claim_count_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
-        plan.write_text(plan.read_text(encoding="utf-8").replace("records 150 scoped claims", "records 149 scoped claims", 1), encoding="utf-8")
+        plan.write_text(plan.read_text(encoding="utf-8").replace("records 151 scoped claims", "records 150 scoped claims", 1), encoding="utf-8")
         self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
 
     def test_missing_windows_reparse_pin_is_rejected(self):
@@ -443,7 +477,7 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_n8n_engine_cache_gate_removal_is_rejected(self):
         workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
-        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@v4", "removed_n8n_cache", 1), encoding="utf-8")
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@caa296126883cff596d87d8935842f9db880ef25", "removed_n8n_cache", 1), encoding="utf-8")
         self.assertIn("n8n engine CI cache/gate is missing", self.run_audit(False))
 
     def test_deterministic_shard_removal_is_rejected(self):

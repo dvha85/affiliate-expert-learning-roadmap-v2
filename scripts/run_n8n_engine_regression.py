@@ -34,6 +34,7 @@ M06_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-readonly-watcher.blueprint.json"
 M06_SELECTED_SOURCE_BLUEPRINT = ROOT / "lab" / "n8n" / "M06-accesstrade-shopee-readonly.blueprint.json"
 M07_BLUEPRINT = ROOT / "lab" / "n8n" / "M07-readonly-evidence-agent.blueprint.json"
 M07_MODEL_CASES = {"model-success", "model-forged-commission", "model-malformed-output", "model-exact-number"}
+ADAPTER_TOKEN = "n8n-regression-canonical-adapter-token-20260919"
 
 
 def m07_model_output_from_prompt(payload: dict, mode: str = "valid") -> dict:
@@ -376,7 +377,7 @@ def require_m07_grounding_rejection(execution: dict, proposal_store: Path, propo
 
 def post_json(url: str, payload: dict) -> tuple[int, dict]:
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    request = urllib.request.Request(url, data=raw, headers={"Content-Type": "application/json"}, method="POST")
+    request = urllib.request.Request(url, data=raw, headers={"Content-Type": "application/json", "Authorization": f"Bearer {ADAPTER_TOKEN}"}, method="POST")
     with urllib.request.urlopen(request, timeout=10) as response:
         return response.status, json.loads(response.read())
 
@@ -445,9 +446,15 @@ def main() -> None:
                 "N8N_DIAGNOSTICS_ENABLED": "false",
                 "N8N_PERSONALIZATION_ENABLED": "false",
                 "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false",
+                # The imported blueprints read the short-lived CI bearer token
+                # through $env.CANONICAL_ADAPTER_TOKEN. n8n blocks env access in
+                # expressions by default, so make this explicit for this
+                # disposable, isolated regression runtime only.
+                "N8N_BLOCK_ENV_ACCESS_IN_NODE": "false",
                 "N8N_RUNNERS_BROKER_PORT": str(choose_port()),
                 "GOWORK": "off",
                 "GOCACHE": str(runtime / "go-cache"),
+                "CANONICAL_ADAPTER_TOKEN": ADAPTER_TOKEN,
             }
         )
         if args.n8n_node:
