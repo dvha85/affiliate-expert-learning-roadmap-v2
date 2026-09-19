@@ -148,6 +148,19 @@ remain open. Record:
 `docs/architecture/EVIDENCE-RP03-BUDGET-EXPIRY-POST-MERGE-PR472-20260919.md`.
 Marker: `Baseline sync after PR #472`.
 
+**Baseline sync after PR #473 (2026-09-19):** PR #473 was squash-merged into
+`main` at `0fb578a1`, from implementation head `6f15547a`. GitHub reported 13
+exact-head checks passed, including Windows runtime, learner race and the
+deterministic backup/mutation path. The post-merge audit still resolves 150
+scoped claims and the isolated readiness suite passes 142 tests; the state
+remains `NOT_READY_FOR_PRODUCTION`. This rebinds the existing RP-03/R10
+24-process reservation, M11 outcome-barrier and reservation commit-fault
+evidence to current main only; distributed locking, kill/power-loss,
+multi-file atomicity, provider/live execution, deployment, pilot, business
+outcome and production readiness remain open. Record:
+`docs/architecture/EVIDENCE-RP03-CONCURRENT-RESERVATION-POST-MERGE-PR473-20260919.md`.
+Marker: `Baseline sync after PR #473`.
+
 **Baseline sync after PR #470 (2026-09-19):** PR #470 was squash-merged into
 `main` at `b41e69c`, from implementation head
 `5db49308c768a34fa17dc4144c83f482fbdbba87`. GitHub reported 13 exact-head
