@@ -1,7 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 8346d676ee9fbacd364025cb9f28f9cac1c40216 -->
+<!-- readiness-main-baseline: 40f3d76fa163b6aee6d20bd8c6bd24bceca9254f -->
+
+**Baseline sync after PR #457 (2026-09-19):** PR #457 was squash-merged into
+`main` at `40f3d76fa163b6aee6d20bd8c6bd24bceca9254f`, from implementation head
+`d9e74ddcd2475bd1e6e1ab4247d237ae75b21319`. Curriculum CI run `35407311675`
+and Mission Agent Path CI run `35407311697` passed all 13 hosted checks,
+including Windows runtime job `105799633655`, learner race job `105799633794`
+and deterministic backup/mutations job `105799633765`. The outcome-link
+mutation proof now fails at the real swapped OutcomeID assertion after removing
+only the targeted guard in a disposable copy. This rebinds bounded
+offline/read-only mutation evidence to the merged PR #457 snapshot; mutation
+breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot, business outcome and production readiness remain open.
 
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
