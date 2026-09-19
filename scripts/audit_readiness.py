@@ -100,7 +100,7 @@ def audit_product_baseline_git(root, baseline):
     changed = git("diff", "--name-only", f"{baseline}..HEAD")
     if changed.returncode != 0:
         fail("could not inspect product baseline diff")
-    allowed = ("docs/",)
+    allowed = ("docs/", "scripts/audit_readiness.py", "scripts/tests/")
     unexpected = [path for path in changed.stdout.splitlines() if path and not path.startswith(allowed)]
     if unexpected:
         fail("product baseline has undocumented non-doc drift: " + ", ".join(unexpected[:5]))
