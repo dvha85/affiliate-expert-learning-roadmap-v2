@@ -28,6 +28,10 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("core/m10/canary_grant.go", "core/m10/cost_bound.go", "core/m10/canary_gate.go", "core/m10/canary_authorization.go", "core/m10/canary_execution_record.go", "core/m10/historical_chain.go", "core/m10/cost_bound_test.go", "lab/mission-runtime/cmd/demo/m10_boundary.go", "lab/mission-runtime/cmd/demo/m10_chain.go", "lab/mission-runtime/cmd/demo/m10_boundary_test.go", "lab/mission-runtime/cmd/demo/m10_chain_test.go"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
         evidence_rp02_post_merge = self.root / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md"
         evidence_rp02_post_merge.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md", evidence_rp02_post_merge)
@@ -314,6 +318,26 @@ class ReadinessAuditTests(unittest.TestCase):
         matrix = self.root / "docs/plans/READINESS-MATRIX.json"
         matrix.write_text(matrix.read_text(encoding="utf-8").replace("multi-file crash proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
         self.assertIn("RP-02 M09 bounded approval/execution boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_core_decoder_boundary_is_rejected(self):
+        source = self.root / "core/m10/cost_bound.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func DecodeTrustedCostBound", "func RemovedDecodeTrustedCostBound", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 core decoder/chain boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_mission_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m10_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem10.DecodeCanaryExecutionRecord", "removedSharedExecutionDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_historical_chain_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m10_chain.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem10.ValidateHistoricalChain", "removedSharedHistoricalChain", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 mission-runtime historical-chain use is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_decoder_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("crash/power-loss, distributed locking, executor and business outcome proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 shared decoder boundary is missing", self.run_audit(False))
 
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"

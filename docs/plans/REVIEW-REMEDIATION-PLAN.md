@@ -115,6 +115,17 @@ deployment, pilot and production readiness remain open. Record:
 `docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md`.
 Marker: `Baseline sync after PR #468`.
 
+**Cập nhật RP-03 M10 shared decoder audit guard (2026-09-19):** readiness
+audit now checks the existing shared M10 decoder and historical-chain records
+against the real core grant, cost-bound, gate, authorization and execution
+decoders, the mission-runtime boundary, the shared historical-chain validator,
+focused regressions and hosted CI declarations. Negative fixtures must fail
+when a decoder, mission consumer, chain call, regression or bounded disclosure
+is removed. This is evidence-integrity hardening only; ledger durability,
+crash/power-loss, distributed locking, provider/live execution, deployment,
+pilot and production readiness remain open. Marker:
+`Cập nhật RP-03 M10 shared decoder audit guard`.
+
 **Baseline sync after PR #466 (2026-09-19):** PR #466 was squash-merged into
 `main` at `1b65f83cc85c1bcc549e66a1e64d8c1162af5053`, from implementation head
 `7be41010fca41cf66d054273b6cbc691d7474174`. GitHub reported 13 exact-head
