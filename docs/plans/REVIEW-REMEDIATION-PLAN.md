@@ -1,8 +1,15 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: dc56285d599b6d8a7391fab9ca3f5ba7c20b961d -->
+<!-- readiness-main-baseline: 2d8eac865b0fff5599da75cd3cbd1575cce20fc7 -->
 <!-- readiness-baseline-kind: product -->
+
+**Post-merge sync after PR #475 (2026-09-19):** PR #475 was squash-merged
+into `main` at `2d8eac865b0fff5599da75cd3cbd1575cce20fc7`. Curriculum CI,
+Mission Agent Path CI (including hosted n8n and Windows jobs), Security Scans
+and CodeQL passed on the final head. The product baseline is rebound to the
+merge commit; external provider, deployment, pilot, business-outcome and
+production-readiness evidence remain open.
 
 **Cập nhật FULL repository hardening (2026-09-19):** nhánh thực hiện bổ sung
 body-size guard `limit+1` và bearer token bắt buộc cho canonical adapter, đồng
