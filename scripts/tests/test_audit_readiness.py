@@ -38,6 +38,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp02_m09_post_merge = self.root / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md"
         evidence_rp02_m09_post_merge.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md", evidence_rp02_m09_post_merge)
+        evidence_rp03_m10_post_merge = self.root / "docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md"
+        evidence_rp03_m10_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md", evidence_rp03_m10_post_merge)
         mutation_terminal_chain = self.root / "scripts/mutate_backup_m11_terminal_chain.py"
         mutation_terminal_chain.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_terminal_chain.py", mutation_terminal_chain)

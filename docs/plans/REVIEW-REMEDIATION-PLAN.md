@@ -126,6 +126,18 @@ crash/power-loss, distributed locking, provider/live execution, deployment,
 pilot and production readiness remain open. Marker:
 `Cập nhật RP-03 M10 shared decoder audit guard`.
 
+**Baseline sync after PR #470 (2026-09-19):** PR #470 was squash-merged into
+`main` at `b41e69c`, from implementation head
+`5db49308c768a34fa17dc4144c83f482fbdbba87`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 138 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-03 M10 evidence-integrity
+hardening only; ledger durability, crash/power-loss, distributed locking,
+provider/live execution, deployment, pilot and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md`.
+Marker: `Baseline sync after PR #470`.
+
 **Baseline sync after PR #466 (2026-09-19):** PR #466 was squash-merged into
 `main` at `1b65f83cc85c1bcc549e66a1e64d8c1162af5053`, from implementation head
 `7be41010fca41cf66d054273b6cbc691d7474174`. GitHub reported 13 exact-head
