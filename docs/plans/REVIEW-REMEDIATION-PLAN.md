@@ -136,6 +136,18 @@ hardening only; multi-file crash/power-loss, distributed locking,
 provider/live execution, deployment, pilot and production readiness remain
 open. Marker: `Cập nhật RP-03 M10 budget/expiry audit guard`.
 
+**Baseline sync after PR #472 (2026-09-19):** PR #472 was squash-merged into
+`main` at `f88ef2d`, from implementation head
+`7442cf825403a95f44bc4839d5c36fd6b95817b0`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 142 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-03 budget/expiry
+evidence-integrity hardening only; multi-file crash/power-loss, distributed
+locking, provider/live execution, deployment, pilot and production readiness
+remain open. Record:
+`docs/architecture/EVIDENCE-RP03-BUDGET-EXPIRY-POST-MERGE-PR472-20260919.md`.
+Marker: `Baseline sync after PR #472`.
+
 **Baseline sync after PR #470 (2026-09-19):** PR #470 was squash-merged into
 `main` at `b41e69c`, from implementation head
 `5db49308c768a34fa17dc4144c83f482fbdbba87`. GitHub reported 13 exact-head
