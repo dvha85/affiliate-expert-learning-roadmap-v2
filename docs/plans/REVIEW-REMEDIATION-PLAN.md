@@ -2717,6 +2717,18 @@ distributed/multi-host, Windows traversal parity, provider/live execution,
 deployment, pilot và business outcome vẫn mở. Marker: `Cập nhật RP-08 M11
 reverse-ledger graph mutation proof`.
 
+**Cập nhật RP-08 M11 outcome-link graph mutation proof (2026-09-19):**
+implementation branch thêm disposable-copy mutation bỏ riêng reverse guard yêu cầu
+mỗi `PRODUCTION_LEDGER.OutcomeLinks` checksum-valid phải khớp `OutcomeID` của
+offline evaluation khi evaluation tồn tại. Mutation chạy
+`TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks` và phải fail
+tại assertion swapped outcome ID; fail ở seam khác hoặc mutation xanh đều làm
+runner fail. Đây là proof offline/read-only cho một reverse outcome-to-evaluation
+seam; mutation breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot và business outcome vẫn mở. Marker: `Cập nhật RP-08 M11
+outcome-link graph mutation proof`.
+
 **Cập nhật M11 restore authorization/execution lineage (2026-09-16):** BR-18b
 giờ tạo bản sao checksum-valid của backup bằng learner Bot thật rồi làm lệch
 `production_health_snapshot_hash` trong `PRODUCTION_EXECUTION_AUTHORIZATION`

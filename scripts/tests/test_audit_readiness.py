@@ -29,6 +29,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_reverse_ledger = self.root / "scripts/mutate_m11_reverse_ledger_graph.py"
         mutation_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_reverse_ledger_graph.py", mutation_reverse_ledger)
+        mutation_outcome_link = self.root / "scripts/mutate_m11_outcome_link_graph.py"
+        mutation_outcome_link.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_outcome_link_graph.py", mutation_outcome_link)
         mutation_failed_outcome = self.root / "scripts/mutate_backup_m11_failed_outcome.py"
         mutation_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_failed_outcome.py", mutation_failed_outcome)
@@ -110,6 +113,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_reverse_ledger = self.root / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md"
         evidence_rp08_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md", evidence_rp08_reverse_ledger)
+        evidence_rp08_outcome_link = self.root / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md"
+        evidence_rp08_outcome_link.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md", evidence_rp08_outcome_link)
         evidence_rp08_post_merge_pr453 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md"
         evidence_rp08_post_merge_pr453.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md", evidence_rp08_post_merge_pr453)
@@ -375,6 +381,11 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "scripts/mutate_m11_reverse_ledger_graph.py"
         source.write_text(source.read_text(encoding="utf-8").replace("CORE_GUARD", "REMOVED_CORE_GUARD", 1), encoding="utf-8")
         self.assertIn("M11 reverse-ledger mutation proof is missing", self.run_audit(False))
+
+    def test_missing_m11_outcome_link_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_m11_outcome_link_graph.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("CORE_GUARD", "REMOVED_CORE_GUARD", 1), encoding="utf-8")
+        self.assertIn("M11 outcome-link mutation proof is missing", self.run_audit(False))
 
     def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
