@@ -61,6 +61,16 @@ locking, business outcomes and production readiness remain open. Record:
 `docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
 Marker: `Baseline sync after PR #462`.
 
+**Cập nhật RP-01 Windows ancestor-race audit guard (2026-09-19):** readiness
+audit now checks the native Windows reparse-point pinning sources, all four
+controlled ancestor-junction regressions, the `windows-latest` CI job and the
+explicit conservative boundary that does not claim POSIX `openat`/`mkdirat`
+parity. Negative fixtures remove each class of evidence and require audit
+failure. This strengthens evidence integrity only; the single-host boundary,
+distributed locking, crash/power-loss, provider/live execution, deployment,
+pilot and production readiness remain open. Marker:
+`Cập nhật RP-01 Windows ancestor-race audit guard`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`

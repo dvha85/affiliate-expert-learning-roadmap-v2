@@ -437,6 +437,46 @@ def audit_runtime_acceptance(root, matrix):
         fail("M04 incomplete JSONL no-mutation regression is missing")
 
 
+def audit_windows_ancestor_race(root, plan_text):
+    """Keep the Windows ancestor-race guard and conservative boundary auditable."""
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (
+            "lab/affiliate-bot/cmd/bot/output_parent_windows.go",
+            "lab/affiliate-bot/cmd/bot/runtime_gate_windows.go",
+            "lab/affiliate-bot/cmd/bot/windows_directory.go",
+            "lab/affiliate-bot/internal/store/stable_read_windows.go",
+        )
+    }
+    test_path = root / "lab/affiliate-bot/cmd/bot/windows_ancestor_race_test.go"
+    test_text = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    store_test_path = root / "lab/affiliate-bot/internal/store/stable_read_windows_test.go"
+    store_test_text = store_test_path.read_text(encoding="utf-8") if store_test_path.is_file() else ""
+    evidence_path = root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    workflow_path = root / ".github/workflows/curriculum-ci.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8") if workflow_path.is_file() else ""
+    if "Cập nhật RP-01 Windows ancestor-race hardening" not in plan_text:
+        fail("Windows ancestor-race plan marker is missing")
+    if any(not text for text in sources.values()):
+        fail("Windows ancestor-race implementation source is missing")
+    if "FILE_FLAG_OPEN_REPARSE_POINT" not in sources["lab/affiliate-bot/cmd/bot/windows_directory.go"] or "pinWindowsDirectoryChain" not in sources["lab/affiliate-bot/cmd/bot/windows_directory.go"]:
+        fail("Windows ancestor-race reparse-point pinning guard is missing")
+    required_tests = (
+        "TestWindowsBackupRestoreRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsStableReaderRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsStableAppendRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsJSONLReaderRejectsAncestorJunctionAfterPreflight",
+    )
+    if any(marker not in test_text for marker in required_tests[:-1]) or required_tests[-1] not in store_test_text or "external tree changed" not in test_text:
+        fail("Windows ancestor-race regression coverage is missing")
+    for boundary in ("portable `openat`/`mkdirat`", "does not claim POSIX traversal parity", "NOT_READY_FOR_PRODUCTION"):
+        if boundary not in evidence_text:
+            fail("Windows ancestor-race conservative boundary disclosure is missing")
+    if "windows-runtime:" not in workflow_text or "go test ./..." not in workflow_text or "go vet ./..." not in workflow_text:
+        fail("Windows runtime CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -2244,6 +2284,7 @@ def audit(root):
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
+    audit_windows_ancestor_race(root, plan_text)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
