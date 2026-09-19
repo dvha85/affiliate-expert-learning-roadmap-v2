@@ -50,6 +50,17 @@ pilot, crash/power-loss, distributed-locking or production evidence. Record:
 `docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
 Marker: `Cập nhật RP-09 claim-count disclosure consistency`.
 
+**Baseline sync after PR #462 (2026-09-19):** PR #462 was squash-merged into
+`main` at `0adce7873ce06144e76aa3544284e6e6f0356537`, from implementation head
+`b4322d02cf0279612ed9658cdaf9d402d3337b1b`. GitHub reported 13 checks passed
+on the exact head. The post-merge audit still resolves 150 scoped claims and
+the readiness state remains `NOT_READY_FOR_PRODUCTION`. This records the
+claim-count disclosure invariant as bounded synthetic/read-only evidence only;
+provider/live execution, deployment, pilot, crash/power-loss, distributed
+locking, business outcomes and production readiness remain open. Record:
+`docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
+Marker: `Baseline sync after PR #462`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
