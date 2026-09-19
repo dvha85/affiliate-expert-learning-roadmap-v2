@@ -26,6 +26,14 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            contracts/go.sum
+            core/go.sum
+            lab/affiliate-bot/go.sum
+            lab/mission-runtime/go.sum
       - uses: github/codeql-action/init@d8073367669608af8fbcc5f63dd0a0d52bb90cff # v4
         with:
           languages: go
