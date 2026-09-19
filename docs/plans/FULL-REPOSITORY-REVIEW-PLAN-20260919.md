@@ -461,3 +461,23 @@ Ngay lập tức: PR-A
 3. `main_baseline` sẽ là exact snapshot HEAD hay product baseline có allowlist.
 4. Có công bố license/contribution hay tiếp tục repo cá nhân không nhận contribution.
 5. Có sẵn target host/provider/pilot cho RP-10 hay chỉ triển khai các PR offline A–G.
+
+## 9. Kết quả thực hiện tự động — 2026-09-19
+
+| Hạng mục | Kết quả | Ghi chú |
+|---|---|---|
+| FR-01/03/04/08 | `DONE_OFFLINE` | CI action SHA, Ubuntu 24.04, cache paths, timeout/concurrency, n8n path gate và cache v5. |
+| FR-02 | `DONE_REPO` | Thêm `curriculum-gate` và `mission-gate`; bật branch protection thật vẫn cần admin. |
+| FR-05/06 | `DONE_OFFLINE` | Body `limit+1`/413, bearer token bắt buộc, test missing/wrong/correct và caller/blueprint wiring. |
+| FR-07/11 | `DONE_OFFLINE` | Runbook Go 1.27, hygiene files, Dependabot, CodeQL/govulncheck workflow, ignore/generated-file policy. |
+| FR-09 | `DONE_REPO` | Chọn `product` baseline; audit kiểm commit tồn tại, ancestor, working tree sạch và docs-only drift. |
+| FR-10 | `DEFERRED` | Move-only refactor lớn chưa gộp cùng security fix; cần PR riêng có Go baseline và review ownership. |
+| FR-12 | `BLOCKED_EXTERNAL` | Chưa tự chọn license/legal policy thay chủ repo. |
+
+### Kiểm chứng cuối nhánh
+
+- `python -m unittest discover -s scripts/tests -q`: PASS (157 tests).
+- `python scripts/audit_readiness.py .`: PASS, 151 scoped claims,
+  `NOT_READY_FOR_PRODUCTION`.
+- JSON parse, Python compile, static n8n validators và `git diff --check`: PASS.
+- Go và real n8n: chưa chạy vì host không có executable; hosted CI là gate tiếp theo.
