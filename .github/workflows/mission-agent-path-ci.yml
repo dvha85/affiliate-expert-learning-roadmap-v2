@@ -133,7 +133,7 @@ jobs:
       - name: Restore pinned n8n runtime
         id: n8n-cache
         if: steps.n8n-inputs.outputs.run == 'true'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/n8n-rp08/node_modules
           key: n8n-engine-${{ runner.os }}-node24-v${{ env.N8N_VERSION }}
