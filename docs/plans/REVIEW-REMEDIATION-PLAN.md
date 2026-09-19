@@ -41,6 +41,15 @@ open. Record:
 `docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md`.
 Marker: `Baseline sync after PR #459`.
 
+**Cập nhật RP-09 claim-count disclosure consistency (2026-09-19):** readiness
+audit now derives the scoped claim count from the evidence graph and rejects a
+stale count in the current post-merge evidence or remediation-plan disclosure.
+The isolated audit suite adds negative fixtures for both disclosures. This
+hardens bookkeeping only; it does not add remote CI, provider/live, deployment,
+pilot, crash/power-loss, distributed-locking or production evidence. Record:
+`docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
+Marker: `Cập nhật RP-09 claim-count disclosure consistency`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
