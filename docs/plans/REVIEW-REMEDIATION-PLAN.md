@@ -71,6 +71,16 @@ distributed locking, crash/power-loss, provider/live execution, deployment,
 pilot and production readiness remain open. Marker:
 `Cập nhật RP-01 Windows ancestor-race audit guard`.
 
+**Baseline sync after PR #464 (2026-09-19):** PR #464 was squash-merged into
+`main` at `d339f6d6db218b2a33fb19eda81a5338c0e26004`, from implementation head
+`ad38a9a65b32b0800aed3a229e493916eb4c330f`. GitHub reported 13 checks passed
+on the exact head. The post-merge audit still resolves 150 scoped claims and
+the readiness state remains `NOT_READY_FOR_PRODUCTION`; the Windows evidence
+remains a bounded single-host conservative boundary without POSIX traversal
+parity. Record:
+`docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-AUDIT-20260919.md`.
+Marker: `Baseline sync after PR #464`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
