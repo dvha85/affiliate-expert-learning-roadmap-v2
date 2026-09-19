@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: b565d798dcf855842a5a6fc35cb47c9d70a2c03c -->
+<!-- readiness-main-baseline: 65e51fc25e31bcc01fde521bf99b458983005f8d -->
 <!-- readiness-baseline-kind: product -->
 
 **Cập nhật FULL repository hardening (2026-09-19):** nhánh thực hiện bổ sung
