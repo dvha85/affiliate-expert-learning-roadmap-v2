@@ -301,6 +301,8 @@ jobs:
         run: python scripts/mutate_m11_reverse_ledger_graph.py
       - name: RP-08 M11 outcome-link graph mutation proof
         run: python scripts/mutate_m11_outcome_link_graph.py
+      - name: RP-08 M11 cycle graph mutation proof
+        run: python scripts/mutate_m11_cycle_graph.py
       - name: RP-08 M10 canonical identity mutation proof
         run: python scripts/mutate_m10_identity_guard.py
       - name: RP-08 M10/M11 registry graph envelope mutation proof

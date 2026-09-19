@@ -32,6 +32,9 @@ class ReadinessAuditTests(unittest.TestCase):
         mutation_outcome_link = self.root / "scripts/mutate_m11_outcome_link_graph.py"
         mutation_outcome_link.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_m11_outcome_link_graph.py", mutation_outcome_link)
+        mutation_cycle_graph = self.root / "scripts/mutate_m11_cycle_graph.py"
+        mutation_cycle_graph.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_cycle_graph.py", mutation_cycle_graph)
         mutation_failed_outcome = self.root / "scripts/mutate_backup_m11_failed_outcome.py"
         mutation_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_failed_outcome.py", mutation_failed_outcome)
@@ -116,6 +119,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_outcome_link = self.root / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md"
         evidence_rp08_outcome_link.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md", evidence_rp08_outcome_link)
+        evidence_rp08_cycle = self.root / "docs/architecture/EVIDENCE-RP08-M11-CYCLE-GRAPH-MUTATION-20260919.md"
+        evidence_rp08_cycle.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-CYCLE-GRAPH-MUTATION-20260919.md", evidence_rp08_cycle)
         evidence_rp08_post_merge_pr453 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md"
         evidence_rp08_post_merge_pr453.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md", evidence_rp08_post_merge_pr453)

@@ -16,6 +16,16 @@ breadth, ledger durability, crash/power-loss, atomic multi-file,
 distributed/multi-host, Windows traversal parity, provider/live execution,
 deployment, pilot, business outcome and production readiness remain open.
 
+**Cập nhật RP-08 M11 cycle graph mutation (2026-09-19):** implementation PR bổ
+sung disposable-copy mutation tháo riêng guard `ProductionCycleRecord` yêu cầu
+cycle `CLOSED` giữ đúng evaluation outcome, execution, authorization, gate và
+lease lineage. Regression thật `TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks`
+phải fail tại assertion cycle nhận mismatched evaluation outcome; exact-head
+hosted verification sẽ là gate nghiệm thu. Đây chỉ là bounded offline/read-only
+mutation evidence; crash/power-loss, atomic multi-file, distributed/multi-host,
+Windows traversal parity, provider/live execution, deployment, pilot, business
+outcome và production readiness vẫn mở.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
