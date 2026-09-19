@@ -15,7 +15,9 @@ Local verification: the readiness audit remains
 `NOT_READY_FOR_PRODUCTION`, 151 scoped claims; all 159 Python tests pass, JSON
 parsing, Python compile, static n8n validators and `git diff --check` pass. Go
 and real n8n execution were not run because those executables are unavailable on
-the host; hosted Go/Windows/n8n verification remains required.
+the host. Hosted PR #475 checks passed Curriculum, Mission (including Go,
+Windows and n8n jobs), Security and CodeQL; provider/live and production
+verification remain required.
 
 This evidence does not establish branch protection, provider/live execution,
 deployment recovery, beginner pilot acceptance, business outcomes, distributed
