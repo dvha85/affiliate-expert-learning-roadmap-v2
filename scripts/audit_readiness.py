@@ -510,6 +510,18 @@ def audit_evidence_graph(root, criteria_by_id):
     return len(claim_ids)
 
 
+def audit_claim_count_disclosures(root, plan_text, claim_count):
+    """Keep current human-readable claim-count disclosures tied to the graph."""
+    evidence_path = root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    evidence_match = re.search(r"`NOT_READY_FOR_PRODUCTION`,\s*(\d+) scoped claims", evidence_text)
+    if evidence_match is None or int(evidence_match.group(1)) != claim_count:
+        fail("current post-merge evidence claim count does not match the evidence graph")
+    plan_match = re.search(r"records\s+(\d+) scoped claims and \d+ readiness-audit tests", plan_text)
+    if plan_match is None or int(plan_match.group(1)) != claim_count:
+        fail("current remediation plan claim count does not match the evidence graph")
+
+
 def audit_public_readiness_boundary(root, overall):
     """Keep the two public entrypoints aligned with the scoped readiness state."""
     if overall != "NOT_READY_FOR_PRODUCTION":
@@ -2238,6 +2250,7 @@ def audit(root):
     audit_registry_graph_envelope_integrity(root, matrix, plan_text)
     audit_post_merge_pr412(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
+    audit_claim_count_disclosures(root, plan_text, claim_count)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
     audit_assisted_fresh_workspace(root, matrix, plan_text)

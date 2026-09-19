@@ -134,6 +134,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_rp08_post_merge_pr459 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
         evidence_rp08_post_merge_pr459.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md", evidence_rp08_post_merge_pr459)
+        evidence_rp09_claim_count = self.root / "docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md"
+        evidence_rp09_claim_count.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md", evidence_rp09_claim_count)
         evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
         evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
@@ -232,6 +235,16 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_canonical_matrix(self):
         self.assertIn("NOT_READY_FOR_PRODUCTION", self.run_audit(True))
+
+    def test_stale_post_merge_evidence_claim_count_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("150 scoped claims", "149 scoped claims", 1), encoding="utf-8")
+        self.assertIn("current post-merge evidence claim count does not match the evidence graph", self.run_audit(False))
+
+    def test_stale_remediation_plan_claim_count_is_rejected(self):
+        plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
+        plan.write_text(plan.read_text(encoding="utf-8").replace("records 150 scoped claims", "records 149 scoped claims", 1), encoding="utf-8")
+        self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
 
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
