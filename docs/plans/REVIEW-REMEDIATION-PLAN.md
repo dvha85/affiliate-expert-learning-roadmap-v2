@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 40f3d76fa163b6aee6d20bd8c6bd24bceca9254f -->
+<!-- readiness-main-baseline: ec2499a51dee185e7086c683a2ef944de2e650f2 -->
 
 **Baseline sync after PR #457 (2026-09-19):** PR #457 was squash-merged into
 `main` at `40f3d76fa163b6aee6d20bd8c6bd24bceca9254f`, from implementation head
@@ -25,6 +25,21 @@ hosted verification sẽ là gate nghiệm thu. Đây chỉ là bounded offline/
 mutation evidence; crash/power-loss, atomic multi-file, distributed/multi-host,
 Windows traversal parity, provider/live execution, deployment, pilot, business
 outcome và production readiness vẫn mở.
+
+**Baseline sync after PR #459 (2026-09-19):** PR #459 was squash-merged into
+`main` at `ec2499a51dee185e7086c683a2ef944de2e650f2`, from implementation head
+`a5c141070a5b4a1b8cfee40f9d3f3a389b1d487f`. Curriculum CI run `35411941678`
+and Mission Agent Path CI run `35411941661` passed all 13 hosted checks,
+including Windows runtime job `105813136321`, learner race job `105813136435`
+and deterministic backup/mutations job `105813136450`. The post-merge evidence
+records 149 scoped claims and 121 readiness-audit tests. This rebinds the
+readiness bookkeeping to the merged PR #459 product baseline only; the M11
+mutation proof remains bounded offline/read-only and crash/power-loss, atomic
+multi-file, distributed/multi-host, Windows traversal parity, provider/live
+execution, deployment, pilot, business outcome and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md`.
+Marker: `Baseline sync after PR #459`.
 
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
