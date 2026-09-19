@@ -92,6 +92,18 @@ persistence, provider/live execution, deployment, pilot and production
 readiness remain open. Marker:
 `Cập nhật RP-02 M08 shared decoder audit guard`.
 
+**Baseline sync after PR #466 (2026-09-19):** PR #466 was squash-merged into
+`main` at `1b65f83cc85c1bcc549e66a1e64d8c1162af5053`, from implementation head
+`7be41010fca41cf66d054273b6cbc691d7474174`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 130 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-02 evidence-integrity
+hardening only; broader conformance, hash migration, cross-store persistence,
+provider/live execution, deployment, pilot and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md`.
+Marker: `Baseline sync after PR #466`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
