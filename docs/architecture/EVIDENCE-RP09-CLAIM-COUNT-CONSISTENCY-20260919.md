@@ -20,8 +20,10 @@ disclosure from 150 to 149 and requires the audit to fail closed.
   scoped claims;
 - local `scripts.tests.test_audit_readiness`: the canonical suite and both stale
   disclosure regressions PASS;
-- exact-head hosted Curriculum CI remains the acceptance gate for the merged
-  implementation branch.
+- PR #462 implementation head `b4322d02cf0279612ed9658cdaf9d402d3337b1b` was
+  squash-merged into `main` at `0adce7873ce06144e76aa3544284e6e6f0356537`;
+  GitHub reported 13 checks passed on the exact head;
+- post-merge `scripts/audit_readiness.py`: PASS with the same 150-claim graph.
 
 ## Boundary
 
