@@ -631,6 +631,94 @@ def audit_m09_shared_approval_boundary(root, matrix, plan_text):
         fail("RP-02 M09 hosted CI acceptance is missing")
 
 
+def audit_m10_shared_artifact_decoders(root, matrix, plan_text):
+    """Keep the RP-03 shared M10 decoder/chain boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật shared M10 artifact decoders",
+        "Cập nhật shared M10 historical-chain validator",
+        "Cập nhật RP-03 M10 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-03 M10 shared decoder audit plan markers are incomplete")
+
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    decoder_record = updates.get("RP-03-shared-m10-artifact-decoders-20260916")
+    chain_record = updates.get("RP-03-shared-m10-historical-chain-validator-20260916")
+    if not isinstance(decoder_record, dict) or not isinstance(chain_record, dict):
+        fail("RP-03 M10 shared decoder records are missing")
+    decoder_scope = decoder_record.get("scope")
+    chain_scope = chain_record.get("scope")
+    if not isinstance(decoder_scope, str) or any(marker not in decoder_scope for marker in ("core/m10 decoders", "executor", "crash/power-loss")):
+        fail("RP-03 M10 shared decoder boundary is missing")
+    if not isinstance(chain_scope, str) or any(marker not in chain_scope for marker in ("ValidateHistoricalChain", "non-authorizing", "crash/power-loss")):
+        fail("RP-03 M10 historical-chain boundary is missing")
+
+    source_paths = (
+        "core/m10/canary_grant.go",
+        "core/m10/cost_bound.go",
+        "core/m10/canary_gate.go",
+        "core/m10/canary_authorization.go",
+        "core/m10/canary_execution_record.go",
+        "core/m10/historical_chain.go",
+        "lab/mission-runtime/cmd/demo/m10_boundary.go",
+        "lab/mission-runtime/cmd/demo/m10_chain.go",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-03 M10 shared decoder implementation source is missing")
+    core_markers = {
+        "core/m10/canary_grant.go": ("func DecodeCanaryGrant",),
+        "core/m10/cost_bound.go": ("func DecodeTrustedCostBound",),
+        "core/m10/canary_gate.go": ("func ValidateCanaryGateDecision",),
+        "core/m10/canary_authorization.go": ("func ValidateExecutionAuthorization",),
+        "core/m10/canary_execution_record.go": ("func DecodeCanaryExecutionRecord", "func ValidateExecutionRecord"),
+        "core/m10/historical_chain.go": ("func ValidateHistoricalChain",),
+    }
+    if any(marker not in sources[relative] for relative, markers in core_markers.items() for marker in markers):
+        fail("RP-03 M10 core decoder/chain boundary is missing")
+    if any(marker not in sources["lab/mission-runtime/cmd/demo/m10_boundary.go"] for marker in ("corem10.DecodeCanaryGrant", "corem10.DecodeTrustedCostBound", "corem10.ValidateCanaryGateDecision", "corem10.ValidateExecutionAuthorization", "corem10.DecodeCanaryExecutionRecord")):
+        fail("RP-03 M10 mission-runtime shared decoder use is missing")
+    if "corem10.ValidateHistoricalChain" not in sources["lab/mission-runtime/cmd/demo/m10_chain.go"]:
+        fail("RP-03 M10 mission-runtime historical-chain use is missing")
+
+    test_paths = (
+        "core/m10/cost_bound_test.go",
+        "lab/mission-runtime/cmd/demo/m10_boundary_test.go",
+        "lab/mission-runtime/cmd/demo/m10_chain_test.go",
+    )
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-03 M10 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodeCanaryExecutionRecordAcceptsPerformedSuccess",
+        "TestTrustedCostBoundDecodeAndBinding",
+        "TestCanaryGrantDecodeAndBinding",
+        "TestCanaryGateIsNonAuthorizingAndBounded",
+        "TestCanaryAuthorizationBindsGateWithoutExecuting",
+    )
+    if any(marker not in tests["core/m10/cost_bound_test.go"] for marker in required_core_tests):
+        fail("RP-03 M10 core decoder regressions are missing")
+    required_boundary_tests = ("TestM10RawArtifacts", "TestM10RawMutations", "TestM10RawHashesAndNumbers")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m10_boundary_test.go"] for marker in required_boundary_tests):
+        fail("RP-03 M10 mission-runtime decoder regressions are missing")
+    required_chain_tests = ("TestM10ChainBindings", "TestM10ChainScopeAndTime", "TestM10ChainBudget")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m10_chain_test.go"] for marker in required_chain_tests):
+        fail("RP-03 M10 historical-chain regressions are missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-03 M10 hosted CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -2441,6 +2529,7 @@ def audit(root):
     audit_windows_ancestor_race(root, plan_text)
     audit_m08_shared_decoder_policy(root, plan_text)
     audit_m09_shared_approval_boundary(root, matrix, plan_text)
+    audit_m10_shared_artifact_decoders(root, matrix, plan_text)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
