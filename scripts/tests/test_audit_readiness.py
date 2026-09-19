@@ -12,6 +12,33 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReadinessAuditTests(unittest.TestCase):
+    def _git_fixture(self):
+        root = Path(tempfile.mkdtemp(dir=self.temp.name))
+        subprocess.run(["git", "init", str(root)], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "audit@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Readiness Audit"], check=True)
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "fixture"], check=True, capture_output=True, text=True)
+        return root, subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+
+    def test_product_baseline_git_rejects_missing_commit(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, _ = self._git_fixture()
+        with self.assertRaisesRegex(AssertionError, "not a resolvable Git commit"):
+            audit_product_baseline_git(root, "0" * 40)
+
+    def test_product_baseline_git_rejects_undocumented_code_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        (root / "source.go").write_text("package fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "source.go"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "code"], check=True, capture_output=True, text=True)
+        with self.assertRaisesRegex(AssertionError, "non-doc drift"):
+            audit_product_baseline_git(root, baseline)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

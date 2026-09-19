@@ -63,7 +63,7 @@ Tuy nhiên vẫn cần chỉnh sửa trước khi mở rộng operated/deploymen
 | Kiểm tra | Kết quả |
 |---|---|
 | `python scripts/audit_readiness.py .` | PASS; `NOT_READY_FOR_PRODUCTION`; 150 scoped claims |
-| `python -m unittest discover -s scripts/tests -v` | PASS; 157 tests |
+| `python -m unittest discover -s scripts/tests -v` | PASS; 159 tests |
 | Foundation validators | PASS: missions, repo, artifact spine, continuity, language |
 | Semantic/static validators | PASS: agent semantics, semantic contracts, M11, n8n M06/M07 static |
 | n8n M07 adversarial/output validators | không chạy hết vì máy review không có Go |
@@ -476,7 +476,7 @@ Ngay lập tức: PR-A
 
 ### Kiểm chứng cuối nhánh
 
-- `python -m unittest discover -s scripts/tests -q`: PASS (157 tests).
+- `python -m unittest discover -s scripts/tests -q`: PASS (159 tests).
 - `python scripts/audit_readiness.py .`: PASS, 151 scoped claims,
   `NOT_READY_FOR_PRODUCTION`.
 - JSON parse, Python compile, static n8n validators và `git diff --check`: PASS.
