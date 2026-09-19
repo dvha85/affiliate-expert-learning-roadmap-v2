@@ -446,6 +446,11 @@ def main() -> None:
                 "N8N_DIAGNOSTICS_ENABLED": "false",
                 "N8N_PERSONALIZATION_ENABLED": "false",
                 "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false",
+                # The imported blueprints read the short-lived CI bearer token
+                # through $env.CANONICAL_ADAPTER_TOKEN. n8n blocks env access in
+                # expressions by default, so make this explicit for this
+                # disposable, isolated regression runtime only.
+                "N8N_BLOCK_ENV_ACCESS_IN_NODE": "false",
                 "N8N_RUNNERS_BROKER_PORT": str(choose_port()),
                 "GOWORK": "off",
                 "GOCACHE": str(runtime / "go-cache"),
