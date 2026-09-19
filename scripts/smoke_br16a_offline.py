@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BOT_DIR = ROOT / "lab/affiliate-bot"
 REGISTRY = ROOT / "lab/mission-runtime/testdata/m07-registry.json"
+ADAPTER_TOKEN = "br16a-canonical-adapter-token-20260919"
 
 
 def workspace_context(workspace):
@@ -104,7 +105,7 @@ def start_m07_adapter(bot, history, env):
 
 
 def call_m07_adapter(base_url, endpoint, payload):
-    request = urllib.request.Request(base_url + endpoint, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json"})
+    request = urllib.request.Request(base_url + endpoint, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json", "Authorization": f"Bearer {ADAPTER_TOKEN}"})
     with urllib.request.urlopen(request, timeout=2) as response:
         if response.status != 200:
             raise AssertionError((endpoint, response.status))
@@ -252,7 +253,7 @@ def main(argv=None):
     except ValueError as error:
         parser.error(str(error))
     with workspace as directory:
-        work = Path(directory); bot = work / "bot"; env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"))
+        work = Path(directory); bot = work / "bot"; env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"), CANONICAL_ADAPTER_TOKEN=ADAPTER_TOKEN)
         run([go, "build", "-o", bot, "./cmd/bot"], BOT_DIR, env=env)
         state = work / "runtime"; state.mkdir()
         history, observations, model = state / "history.jsonl", work / "observations.json", work / "model.json"

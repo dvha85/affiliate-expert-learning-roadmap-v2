@@ -1,6 +1,7 @@
 """Audit readiness claims against the structured matrix and CI wiring."""
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,7 +50,7 @@ PACKAGE_STATUSES = {"PARTIAL", "OPEN"}
 REVIEW_IDS = {f"R{number:02d}" for number in range(1, 17)}
 REVIEW_STATUSES = {"PARTIAL", "OPEN"}
 BASELINE_RE = re.compile(r"^[0-9a-f]{40}$")
-PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline): ([^>]+) -->$", re.MULTILINE)
+PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline|baseline-kind): ([^>]+) -->$", re.MULTILINE)
 PLAN_PACKAGE_RE = re.compile(r"^\| (RP-\d+) \|.*\| (PARTIAL|OPEN) [—-]", re.MULTILINE)
 
 
@@ -57,21 +58,52 @@ def fail(message):
     raise AssertionError(message)
 
 
-def audit_snapshot_metadata(matrix, graph, plan_text):
+def audit_snapshot_metadata(root, matrix, graph, plan_text):
     """Require the three readiness artifacts to describe one reviewed main base."""
     plan_metadata = dict(PLAN_METADATA_RE.findall(plan_text))
-    if set(plan_metadata) != {"as-of", "main-baseline"}:
+    if set(plan_metadata) != {"as-of", "main-baseline", "baseline-kind"}:
         fail("plan lacks exact readiness snapshot metadata")
     as_of = matrix.get("as_of")
     baseline = matrix.get("main_baseline")
+    baseline_kind = matrix.get("baseline_kind")
     if not isinstance(as_of, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_of):
         fail("matrix has invalid readiness as_of")
     if not isinstance(baseline, str) or not BASELINE_RE.fullmatch(baseline):
         fail("matrix has invalid main baseline")
+    if baseline_kind != "product":
+        fail("matrix must declare product baseline semantics")
+    if graph.get("baseline_kind") != baseline_kind or plan_metadata["baseline-kind"] != baseline_kind:
+        fail("matrix/graph/plan baseline-kind mismatch")
     if graph.get("as_of") != as_of or graph.get("main_baseline") != baseline:
         fail("matrix/evidence graph readiness snapshot mismatch")
     if plan_metadata["as-of"] != as_of or plan_metadata["main-baseline"] != baseline:
         fail("matrix/plan readiness snapshot mismatch")
+    audit_product_baseline_git(root=root, baseline=baseline)
+
+
+def audit_product_baseline_git(root, baseline):
+    """Validate product baseline ancestry and prevent undocumented drift."""
+    git_dir = root / ".git"
+    if not git_dir.exists():
+        return
+    def git(*args):
+        return subprocess.run(["git", "-C", str(root), *args], text=True, capture_output=True)
+    if git("cat-file", "-e", f"{baseline}^{{commit}}").returncode != 0:
+        fail("declared product baseline is not a resolvable Git commit")
+    if git("merge-base", "--is-ancestor", baseline, "HEAD").returncode != 0:
+        fail("declared product baseline is not an ancestor of HEAD")
+    status = git("status", "--porcelain", "--untracked-files=all")
+    if status.returncode != 0:
+        fail("could not inspect Git working tree for product baseline")
+    if status.stdout.strip():
+        fail("product baseline audit requires a clean working tree")
+    changed = git("diff", "--name-only", f"{baseline}..HEAD")
+    if changed.returncode != 0:
+        fail("could not inspect product baseline diff")
+    allowed = ("docs/",)
+    unexpected = [path for path in changed.stdout.splitlines() if path and not path.startswith(allowed)]
+    if unexpected:
+        fail("product baseline has undocumented non-doc drift: " + ", ".join(unexpected[:5]))
 
 
 def audit_package_statuses(matrix, plan_text):
@@ -847,7 +879,7 @@ def audit_evidence_graph(root, criteria_by_id):
 
 def audit_claim_count_disclosures(root, plan_text, claim_count):
     """Keep current human-readable claim-count disclosures tied to the graph."""
-    evidence_path = root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
+    evidence_path = root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
     evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
     evidence_match = re.search(r"`NOT_READY_FOR_PRODUCTION`,\s*(\d+) scoped claims", evidence_text)
     if evidence_match is None or int(evidence_match.group(1)) != claim_count:
@@ -1107,7 +1139,7 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     cache_gate = updates.get("RP-08-n8n-engine-cache-gating")
     if not isinstance(cache_gate, dict) or "full engine coverage remains required" not in cache_gate.get("scope", ""):
         fail("matrix lacks scoped n8n engine cache/gate acceptance")
-    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@v4" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text:
+    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@caa296126883cff596d87d8935842f9db880ef25" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text or "mission-gate:" not in workflow_text:
         fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 
@@ -1130,6 +1162,7 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         "\n  deterministic-smokes-foundations:\n",
         "\n  deterministic-smokes-m06-m07:\n",
         "\n  deterministic-smokes-backup-mutations:\n",
+        "\n  curriculum-gate:\n",
     )
     required = (
         "Learner Bot race regression",
@@ -1143,6 +1176,7 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         "contracts/go.sum",
         "core/go.sum",
         "lab/mission-runtime/go.sum",
+        "curriculum-gate",
     )
     if not all(token in workflow_text for token in required_jobs + required):
         fail("deterministic CI shard/cache is missing a required coverage boundary")
@@ -2512,7 +2546,7 @@ def audit(root):
         fail("unsupported readiness matrix version")
     if matrix.get("overall") != "NOT_READY_FOR_PRODUCTION":
         fail("readiness matrix must remain NOT_READY_FOR_PRODUCTION")
-    audit_snapshot_metadata(matrix, graph, plan_text)
+    audit_snapshot_metadata(root, matrix, graph, plan_text)
     audit_package_statuses(matrix, plan_text)
     criteria = matrix.get("criteria")
     if not isinstance(criteria, list) or not criteria:

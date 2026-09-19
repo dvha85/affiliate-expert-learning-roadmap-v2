@@ -109,9 +109,14 @@ Watcher fixture và watcher n8n dùng chung canonical adapter. Chạy adapter lo
 trước khi import blueprint M06:
 
 ```bash
+export CANONICAL_ADAPTER_TOKEN='replace-with-a-random-32-byte-local-token'
 go run ./cmd/bot watcher serve /tmp/affiliate-runtime/history.jsonl 127.0.0.1:8787
 go run ./cmd/bot watcher history-handoff HISTORY.jsonl HISTORY-RECORD.json
 ```
+
+`CANONICAL_ADAPTER_TOKEN` is required for stateful `/v1/*` endpoints. The n8n
+blueprints send `Authorization: Bearer` from `$env.CANONICAL_ADAPTER_TOKEN`;
+only `/healthz` is public for health checks. Never commit this token.
 
 M07 không tự gắn IDs từ context vào câu trả lời. Lệnh `context` xuất payload đã
 resolve từ history; blueprint n8n cũng GET lại cùng `record_id` từ canonical

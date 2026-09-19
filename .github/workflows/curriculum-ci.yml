@@ -8,13 +8,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: curriculum-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   structure-language-and-foundations:
     name: structure-language-and-foundations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Artifact spine regression tests
@@ -40,10 +45,11 @@ jobs:
 
   deterministic-runtime:
     name: deterministic-runtime
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           # The repository has multiple Go modules. Declare every checksum so
@@ -82,9 +88,10 @@ jobs:
   windows-runtime:
     name: windows-runtime
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -104,10 +111,11 @@ jobs:
 
   learner-bot-tests-shard-0:
     name: learner-bot-tests-shard-0
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -115,7 +123,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Verify deterministic learner Bot shard helper
@@ -125,10 +133,11 @@ jobs:
 
   learner-bot-tests-shard-1:
     name: learner-bot-tests-shard-1
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -136,7 +145,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Verify deterministic learner Bot shard helper
@@ -146,10 +155,11 @@ jobs:
 
   learner-bot-race:
     name: learner-bot-race
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           # The race build has a separate build-cache key. Keep every module
@@ -166,10 +176,11 @@ jobs:
 
   deterministic-quickstart:
     name: deterministic-quickstart
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -177,7 +188,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Beginner quickstart isolated-clone smoke
@@ -185,10 +196,11 @@ jobs:
 
   deterministic-smokes-foundations:
     name: deterministic-smokes-foundations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -196,7 +208,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: BR-08 learner and harness integration smoke
@@ -218,10 +230,11 @@ jobs:
 
   deterministic-smokes-m06-m07:
     name: deterministic-smokes-m06-m07
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -229,7 +242,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: BR-13b fixture watcher history handoff
@@ -261,10 +274,11 @@ jobs:
 
   deterministic-smokes-backup-mutations:
     name: deterministic-smokes-backup-mutations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -272,7 +286,7 @@ jobs:
             contracts/go.sum
             core/go.sum
             lab/mission-runtime/go.sum
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: BR-18b M11 backup, reconciliation and restore
@@ -335,3 +349,33 @@ jobs:
         run: python scripts/mutate_m07_registry_strict_decoder.py
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
+
+  curriculum-gate:
+    name: curriculum-gate
+    if: ${{ always() }}
+    needs:
+      - structure-language-and-foundations
+      - deterministic-runtime
+      - windows-runtime
+      - learner-bot-tests-shard-0
+      - learner-bot-tests-shard-1
+      - learner-bot-race
+      - deterministic-quickstart
+      - deterministic-smokes-foundations
+      - deterministic-smokes-m06-m07
+      - deterministic-smokes-backup-mutations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every curriculum job to pass
+        run: |
+          test "${{ needs.structure-language-and-foundations.result }}" = success
+          test "${{ needs.deterministic-runtime.result }}" = success
+          test "${{ needs.windows-runtime.result }}" = success
+          test "${{ needs.learner-bot-tests-shard-0.result }}" = success
+          test "${{ needs.learner-bot-tests-shard-1.result }}" = success
+          test "${{ needs.learner-bot-race.result }}" = success
+          test "${{ needs.deterministic-quickstart.result }}" = success
+          test "${{ needs.deterministic-smokes-foundations.result }}" = success
+          test "${{ needs.deterministic-smokes-m06-m07.result }}" = success
+          test "${{ needs.deterministic-smokes-backup-mutations.result }}" = success

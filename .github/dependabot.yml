@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /contracts
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /core
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /lab/affiliate-bot
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /lab/mission-runtime
+    schedule:
+      interval: weekly

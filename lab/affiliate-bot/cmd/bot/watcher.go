@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -24,6 +26,11 @@ import (
 
 const watcherFixtureURL = "https://example.com/br13/offer"
 const m07MaxToolResponseBytes = 256 << 10
+const m06MaxAdapterRequestBytes = 64 << 10
+const m07MaxAdapterRequestBytes = 1 << 20
+const historyMaxAdapterRequestBytes = 1 << 20
+
+var errAdapterRequestBodyTooLarge = errors.New("adapter request body exceeds size limit")
 
 type watcherFixture = m06.OfferFixture
 
@@ -181,7 +188,7 @@ type m07AdapterRequest struct {
 
 func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
 	var request m06AdapterRequest
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+	raw, err := readAdapterRequestBody(r.Body, m06MaxAdapterRequestBytes)
 	if err != nil {
 		return request, err
 	}
@@ -299,6 +306,11 @@ func m06AdapterHandler(historyPath string) http.HandlerFunc {
 		}
 		request, err := decodeM06AdapterRequest(r)
 		if err != nil {
+			if errors.Is(err, errAdapterRequestBodyTooLarge) {
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "INPUT_TOO_LARGE", "canonical_history_ack": false, "execution_permitted": false})
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_M06_INPUT", "canonical_history_ack": false, "execution_permitted": false})
 			return
@@ -365,7 +377,7 @@ func m07PersistenceFailureResponse(err error, artifactID string, artifact any) m
 
 func decodeM07AdapterRequest(r *http.Request) (m07AdapterRequest, error) {
 	var request m07AdapterRequest
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	raw, err := readAdapterRequestBody(r.Body, m07MaxAdapterRequestBytes)
 	if err != nil {
 		return request, err
 	}
@@ -543,6 +555,11 @@ func m07AdapterHandlerWithFetcher(historyPath string, fetcher m07ToolFetcher) ht
 		}
 		request, err := decodeM07AdapterRequest(r)
 		if err != nil {
+			if errors.Is(err, errAdapterRequestBodyTooLarge) {
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "INPUT_TOO_LARGE", "execution_permitted": false})
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "INVALID_REQUEST", "execution_permitted": false})
 			return
@@ -731,6 +748,11 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 2 {
 		address = args[1]
 	}
+	adapterToken, err := canonicalAdapterTokenFromEnvironment()
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
 	if !strings.HasPrefix(address, "127.0.0.1:") {
 		fmt.Fprintln(stderr, "canonical adapter must bind to loopback 127.0.0.1")
 		return 1
@@ -750,20 +772,23 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/m06/fixture-import", m06AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m06/accesstrade-shopee-campaign", m06AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/context", m07AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/preflight", m07AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/fetch-and-register", m07AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/register-tool-result", m07AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/validate", m07AdapterHandler(historyPath))
-	mux.HandleFunc("/v1/m07/register-proposal", m07AdapterHandler(historyPath))
+	protected := func(handler http.Handler) http.Handler {
+		return canonicalAdapterAuthHandler(adapterToken, handler)
+	}
+	mux.Handle("/v1/m06/fixture-import", protected(m06AdapterHandler(historyPath)))
+	mux.Handle("/v1/m06/accesstrade-shopee-campaign", protected(m06AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/context", protected(m07AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/preflight", protected(m07AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/fetch-and-register", protected(m07AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/register-tool-result", protected(m07AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/validate", protected(m07AdapterHandler(historyPath)))
+	mux.Handle("/v1/m07/register-proposal", protected(m07AdapterHandler(historyPath)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"status":"OK","execution_permitted":false}`+"\n")
 	})
-	mux.HandleFunc("/v1/history/append", historyHandoffHTTPHandler(historyPath))
-	mux.HandleFunc("/v1/history", historyReadHandler(historyPath))
+	mux.Handle("/v1/history/append", protected(historyHandoffHTTPHandler(historyPath)))
+	mux.Handle("/v1/history", protected(historyReadHandler(historyPath)))
 	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
 	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -784,8 +809,13 @@ func historyHandoffHTTPHandler(historyPath string) http.HandlerFunc {
 			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD","canonical_history_ack":false}`+"\n")
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		body, err := readAdapterRequestBody(r.Body, historyMaxAdapterRequestBytes)
 		if err != nil {
+			if errors.Is(err, errAdapterRequestBodyTooLarge) {
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_, _ = io.WriteString(w, `{"status":"INPUT_TOO_LARGE","canonical_history_ack":false}`+"\n")
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"status":"INPUT_ERROR","canonical_history_ack":false}`+"\n")
 			return
@@ -809,6 +839,40 @@ func historyHandoffHTTPHandler(historyPath string) http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "record_id": resolved.RecordID, "canonical_history_ack": true, "canonical_history_persisted": true, "execution_permitted": false, "artifact": resolved})
 	}
+}
+
+func readAdapterRequestBody(reader io.Reader, maxBytes int64) ([]byte, error) {
+	raw, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(raw)) > maxBytes {
+		return nil, errAdapterRequestBodyTooLarge
+	}
+	return raw, nil
+}
+
+func canonicalAdapterTokenFromEnvironment() (string, error) {
+	token := os.Getenv("CANONICAL_ADAPTER_TOKEN")
+	if len(token) < 32 || len(token) > 256 || strings.ContainsAny(token, " \t\r\n") {
+		return "", fmt.Errorf("CANONICAL_ADAPTER_TOKEN must be 32-256 characters without whitespace")
+	}
+	return token, nil
+}
+
+func canonicalAdapterAuthHandler(token string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		provided := r.Header.Get("Authorization")
+		const prefix = "Bearer "
+		if !strings.HasPrefix(provided, prefix) || subtle.ConstantTimeCompare([]byte(strings.TrimPrefix(provided, prefix)), []byte(token)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="canonical-adapter"`)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = io.WriteString(w, `{"status":"UNAUTHORIZED","execution_permitted":false}`+"\n")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // runWatcherHistoryHandoff is the local BR-13 adapter used by the n8n

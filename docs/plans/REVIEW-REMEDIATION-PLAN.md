@@ -3,6 +3,17 @@
 <!-- readiness-as-of: 2026-09-19 -->
 <!-- readiness-main-baseline: ec2499a51dee185e7086c683a2ef944de2e650f2 -->
 
+**Cập nhật FULL repository hardening (2026-09-19):** nhánh thực hiện bổ sung
+body-size guard `limit+1` và bearer token bắt buộc cho canonical adapter, đồng
+bộ token vào runner/blueprint n8n, pin GitHub Actions theo SHA, chuyển Ubuntu
+CI sang `24.04`, thêm cache dependency paths, final gates fail-closed,
+security/Dependabot workflow và repository hygiene metadata. Python audit,
+static n8n validators, JSON/compile checks và 157 Python tests chạy được;
+Go/real n8n chưa chạy trên host này vì thiếu executable. Đây là bằng chứng
+offline/fixture/read-only trên implementation branch; `NOT_READY_FOR_PRODUCTION`
+giữ nguyên cho đến khi có hosted Go/Windows/n8n, branch protection, provider,
+deployment, pilot và business-outcome evidence.
+
 **Baseline sync after PR #457 (2026-09-19):** PR #457 was squash-merged into
 `main` at `40f3d76fa163b6aee6d20bd8c6bd24bceca9254f`, from implementation head
 `d9e74ddcd2475bd1e6e1ab4247d237ae75b21319`. Curriculum CI run `35407311675`
@@ -32,7 +43,7 @@ outcome và production readiness vẫn mở.
 and Mission Agent Path CI run `35411941661` passed all 13 hosted checks,
 including Windows runtime job `105813136321`, learner race job `105813136435`
 and deterministic backup/mutations job `105813136450`. The post-merge evidence
-records 150 scoped claims and 121 readiness-audit tests. This rebinds the
+records 151 scoped claims and 157 readiness-audit tests. This rebinds the
 readiness bookkeeping to the merged PR #459 product baseline only; the M11
 mutation proof remains bounded offline/read-only and crash/power-loss, atomic
 multi-file, distributed/multi-host, Windows traversal parity, provider/live
