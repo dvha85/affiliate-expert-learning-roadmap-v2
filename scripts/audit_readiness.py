@@ -719,6 +719,59 @@ def audit_m10_shared_artifact_decoders(root, matrix, plan_text):
         fail("RP-03 M10 hosted CI acceptance is missing")
 
 
+def audit_m10_budget_expiry_boundaries(root, matrix, plan_text):
+    """Keep the RP-03 budget/expiry/STOP evidence boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật RP-03 exhausted-budget monotonicity",
+        "Cập nhật RP-03 approval expiry và STOP/reserve boundary",
+        "Cập nhật RP-03 M10 budget/expiry audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-03 M10 budget/expiry audit plan markers are incomplete")
+
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    budget_record = updates.get("RP-03-budget-monotonicity-20260918")
+    expiry_record = updates.get("RP-03-expiry-stop-reserve-20260918")
+    if not isinstance(budget_record, dict) or not isinstance(expiry_record, dict):
+        fail("RP-03 M10 budget/expiry records are missing")
+    budget_scope = budget_record.get("scope")
+    expiry_scope = expiry_record.get("scope")
+    if not isinstance(budget_scope, str) or any(marker not in budget_scope for marker in ("cap=1", "backup/restore", "BUDGET_DENIED", "multi-file crash/power-loss")):
+        fail("RP-03 exhausted-budget boundary disclosure is missing")
+    if not isinstance(expiry_scope, str) or any(marker not in expiry_scope for marker in ("before", "at", "after", "STOP", "without mutation", "multi-file crash/power-loss")):
+        fail("RP-03 approval-expiry/STOP boundary disclosure is missing")
+
+    source_paths = (
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/smoke_br16a_offline.py",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-03 M10 budget/expiry implementation source is missing")
+    learner_source = sources["lab/affiliate-bot/cmd/bot/mission_command.go"]
+    if any(marker not in learner_source for marker in ("BUDGET_DENIED", "execution authorization has expired", "durable STOP:")):
+        fail("RP-03 M10 budget/expiry implementation boundary is missing")
+    learner_tests = sources["lab/affiliate-bot/cmd/bot/mission_command_test.go"]
+    if "TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore" not in learner_tests:
+        fail("RP-03 exhausted-budget regression is missing")
+    if any(marker not in learner_tests for marker in ("TestMissionM10AuthorityExpiryBoundariesAfterBackupRestoreInFreshProcess", "TestMissionM10ReserveRejectsDurableStopWithoutMutation")):
+        fail("RP-03 approval-expiry/STOP regression is missing")
+    if "m10-reserve" not in sources["lab/affiliate-bot/cmd/bot/backup_command_test.go"] or any(marker not in sources["scripts/smoke_br16a_offline.py"] for marker in ("stop_race_state", "BUDGET_DENIED", "m10-reserve")):
+        fail("RP-03 budget/expiry restore and race regression is missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:", "python scripts/smoke_br16a_offline.py")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-03 M10 budget/expiry hosted CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -2537,6 +2590,7 @@ def audit(root):
     audit_post_merge_pr412(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
     audit_claim_count_disclosures(root, plan_text, claim_count)
+    audit_m10_budget_expiry_boundaries(root, matrix, plan_text)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
     audit_assisted_fresh_workspace(root, matrix, plan_text)

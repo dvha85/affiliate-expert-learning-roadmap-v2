@@ -126,6 +126,16 @@ crash/power-loss, distributed locking, provider/live execution, deployment,
 pilot and production readiness remain open. Marker:
 `Cập nhật RP-03 M10 shared decoder audit guard`.
 
+**Cập nhật RP-03 M10 budget/expiry audit guard (2026-09-19):** readiness
+audit now checks the existing exhausted-budget monotonicity and approval
+expiry/STOP-reserve records against the real learner implementation, fresh
+process/restore regressions, cross-process smoke and hosted CI declarations.
+Negative fixtures must fail when the budget/expiry implementation, regression
+or conservative boundary disclosure is removed. This is evidence-integrity
+hardening only; multi-file crash/power-loss, distributed locking,
+provider/live execution, deployment, pilot and production readiness remain
+open. Marker: `Cập nhật RP-03 M10 budget/expiry audit guard`.
+
 **Baseline sync after PR #470 (2026-09-19):** PR #470 was squash-merged into
 `main` at `b41e69c`, from implementation head
 `5db49308c768a34fa17dc4144c83f482fbdbba87`. GitHub reported 13 exact-head

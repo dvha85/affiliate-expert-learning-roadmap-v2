@@ -342,6 +342,26 @@ class ReadinessAuditTests(unittest.TestCase):
         matrix.write_text(matrix.read_text(encoding="utf-8").replace("crash/power-loss, distributed locking, executor and business outcome proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
         self.assertIn("RP-03 M10 shared decoder boundary is missing", self.run_audit(False))
 
+    def test_missing_rp03_budget_expiry_implementation_boundary_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("BUDGET_DENIED", "REMOVED_BUDGET_STATUS"), encoding="utf-8")
+        self.assertIn("RP-03 M10 budget/expiry implementation boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_exhausted_budget_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore", "RemovedBudgetMonotonicityRegression", 1), encoding="utf-8")
+        self.assertIn("RP-03 exhausted-budget regression is missing", self.run_audit(False))
+
+    def test_missing_rp03_expiry_stop_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ReserveRejectsDurableStopWithoutMutation", "RemovedExpiryStopRegression", 1), encoding="utf-8")
+        self.assertIn("RP-03 approval-expiry/STOP regression is missing", self.run_audit(False))
+
+    def test_missing_rp03_budget_expiry_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("This is bounded local/offline/synthetic/read-only evidence and does not prove multi-file crash/power-loss, distributed locking, provider, live executor, business outcome, pilot or deployment readiness.", "budget boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-03 exhausted-budget boundary disclosure is missing", self.run_audit(False))
+
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("type LearnerIntent = corem08.Intent", "type LearnerIntent struct"), encoding="utf-8")
