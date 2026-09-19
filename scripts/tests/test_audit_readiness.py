@@ -43,6 +43,10 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        full_plan_source = ROOT / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target = self.root / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(full_plan_source, full_plan_target)
         evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
         evidence.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md", evidence)
@@ -291,13 +295,13 @@ class ReadinessAuditTests(unittest.TestCase):
         self.assertIn("NOT_READY_FOR_PRODUCTION", self.run_audit(True))
 
     def test_stale_post_merge_evidence_claim_count_is_rejected(self):
-        evidence = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
-        evidence.write_text(evidence.read_text(encoding="utf-8").replace("150 scoped claims", "149 scoped claims", 1), encoding="utf-8")
+        evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("151 scoped claims", "150 scoped claims", 1), encoding="utf-8")
         self.assertIn("current post-merge evidence claim count does not match the evidence graph", self.run_audit(False))
 
     def test_stale_remediation_plan_claim_count_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
-        plan.write_text(plan.read_text(encoding="utf-8").replace("records 150 scoped claims", "records 149 scoped claims", 1), encoding="utf-8")
+        plan.write_text(plan.read_text(encoding="utf-8").replace("records 151 scoped claims", "records 150 scoped claims", 1), encoding="utf-8")
         self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
 
     def test_missing_windows_reparse_pin_is_rejected(self):
