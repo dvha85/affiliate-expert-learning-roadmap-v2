@@ -477,6 +477,81 @@ def audit_windows_ancestor_race(root, plan_text):
         fail("Windows runtime CI acceptance is missing")
 
 
+def audit_m08_shared_decoder_policy(root, plan_text):
+    """Keep the RP-02 shared decoder/hash evidence boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật RP-02 shared M08 policy context decoder",
+        "Cập nhật RP-02 shared M08 conformance table",
+        "Cập nhật RP-02 intent hash version boundary",
+        "Cập nhật RP-02 exact-number restart conformance",
+        "Cập nhật RP-02 M08 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-02 M08 shared decoder audit plan markers are incomplete")
+
+    source_paths = (
+        "core/m08/m08.go",
+        "core/m08/conformance.go",
+        "lab/mission-runtime/cmd/demo/m08_boundary.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-02 M08 shared decoder implementation source is missing")
+    core_source = sources["core/m08/m08.go"]
+    if any(marker not in core_source for marker in ("func DecodeIntent", "func DecodePolicy", "func DecodePolicyContext", "UNSUPPORTED_HASH_VERSION", "sha256:")):
+        fail("RP-02 M08 core decoder/hash boundary is missing")
+    if any(marker not in sources["core/m08/conformance.go"] for marker in ("func PolicyConformanceCases", "LearnerEquivalent")):
+        fail("RP-02 M08 shared conformance table is missing")
+    if "corem08.DecodePolicyContext" not in sources["lab/mission-runtime/cmd/demo/m08_boundary.go"]:
+        fail("RP-02 M08 mission-runtime shared decoder use is missing")
+    if sources["lab/affiliate-bot/cmd/bot/mission_command.go"].count("decoder.UseNumber()") < 2 or "corem08.DecodeIntent" not in sources["lab/affiliate-bot/cmd/bot/mission_command.go"]:
+        fail("RP-02 M08 learner exact-number/shared decoder use is missing")
+    if "decoder.UseNumber()" not in sources["lab/affiliate-bot/cmd/bot/backup_command.go"]:
+        fail("RP-02 M08 backup exact-number reader guard is missing")
+
+    test_paths = (
+        "core/m08/m08_test.go",
+        "core/m08/conformance_test.go",
+        "lab/mission-runtime/cmd/demo/m08_boundary_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+    )
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-02 M08 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodePolicyContextSharesStrictAndSemanticBoundary",
+        "TestDecodeIntentPreservesLargeJSONNumberForHash",
+        "TestDecodeIntentRejectsNullParametersAndDuplicateKeys",
+        "TestIntentHashVersionRejectsUnsupportedPrefixWithoutResealing",
+    )
+    if any(marker not in tests["core/m08/m08_test.go"] for marker in required_core_tests):
+        fail("RP-02 M08 core decoder/hash regressions are missing")
+    if "TestPolicyConformanceTable" not in tests["core/m08/conformance_test.go"] or "TestM08HarnessUsesSharedPolicyConformanceTable" not in tests["lab/mission-runtime/cmd/demo/m08_boundary_test.go"] or "TestLearnerM08UsesSharedPolicyConformanceTable" not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"]:
+        fail("RP-02 M08 shared conformance regressions are missing")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m08_boundary_test.go"] for marker in ("9007199254740993", "UNSUPPORTED_HASH_VERSION")) or any(marker not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"] for marker in ("9007199254740993", "learnerIntentHash(reloaded)", "TestEvaluateLearnerPolicyUsesSharedContextValidation")):
+        fail("RP-02 M08 exact-number/hash learner and harness regressions are missing")
+
+    evidence_path = root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    for boundary in ("does not claim provider access", "exact hash-version/migration", "NOT_READY_FOR_PRODUCTION", "9007199254740993"):
+        if boundary not in evidence_text:
+            fail("RP-02 M08 bounded evidence disclosure is missing")
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-02 M08 hosted CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -2285,6 +2360,7 @@ def audit(root):
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
     audit_windows_ancestor_race(root, plan_text)
+    audit_m08_shared_decoder_policy(root, plan_text)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)

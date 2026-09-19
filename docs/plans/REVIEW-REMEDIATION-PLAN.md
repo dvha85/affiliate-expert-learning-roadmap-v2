@@ -81,6 +81,17 @@ parity. Record:
 `docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-AUDIT-20260919.md`.
 Marker: `Baseline sync after PR #464`.
 
+**Cập nhật RP-02 M08 shared decoder audit guard (2026-09-19):** readiness
+audit now independently checks the canonical `core/m08` intent/policy/context
+decoder, shared conformance table, learner and mission-runtime consumers,
+exact-number readers, hash-version fail-closed tests, hosted CI commands and
+the existing bounded evidence disclosure. Negative fixtures must fail when a
+shared consumer, exact-number/hash marker or readiness boundary is removed.
+This is evidence-integrity hardening only; hash migration, cross-store
+persistence, provider/live execution, deployment, pilot and production
+readiness remain open. Marker:
+`Cập nhật RP-02 M08 shared decoder audit guard`.
+
 **Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
 `main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
 `872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`

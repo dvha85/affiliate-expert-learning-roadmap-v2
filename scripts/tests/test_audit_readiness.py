@@ -20,6 +20,10 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("core/m08/m08.go", "core/m08/m08_test.go", "core/m08/conformance.go", "core/m08/conformance_test.go", "lab/mission-runtime/cmd/demo/m08_boundary.go", "lab/mission-runtime/cmd/demo/m08_boundary_test.go", "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
         mutation_terminal_chain = self.root / "scripts/mutate_backup_m11_terminal_chain.py"
         mutation_terminal_chain.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "scripts/mutate_backup_m11_terminal_chain.py", mutation_terminal_chain)
@@ -260,6 +264,26 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
         evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim POSIX traversal parity", "boundary disclosure removed", 1), encoding="utf-8")
         self.assertIn("Windows ancestor-race conservative boundary disclosure is missing", self.run_audit(False))
+
+    def test_missing_rp02_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m08_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem08.DecodePolicyContext", "removedSharedPolicyContextDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-02 M08 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_exact_number_reader_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("decoder.UseNumber()", "removedExactNumberReader()"), encoding="utf-8")
+        self.assertIn("RP-02 M08 learner exact-number/shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_hash_version_guard_is_rejected(self):
+        source = self.root / "core/m08/m08.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("UNSUPPORTED_HASH_VERSION", "REMOVED_HASH_VERSION_GUARD"), encoding="utf-8")
+        self.assertIn("RP-02 M08 core decoder/hash boundary is missing", self.run_audit(False))
+
+    def test_missing_rp02_bounded_evidence_disclosure_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim provider access", "provider boundary removed", 1), encoding="utf-8")
+        self.assertIn("RP-02 M08 bounded evidence disclosure is missing", self.run_audit(False))
 
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
