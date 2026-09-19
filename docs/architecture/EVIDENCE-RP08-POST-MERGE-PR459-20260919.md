@@ -22,7 +22,7 @@ Status: `VERIFIED_OFFLINE` for bounded synthetic/read-only mutation evidence.
 
 ## Local verification
 
-- Readiness audit: PASS, `NOT_READY_FOR_PRODUCTION`, 149 scoped claims.
+- Readiness audit: PASS, `NOT_READY_FOR_PRODUCTION`, 150 scoped claims.
 - Python audit regression suite: 121 tests passed.
 - JSON, Python compile and diff checks passed.
 - The local workspace has no `go.exe`; Go mutation execution is therefore
@@ -36,4 +36,3 @@ breadth, crash or power-loss durability, atomic multi-file publication,
 distributed or multi-host locking, Windows traversal parity, provider/live
 execution, deployment, pilot acceptance, business outcomes or production
 readiness. The repository remains `NOT_READY_FOR_PRODUCTION`.
-
