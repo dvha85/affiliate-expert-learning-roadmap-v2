@@ -246,6 +246,21 @@ class ReadinessAuditTests(unittest.TestCase):
         plan.write_text(plan.read_text(encoding="utf-8").replace("records 150 scoped claims", "records 149 scoped claims", 1), encoding="utf-8")
         self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
 
+    def test_missing_windows_reparse_pin_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/windows_directory.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("FILE_FLAG_OPEN_REPARSE_POINT", "removedReparsePointFlag", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race reparse-point pinning guard is missing", self.run_audit(False))
+
+    def test_missing_windows_ancestor_race_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/windows_ancestor_race_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestWindowsStableReaderRejectsAncestorJunctionAfterPreflight", "RemovedWindowsAncestorRaceRegression", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race regression coverage is missing", self.run_audit(False))
+
+    def test_missing_windows_conservative_boundary_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim POSIX traversal parity", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race conservative boundary disclosure is missing", self.run_audit(False))
+
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("type LearnerIntent = corem08.Intent", "type LearnerIntent struct"), encoding="utf-8")
