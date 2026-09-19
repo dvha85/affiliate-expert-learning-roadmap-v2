@@ -92,6 +92,17 @@ persistence, provider/live execution, deployment, pilot and production
 readiness remain open. Marker:
 `Cập nhật RP-02 M08 shared decoder audit guard`.
 
+**Cập nhật RP-02 M09 shared decoder audit guard (2026-09-19):** readiness
+audit now checks the existing shared M09 approval boundary record against the
+real `core/m09` approval/authorization/execution decoders, historical-chain
+validator, mission-runtime consumers, learner reload path, focused regressions
+and hosted CI declarations. Negative fixtures must fail when a decoder,
+consumer, learner alias, regression or bounded disclosure is removed. This is
+evidence-integrity hardening only; policy-context provenance, broader
+authorization/execution conformance, migration, cross-store persistence,
+provider/live execution, deployment, pilot and production readiness remain
+open. Marker: `Cập nhật RP-02 M09 shared decoder audit guard`.
+
 **Baseline sync after PR #466 (2026-09-19):** PR #466 was squash-merged into
 `main` at `1b65f83cc85c1bcc549e66a1e64d8c1162af5053`, from implementation head
 `7be41010fca41cf66d054273b6cbc691d7474174`. GitHub reported 13 exact-head

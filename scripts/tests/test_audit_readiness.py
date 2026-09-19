@@ -24,6 +24,10 @@ class ReadinessAuditTests(unittest.TestCase):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("core/m09/m09.go", "core/m09/m09_test.go", "lab/mission-runtime/cmd/demo/m09.go", "lab/mission-runtime/cmd/demo/m09_boundary.go", "lab/mission-runtime/cmd/demo/m09_test.go"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
         evidence_rp02_post_merge = self.root / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md"
         evidence_rp02_post_merge.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md", evidence_rp02_post_merge)
@@ -287,6 +291,26 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence = self.root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
         evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim provider access", "provider boundary removed", 1), encoding="utf-8")
         self.assertIn("RP-02 M08 bounded evidence disclosure is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_core_decoder_boundary_is_rejected(self):
+        source = self.root / "core/m09/m09.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func DecodeAuthorization", "func RemovedDecodeAuthorization", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 core decoder/chain boundary is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_mission_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m09_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem09.DecodeExecution", "removedSharedExecutionDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_learner_shared_approval_use_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("type LearnerApproval = corem09.ApprovalRecord", "type LearnerApproval struct", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 learner shared approval use is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("multi-file crash proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 bounded approval/execution boundary is missing", self.run_audit(False))
 
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
