@@ -2,10 +2,14 @@
 
 ## 0. Trạng thái tài liệu
 
-- Trạng thái: `DRAFT_REVIEW_PLAN`.
-- Phạm vi: review từ đầu toàn bộ repository tại `main` / `2ec78f1a40c264d796ec5b7c459abf864cd9a97a`.
+- Trạng thái: `IMPLEMENTED_OFFLINE_WITH_HOSTED_BLOCKERS`.
+- Phạm vi: review từ đầu toàn bộ repository tại `main` / `2ec78f1a40c264d796ec5b7c459abf864cd9a97a`; triển khai offline trên nhánh `codex/full-repository-hardening-20260919`.
 - Tài liệu này **không** tự cấp quyền triển khai code, thay branch protection, dùng credential/provider, chạy live executor hoặc nâng readiness.
 - Trạng thái readiness giữ nguyên: `NOT_READY_FOR_PRODUCTION`.
+- Đã triển khai offline: adapter size/auth guard, n8n token wiring, CI pin/cache/gates,
+  security/hygiene metadata, runbook Go version và readiness evidence sync.
+- Còn chờ hosted/admin: Go/Windows/n8n exact-head checks, branch protection, provider,
+  deployment/target-host, pilot và business-outcome evidence.
 - Nguồn trạng thái chi tiết hiện hành vẫn là:
   - [REVIEW-REMEDIATION-PLAN.md](REVIEW-REMEDIATION-PLAN.md)
   - [READINESS-MATRIX.json](READINESS-MATRIX.json)

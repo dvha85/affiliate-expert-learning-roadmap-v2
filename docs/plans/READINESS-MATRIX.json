@@ -1,7 +1,8 @@
 {
   "version": "readiness-matrix/v1",
   "as_of": "2026-09-19",
- 	"main_baseline": "ec2499a51dee185e7086c683a2ef944de2e650f2",
+	"main_baseline": "0852f6dc7b8922834230e5a639551576e60688fd",
+	"baseline_kind": "product",
 	"overall": "NOT_READY_FOR_PRODUCTION",
 	"recent_updates": [
 	{"id":"BR-19-full-repository-hardening-20260919","status":"PARTIAL","implementation_refs":["docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md","docs/plans/REVIEW-REMEDIATION-PLAN.md","lab/affiliate-bot/cmd/bot/watcher.go",".github/workflows/curriculum-ci.yml",".github/workflows/mission-agent-path-ci.yml",".github/workflows/security.yml",".github/dependabot.yml","SECURITY.md","CONTRIBUTING.md"],"test_refs":["lab/affiliate-bot/cmd/bot/watcher_test.go","scripts/run_n8n_engine_regression.py","scripts/run_n8n_m06_schedule_regression.py","scripts/smoke_br16a_offline.py","scripts/audit_readiness.py","scripts/tests/test_audit_readiness.py",".github/workflows/curriculum-ci.yml",".github/workflows/mission-agent-path-ci.yml"],"scope":"Implementation branch hardens the loopback canonical adapter with limit+1 body-size checks returning 413 before mutation and constant-time bearer authentication on every stateful /v1 endpoint; n8n blueprints and offline runners pass the token. CI actions are SHA-pinned, Ubuntu is explicit 24.04, Go cache dependency paths are declared, n8n path gating covers all module changes, final curriculum/mission gates fail closed, and security/Dependabot plus repository hygiene metadata are present. Python audit/static validators/JSON/compile checks and 157 Python tests pass locally; Go/real n8n cannot run on this host because the executables are unavailable. This remains bounded offline/fixture/read-only evidence and does not close hosted Windows/Go/n8n, branch protection, provider, deployment, pilot, business outcome or production-readiness blockers."},
