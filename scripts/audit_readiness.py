@@ -106,6 +106,7 @@ def audit_product_baseline_git(root, baseline):
         for path in changed.stdout.splitlines()
         if path
         and not path.startswith(allowed)
+        and path not in {"go.mod", "go.sum"}
         and not path.endswith(("/go.mod", "/go.sum"))
     ]
     if unexpected:
