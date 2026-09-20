@@ -1,8 +1,20 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-21 -->
-<!-- readiness-main-baseline: 12cb66f45d4e5e27002d4cbf01e6ec0481436759 -->
+<!-- readiness-main-baseline: d00122795317c0b6c8dee123ac1cf4205ea354c7 -->
 <!-- readiness-baseline-kind: product -->
+
+**Full review follow-up (2026-09-21):** current implementation baseline
+`d00122795317c0b6c8dee123ac1cf4205ea354c7`; [complete RV checklist](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).
+Local Python: 185 PASS; rollover and fail-open scope regressions reproduced
+before correction. Added exact M11 binding/number/health-TTL boundaries,
+n8n child-environment/restart/parser checks and workflow/governance drift tests.
+The full offline entrypoint is now wired into `offline-review-contract` under
+`curriculum-gate`; hosted acceptance is pending, local Go is absent. Main baseline
+`ada7827` failed BR-16a, so earlier PR #489 PASS below remains historical evidence.
+Main has no branch protection or applicable rules at this audit; owner/admin
+configuration is still required. `NOT_READY_FOR_PRODUCTION`, 154 scoped claims;
+no provider/live, deployment, pilot, business or durability gap is closed here.
 
 **Post-merge sync after PR #489 (2026-09-21):** PR #489 was squash-merged
 into `main` at `12cb66f45d4e5e27002d4cbf01e6ec0481436759` from implementation
