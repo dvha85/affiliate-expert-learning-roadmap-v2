@@ -12,10 +12,13 @@ into `main` at
 On the exact PR head, the required `curriculum-gate` and `mission-gate` passed.
 Their child jobs passed for deterministic runtime, learner shards and race,
 native Windows runtime, offline smokes, backup/mutation coverage, mission
-runtime, mission semantics and n8n engine regression. CodeQL and `codeql-go`
-also passed. The `govulncheck-go-modules` job returned failure, but remains
-non-blocking under the checked-in `continue-on-error` policy; it is recorded
-separately and is not upgraded to a clean security scan.
+runtime and mission semantics. CodeQL and `codeql-go` also passed. The
+`n8n-engine-regression` check completed successfully as a scoped skip because
+the PR diff did not include an n8n-related path; its setup, pinned-engine
+installation and engine-run steps did not execute. The
+`govulncheck-go-modules` job returned failure, but remains non-blocking under
+the checked-in `continue-on-error` policy; it is recorded separately and is
+not upgraded to a clean security scan.
 
 ## Post-merge local verification
 

@@ -8,9 +8,11 @@
 into `main` at `885f2d834ae5e0fe9df42da9be4005945169a519` from implementation
 head `1ad9105d1d529dde9aa840c039cc796382fe7e87`. The exact-head required
 `curriculum-gate` and `mission-gate` passed, including Windows, learner race,
-shards, backup/mutation, n8n and CodeQL paths. `govulncheck-go-modules` still
-returned failure as a non-blocking `continue-on-error` job, matching the
-baseline behavior. The post-merge evidence record is
+shards, backup/mutation and CodeQL paths. The `n8n-engine-regression` check
+completed as a scoped skip because the PR diff did not include an n8n-related
+path; its pinned-engine setup and run steps did not execute.
+`govulncheck-go-modules` still returned failure as a non-blocking
+`continue-on-error` job, matching the baseline behavior. The post-merge evidence record is
 `docs/architecture/EVIDENCE-PR487-POST-MERGE-20260921.md`; the audit remains
 `NOT_READY_FOR_PRODUCTION` and records 154 scoped claims and 174
 readiness-audit tests. This rebinds bookkeeping only; provider/live,
