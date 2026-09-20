@@ -66,6 +66,12 @@ Local: full Python 185 PASS hai lần sau sửa; compileall, structure, language
 continuity, artifact-spine và clean-worktree readiness audit PASS. Không chạy
 Go/n8n local; full runner local exit 2 trước mọi check vì thiếu `go`.
 
+Post-merge **riêng trên b447c04** cũng PASS:
+[Curriculum 35531803423](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35531803423),
+[Mission 35531803431](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/actions/runs/35531803431).
+Đây là lần chạy sau merge, khác hai run exact-head PR nêu trên. Security workflow
+tổng xanh không thay thế giới hạn govulncheck đã ghi.
+
 RV-01…RV-08, RV-10, RV-11 và G-01 đã đạt phạm vi repository/offline/fixture
 của đợt review; RV-09 đạt workflow/governance regression nhưng **ADMIN_OPEN**.
 Không còn correction RV đã xác định nào chờ sửa source. Overall giữ
