@@ -22,7 +22,7 @@ M01 learner Bot baseline
 
 ### `lab/affiliate-bot/`
 
-Reference learner baseline (mốc Bot tham chiếu cho người học) của M01–M02. Từ M03 trở đi, learner **mở rộng chính Bot/workspace của mình** từ baseline này; repo không copy toàn bộ M03–M11 vào đây vì như vậy sẽ tạo một implementation thứ hai phải giữ parity.
+Đây là learner Bot liên tục từ M01–M02 trở đi. Các entrypoint M03–M11 hiện nằm cùng workspace này và mở rộng canonical history/state; learner **mở rộng chính Bot/workspace của mình** thay vì chuyển sang một demo rời. `lab/mission-runtime/` vẫn là oracle/eval để đối chiếu, không phải implementation thứ hai của learner.
 
 ### `lab/mission-runtime/`
 

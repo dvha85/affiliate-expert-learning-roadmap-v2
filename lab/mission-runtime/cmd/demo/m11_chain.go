@@ -122,7 +122,12 @@ func CheckM11Chain(raw []byte) (M11ChainSummary, string) {
 		raw, err := json.Marshal(in)
 		return err == nil && json.Unmarshal(raw, out) == nil
 	}
-	var ci corem08.Intent
+	// DecodeM08Intent deliberately keeps parameters as json.Number so the
+	// canonical intent hash can distinguish integers beyond float64's 2^53
+	// precision boundary. Do not marshal the intent through map[string]any
+	// again here: that conversion would round a valid large integer before the
+	// shared historical validator recomputes the hash.
+	ci := coreIntent(i)
 	var cp corem08.PolicyDecision
 	var cl corem11.ProductionLease
 	var ca corem11.ProductionLeaseApproval
@@ -133,7 +138,7 @@ func CheckM11Chain(raw []byte) (M11ChainSummary, string) {
 	var cauth corem11.ProductionExecutionAuthorization
 	var cexec corem11.ProductionExecutionRecord
 	var cactivation corem11.ProductionActivationRecord
-	if !toCore(i, &ci) || !toCore(p, &cp) || !toCore(*l, &cl) || !toCore(*ap, &ca) || !toCore(*h, &ch) || !toCore(*c, &cc) || !toCore(*pre, &cpre) || !toCore(*post, &cpost) || !toCore(*g, &cg) || !toCore(*a, &cauth) || !toCore(*r, &cexec) || !toCore(*activation, &cactivation) {
+	if !toCore(p, &cp) || !toCore(*l, &cl) || !toCore(*ap, &ca) || !toCore(*h, &ch) || !toCore(*c, &cc) || !toCore(*pre, &cpre) || !toCore(*post, &cpost) || !toCore(*g, &cg) || !toCore(*a, &cauth) || !toCore(*r, &cexec) || !toCore(*activation, &cactivation) {
 		return fail("INVALID_SCHEMA")
 	}
 	chain := corem11.HistoricalChain{Profile: profile, Intent: ci, Policy: cp, Lease: cl, Approval: ca, Health: ch, Cost: cc, PreLedger: cpre, PostLedger: cpost, Gate: cg, Authorization: cauth, Execution: cexec, Activation: cactivation}
