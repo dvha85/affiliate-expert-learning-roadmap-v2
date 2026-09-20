@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/dvha85/affiliate-expert-learning-roadmap-v2/contracts v0.0.0
 	github.com/dvha85/affiliate-expert-learning-roadmap-v2/core v0.0.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
