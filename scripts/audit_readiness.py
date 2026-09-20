@@ -1146,7 +1146,13 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     cache_gate = updates.get("RP-08-n8n-engine-cache-gating")
     if not isinstance(cache_gate, dict) or "full engine coverage remains required" not in cache_gate.get("scope", ""):
         fail("matrix lacks scoped n8n engine cache/gate acceptance")
-    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@caa296126883cff596d87d8935842f9db880ef25" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text or "mission-gate:" not in workflow_text:
+    pinned_cache_refs = {
+        # v5 pin used by the existing baseline.
+        "actions/cache@caa296126883cff596d87d8935842f9db880ef25",
+        # v6.1.0 pin carried by the Dependabot upgrade.
+        "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    }
+    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or not any(ref in workflow_text for ref in pinned_cache_refs) or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text or "mission-gate:" not in workflow_text:
         fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 

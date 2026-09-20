@@ -489,7 +489,7 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_n8n_engine_cache_gate_removal_is_rejected(self):
         workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
-        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@caa296126883cff596d87d8935842f9db880ef25", "removed_n8n_cache", 1), encoding="utf-8")
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@", "removed_n8n_cache@", 1), encoding="utf-8")
         self.assertIn("n8n engine CI cache/gate is missing", self.run_audit(False))
 
     def test_deterministic_shard_removal_is_rejected(self):
