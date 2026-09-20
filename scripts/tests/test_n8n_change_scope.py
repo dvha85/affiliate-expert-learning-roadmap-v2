@@ -28,6 +28,9 @@ class N8nChangeScopeTests(unittest.TestCase):
             "scripts/run_n8n_engine_regression.py",
             "scripts/run_n8n_m06_schedule_regression.py",
             "scripts/validate_n8n_m06_operated_execution.py",
+            "scripts/run_offline_checks.py",
+            "scripts/tests/test_n8n_change_scope.py",
+            "scripts/tests/test_n8n_schedule_regression.py",
         ]
         for path in paths:
             with self.subTest(path=path):

@@ -106,6 +106,7 @@ def audit_product_baseline_git(root, baseline):
         "curriculum/README.md",
         "lab/affiliate-bot/README.md",
         "scripts/audit_readiness.py",
+        "scripts/n8n_change_scope.py",
         "scripts/run_offline_checks.py",
         "scripts/tests/",
         ".github/workflows/",

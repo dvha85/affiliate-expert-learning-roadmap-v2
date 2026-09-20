@@ -25,6 +25,9 @@ _EXACT_PATHS = {
     ".github/workflows/mission-agent-path-ci.yml",
     "lab/affiliate-bot/go.mod",
     "lab/affiliate-bot/go.sum",
+    "scripts/run_offline_checks.py",
+    "scripts/tests/test_n8n_change_scope.py",
+    "scripts/tests/test_n8n_schedule_regression.py",
 }
 _N8N_SCRIPT_PREFIXES = (
     "scripts/n8n_",
