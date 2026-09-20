@@ -91,8 +91,10 @@ Chi tiết: `docs/technology/DEPLOYMENT-ALWAYS-ON.md`.
 
 ## Kế hoạch hoàn thiện repo
 
-- [Kế hoạch chỉnh sửa theo review 05/09/2026](docs/plans/BEGINNER-READINESS-PLAN.md): các đợt triển khai, đầu việc, phụ thuộc, trạng thái và tiêu chí nghiệm thu.
-- [Báo cáo review khả năng tự học](REVIEW-2026-09-05.md): phát hiện, bằng chứng và giới hạn kiểm chứng tại phiên bản được đánh giá.
+- [Kế hoạch chỉnh sửa theo review 05/09/2026](docs/plans/BEGINNER-READINESS-PLAN.md) (baseline snapshot): các đợt triển khai, đầu việc, phụ thuộc, trạng thái và tiêu chí nghiệm thu.
+- [Báo cáo review khả năng tự học](REVIEW-2026-09-05.md) (baseline snapshot): phát hiện, bằng chứng và giới hạn kiểm chứng tại phiên bản được đánh giá.
+- [Review toàn repo 19/09/2026](docs/plans/FULL-REPO-REVIEW-2026-09-19.md): các finding RV-01…RV-11, regression đã triển khai cục bộ và phần còn mở.
+- [Tracker remediation hiện hành](docs/plans/REVIEW-REMEDIATION-PLAN.md): baseline, bằng chứng hậu merge và giới hạn readiness được cập nhật theo từng đợt.
 
 Đây là tiến độ phát triển repo; tiến độ học thực tế vẫn nằm trong `PROGRESS.md`.
 

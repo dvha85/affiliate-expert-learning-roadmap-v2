@@ -31,6 +31,7 @@ from run_n8n_engine_regression import (
     stop_adapter,
 )
 from n8n_cli_preflight import command_prefix, validate_n8n_command
+from n8n_runtime_env import isolated_n8n_environment
 from validate_n8n_m06_operated_execution import validate_success
 
 ADAPTER_TOKEN = "n8n-regression-canonical-adapter-token-20260919"
@@ -122,6 +123,19 @@ def stop_n8n(process: subprocess.Popen[str], log: Path) -> None:
         raise AssertionError(f"disposable n8n server exited {process.returncode}:\n{log.read_text(encoding='utf-8')[-8000:]}")
 
 
+def latest_execution_id(database: Path, workflow_id: str) -> int:
+    """Return the post-shutdown watermark for a workflow's executions."""
+    connection = sqlite3.connect(database, timeout=2)
+    try:
+        row = connection.execute(
+            "SELECT MAX(CAST(id AS INTEGER)) FROM execution_entity WHERE workflowId = ?",
+            (workflow_id,),
+        ).fetchone()
+        return int(row[0] or 0)
+    finally:
+        connection.close()
+
+
 def wait_for_execution(database: Path, workflow_id: str, status: str, server: subprocess.Popen[str], log: Path, *, after_id: int = 0, timeout: float = 35) -> tuple[int, dict]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -155,12 +169,13 @@ def decode_flatted_execution(raw: str) -> dict:
         raise AssertionError("n8n execution data is not a flatted array")
     resolving: set[int] = set()
 
-    def resolve(value: object) -> object:
+    def resolve_ref(value: object) -> object:
+        """Resolve a reference stored in an object/list container."""
+        if isinstance(value, list):
+            return [resolve_ref(item) for item in value]
+        if isinstance(value, dict):
+            return {key: resolve_ref(item) for key, item in value.items()}
         if not isinstance(value, str):
-            if isinstance(value, list):
-                return [resolve(item) for item in value]
-            if isinstance(value, dict):
-                return {key: resolve(item) for key, item in value.items()}
             return value
         try:
             index = int(value)
@@ -168,16 +183,28 @@ def decode_flatted_execution(raw: str) -> dict:
             return value
         if str(index) != value or index < 0 or index >= len(values):
             return value
+        return resolve_table(index)
+
+    def resolve_table(index: int) -> object:
+        """Decode one table slot; primitive strings here are literals."""
         if index in resolving:
             # M06 has no cycles, but preserve a harmless marker if n8n adds one.
             return {"$flatted_ref": index}
         resolving.add(index)
         try:
-            return resolve(values[index])
+            value = values[index]
+            if isinstance(value, list):
+                return [resolve_ref(item) for item in value]
+            if isinstance(value, dict):
+                return {key: resolve_ref(item) for key, item in value.items()}
+            # A string in the table is a literal. Calling resolve_ref on it
+            # would reinterpret a legitimate value such as "1" as another
+            # table reference.
+            return value
         finally:
             resolving.remove(index)
 
-    decoded = resolve(values[0])
+    decoded = resolve_table(0)
     if not isinstance(decoded, dict):
         raise AssertionError("decoded n8n execution data is not an object")
     return decoded
@@ -213,11 +240,18 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
     adapter: Optional[subprocess.Popen[str]] = None
     server: Optional[subprocess.Popen[str]] = None
     try:
+        # Keep the SQLite lookup tied to the same disposable home that the
+        # shared environment builder exposes to n8n.  The previous merge
+        # dropped this local binding while retaining the isolated env setup,
+        # so the hosted Schedule Trigger regression raised NameError before
+        # it could exercise the workflow.
         n8n_home = runtime / "n8n"
-        env = dict(os.environ)
-        env.update({"N8N_USER_FOLDER": str(n8n_home), "N8N_ENCRYPTION_KEY": "n8n-ci-isolated-fixture-key-not-a-secret", "N8N_DIAGNOSTICS_ENABLED": "false", "N8N_PERSONALIZATION_ENABLED": "false", "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false", "N8N_BLOCK_ENV_ACCESS_IN_NODE": "false", "N8N_RUNNERS_BROKER_PORT": str(choose_port()), "GOWORK": "off", "GOCACHE": str(runtime / "go-cache"), "CANONICAL_ADAPTER_TOKEN": ADAPTER_TOKEN})
-        if args.n8n_node:
-            env["PATH"] = str(Path(args.n8n_node).resolve().parent) + os.pathsep + env.get("PATH", "")
+        env = isolated_n8n_environment(
+            runtime,
+            broker_port=choose_port(),
+            node_path=Path(args.n8n_node) if args.n8n_node else None,
+        )
+        env.update({"N8N_BLOCK_ENV_ACCESS_IN_NODE": "false", "CANONICAL_ADAPTER_TOKEN": ADAPTER_TOKEN})
         bot = runtime / "bot"
         run(["go", "build", "-o", str(bot), "./cmd/bot"], env=env, cwd=BOT_DIR)
         history = runtime / "history.jsonl"
@@ -242,11 +276,12 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
             # as a fresh observation after n8n re-registers the schedule.
             stop_n8n(server, log)
             server = None
+            restart_watermark = latest_execution_id(database, workflow_id)
             stop_adapter(adapter)
             adapter = None
             adapter = start_adapter(bot, history, adapter_port, env)
             server, log = start_n8n(prefix, env, choose_port(), runtime)
-            replay_id, replay_execution = wait_for_execution(database, workflow_id, "success", server, log, after_id=duplicate_id)
+            replay_id, replay_execution = wait_for_execution(database, workflow_id, "success", server, log, after_id=restart_watermark)
             if assert_success(replay_id, replay_execution, history, expected_result="EXACT_DUPLICATE") != record_id:
                 raise AssertionError("restarted Schedule Trigger did not resolve the original canonical record")
             replay = run([str(bot), "history", "replay", str(history)], env=env)
