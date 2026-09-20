@@ -106,7 +106,7 @@ jobs:
             exit 0
           fi
           changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
-          if printf '%s\n' "$changed" | grep -Eq '^(lab/n8n/|scripts/run_n8n_(engine|m06_schedule)_regression\.py$|lab/affiliate-bot/|core/|contracts/|\.github/workflows/(mission-agent-path-ci|curriculum-ci)\.yml$)'; then
+          if printf '%s\n' "$changed" | python scripts/n8n_change_scope.py; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "reason=n8n_related_change" >> "$GITHUB_OUTPUT"
           else

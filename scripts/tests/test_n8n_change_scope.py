@@ -10,6 +10,11 @@ from n8n_change_scope import requires_n8n_engine
 
 
 class N8nChangeScopeTests(unittest.TestCase):
+    def test_workflow_uses_shared_scope_helper(self):
+        workflow = (SCRIPTS.parent / ".github" / "workflows" / "mission-agent-path-ci.yml").read_text(encoding="utf-8")
+        self.assertIn("python scripts/n8n_change_scope.py", workflow)
+        self.assertNotIn("grep -Eq", workflow)
+
     def test_direct_integration_dependencies_run_engine(self):
         paths = [
             "lab/n8n/M06-readonly-watcher.blueprint.json",
