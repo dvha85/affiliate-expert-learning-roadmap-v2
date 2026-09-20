@@ -1,8 +1,21 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-20 -->
-<!-- readiness-main-baseline: 1ef3c097eaf6553fe2dacb45166a5adebd78411a -->
+<!-- readiness-as-of: 2026-09-21 -->
+<!-- readiness-main-baseline: 885f2d834ae5e0fe9df42da9be4005945169a519 -->
 <!-- readiness-baseline-kind: product -->
+
+**Post-merge sync after PR #487 (2026-09-21):** PR #487 was squash-merged
+into `main` at `885f2d834ae5e0fe9df42da9be4005945169a519` from implementation
+head `1ad9105d1d529dde9aa840c039cc796382fe7e87`. The exact-head required
+`curriculum-gate` and `mission-gate` passed, including Windows, learner race,
+shards, backup/mutation, n8n and CodeQL paths. `govulncheck-go-modules` still
+returned failure as a non-blocking `continue-on-error` job, matching the
+baseline behavior. The post-merge evidence record is
+`docs/architecture/EVIDENCE-PR487-POST-MERGE-20260921.md`; the audit remains
+`NOT_READY_FOR_PRODUCTION` and records 154 scoped claims and 174
+readiness-audit tests. This rebinds bookkeeping only; provider/live,
+deployment, pilot, business outcome, distributed locking, power-loss and
+production-readiness blockers remain open.
 
 **Cập nhật F-09 offline runner (2026-09-20):** `scripts/run_offline_checks.py`
 đã trở thành entrypoint version-control cho toàn bộ đường kiểm
