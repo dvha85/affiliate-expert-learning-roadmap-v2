@@ -1,5 +1,6 @@
 import sys
 import unittest
+import subprocess
 from pathlib import Path
 
 
@@ -10,6 +11,12 @@ from n8n_change_scope import requires_n8n_engine
 
 
 class N8nChangeScopeTests(unittest.TestCase):
+    def test_cli_emits_unambiguous_decision_with_compatible_exit_code(self):
+        for path, status, decision in (("README.md", 1, "skip"), ("core/m07/m07.go", 0, "run")):
+            with self.subTest(path=path):
+                result = subprocess.run([sys.executable, str(SCRIPTS / "n8n_change_scope.py")], input=path + "\n", text=True, capture_output=True)
+                self.assertEqual(result.returncode, status)
+                self.assertEqual(result.stdout.strip(), decision)
     def test_workflow_uses_shared_scope_helper(self):
         workflow = (SCRIPTS.parent / ".github" / "workflows" / "mission-agent-path-ci.yml").read_text(encoding="utf-8")
         self.assertIn("python scripts/n8n_change_scope.py", workflow)
@@ -31,6 +38,10 @@ class N8nChangeScopeTests(unittest.TestCase):
             "scripts/run_offline_checks.py",
             "scripts/tests/test_n8n_change_scope.py",
             "scripts/tests/test_n8n_schedule_regression.py",
+            "scripts/tests/test_n8n_runtime_env.py",
+            "scripts/tests/test_n8n_cli_preflight.py",
+            "scripts/check_n8n_flatted_parity.py",
+            "scripts/tests/test_ci_gate_contract.py",
         ]
         for path in paths:
             with self.subTest(path=path):

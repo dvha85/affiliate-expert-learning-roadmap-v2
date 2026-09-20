@@ -106,13 +106,22 @@ jobs:
             exit 0
           fi
           changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
-          if printf '%s\n' "$changed" | python scripts/n8n_change_scope.py; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "reason=n8n_related_change" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "reason=no_n8n_related_change" >> "$GITHUB_OUTPUT"
-          fi
+          scope_status=0
+          scope="$(printf '%s\n' "$changed" | python scripts/n8n_change_scope.py)" || scope_status=$?
+          case "$scope_status:$scope" in
+            0:run)
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              echo "reason=n8n_related_change" >> "$GITHUB_OUTPUT"
+              ;;
+            1:skip)
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=no_n8n_related_change" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "n8n scope helper failed (exit $scope_status); refusing to skip coverage" >&2
+              exit 1
+              ;;
+          esac
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         if: steps.n8n-inputs.outputs.run == 'true'
         with:
@@ -143,6 +152,7 @@ jobs:
       - name: Run M06/M07 engine paths and real M06 Schedule Trigger admission
         if: steps.n8n-inputs.outputs.run == 'true'
         run: |
+          python scripts/check_n8n_flatted_parity.py --node-modules "$RUNNER_TEMP/n8n-rp08/node_modules"
           python scripts/run_n8n_engine_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
           python scripts/run_n8n_m06_schedule_regression.py \

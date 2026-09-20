@@ -30,7 +30,10 @@ _FIXTURE_NOW = datetime.now(timezone.utc) - timedelta(seconds=10)
 
 def fixture_time(raw):
     parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    shifted = parsed + (_FIXTURE_NOW - _FIXTURE_ANCHOR)
+    # Shift whole seconds only: the original fraction is appended below.
+    # Including the process-start microseconds can carry into the next second
+    # and put an authorization after its reservation near a second rollover.
+    shifted = parsed + (_FIXTURE_NOW.replace(microsecond=0) - _FIXTURE_ANCHOR)
     if "." in raw.split("T", 1)[1]:
         fraction = raw.split(".", 1)[1].rstrip("Z")
         return shifted.strftime("%Y-%m-%dT%H:%M:%S.") + fraction + "Z"
@@ -477,7 +480,7 @@ def main(argv=None):
             (label, ("mission", "m11-reserve-authorization", production_race_state, authorization_id, production_race_ledger_id, production_race_reserved_at))
             for label, authorization_id in production_race_authorizations.items()
         ))
-        assert sum(response["status"] == "APPENDED" for response in production_race_responses.values()) == 1
+        assert sum(response["status"] == "APPENDED" for response in production_race_responses.values()) == 1, production_race_responses
         assert all(response["status"] in {"APPENDED", "BUSY", "REJECTED"} for response in production_race_responses.values())
         production_race_winner = next(label for label, response in production_race_responses.items() if response["status"] == "APPENDED")
         production_race_winner_authorization = production_race_authorizations[production_race_winner]

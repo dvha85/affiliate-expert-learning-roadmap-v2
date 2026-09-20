@@ -354,6 +354,28 @@ jobs:
       - name: BR-19a readiness audit
         run: python scripts/audit_readiness.py
 
+  offline-review-contract:
+    name: offline-review-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: lab/affiliate-bot/go.mod
+          cache-dependency-path: |
+            contracts/go.sum
+            core/go.sum
+            lab/affiliate-bot/go.sum
+            lab/mission-runtime/go.sum
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Execute the documented offline entrypoint end to end
+        run: python scripts/run_offline_checks.py
+
   curriculum-gate:
     name: curriculum-gate
     if: ${{ always() }}
@@ -368,6 +390,7 @@ jobs:
       - deterministic-smokes-foundations
       - deterministic-smokes-m06-m07
       - deterministic-smokes-backup-mutations
+      - offline-review-contract
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -383,3 +406,4 @@ jobs:
           test "${{ needs.deterministic-smokes-foundations.result }}" = success
           test "${{ needs.deterministic-smokes-m06-m07.result }}" = success
           test "${{ needs.deterministic-smokes-backup-mutations.result }}" = success
+          test "${{ needs.offline-review-contract.result }}" = success

@@ -75,6 +75,9 @@ class ReadinessAuditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        followup = Path("docs/plans/FULL-REPO-REVIEW-FOLLOWUP-20260921.md")
+        (self.root / followup).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / followup, self.root / followup)
         full_plan_source = ROOT / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
         full_plan_target = self.root / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
         full_plan_target.parent.mkdir(parents=True, exist_ok=True)

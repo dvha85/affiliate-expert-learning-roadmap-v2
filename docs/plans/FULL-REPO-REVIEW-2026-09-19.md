@@ -2,6 +2,11 @@
 
 ## 1. Kết luận
 
+**Đối chiếu mới nhất (21/09/2026):** xem [checklist follow-up từng RV và phần còn phải làm](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).
+Baseline `ada7827` có Curriculum CI failure tại BR-16a reservation race; không
+coi PASS lịch sử của PR #489 là PASS của main hiện tại. Follow-up giữ các kết
+quả lịch sử bên dưới, bổ sung nghiệm thu còn thiếu và tách owner/external blockers.
+
 Repo có nền tảng kiểm thử khá đầy đủ và đường chạy offline liên tục đã hoạt động. Trong phiên review này, cả bốn Go module qua test/vet; learner Bot qua race detector; 133 test Python, 14 validator không cần execution artifact, 11 smoke offline, quickstart clone/cache rỗng và HTTPS fixture smoke đều đạt.
 
 Tuy nhiên, đã xác nhận **11 nhóm vấn đề: 2 P1, 8 P2 và 1 P3**. Hai việc cần xử lý trước là:
