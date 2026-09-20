@@ -39,6 +39,15 @@ class ReadinessAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "non-doc drift"):
             audit_product_baseline_git(root, baseline)
 
+    def test_product_baseline_git_allows_dependency_manifest_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        (root / "go.mod").write_text("module fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "go.mod"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "dependency"], check=True, capture_output=True, text=True)
+        audit_product_baseline_git(root, baseline)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
