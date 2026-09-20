@@ -62,7 +62,7 @@ Tuy nhiên vẫn cần chỉnh sửa trước khi mở rộng operated/deploymen
 
 | Kiểm tra | Kết quả |
 |---|---|
-| `python scripts/audit_readiness.py .` | PASS; `NOT_READY_FOR_PRODUCTION`; 150 scoped claims |
+| `python scripts/audit_readiness.py .` | PASS; `NOT_READY_FOR_PRODUCTION`; 151 scoped claims |
 | `python -m unittest discover -s scripts/tests -v` | PASS; 159 tests |
 | Foundation validators | PASS: missions, repo, artifact spine, continuity, language |
 | Semantic/static validators | PASS: agent semantics, semantic contracts, M11, n8n M06/M07 static |
