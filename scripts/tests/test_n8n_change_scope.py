@@ -20,8 +20,6 @@ class N8nChangeScopeTests(unittest.TestCase):
             "lab/n8n/M06-readonly-watcher.blueprint.json",
             "contracts/action-intent.schema.json",
             "core/m07/m07.go",
-            "lab/mission-runtime/go.mod",
-            "lab/mission-runtime/go.sum",
             "lab/affiliate-bot/go.mod",
             "lab/affiliate-bot/cmd/bot/watcher.go",
             "lab/affiliate-bot/internal/store/history.go",
