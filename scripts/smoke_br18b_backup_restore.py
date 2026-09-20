@@ -353,10 +353,15 @@ def main():
         duplicate_execution_outcome = root / "duplicate-execution-outcome.json"
         duplicate_execution_outcome.write_text(json.dumps({"outcome_id":"br18-production-o-duplicate","effect_ref":{"effect_kind":"MACHINE_EXECUTION","effect_id":production_failed["artifact"]["execution"]["execution_id"]},"observed_at":"2026-09-08T00:00:04Z","status":"CANCELLED","metrics":{},"source_ref":"fixture:m11-outcome/duplicate"}), encoding="utf-8")
         assert invoke(bot, "mission", "m11-outcome", runtime, duplicate_execution_outcome, execution_ledger_id, expected=1, env=env)["status"] == "REJECTED"
-        # A second approved intent cannot select the genesis ledger to reopen a
-        # lease already charged by the first intent. The same runtime state is
-        # copied so the main M11 evaluation/cycle chain remains continuous.
-        budget_runtime = root / "budget-runtime"; shutil.copytree(runtime, budget_runtime)
+        # A second approved intent cannot rebind the first runtime after its
+        # grant has been consumed. Build a fresh mission envelope, then copy
+        # only the immutable M11 registry so this drill can still exercise the
+        # shared production-ledger budget boundary without discarding the
+        # original intent's authority or reservation history.
+        budget_runtime = root / "budget-runtime"; budget_runtime.mkdir()
+        shutil.copy2(runtime / "history.jsonl", budget_runtime / "history.jsonl")
+        shutil.copy2(runtime / "m11-artifacts.jsonl", budget_runtime / "m11-artifacts.jsonl")
+        invoke(bot, "mission", "init", budget_runtime, env=env)
         budget_request = root / "budget-intent-request.json"; budget_intent = root / "budget-intent.json"; budget_policy = root / "budget-policy.json"
         budget_request.write_text(json.dumps({"intent_id":"br18-budget-i","decision_id":"br18-d","action_type":"DRAFT","target":"https://example.com/draft","parameters":{},"proposed_by":"human","created_at":"2026-09-07T00:00:00Z","expires_at":"2099-09-03T03:00:00Z","correlation_id":"br18-c","idempotency_key":"br18-budget-k"}), encoding="utf-8")
         assert invoke(bot, "mission", "m08-intent", budget_runtime / "history.jsonl", budget_request, budget_intent, env=env)["status"] == "APPENDED"

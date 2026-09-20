@@ -179,9 +179,26 @@ type m07AdapterRequest struct {
 	ToolResultID    string `json:"tool_result_id,omitempty"`
 }
 
+// readHTTPBodyLimit reads one byte beyond the contract limit so a request is
+// rejected before decoding or any canonical append. Reading exactly the limit
+// would accept a valid JSON prefix and silently discard trailing bytes.
+func readHTTPBodyLimit(r io.Reader, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("invalid request body limit")
+	}
+	raw, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(raw)) > limit {
+		return nil, fmt.Errorf("request body exceeds size limit")
+	}
+	return raw, nil
+}
+
 func decodeM06AdapterRequest(r *http.Request) (m06AdapterRequest, error) {
 	var request m06AdapterRequest
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+	raw, err := readHTTPBodyLimit(r.Body, 64<<10)
 	if err != nil {
 		return request, err
 	}
@@ -365,7 +382,7 @@ func m07PersistenceFailureResponse(err error, artifactID string, artifact any) m
 
 func decodeM07AdapterRequest(r *http.Request) (m07AdapterRequest, error) {
 	var request m07AdapterRequest
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	raw, err := readHTTPBodyLimit(r.Body, 1<<20)
 	if err != nil {
 		return request, err
 	}
@@ -784,7 +801,7 @@ func historyHandoffHTTPHandler(historyPath string) http.HandlerFunc {
 			_, _ = io.WriteString(w, `{"status":"REJECT_METHOD","canonical_history_ack":false}`+"\n")
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		body, err := readHTTPBodyLimit(r.Body, 1<<20)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"status":"INPUT_ERROR","canonical_history_ack":false}`+"\n")

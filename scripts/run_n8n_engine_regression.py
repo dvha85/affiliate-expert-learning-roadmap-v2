@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from n8n_cli_preflight import command_prefix, validate_n8n_command
+from n8n_runtime_env import isolated_n8n_environment
 from validate_n8n_m06_operated_execution import validate_rejection as validate_m06_operated_rejection
 from validate_n8n_m06_operated_execution import validate_success as validate_m06_operated_success
 
@@ -437,21 +438,11 @@ def main() -> None:
     keep = args.keep_runtime
     try:
         n8n_home = runtime / "n8n"
-        env = dict(os.environ)
-        env.update(
-            {
-                "N8N_USER_FOLDER": str(n8n_home),
-                "N8N_ENCRYPTION_KEY": "n8n-ci-isolated-fixture-key-not-a-secret",
-                "N8N_DIAGNOSTICS_ENABLED": "false",
-                "N8N_PERSONALIZATION_ENABLED": "false",
-                "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false",
-                "N8N_RUNNERS_BROKER_PORT": str(choose_port()),
-                "GOWORK": "off",
-                "GOCACHE": str(runtime / "go-cache"),
-            }
+        env = isolated_n8n_environment(
+            runtime,
+            broker_port=choose_port(),
+            node_path=Path(args.n8n_node) if args.n8n_node else None,
         )
-        if args.n8n_node:
-            env["PATH"] = str(Path(args.n8n_node).resolve().parent) + os.pathsep + env.get("PATH", "")
         bot = runtime / "bot"
         run(["go", "build", "-o", str(bot), "./cmd/bot"], env=env, cwd=BOT_DIR)
         history = runtime / "history.jsonl"

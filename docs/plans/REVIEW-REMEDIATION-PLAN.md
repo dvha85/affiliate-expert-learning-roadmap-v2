@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 598bb21801d44d9f2a1bf5ed56fbcb522aa2c0e9 -->
+<!-- readiness-main-baseline: 707ac76aba0c1aac705ec3e52bcbd45e71edfb85 -->
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -48,6 +48,29 @@ hosted Windows, không đóng full ancestor-race parity, distributed locking,
 crash/power-loss, provider, live executor, business outcome, pilot hoặc
 deployment. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
 Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md`.
+
+**Baseline sync after PR #415 (2026-09-18):** PR #415 đã squash-merge vào
+`main` tại `707ac76aba0c1aac705ec3e52bcbd45e71edfb85`. Hậu-merge Curriculum CI
+run `35303587160` hoàn tất 10/10 jobs PASS, gồm `windows-runtime`; Mission
+Agent Path CI run `35303587091` hoàn tất 3/3 jobs PASS. Local learner race,
+bốn Go module test/vet, 133 Python tests, BR-16a, BR-18b và readiness audit
+cũng PASS; audit vẫn trả `NOT_READY_FOR_PRODUCTION`. Đây là sync evidence
+bounded, không đóng arbitrary non-cooperating writers, full ancestor-race
+parity, distributed locking, crash/power-loss, provider, live executor,
+business outcome, pilot hoặc deployment. Marker: `Baseline sync after PR #415`;
+record: `docs/architecture/EVIDENCE-PR415-POST-MERGE-20260918.md`.
+
+**Working-tree remediation after full-repo review (2026-09-19):** trên working
+tree sau baseline PR #415, các gói F-01…F-06 của báo cáo
+`docs/plans/FULL-REPO-REVIEW-2026-09-19.md` đã được triển khai và có regression
+local tương ứng: bind giữ consumption history; n8n runner cô lập SQLite/regular
+execution; M11 exact intent/health-TTL checks và adapter giữ số lớn; HTTP body
+limits fail closed trước mutation; Schedule Trigger dùng watermark sau shutdown
+và decoder flatted giữ numeric strings. F-07 mới ở mức partial local với path
+filter/helper tests và governance documentation; F-09 cũng partial local với
+runbook/capability updates; F-08 và F-10 vẫn mở. Đây là thay đổi chưa
+commit, không phải evidence của main/CI mới và không thay đổi
+`NOT_READY_FOR_PRODUCTION`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
@@ -2971,15 +2994,25 @@ Các lệnh baseline dưới đây là lệnh đã có trong repo; các negative
 for module in contracts core lab/affiliate-bot lab/mission-runtime; do
   (cd "$module" && GOWORK=off go test -count=1 ./... && GOWORK=off go vet ./...) || exit 1
 done
-python3 -m unittest discover -s scripts/tests -v
-for validator in scripts/validate*.py; do
-  python3 "$validator" || exit 1
+python3 -m unittest discover -s scripts/tests -v || exit 1
+
+# Static validators only.  The *_operated_execution.py validators require an
+# execution JSON/history artifact and are called by the corresponding engine
+# runner or operated runbook, so a no-argument glob would stop this offline
+# check with a usage error.
+for name in \
+  validate_repo validate_missions validate_artifact_spine \
+  validate_continuity validate_language_policy validate_agent_semantics \
+  validate_semantic_contracts validate_m11 \
+  validate_n8n_m06 validate_n8n_m06_cases validate_n8n_m06_selected_source \
+  validate_n8n_m07 validate_n8n_m07_adversarial validate_n8n_m07_output_cases; do
+  python3 "scripts/$name.py" || exit 1
 done
-python3 scripts/audit_readiness.py
-python3 scripts/smoke_br12d.py
-python3 scripts/smoke_br13b.py
-python3 scripts/smoke_br16a_offline.py
-python3 scripts/smoke_br18b_backup_restore.py
+python3 scripts/audit_readiness.py || exit 1
+python3 scripts/smoke_br12d.py || exit 1
+python3 scripts/smoke_br13b.py || exit 1
+python3 scripts/smoke_br16a_offline.py || exit 1
+python3 scripts/smoke_br18b_backup_restore.py || exit 1
 git diff --check
 ```
 

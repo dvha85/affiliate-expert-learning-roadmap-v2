@@ -19,6 +19,13 @@ import (
 
 func m11ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m11-artifacts.jsonl") }
 
+func m11HealthAge(maxSeconds int) (time.Duration, bool) {
+	if maxSeconds < 0 || int64(maxSeconds) > int64(^uint64(0)>>1)/int64(time.Second) {
+		return 0, false
+	}
+	return time.Duration(maxSeconds) * time.Second, true
+}
+
 // m11RegistryAppendFault is a test-only seam for deterministic failure drills.
 // Production leaves it nil; it is deliberately not controlled by CLI input or
 // environment variables.
@@ -576,7 +583,11 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	if observedErr != nil || observed.Before(activatedAt) || observed.After(now) || health.LeaseHash != lease.LeaseHash {
 		return decision("DENY", "HEALTH_MISMATCH")
 	}
-	if now.Unix()-observed.Unix() >= int64(lease.MaxHealthSnapshotAgeSeconds) {
+	healthAge, healthAgeOK := m11HealthAge(lease.MaxHealthSnapshotAgeSeconds)
+	if !healthAgeOK {
+		return decision("DENY", "INVALID_HEALTH_AGE_LIMIT")
+	}
+	if now.Sub(observed) >= healthAge {
 		return decision("DEGRADE", "HEALTH_STALE")
 	}
 	if health.ComplianceAlertCount > 0 {
@@ -643,14 +654,16 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	gateAt, gateErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
 	healthAt, healthErr := time.Parse(time.RFC3339, health.ObservedAt)
 	activatedAt, activationErr := time.Parse(time.RFC3339, activation.ActivatedAt)
-	if gateErr != nil || healthErr != nil || activationErr != nil || activation.LeaseHash != lease.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) || gateAt.After(now) || healthAt.After(now) || now.Sub(healthAt) >= time.Duration(lease.MaxHealthSnapshotAgeSeconds)*time.Second {
+	healthAge, healthAgeOK := m11HealthAge(lease.MaxHealthSnapshotAgeSeconds)
+	if gateErr != nil || healthErr != nil || activationErr != nil || !healthAgeOK || activation.LeaseHash != lease.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) || gateAt.After(now) || healthAt.After(now) || now.Sub(healthAt) >= healthAge {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate health is stale or temporally invalid")
 	}
 	currentLedgerEntry, currentLedger, headErr := m11LedgerHead(dir, lease.LeaseID)
 	if headErr != nil || gate.LedgerArtifactID != currentLedgerEntry.ArtifactID || gate.LedgerContentHash != currentLedgerEntry.ContentHash || gate.GateID != corem11.ComputeProductionGateID(*lease, state.Intent.IntentID, state.Intent.IntentHash, *health, cost, currentLedgerEntry, gate.EvaluatedAt) || currentLedger.ExecutionsTotal != gate.ExecutionsTotalBefore || currentLedger.ExecutionsInWindow != gate.ExecutionsInWindowBefore || currentLedger.CostMinorTotal != gate.CostMinorTotalBefore || currentLedger.PendingOutcomes != gate.PendingOutcomesBefore {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate is stale against the current ledger")
 	}
-	limits := []string{lease.ExpiresAt, state.Intent.ExpiresAt, state.Approval.ExpiresAt, cost.ExpiresAt}
+	healthExpiresAt := healthAt.Add(healthAge).Format(time.RFC3339Nano)
+	limits := []string{lease.ExpiresAt, state.Intent.ExpiresAt, state.Approval.ExpiresAt, cost.ExpiresAt, healthExpiresAt}
 	expires := time.Time{}
 	for _, raw := range limits {
 		parsed, parseErr := time.Parse(time.RFC3339, raw)

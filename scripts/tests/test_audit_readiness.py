@@ -97,6 +97,9 @@ class ReadinessAuditTests(unittest.TestCase):
         evidence_current_baseline = self.root / "docs/architecture/EVIDENCE-PR413-POST-MERGE-20260918.md"
         evidence_current_baseline.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR413-POST-MERGE-20260918.md", evidence_current_baseline)
+        evidence_post_415 = self.root / "docs/architecture/EVIDENCE-PR415-POST-MERGE-20260918.md"
+        evidence_post_415.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR415-POST-MERGE-20260918.md", evidence_post_415)
         matrix = json.loads((ROOT / "docs/plans/READINESS-MATRIX.json").read_text(encoding="utf-8"))
         for item in matrix["criteria"]:
             for field in ("implementation_refs", "test_refs"):

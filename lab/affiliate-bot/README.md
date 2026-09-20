@@ -98,12 +98,13 @@ Các guard freshness có trạng thái `ABSTAIN_STALE` và `ABSTAIN_FUTURE`; yê
 
 ## M06–M11 learner entrypoints
 
-Trạng thái sau review `ece6a32`: **PARTIAL**. Các lệnh dưới đây đã tồn tại nhưng
-chưa nghiệm thu tích hợp: còn lỗi grounding/ID, budget/expiry/concurrency,
-output-path safety và backup/restore. Chưa dùng các guard này cho live executor.
-Xem [kế hoạch sửa R01–R16](../../docs/plans/REVIEW-REMEDIATION-PLAN.md) và
-[baseline review](../../docs/plans/evidence/REVIEW-ECE6A32.md); việc lưu kế hoạch
-không có nghĩa các lỗi đã được sửa.
+Trạng thái hiện hành tại baseline `707ac76`: **PARTIAL / offline only**. Các
+entrypoint M06–M11 đã chạy trong cùng learner Bot và có regression cho identity,
+budget, recovery, HTTP boundary, registry graph và durable STOP. Chúng vẫn chưa
+là live executor hoặc production readiness: selected source/provider, business
+outcome, crash/power-loss, multi-host, deployment và beginner pilot còn mở.
+Xem [review toàn repo 19/09/2026](../../docs/plans/FULL-REPO-REVIEW-2026-09-19.md)
+và [tracker remediation hiện hành](../../docs/plans/REVIEW-REMEDIATION-PLAN.md).
 
 Watcher fixture và watcher n8n dùng chung canonical adapter. Chạy adapter local
 trước khi import blueprint M06:

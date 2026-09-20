@@ -2309,6 +2309,178 @@ func TestMissionIntentGrantAndCostRebindRejectWithoutMutation(t *testing.T) {
 	assertMissionRuntimeUnchanged(t, before, runtimeDir)
 }
 
+func TestMissionBindRejectsPolicyReplacementAfterAuthority(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Policy == nil || state.Approval == nil {
+		t.Fatalf("load authority fixture: state=%+v err=%v", state, err)
+	}
+	policy := *state.Policy
+	policy.PolicyVersion = "replacement-policy"
+	policyPath := filepath.Join(filepath.Dir(runtimeDir), "replacement-policy.json")
+	writeMissionTestJSON(t, policyPath, policy)
+	intentPath := filepath.Join(filepath.Dir(runtimeDir), "current-intent.json")
+	writeMissionTestJSON(t, intentPath, *state.Intent)
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("policy replacement discarded authority lineage: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionIntentRebindRejectsWhenAuthorityHistoryExists(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Canary == nil {
+		t.Fatalf("load authority fixture: state=%+v err=%v", state, err)
+	}
+	changed := *state.Intent
+	changed.IntentID = "different-intent"
+	changed.IdempotencyKey = "different-key"
+	changed.IntentHash = learnerIntentHash(changed)
+	intentPath := filepath.Join(filepath.Dir(runtimeDir), "different-intent.json")
+	policyPath := filepath.Join(filepath.Dir(runtimeDir), "different-policy.json")
+	writeMissionTestJSON(t, intentPath, changed)
+	writeMissionTestJSON(t, policyPath, LearnerPolicy{PolicyVersion: state.Policy.PolicyVersion, IntentID: changed.IntentID, IntentHash: changed.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: "2026-09-08T00:00:00Z"})
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("rebind discarded authority history: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionIntentRebindRejectsImmutableM10HistoryWithoutMutablePointers(t *testing.T) {
+	runtimeDir, _, _, _ := authorityFixtureAt(t, time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), "none", true, 1)
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Policy == nil {
+		t.Fatalf("load authority fixture: state=%+v err=%v", state, err)
+	}
+	// Simulate a partial state restore: immutable M10 artifacts remain, while
+	// the mutable envelope no longer has pointers that would reveal them.
+	state.Approval = nil
+	state.Canary = nil
+	state.Lease = nil
+	state.Reservations = nil
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+	changed := *state.Intent
+	changed.IntentID = "registry-history-rebind"
+	changed.IdempotencyKey = "registry-history-key"
+	changed.IntentHash = learnerIntentHash(changed)
+	root := filepath.Dir(runtimeDir)
+	intentPath := filepath.Join(root, "registry-history-intent.json")
+	policyPath := filepath.Join(root, "registry-history-policy.json")
+	writeMissionTestJSON(t, intentPath, changed)
+	writeMissionTestJSON(t, policyPath, LearnerPolicy{PolicyVersion: state.Policy.PolicyVersion, IntentID: changed.IntentID, IntentHash: changed.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: "2026-09-08T00:00:00Z"})
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("rebind ignored immutable M10 registry history: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionBindRejectsPolicyReplacementAfterPartialRestore(t *testing.T) {
+	runtimeDir, _, _, _ := authorityFixtureAt(t, time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), "none", true, 1)
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Intent == nil || state.Policy == nil {
+		t.Fatalf("load authority fixture: state=%+v err=%v", state, err)
+	}
+	// A restore can lose the mutable policy pointer while retaining the
+	// immutable registry. Installing a replacement here would orphan the old
+	// grant lineage and permit a fresh policy to start from empty counters.
+	state.Policy = nil
+	state.Approval = nil
+	state.Canary = nil
+	state.Lease = nil
+	state.Reservations = nil
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+	policy := LearnerPolicy{PolicyVersion: "replacement-after-restore", IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: "2026-09-08T00:00:00Z"}
+	root := filepath.Dir(runtimeDir)
+	intentPath := filepath.Join(root, "partial-restore-intent.json")
+	policyPath := filepath.Join(root, "partial-restore-policy.json")
+	writeMissionTestJSON(t, intentPath, *state.Intent)
+	writeMissionTestJSON(t, policyPath, policy)
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("policy replacement bypassed immutable M10 history: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionIntentRebindAfterConsumptionHistoryFailsClosed(t *testing.T) {
+	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	for _, recordFailure := range []bool{false, true} {
+		name := "pending-reservation"
+		if recordFailure {
+			name = "failed-execution"
+		}
+		t.Run(name, func(t *testing.T) {
+			runtimeDir, boundPath, gatePath, _ := authorityFixtureAt(t, base, "none", true, 1)
+			root := filepath.Dir(runtimeDir)
+			authorizationPath := filepath.Join(root, "rebind-authorization.json")
+			if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, gatePath, authorizationPath, base.Format(time.RFC3339), "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+				t.Fatalf("authorization setup failed: code=%d response=%+v", code, response)
+			}
+			if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, authorizationPath, "rebind-reservation"); code != 0 || response["status"] != "RESERVED" {
+				t.Fatalf("reservation setup failed: code=%d response=%+v", code, response)
+			}
+			if recordFailure {
+				recordPath := filepath.Join(root, "rebind-failed-execution.json")
+				if code, response := missionCall(t, "m10-record-failed", runtimeDir, authorizationPath, recordPath, base.Format(time.RFC3339), "fixture failed before dispatch"); code != 0 || response["status"] != "APPENDED" {
+					t.Fatalf("failed execution setup failed: code=%d response=%+v", code, response)
+				}
+				var record corem10.ExecutionRecord
+				if err := readJSON(recordPath, &record); err != nil {
+					t.Fatal(err)
+				}
+				outcomePath := filepath.Join(root, "rebind-failed-outcome.json")
+				writeMissionTestJSON(t, outcomePath, m03.OutcomeRecord{
+					OutcomeID:  "rebind-failed-outcome",
+					EffectRef:  m03.EffectRef{EffectKind: "MACHINE_EXECUTION", EffectID: record.ExecutionID},
+					ObservedAt: base.Format(time.RFC3339),
+					Status:     "CANCELLED",
+					Metrics:    map[string]float64{},
+					SourceRef:  "fixture:m10-outcome/rebind",
+				})
+				if code, response := missionCall(t, "m10-outcome", runtimeDir, outcomePath); code != 0 || response["status"] != "APPENDED" {
+					t.Fatalf("failed execution outcome setup failed: code=%d response=%+v", code, response)
+				}
+			}
+
+			state, err := loadMissionState(runtimeDir)
+			if err != nil || state.Intent == nil || state.Policy == nil || state.Canary == nil || len(state.Reservations) != 1 {
+				t.Fatalf("load consumed runtime: state=%+v err=%v", state, err)
+			}
+			before := missionRuntimeSnapshot(t, runtimeDir)
+			changed := *state.Intent
+			changed.IntentID = "rebind-intent"
+			changed.IdempotencyKey = "rebind-key"
+			changed.IntentHash = learnerIntentHash(changed)
+			intentPath := filepath.Join(root, "rebind-intent.json")
+			policyPath := filepath.Join(root, "rebind-policy.json")
+			writeMissionTestJSON(t, intentPath, changed)
+			writeMissionTestJSON(t, policyPath, LearnerPolicy{PolicyVersion: state.Policy.PolicyVersion, IntentID: changed.IntentID, IntentHash: changed.IntentHash, Decision: "ALLOW", RiskClass: "RISK0", PolicyCheckedAt: base.Format(time.RFC3339)})
+			if code, response := missionCall(t, "bind", runtimeDir, intentPath, policyPath); code == 0 || response["status"] != "REJECTED" {
+				t.Fatalf("rebind discarded consumption history: code=%d response=%+v", code, response)
+			}
+			assertMissionRuntimeUnchanged(t, before, runtimeDir)
+			after, err := loadMissionState(runtimeDir)
+			if err != nil || after.Canary.ExecutionsUsed != 1 || len(after.Reservations) != 1 {
+				t.Fatalf("rebind changed consumed budget: state=%+v err=%v", after, err)
+			}
+			if recordFailure && after.Reservations[0].ExecutionID == "" {
+				t.Fatal("failed execution lost its reservation binding")
+			}
+			if err := validateM10BackupGraph(runtimeDir); err != nil {
+				t.Fatalf("consumption history became an invalid backup graph: %v", err)
+			}
+		})
+	}
+}
+
 func TestM11LeaseSourceGrantMustResolveActiveM10Grant(t *testing.T) {
 	runtimeDir, _, _, _ := authorityExpiryFixture(t, "cost")
 	state, err := loadMissionState(runtimeDir)

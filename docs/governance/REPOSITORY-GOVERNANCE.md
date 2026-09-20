@@ -25,8 +25,17 @@ Khuyến nghị bật required checks trên `main`:
 |---|---|
 | `curriculum-ci.yml` — Curriculum CI | `structure-language-and-foundations` |
 | `curriculum-ci.yml` — Curriculum CI | `deterministic-runtime` |
+| `curriculum-ci.yml` — Curriculum CI | `windows-runtime` |
+| `curriculum-ci.yml` — Curriculum CI | `learner-bot-tests-shard-0` |
+| `curriculum-ci.yml` — Curriculum CI | `learner-bot-tests-shard-1` |
+| `curriculum-ci.yml` — Curriculum CI | `learner-bot-race` |
+| `curriculum-ci.yml` — Curriculum CI | `deterministic-quickstart` |
+| `curriculum-ci.yml` — Curriculum CI | `deterministic-smokes-foundations` |
+| `curriculum-ci.yml` — Curriculum CI | `deterministic-smokes-m06-m07` |
+| `curriculum-ci.yml` — Curriculum CI | `deterministic-smokes-backup-mutations` |
 | `mission-agent-path-ci.yml` — Mission Agent Path CI | `mission-semantics-and-blueprints` |
 | `mission-agent-path-ci.yml` — Mission Agent Path CI | `mission-runtime` |
+| `mission-agent-path-ci.yml` — Mission Agent Path CI | `n8n-engine-regression` |
 
 Tên check là tên job, không phải tên step; regression tests Python thuộc job `structure-language-and-foundations`. Khi cấu hình, chọn đúng check do GitHub Actions phát hành trên commit hiện hành. Không dùng các tên cũ `curriculum`, `evidence-and-safety`, `python-regression` hoặc tự thêm tiền tố workflow vào tên check.
 
