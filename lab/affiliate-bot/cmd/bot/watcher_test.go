@@ -119,6 +119,74 @@ func TestM06HTTPAdapterBuildsAndResolvesCanonicalHistory(t *testing.T) {
 	}
 }
 
+func TestHTTPAdaptersRejectOversizedBodiesBeforeCanonicalMutation(t *testing.T) {
+	overLimit := func(raw []byte, limit int) []byte {
+		t.Helper()
+		if len(raw) > limit {
+			t.Fatalf("fixture already exceeds limit: %d > %d", len(raw), limit)
+		}
+		return append(raw, bytes.Repeat([]byte{' '}, limit-len(raw)+1)...)
+	}
+
+	t.Run("M06", func(t *testing.T) {
+		dir := t.TempDir()
+		history := filepath.Join(dir, "history.jsonl")
+		raw, err := json.Marshal(m06AdapterRequest{Fixture: mustRawJSON(t, watchFixture())})
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		m06AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m06/fixture-import", bytes.NewReader(overLimit(raw, 64<<10))))
+		if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+			t.Fatalf("oversized M06 body was accepted: code=%d body=%s", response.Code, response.Body.String())
+		}
+		if _, err := os.Stat(history); !os.IsNotExist(err) {
+			t.Fatalf("oversized M06 body mutated history: %v", err)
+		}
+	})
+
+	t.Run("M07", func(t *testing.T) {
+		dir := t.TempDir()
+		history := filepath.Join(dir, "history.jsonl")
+		raw, err := json.Marshal(m07AdapterRequest{RecordID: "record", Registry: []corem07.ToolSpec{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		m07AdapterHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/m07/context", bytes.NewReader(overLimit(raw, 1<<20))))
+		if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+			t.Fatalf("oversized M07 body was accepted: code=%d body=%s", response.Code, response.Body.String())
+		}
+		if _, err := os.Stat(history); !os.IsNotExist(err) {
+			t.Fatalf("oversized M07 body mutated history: %v", err)
+		}
+		if _, err := os.Stat(history + ".m07"); !os.IsNotExist(err) {
+			t.Fatalf("oversized M07 body created sidecar state: %v", err)
+		}
+	})
+
+	t.Run("history handoff", func(t *testing.T) {
+		dir := t.TempDir()
+		history := filepath.Join(dir, "history.jsonl")
+		record, err := watcherRecord(mustRawJSON(t, watchFixture()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		historyHandoffHTTPHandler(history).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/history/append", bytes.NewReader(overLimit(raw, 1<<20))))
+		if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), `"status":"INPUT_TOO_LARGE"`) {
+			t.Fatalf("oversized history body was accepted: code=%d body=%s", response.Code, response.Body.String())
+		}
+		if _, err := os.Stat(history); !os.IsNotExist(err) {
+			t.Fatalf("oversized history body mutated canonical history: %v", err)
+		}
+	})
+}
+
 func TestHistoryHandoffRejectsDuplicateRawKeyBeforePersistence(t *testing.T) {
 	dir := t.TempDir()
 	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "record.json")

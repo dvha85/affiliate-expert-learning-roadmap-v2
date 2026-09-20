@@ -12,11 +12,16 @@ Dependabot, CODEOWNERS, editor attributes, and contributor/security guidance are
 also checked in.
 
 Local verification: the readiness audit remains
-`NOT_READY_FOR_PRODUCTION`, 151 scoped claims; all 159 Python tests pass, JSON
+`NOT_READY_FOR_PRODUCTION`, 153 scoped claims; all 167 Python tests pass, JSON
 parsing, Python compile, static n8n validators and `git diff --check` pass. Go
 and real n8n execution were not run because those executables are unavailable on
-the host; hosted Go/Windows/n8n verification remains required.
+the host. Hosted PR #475 checks passed Curriculum, Mission (including Go,
+Windows and n8n jobs), Security and CodeQL; provider/live and production
+verification remain required.
 
 This evidence does not establish branch protection, provider/live execution,
 deployment recovery, beginner pilot acceptance, business outcomes, distributed
 locking, power-loss durability, or production readiness.
+
+
+The current graph count also includes the F-08 M11 process-clock authority evidence recorded at `docs/architecture/EVIDENCE-F08-M11-PROCESS-CLOCK-20260920.md`; this remains bounded offline/fixture/read-only evidence.

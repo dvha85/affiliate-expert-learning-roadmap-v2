@@ -215,7 +215,8 @@ func ValidateHistoricalChain(c HistoricalChain) string {
 	}
 	if c.Intent.IntentID != c.Policy.IntentID || c.Intent.IntentHash != c.Policy.IntentHash ||
 		c.Intent.IntentID != c.Gate.IntentID || c.Intent.IntentHash != c.Gate.IntentHash ||
-		c.Intent.IntentID != c.Authorization.IntentID ||
+		c.Intent.IntentID != c.Authorization.IntentID || c.Intent.IntentHash != c.Authorization.IntentHash ||
+		c.Intent.IntentID != c.Cost.IntentID || c.Intent.IntentHash != c.Cost.IntentHash ||
 		c.Intent.CorrelationID != c.Lease.CorrelationID || c.Intent.CorrelationID != c.Cost.CorrelationID || c.Intent.CorrelationID != c.Authorization.CorrelationID || c.Intent.CorrelationID != c.Execution.CorrelationID ||
 		c.Intent.IdempotencyKey != c.Authorization.IdempotencyKey || c.Intent.IdempotencyKey != c.Execution.IdempotencyKey ||
 		c.Intent.IntentID != c.Execution.IntentID || c.Intent.IntentHash != c.Execution.IntentHash {
@@ -285,6 +286,10 @@ func ValidateHistoricalChain(c HistoricalChain) string {
 	if !intentEndOK || !createdOK || !policyOK || !approvalOK || !leaseReviewedOK || !costObservedOK || !costEndOK || !healthObservedOK || !authorizedOK || !authEndOK || !attemptedOK || !activatedOK || !windowOK || !preUpdatedOK || !postUpdatedOK {
 		return "INVALID_TIME_BINDING"
 	}
+	healthExpiry, healthExpiryOK := historicalHealthExpiry(healthObserved, c.Lease.MaxHealthSnapshotAgeSeconds)
+	if !healthExpiryOK {
+		return "INVALID_TIME_BINDING"
+	}
 	if !approvalAt.Equal(leaseReviewedAt) || now.Before(start) || !now.Before(leaseEnd) || !now.Before(intentEnd) || !intentEnd.After(created) || policyChecked.Before(created) || policyChecked.After(now) ||
 		costObserved.After(now) || !now.Before(costEnd) || healthObserved.After(now) || !authorizedAt.Equal(now) || authEnd.After(leaseEnd) || authEnd.After(intentEnd) || authEnd.After(costEnd) ||
 		attemptedAt.Before(now) || !attemptedAt.Before(authEnd) || activatedAt.Before(start) || activatedAt.After(now) || windowStarted.Before(start) || preUpdated.After(now) || windowStarted.After(now) || postUpdated.Before(attemptedAt) {
@@ -292,6 +297,9 @@ func ValidateHistoricalChain(c HistoricalChain) string {
 	}
 	if now.Unix()-healthObserved.Unix() > int64(c.Lease.MaxHealthSnapshotAgeSeconds) || now.Unix()-healthObserved.Unix() == int64(c.Lease.MaxHealthSnapshotAgeSeconds) && now.Nanosecond() > healthObserved.Nanosecond() {
 		return "STALE_HEALTH"
+	}
+	if authEnd.After(healthExpiry) {
+		return "INVALID_TIME_BINDING"
 	}
 	elapsed := now.Unix() - windowStarted.Unix()
 	if now.Nanosecond() < windowStarted.Nanosecond() {
@@ -382,6 +390,13 @@ func ValidateHistoricalChain(c HistoricalChain) string {
 func historicalTimeEqual(value string, expected time.Time) bool {
 	parsed, ok := historicalTime(value)
 	return ok && parsed.Equal(expected)
+}
+
+func historicalHealthExpiry(observed time.Time, maxAgeSeconds int) (time.Time, bool) {
+	if maxAgeSeconds < 0 || int64(maxAgeSeconds) > int64(^uint64(0)>>1)/int64(time.Second) {
+		return time.Time{}, false
+	}
+	return observed.Add(time.Duration(maxAgeSeconds) * time.Second), true
 }
 
 func historicalTimesEqual(left, right string) bool {
