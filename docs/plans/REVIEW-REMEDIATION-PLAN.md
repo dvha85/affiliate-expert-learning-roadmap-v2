@@ -68,8 +68,9 @@ execution; M11 exact intent/health-TTL checks và adapter giữ số lớn; HTTP
 limits fail closed trước mutation; Schedule Trigger dùng watermark sau shutdown
 và decoder flatted giữ numeric strings. F-07 mới ở mức partial local với path
 filter/helper tests và governance documentation; F-09 cũng partial local với
-runbook/capability updates; F-08 và F-10 vẫn mở. Đây là thay đổi chưa
-commit, không phải evidence của main/CI mới và không thay đổi
+runbook/capability updates; F-08 và F-10 vẫn mở. Các thay đổi này đã được
+commit trên nhánh remediation tại `0fef251`, nhưng chưa merge vào `main` và
+chưa có CI/evidence hậu merge mới; chúng không thay đổi
 `NOT_READY_FOR_PRODUCTION`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
