@@ -240,6 +240,12 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
     adapter: Optional[subprocess.Popen[str]] = None
     server: Optional[subprocess.Popen[str]] = None
     try:
+        # Keep the SQLite lookup tied to the same disposable home that the
+        # shared environment builder exposes to n8n.  The previous merge
+        # dropped this local binding while retaining the isolated env setup,
+        # so the hosted Schedule Trigger regression raised NameError before
+        # it could exercise the workflow.
+        n8n_home = runtime / "n8n"
         env = isolated_n8n_environment(
             runtime,
             broker_port=choose_port(),

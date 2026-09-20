@@ -2689,6 +2689,37 @@ func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
 	assertRejectedAfterRestore("execution-expiry", preExecutionBackup, func(restoredDir string) []string {
 		return []string{"mission", "m11-record-failed", restoredDir, authorizationID, reservationLedgerID, expiresAt.Format(time.RFC3339), "expired fixture execution"}
 	})
+
+	// The provenance timestamp is intentionally backdated into the original
+	// lease window while the fresh process clock is already past expiry. These
+	// calls must fail before any registry/state mutation; accepting the old
+	// timestamp would let a caller reopen expired authority by simulation time.
+	assertBackdatedAfterRestore := func(name string, backupDir string, commandArgs func(string) []string) {
+		t.Helper()
+		restoredDir := filepath.Join(root, name+"-restored")
+		if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+			t.Fatalf("%s restore failed: code=%d response=%+v", name, code, response)
+		}
+		before := missionRuntimeSnapshot(t, restoredDir)
+		code, response := missionExpirySubprocessCall(t, expiresAt.Add(time.Second), commandArgs(restoredDir)...)
+		if code == 0 || response["status"] == "AUTHORIZED" || response["status"] == "APPENDED" || response["status"] == "ALLOW_PRODUCTION" {
+			t.Fatalf("%s accepted a backdated authority timestamp after process expiry: code=%d response=%+v", name, code, response)
+		}
+		assertMissionRuntimeUnchanged(t, before, restoredDir)
+	}
+
+	assertBackdatedAfterRestore("gate-backdated", preGateBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-gate", restoredDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, gateAt}
+	})
+	assertBackdatedAfterRestore("authorization-backdated", preAuthorizeBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-authorize", restoredDir, lease.LeaseID, gateID, "fixture_stub", authorizationAt}
+	})
+	assertBackdatedAfterRestore("reservation-backdated", preReserveBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-reserve-authorization", restoredDir, authorizationID, ledgerID, reservationAt}
+	})
+	assertBackdatedAfterRestore("execution-backdated", preExecutionBackup, func(restoredDir string) []string {
+		return []string{"mission", "m11-record-failed", restoredDir, authorizationID, reservationLedgerID, base.Add(40 * time.Second).Format(time.RFC3339), "backdated fixture execution"}
+	})
 }
 
 func TestTrustedCostBoundRegistryResolvesOnlyCanonicalEntry(t *testing.T) {
