@@ -19,7 +19,9 @@ _FIXTURE_NOW = datetime.now(timezone.utc) - timedelta(seconds=10)
 
 def fixture_time(raw):
     parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    shifted = parsed + (_FIXTURE_NOW - _FIXTURE_ANCHOR)
+    # Preserve fixture fractions without adding process-start microseconds a
+    # second time (which could reorder authority and reservation timestamps).
+    shifted = parsed + (_FIXTURE_NOW.replace(microsecond=0) - _FIXTURE_ANCHOR)
     if "." in raw.split("T", 1)[1]:
         fraction = raw.split(".", 1)[1].rstrip("Z")
         return shifted.strftime("%Y-%m-%dT%H:%M:%S.") + fraction + "Z"

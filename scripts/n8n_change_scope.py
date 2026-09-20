@@ -26,6 +26,10 @@ _EXACT_PATHS = {
     "lab/affiliate-bot/go.mod",
     "lab/affiliate-bot/go.sum",
     "scripts/run_offline_checks.py",
+    "scripts/check_n8n_flatted_parity.py",
+    "scripts/tests/test_n8n_runtime_env.py",
+    "scripts/tests/test_n8n_cli_preflight.py",
+    "scripts/tests/test_ci_gate_contract.py",
     "scripts/tests/test_n8n_change_scope.py",
     "scripts/tests/test_n8n_schedule_regression.py",
 }
@@ -53,7 +57,11 @@ def requires_n8n_engine(paths: Iterable[str]) -> bool:
 
 
 def main() -> int:
-    return 0 if requires_n8n_engine(sys.stdin) else 1
+    required = requires_n8n_engine(sys.stdin)
+    # Pair the exit code with an explicit decision. A Python exception also
+    # exits 1 and must never be mistaken for an intentional docs-only skip.
+    print("run" if required else "skip")
+    return 0 if required else 1
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func m11Bundle(t *testing.T, profile string) map[string]any {
@@ -173,6 +174,36 @@ func TestM11ChainMutations(t *testing.T) {
 
 func TestM11HistoricalChainBindsCostAndAuthorizationIntentHashes(t *testing.T) {
 	for _, profile := range []string{"closed_cycle", "resolved_stop"} {
+		for _, field := range []string{"intent_id", "intent_hash"} {
+			t.Run(profile+"/cost-"+field, func(t *testing.T) {
+				b := m11Bundle(t, profile)
+				cost := b["cost"].(CanaryCostBound)
+				if field == "intent_id" {
+					cost.IntentID = "foreign-intent"
+				} else {
+					cost.IntentHash = "sha256:" + strings.Repeat("a", 64)
+				}
+				cost = SealCanaryCostBound(cost)
+				b["cost"] = cost
+				mutateBundle(t, b, "gate", "cost_bound_hash", cost.CostBoundHash)
+				mutateBundle(t, b, "authorization", "production_cost_bound_hash", cost.CostBoundHash)
+				mutateBundle(t, b, "execution", "production_cost_bound_hash", cost.CostBoundHash)
+				if _, status := auditBundle(t, b); status != "BROKEN_LINK" {
+					t.Fatalf("cost %s mismatch: got %s", field, status)
+				}
+			})
+			t.Run(profile+"/authorization-"+field, func(t *testing.T) {
+				b := m11Bundle(t, profile)
+				value := "foreign-intent"
+				if field == "intent_hash" {
+					value = "sha256:" + strings.Repeat("b", 64)
+				}
+				mutateBundle(t, b, "authorization", field, value)
+				if _, status := auditBundle(t, b); status != "BROKEN_LINK" {
+					t.Fatalf("authorization %s mismatch: got %s", field, status)
+				}
+			})
+		}
 		t.Run(profile+"/foreign-cost-intent", func(t *testing.T) {
 			b := m11Bundle(t, profile)
 			cost := b["cost"].(CanaryCostBound)
@@ -212,7 +243,26 @@ func TestM11ChainPreservesLargeIntentNumbersAcrossAdapter(t *testing.T) {
 	b := m11Bundle(t, "closed_cycle")
 	intent := b["intent"].(ShadowActionIntent)
 	intent.Parameters["large_integer"] = json.Number("9007199254740993")
+	intent.Parameters["decimal"] = json.Number("1.0000000000000001")
+	intent.Parameters["nested"] = []any{json.Number("1e20"), map[string]any{"tiny": json.Number("1e-1000")}}
 	intent = SealShadowActionIntent(intent)
+	before, err := json.Marshal(intent.Parameters)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, decodeStatus := DecodeM08Intent(raw)
+	if decodeStatus != missionValid {
+		t.Fatal(decodeStatus)
+	}
+	projected := coreIntent(decoded)
+	after, err := json.Marshal(projected.Parameters)
+	if err != nil || !bytes.Equal(before, after) || projected.IntentHash != intent.IntentHash {
+		t.Fatalf("decode/adapter changed exact numbers: before=%s after=%s err=%v", before, after, err)
+	}
 	b["intent"] = intent
 	for _, artifact := range []string{"policy", "gate", "authorization", "execution", "cycle"} {
 		mutateBundle(t, b, artifact, "intent_hash", intent.IntentHash)
@@ -226,6 +276,47 @@ func TestM11ChainPreservesLargeIntentNumbersAcrossAdapter(t *testing.T) {
 	mutateBundle(t, b, "execution", "production_cost_bound_hash", cost.CostBoundHash)
 	if _, status := auditBundle(t, b); status != missionValid {
 		t.Fatalf("exact large integer intent was changed by the adapter: %s", status)
+	}
+}
+
+func TestM11HistoricalHealthExpiryNanosecondBoundaries(t *testing.T) {
+	for _, profile := range []string{"closed_cycle", "resolved_stop"} {
+		for _, tc := range []struct {
+			name                        string
+			expiryDelta, executionDelta time.Duration
+			want                        string
+		}{
+			{"exact-expiry", 0, -time.Second, missionValid},
+			{"expiry-plus-nanosecond", time.Nanosecond, -time.Second, "INVALID_TIME_BINDING"},
+			{"execution-at-expiry", 0, 0, "INVALID_TIME_BINDING"},
+			{"execution-after-health", time.Second, time.Nanosecond, "INVALID_TIME_BINDING"},
+		} {
+			t.Run(profile+"/"+tc.name, func(t *testing.T) {
+				b := m11Bundle(t, profile)
+				health := b["health"].(ProductionHealthSnapshot)
+				lease := b["lease"].(ProductionLease)
+				observed, err := time.Parse(time.RFC3339Nano, health.ObservedAt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expires := observed.Add(time.Duration(lease.MaxHealthSnapshotAgeSeconds) * time.Second)
+				attempted := expires.Add(tc.executionDelta).Format(time.RFC3339Nano)
+				mutateBundle(t, b, "authorization", "expires_at", expires.Add(tc.expiryDelta).Format(time.RFC3339Nano))
+				mutateBundle(t, b, "execution", "attempted_at", attempted)
+				if profile == "closed_cycle" {
+					mutateBundle(t, b, "post_ledger", "last_execution_at", attempted)
+				} else {
+					mutateBundle(t, b, "stop_ledger", "updated_at", attempted)
+				}
+				summary, status := auditBundle(t, b)
+				if status != tc.want {
+					t.Fatalf("want %s, got %s", tc.want, status)
+				}
+				if tc.want == missionValid && (summary.Result != "CONSISTENT_UNVERIFIED" || summary.ExecutionPermitted || summary.ResumePermitted || summary.ProvenanceAuthenticated) {
+					t.Fatalf("historical evidence gained authority: %+v", summary)
+				}
+			})
+		}
 	}
 }
 

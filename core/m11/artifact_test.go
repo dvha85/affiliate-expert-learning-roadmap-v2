@@ -2,7 +2,9 @@ package m11
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
+	"time"
 
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
 )
@@ -46,6 +48,25 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 		t.Fatal(err)
 	}
 	canonicalEntries := append([]ArtifactEntry(nil), entries...)
+	// Rebuild canonical envelopes so rejection cannot be caused by a checksum
+	// mismatch. The baseline authorization expires exactly at health TTL.
+	for _, tc := range []struct {
+		name, expiry string
+		valid        bool
+	}{
+		{"exact-health-expiry", "2026-09-08T00:01:00Z", true},
+		{"one-nanosecond-late", "2026-09-08T00:01:00.000000001Z", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := authorization
+			candidate.ExpiresAt = tc.expiry
+			graph := append([]ArtifactEntry(nil), entries[:8]...)
+			graph[7] = m11Entry(t, ArtifactKindAuthorization, candidate)
+			if err := ValidateArtifactGraph(graph); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v: %v", tc.valid, err)
+			}
+		})
+	}
 	// A checksum-valid cost bound from another correlation lineage must not be
 	// made admissible merely by updating the gate's copied cost hash and
 	// recomputing its derived gate ID. The lease is the M11 correlation root.
@@ -625,6 +646,22 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	priorLineageEntries := append(append([]ArtifactEntry(nil), admissionEntries...), m11Entry(t, ArtifactKindLease, secondLease), m11Entry(t, ArtifactKindLeaseApproval, secondApproval), m11Entry(t, ArtifactKindRecoveryAdmission, priorLineageAdmission))
 	if err := ValidateArtifactGraph(priorLineageEntries); err == nil {
 		t.Fatal("two recovery admissions for one prior resolution lineage were accepted")
+	}
+}
+
+func TestHistoricalHealthExpiryRejectsOverflow(t *testing.T) {
+	observed := time.Date(2026, 9, 21, 0, 0, 0, 123, time.UTC)
+	if expiry, ok := historicalHealthExpiry(observed, 300); !ok || !expiry.Equal(observed.Add(300*time.Second)) {
+		t.Fatalf("valid TTL: expiry=%s ok=%v", expiry, ok)
+	}
+	ttls := []int{-1}
+	if strconv.IntSize == 64 {
+		ttls = append(ttls, int(^uint(0)>>1))
+	}
+	for _, ttl := range ttls {
+		if _, ok := historicalHealthExpiry(observed, ttl); ok {
+			t.Fatalf("unsafe TTL accepted: %d", ttl)
+		}
 	}
 }
 
