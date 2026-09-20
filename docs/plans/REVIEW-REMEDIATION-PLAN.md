@@ -1,20 +1,22 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-21 -->
-<!-- readiness-main-baseline: d00122795317c0b6c8dee123ac1cf4205ea354c7 -->
+<!-- readiness-main-baseline: b447c04262bafd94125b05c2d6df4ecaa8edbeac -->
 <!-- readiness-baseline-kind: product -->
 
-**Full review follow-up (2026-09-21):** current implementation baseline
-`d00122795317c0b6c8dee123ac1cf4205ea354c7`; [complete RV checklist](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).
-Local Python: 185 PASS; rollover and fail-open scope regressions reproduced
-before correction. Added exact M11 binding/number/health-TTL boundaries,
-n8n child-environment/restart/parser checks and workflow/governance drift tests.
-The full offline entrypoint is now wired into `offline-review-contract` under
-`curriculum-gate`; hosted acceptance is pending, local Go is absent. Main baseline
-`ada7827` failed BR-16a, so earlier PR #489 PASS below remains historical evidence.
-Main has no branch protection or applicable rules at this audit; owner/admin
-configuration is still required. `NOT_READY_FOR_PRODUCTION`, 154 scoped claims;
-no provider/live, deployment, pilot, business or durability gap is closed here.
+**Full review follow-up (2026-09-21):** PR #491 self-reviewed and merged at
+`b447c04262bafd94125b05c2d6df4ecaa8edbeac` from exact head `294e35722cf861fe91337a1a96c9647562367e00`;
+[complete RV checklist and remaining work](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).
+Local Python: 185 PASS. Reproduced rollover/scope failures are fixed; exact M11
+binding/number/TTL, n8n env/restart/parser and CI/governance regressions PASS.
+Hosted Curriculum `35531456259` and Mission `35531456254` PASS, including all
+37 offline-runner steps, four Go module test/vet, race, Windows, backup/mutation
+and real pinned n8n/flatted/Schedule Trigger. Local Go remains unavailable.
+Baseline `ada7827` failure and earlier PR #489 PASS remain historical.
+Main is unprotected; owner/admin configuration remains open. CodeQL PASS but
+govulncheck has a non-blocking tool panic, not a clean scan.
+`NOT_READY_FOR_PRODUCTION`, 154 scoped claims; no provider/live, deployment,
+independent pilot, business or durability gap is closed here.
 
 **Post-merge sync after PR #489 (2026-09-21):** PR #489 was squash-merged
 into `main` at `12cb66f45d4e5e27002d4cbf01e6ec0481436759` from implementation

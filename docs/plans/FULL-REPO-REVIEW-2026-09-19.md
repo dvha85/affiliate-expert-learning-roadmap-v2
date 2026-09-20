@@ -3,9 +3,11 @@
 ## 1. Kết luận
 
 **Đối chiếu mới nhất (21/09/2026):** xem [checklist follow-up từng RV và phần còn phải làm](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).
-Baseline `ada7827` có Curriculum CI failure tại BR-16a reservation race; không
-coi PASS lịch sử của PR #489 là PASS của main hiện tại. Follow-up giữ các kết
-quả lịch sử bên dưới, bổ sung nghiệm thu còn thiếu và tách owner/external blockers.
+Đã sửa thêm lỗi fixture chronology và n8n scope fail-open, bổ sung nghiệm thu
+còn thiếu, self-review và merge PR #491 tại `b447c04`. Hosted exact head PASS
+Go/Windows/race, full offline runner và real n8n/flatted/Schedule Trigger.
+RV-09 còn admin settings; RP-10 và các external gaps vẫn mở. Baseline `ada7827`
+failure và các kết quả PR #489 bên dưới được giữ như lịch sử, không thay evidence mới.
 
 Repo có nền tảng kiểm thử khá đầy đủ và đường chạy offline liên tục đã hoạt động. Trong phiên review này, cả bốn Go module qua test/vet; learner Bot qua race detector; 133 test Python, 14 validator không cần execution artifact, 11 smoke offline, quickstart clone/cache rỗng và HTTPS fixture smoke đều đạt.
 
@@ -269,16 +271,20 @@ Chia thành PR nhỏ có test bắt lỗi trước/sau. Quy mô S/M/L dưới đ
 
 | Gói | Nội dung | Phụ thuộc | Quy mô | Trạng thái |
 |---|---|---|---|---|
-| F-01 | Bảo toàn consumption M10 qua bind; RV-01 | Không | M | IMPLEMENTED_LOCAL |
-| F-02 | Cô lập environment n8n trước mọi import; RV-02 | Không; làm song song F-01 | S/M | IMPLEMENTED_LOCAL |
-| F-03 | Sửa exact binding và health TTL audit M11; RV-03/RV-05 | Không; cần đối chiếu graph/issuer | M | IMPLEMENTED_LOCAL |
-| F-04 | Bỏ chuyển số qua float64 trong M11 adapter; RV-04 | Không; có thể song song F-03 | S | IMPLEMENTED_LOCAL |
-| F-05 | Reject HTTP body quá lớn trước mutation; RV-06 | Không | S | IMPLEMENTED_LOCAL |
-| F-06 | Chứng minh restart bằng tick mới; sửa decoder; RV-07/RV-11 | F-02 trước khi chạy engine thật | S/M | IMPLEMENTED_LOCAL |
-| F-07 | Đóng khoảng trống CI filter và merge checks; RV-08/RV-09 | F-02, F-06 để engine evidence đáng tin | M | PARTIAL_LOCAL |
-| F-08 | Chốt semantics thời gian M11; G-01 | Độc lập về thiết kế; trước live admission | M | IMPLEMENTED_LOCAL |
-| F-09 | Đồng bộ runbook/capability và tracker; RV-10 | Cập nhật sơ bộ ngay; chốt sau F-01…F-08 | S/M | IMPLEMENTED_LOCAL |
-| F-10 | Nghiệm thu lại offline rồi tiếp tục RP-10 | F-01…F-09 | M | PARTIAL_LOCAL |
+| F-01 | Bảo toàn consumption M10 qua bind; RV-01 | Không | M | VERIFIED_REPO |
+| F-02 | Cô lập environment n8n trước mọi import; RV-02 | Không; làm song song F-01 | S/M | VERIFIED_REPO |
+| F-03 | Sửa exact binding và health TTL audit M11; RV-03/RV-05 | Không; cần đối chiếu graph/issuer | M | VERIFIED_REPO |
+| F-04 | Bỏ chuyển số qua float64 trong M11 adapter; RV-04 | Không; có thể song song F-03 | S | VERIFIED_REPO |
+| F-05 | Reject HTTP body quá lớn trước mutation; RV-06 | Không | S | VERIFIED_REPO |
+| F-06 | Chứng minh restart bằng tick mới; sửa decoder; RV-07/RV-11 | F-02 trước khi chạy engine thật | S/M | VERIFIED_REPO |
+| F-07 | Đóng khoảng trống CI filter và merge checks; RV-08/RV-09 | F-02, F-06 để engine evidence đáng tin | M | REPO_VERIFIED_ADMIN_OPEN |
+| F-08 | Chốt semantics thời gian M11; G-01 | Độc lập về thiết kế; trước live admission | M | VERIFIED_REPO |
+| F-09 | Đồng bộ runbook/capability và tracker; RV-10 | Cập nhật sơ bộ ngay; chốt sau F-01…F-08 | S/M | VERIFIED_REPO |
+| F-10 | Nghiệm thu lại offline rồi tiếp tục RP-10 | F-01…F-09 | M | OFFLINE_VERIFIED_EXTERNAL_OPEN |
+
+Trạng thái bảng được cập nhật theo PR #491 (21/09/2026). `VERIFIED_REPO` chỉ
+phạm vi source/regression/hosted offline, không phải production readiness;
+chi tiết CI và checklist còn mở nằm trong follow-up link ở đầu tài liệu.
 
 ### Cập nhật implementation trên current product main — 20/09/2026
 
