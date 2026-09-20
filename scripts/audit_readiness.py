@@ -900,7 +900,7 @@ def audit_claim_count_disclosures(root, plan_text, claim_count):
     evidence_match = re.search(r"`NOT_READY_FOR_PRODUCTION`,\s*(\d+) scoped claims", evidence_text)
     if evidence_match is None or int(evidence_match.group(1)) != claim_count:
         fail("current post-merge evidence claim count does not match the evidence graph")
-    plan_match = re.search(r"records\s+(\d+) scoped claims and \d+ readiness-audit tests", plan_text)
+    plan_match = re.search(r"records\s+(\d+) scoped claims and\s+\d+\s+readiness-audit tests", plan_text)
     if plan_match is None or int(plan_match.group(1)) != claim_count:
         fail("current remediation plan claim count does not match the evidence graph")
 
