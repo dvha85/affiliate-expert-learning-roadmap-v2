@@ -294,6 +294,14 @@ func TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks(t *testing.
 	if err := ValidateArtifactGraph(brokenGateCostWindowEntries); err == nil {
 		t.Fatal("gate at cost-bound expiry was accepted")
 	}
+	staleHealthGate := gate
+	staleHealthGate.EvaluatedAt = "2026-09-08T00:01:00Z"
+	staleHealthGate.GateID = ComputeProductionGateID(lease, staleHealthGate.IntentID, staleHealthGate.IntentHash, health, cost, ledgerEntry, staleHealthGate.EvaluatedAt)
+	staleHealthGateEntries := append([]ArtifactEntry(nil), entries[:7]...)
+	staleHealthGateEntries[6] = m11Entry(t, ArtifactKindGate, staleHealthGate)
+	if err := ValidateArtifactGraph(staleHealthGateEntries); err == nil {
+		t.Fatal("ALLOW gate beyond health snapshot TTL was accepted")
+	}
 	brokenAuthorizationWindow := authorization
 	brokenAuthorizationWindow.AuthorizedAt = lease.ExpiresAt
 	brokenAuthorizationWindow.ExpiresAt = "2099-09-08T00:01:00Z"
