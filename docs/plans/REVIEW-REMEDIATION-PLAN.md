@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-20 -->
-<!-- readiness-main-baseline: bd13c2a8519bf6a2291bcc57dcc772d0fdbef7d4 -->
+<!-- readiness-main-baseline: 1c04afe6a1962a9f657e28a483311ba33327dcf9 -->
 <!-- readiness-baseline-kind: product -->
 
 **Post-merge sync after PR #475 (2026-09-19):** PR #475 was squash-merged
