@@ -317,6 +317,17 @@ evidence. Overall readiness không đổi: `NOT_READY_FOR_PRODUCTION`.
   distributed locking, power-loss/atomic multi-file proof và branch protection
   thực tế.
 
+### Cập nhật exact-head PR #489 — 21/09/2026
+
+- RV-08/F-07: `scripts/n8n_change_scope.py` nay bắt cả offline runner và các
+  test parser/scope n8n; table-test 7 ca và Python suite 174 test đạt.
+- RV-11/F-06: decoder giữ numeric-string là literal; hosted exact-head PR #489
+  đã chạy thành công n8n 2.38.1 trên Node 24, M06/M07 engine và Schedule
+  Trigger thật. Đây vẫn là fixture/loopback evidence, không phải provider/live.
+- F-10: Go/core/mission, Windows, race, validators, smoke, mutation và các
+  required aggregate gate đều PASS trên hosted exact head; full offline runner
+  local vẫn chưa chạy vì host thiếu Go. `govulncheck` vẫn non-blocking failure.
+
 ### F-01 — Chặn mất lịch sử trước, hoàn thiện ledger sau
 
 - [x] Đưa đầu dò A→B→A thành regression thất bại trên implementation hiện tại.
@@ -332,7 +343,7 @@ evidence. Overall readiness không đổi: `NOT_READY_FOR_PRODUCTION`.
 - [x] Positive tests số chính xác qua adapter; kiểm cùng dữ liệu trước/sau để loại trường hợp test fixture sai.
 - [x] HTTP limit test kiểm byte-level no-mutation cho cả ba endpoint family.
 - [x] Restart watermark lấy sau shutdown; test không có tick mới phải fail.
-- [ ] Decoder flatted giữ literal string; đối chiếu parser runtime trong môi trường n8n pin.
+- [x] Decoder flatted giữ literal string; đối chiếu parser runtime trong môi trường n8n pin trên exact-head PR #489.
 
 ### F-07…F-09 — Biến test và tài liệu thành gate dùng được
 
@@ -345,9 +356,9 @@ evidence. Overall readiness không đổi: `NOT_READY_FOR_PRODUCTION`.
 ### F-10 — Điều kiện đóng đợt review
 
 - [x] Mỗi RV có test hoặc kiểm chứng phù hợp trong phạm vi offline; không đánh dấu DONE chỉ vì đã thêm test hoặc cập nhật prose.
-- [ ] Bốn Go module qua test/vet; learner race, Python regression, validator và smoke liên quan đều đạt trên cùng head.
-- [ ] n8n engine và Schedule Trigger chạy thật bằng environment cô lập trên phiên bản pin của repo.
-- [ ] CI trên head cần merge có đầy đủ check; kết quả local và remote ghi riêng.
+- [x] Bốn Go module qua test/vet; learner race, Python regression, validator và smoke liên quan đều đạt trên cùng hosted exact head PR #489; local full runner vẫn dừng vì host thiếu Go.
+- [x] n8n engine và Schedule Trigger chạy thật bằng environment cô lập trên phiên bản pin của repo trên exact-head PR #489.
+- [x] CI trên head cần merge có đầy đủ check; kết quả local và remote ghi riêng.
 - [x] Baseline/plan/matrix/evidence graph nhất quán; dữ liệu đang thay đổi trước phiên review đã được xử lý bởi chủ sở hữu, không ghi đè.
 - [x] Overall vẫn `NOT_READY_FOR_PRODUCTION` cho tới khi các điều kiện operated/deployment/business tương ứng được chứng minh.
 

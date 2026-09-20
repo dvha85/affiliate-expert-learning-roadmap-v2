@@ -1,8 +1,23 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-21 -->
-<!-- readiness-main-baseline: 885f2d834ae5e0fe9df42da9be4005945169a519 -->
+<!-- readiness-main-baseline: 12cb66f45d4e5e27002d4cbf01e6ec0481436759 -->
 <!-- readiness-baseline-kind: product -->
+
+**Post-merge sync after PR #489 (2026-09-21):** PR #489 was squash-merged
+into `main` at `12cb66f45d4e5e27002d4cbf01e6ec0481436759` from implementation
+head `cfa4c6d163d46c33907789907222c5cb17139441`. The exact-head
+`curriculum-gate` and `mission-gate` passed, including Go/core/mission checks,
+learner race and shards, Windows, validators, offline smokes, backup/mutation,
+CodeQL and mission semantics. The pinned Node 24 / n8n 2.38.1 engine job
+executed M06/M07 and real M06 Schedule Trigger admission successfully; it was
+not a scoped skip. `govulncheck-go-modules` remained a non-blocking failure.
+The post-merge evidence record is
+`docs/architecture/EVIDENCE-PR489-POST-MERGE-20260921.md`; the audit remains
+`NOT_READY_FOR_PRODUCTION` with 154 scoped claims. This closes the repository
+scope/runtime evidence for F-06/F-07/F-10 only; provider/live, deployment,
+pilot, business outcome, distributed locking, power-loss and production-
+readiness blockers remain open.
 
 **Post-merge sync after PR #487 (2026-09-21):** PR #487 was squash-merged
 into `main` at `885f2d834ae5e0fe9df42da9be4005945169a519` from implementation
