@@ -65,7 +65,7 @@ outcome và production readiness vẫn mở.
 and Mission Agent Path CI run `35411941661` passed all 13 hosted checks,
 including Windows runtime job `105813136321`, learner race job `105813136435`
 and deterministic backup/mutations job `105813136450`. The post-merge evidence
-records 151 scoped claims and 159 readiness-audit tests. This rebinds the
+records 153 scoped claims and 167 readiness-audit tests. This rebinds the
 readiness bookkeeping to the merged PR #459 product baseline only; the M11
 mutation proof remains bounded offline/read-only and crash/power-loss, atomic
 multi-file, distributed/multi-host, Windows traversal parity, provider/live
