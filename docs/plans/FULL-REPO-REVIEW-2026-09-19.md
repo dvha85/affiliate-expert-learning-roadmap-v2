@@ -271,7 +271,7 @@ Chia thành PR nhỏ có test bắt lỗi trước/sau. Quy mô S/M/L dưới đ
 | F-05 | Reject HTTP body quá lớn trước mutation; RV-06 | Không | S | IMPLEMENTED_LOCAL |
 | F-06 | Chứng minh restart bằng tick mới; sửa decoder; RV-07/RV-11 | F-02 trước khi chạy engine thật | S/M | IMPLEMENTED_LOCAL |
 | F-07 | Đóng khoảng trống CI filter và merge checks; RV-08/RV-09 | F-02, F-06 để engine evidence đáng tin | M | PARTIAL_LOCAL |
-| F-08 | Chốt semantics thời gian M11; G-01 | Độc lập về thiết kế; trước live admission | M | TODO |
+| F-08 | Chốt semantics thời gian M11; G-01 | Độc lập về thiết kế; trước live admission | M | IMPLEMENTED_LOCAL |
 | F-09 | Đồng bộ runbook/capability và tracker; RV-10 | Cập nhật sơ bộ ngay; chốt sau F-01…F-08 | S/M | PARTIAL_LOCAL |
 | F-10 | Nghiệm thu lại offline rồi tiếp tục RP-10 | F-01…F-09 | M | TODO |
 
@@ -368,3 +368,15 @@ Các runner n8n cần Node/n8n đã pin và phải hoàn tất F-02 trước khi
 Không cần đổi framework hoặc viết lại toàn repo để xử lý các finding này. Sau khi có regression bảo vệ, có thể tách `mission_command.go` (3.235 dòng), `backup_command.go` (1.869 dòng) và `m11_registry.go` (1.386 dòng) theo use case; ưu tiên các kiểu dữ liệu chung và adapter không chuyển đổi JSON vòng lại. Đây là việc giảm khó khăn bảo trì, không phải điều kiện để trì hoãn F-01/F-02.
 
 Nên giữ phần trạng thái hiện tại của tracker ngắn và chuyển nhật ký cũ thành các evidence record có baseline rõ. Bảo toàn các marker/reference đang được `audit_readiness.py` kiểm khi tổ chức lại tài liệu. Mọi refactor nên là PR riêng sau sửa correctness, để reviewer thấy rõ thay đổi hành vi và thay đổi cấu trúc.
+## 7. Post-review implementation update — F-08 (2026-09-20)
+
+F-08/G-01 is implemented on learner head `35394a3`. M11 authority uses the
+process-owned `missionNowUTC()` clock for lease validity, activation, ledger
+initialization, gate, authorization, reservation and FAILED/UNKNOWN execution.
+Input timestamps remain historical provenance for chronology and deterministic
+artifact identity. The real learner Bot expiry regression restores checkpoints
+and rejects both exact-expiry and backdated authority writes before mutation.
+
+The result is bounded offline/fixture/read-only evidence. It does not close the
+trusted-time, live-executor, provider, deployment, pilot, business-outcome or
+production-readiness gaps listed above.

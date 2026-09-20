@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-19 -->
-<!-- readiness-main-baseline: 2d8eac865b0fff5599da75cd3cbd1575cce20fc7 -->
+<!-- readiness-as-of: 2026-09-20 -->
+<!-- readiness-main-baseline: 35394a3a4f6f91bd5dac73e7dd88c05ff9062eb5 -->
 <!-- readiness-baseline-kind: product -->
 
 **Post-merge sync after PR #475 (2026-09-19):** PR #475 was squash-merged
@@ -10,6 +10,20 @@ Mission Agent Path CI (including hosted n8n and Windows jobs), Security Scans
 and CodeQL passed on the final head. The product baseline is rebound to the
 merge commit; external provider, deployment, pilot, business-outcome and
 production-readiness evidence remain open.
+
+
+**Cập nhật F-08 — M11 process-clock authority (2026-09-20):** gói F-08 đã
+được triển khai trên implementation head `35394a3`. `missionNowUTC()` là đồng
+hồ do process sở hữu cho validity window của lease, activation, ledger
+initialization, cost bound, health TTL, authorization lifetime và mọi authority
+write (gate, authorization, reservation, FAILED/UNKNOWN execution). CLI
+timestamps vẫn là provenance cho chronology và immutable identity. Activation và
+ledger initialization cũng bị chặn khi lease đã hết hạn hoặc chưa bắt đầu;
+backup/restore regression chứng minh timestamp cũ không thể mở lại authority mà
+không mutation. Đây là bằng chứng offline/fixture/read-only; trusted external
+time, live executor, provider, deployment, pilot, business outcome và
+production readiness vẫn mở. Record: `docs/architecture/EVIDENCE-F08-M11-PROCESS-CLOCK-20260920.md`.
+Marker: `Cập nhật F-08 M11 process-clock authority semantics`.
 
 **Cập nhật FULL repository hardening (2026-09-19):** nhánh thực hiện bổ sung
 body-size guard `limit+1` và bearer token bắt buộc cho canonical adapter, đồng
