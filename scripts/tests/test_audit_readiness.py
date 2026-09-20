@@ -48,6 +48,29 @@ class ReadinessAuditTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(root), "commit", "-m", "dependency"], check=True, capture_output=True, text=True)
         audit_product_baseline_git(root, baseline)
 
+    def test_product_baseline_git_allows_public_documentation_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        learner_readme = root / "lab/affiliate-bot/README.md"
+        learner_readme.parent.mkdir(parents=True, exist_ok=True)
+        (root / "README.md").write_text("updated public docs\n", encoding="utf-8")
+        learner_readme.write_text("updated learner docs\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md", str(learner_readme.relative_to(root))], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "documentation"], check=True, capture_output=True, text=True)
+        audit_product_baseline_git(root, baseline)
+
+    def test_product_baseline_git_allows_scoped_offline_runner_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        runner = root / "scripts/run_offline_checks.py"
+        runner.parent.mkdir(parents=True, exist_ok=True)
+        runner.write_text("# scoped offline runner\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "scripts/run_offline_checks.py"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "offline-runner"], check=True, capture_output=True, text=True)
+        audit_product_baseline_git(root, baseline)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -308,12 +331,12 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_stale_post_merge_evidence_claim_count_is_rejected(self):
         evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
-        evidence.write_text(evidence.read_text(encoding="utf-8").replace("153 scoped claims", "152 scoped claims", 1), encoding="utf-8")
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("154 scoped claims", "153 scoped claims", 1), encoding="utf-8")
         self.assertIn("current post-merge evidence claim count does not match the evidence graph", self.run_audit(False))
 
     def test_stale_remediation_plan_claim_count_is_rejected(self):
         plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
-        plan.write_text(plan.read_text(encoding="utf-8").replace("records 153 scoped claims", "records 152 scoped claims", 1), encoding="utf-8")
+        plan.write_text(plan.read_text(encoding="utf-8").replace("records 154 scoped claims", "records 153 scoped claims", 1), encoding="utf-8")
         self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
 
     def test_missing_windows_reparse_pin_is_rejected(self):

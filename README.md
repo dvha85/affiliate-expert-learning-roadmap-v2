@@ -16,6 +16,7 @@ provider, deployment, beginner pilot hay business outcome độc lập.
 4. Nếu chưa từng chạy/sửa/test Bot, học `BOOT.1`.
 5. Chạy `O00.1` để nhìn toàn bộ vòng hệ thống bằng dữ liệu synthetic (mô phỏng); O00 chỉ orientation (định hướng), không tạo PASS.
 6. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
+7. Từ repo root, chạy `python scripts/run_offline_checks.py` trong một checkout sạch để kiểm trọn đường offline; dùng `--list` để xem phạm vi. Lệnh này yêu cầu Go/Python/Git và cố ý không gọi operated validators hoặc n8n engine thật.
 
 ## Lộ trình chuẩn
 
@@ -94,6 +95,7 @@ Chi tiết: `docs/technology/DEPLOYMENT-ALWAYS-ON.md`.
 - [Kế hoạch chỉnh sửa theo review 05/09/2026](docs/plans/BEGINNER-READINESS-PLAN.md) (baseline snapshot): các đợt triển khai, đầu việc, phụ thuộc, trạng thái và tiêu chí nghiệm thu.
 - [Báo cáo review khả năng tự học](REVIEW-2026-09-05.md) (baseline snapshot): phát hiện, bằng chứng và giới hạn kiểm chứng tại phiên bản được đánh giá.
 - [Review toàn repo 19/09/2026](docs/plans/FULL-REPO-REVIEW-2026-09-19.md): các finding RV-01…RV-11, regression đã triển khai cục bộ và phần còn mở.
+- [Entrypoint kiểm offline](scripts/run_offline_checks.py): danh sách lệnh kiểm Go/Python/validator/smoke/audit/diff-check, tách khỏi operated và n8n engine checks.
 - [Tracker remediation hiện hành](docs/plans/REVIEW-REMEDIATION-PLAN.md): baseline, bằng chứng hậu merge và giới hạn readiness được cập nhật theo từng đợt.
 
 Đây là tiến độ phát triển repo; tiến độ học thực tế vẫn nằm trong `PROGRESS.md`.

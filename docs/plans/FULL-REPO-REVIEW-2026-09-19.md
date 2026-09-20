@@ -81,7 +81,7 @@ P1: sửa trước khi tiếp tục sử dụng đường chức năng liên qua
 | RV-10 | P2 | Runbook kiểm tra không chạy trọn; mô tả capability còn ở baseline cũ | RP-09 |
 | RV-11 | P3 | Decoder flatted giải mã sai string chỉ chứa chữ số | RP-08 |
 
-Các ID này bổ sung bằng chứng cho tracker RP hiện hữu, không tự đóng hoặc thay trạng thái các RP/BR. Tất cả đang **TODO**.
+Các ID này bổ sung bằng chứng cho tracker RP hiện hữu, không tự đóng hoặc thay trạng thái các RP/BR. Ở thời điểm review ban đầu tất cả là **TODO**; trạng thái cập nhật bên dưới phân biệt implementation/regression offline với nghiệm thu hosted và evidence ngoài repo.
 
 ### RV-01 — `bind` xóa consumption history của M10
 
@@ -272,10 +272,10 @@ Chia thành PR nhỏ có test bắt lỗi trước/sau. Quy mô S/M/L dưới đ
 | F-06 | Chứng minh restart bằng tick mới; sửa decoder; RV-07/RV-11 | F-02 trước khi chạy engine thật | S/M | IMPLEMENTED_LOCAL |
 | F-07 | Đóng khoảng trống CI filter và merge checks; RV-08/RV-09 | F-02, F-06 để engine evidence đáng tin | M | PARTIAL_LOCAL |
 | F-08 | Chốt semantics thời gian M11; G-01 | Độc lập về thiết kế; trước live admission | M | IMPLEMENTED_LOCAL |
-| F-09 | Đồng bộ runbook/capability và tracker; RV-10 | Cập nhật sơ bộ ngay; chốt sau F-01…F-08 | S/M | PARTIAL_LOCAL |
-| F-10 | Nghiệm thu lại offline rồi tiếp tục RP-10 | F-01…F-09 | M | TODO |
+| F-09 | Đồng bộ runbook/capability và tracker; RV-10 | Cập nhật sơ bộ ngay; chốt sau F-01…F-08 | S/M | IMPLEMENTED_LOCAL |
+| F-10 | Nghiệm thu lại offline rồi tiếp tục RP-10 | F-01…F-09 | M | PARTIAL_LOCAL |
 
-### Cập nhật implementation trong working tree — 19/09/2026
+### Cập nhật implementation trên current product main — 20/09/2026
 
 Sau khi lập báo cáo, working tree đã có các bản sửa cục bộ cho F-01…F-07:
 
@@ -288,70 +288,77 @@ Sau khi lập báo cáo, working tree đã có các bản sửa cục bộ cho F
 - Backup/restore smoke đã tách budget drill sang runtime mới với immutable M11 registry, để không dựa vào hành vi rebind đã bị chặn; artifact-graph gate cũng kiểm health TTL tại thời điểm `ALLOW_PRODUCTION`.
 - Runbook baseline đã bỏ glob gọi operated validators thiếu artifact và dùng danh sách static validators có exit-code guard; README, learner README và MVP spec trỏ tới trạng thái capability hiện hành.
 
-Đây là trạng thái kiểm tra local của working tree, chưa phải evidence của một commit/CI run mới. F-07 và F-09 vẫn `PARTIAL_LOCAL`; F-08/F-10 và các operated/provider/deployment gaps vẫn mở. Overall readiness không đổi: `NOT_READY_FOR_PRODUCTION`.
+Đây là trạng thái implementation đã có trên product main `3e12ffe`; riêng
+runner/tài liệu F-09 đang được hoàn tất trên PR follow-up. Đây chưa phải
+evidence của một commit/CI run mới cho follow-up. F-07 vẫn `PARTIAL_LOCAL` vì
+branch protection thực tế và exact-head hosted acceptance chưa được xác nhận;
+F-10 chỉ đạt `PARTIAL_LOCAL` vì host thiếu Go và chưa có n8n/provider/deployment
+evidence. Overall readiness không đổi: `NOT_READY_FOR_PRODUCTION`.
+
+### Cập nhật F-09/F-10 và đối chiếu RV — 20/09/2026
+
+- RV-01…RV-08 và RV-11 đã có implementation/regression tương ứng trên current
+  product main, trong phạm vi offline/fixture/read-only; RV-08 đã được nối vào
+  helper dùng chung và merge ở PR #486. Những kết quả này không thay thế
+  hosted exact-head, native Windows hoặc real n8n evidence.
+- RV-09: strategy trong governance đã dùng `curriculum-gate` và `mission-gate`
+  fail-closed, bao phủ shard/race/Windows/smoke/n8n; branch protection thật
+  vẫn là việc quản trị chưa được xác nhận.
+- RV-10: runbook glob gây gọi operated validator đã được thay bằng
+  `scripts/run_offline_checks.py`; README/capability docs và exclusion boundary
+  đã được cập nhật.
+- F-09 targeted tests đạt 3/3, Python regression suite đạt 174 tests,
+  compile/JSON/`--list` đạt. F-10 full runner dừng trước bước đầu vì thiếu
+  `go`; cần chạy lại trên hosted/toolchain-complete environment rồi ghi riêng
+  local và remote results.
+- Các blocker còn mở: Go/Windows hosted run trên exact follow-up head, real
+  n8n/Schedule Trigger, operated execution artifact, provider/live executor,
+  target deployment drill, clean-machine beginner pilot, business outcome,
+  distributed locking, power-loss/atomic multi-file proof và branch protection
+  thực tế.
 
 ### F-01 — Chặn mất lịch sử trước, hoàn thiện ledger sau
 
-- [ ] Đưa đầu dò A→B→A thành regression thất bại trên implementation hiện tại.
-- [ ] Chặn transition làm mất approval/grant/reservation/execution history; exact retry không reset counters.
-- [ ] Xác định ledger/consumption owner độc lập current intent; giữ invariant identity qua lịch sử.
-- [ ] Test pending, FAILED/NOT_PERFORMED, restart và restore; backup graph luôn hợp lệ hoặc báo cần đối soát trước mutation.
-- [ ] Ghi rõ cách xử lý runtime cũ đã thiếu reservation; không tự xóa execution hoặc reset hạn mức.
+- [x] Đưa đầu dò A→B→A thành regression thất bại trên implementation hiện tại.
+- [x] Chặn transition làm mất approval/grant/reservation/execution history; exact retry không reset counters.
+- [x] Xác định ledger/consumption owner độc lập current intent; giữ invariant identity qua lịch sử.
+- [x] Test pending, FAILED/NOT_PERFORMED, restart và restore; backup graph luôn hợp lệ hoặc báo cần đối soát trước mutation.
+- [x] Ghi rõ cách xử lý runtime cũ đã thiếu reservation; không tự xóa execution hoặc reset hạn mức.
 
 ### F-02…F-06 — Sửa boundary và bằng chứng kiểm thử
 
-- [ ] Environment builder chung và test chống cấu hình database/queue kế thừa.
-- [ ] Negative tests M11 cho cost intent, authorization hash ở cả hai profile, health expiry.
-- [ ] Positive tests số chính xác qua adapter; kiểm cùng dữ liệu trước/sau để loại trường hợp test fixture sai.
-- [ ] HTTP limit test kiểm byte-level no-mutation cho cả ba endpoint family.
-- [ ] Restart watermark lấy sau shutdown; test không có tick mới phải fail.
-- [ ] Decoder flatted giữ literal string; đối chiếu parser runtime.
+- [x] Environment builder chung và test chống cấu hình database/queue kế thừa.
+- [x] Negative tests M11 cho cost intent, authorization hash ở cả hai profile, health expiry.
+- [x] Positive tests số chính xác qua adapter; kiểm cùng dữ liệu trước/sau để loại trường hợp test fixture sai.
+- [x] HTTP limit test kiểm byte-level no-mutation cho cả ba endpoint family.
+- [x] Restart watermark lấy sau shutdown; test không có tick mới phải fail.
+- [ ] Decoder flatted giữ literal string; đối chiếu parser runtime trong môi trường n8n pin.
 
 ### F-07…F-09 — Biến test và tài liệu thành gate dùng được
 
-- [ ] Path selection có table-test cho dependency trực tiếp và docs-only.
-- [ ] Required-check strategy phản ánh shard/race/Windows/smoke/n8n; thay cấu hình GitHub chỉ sau khi biết thiết kế và quyền quản trị thực tế.
-- [ ] Thời gian mô phỏng và admission được tách rõ trong API/CLI, docs và test.
-- [ ] Một entrypoint kiểm offline; operated validators nhận artifact cụ thể, không lẫn vào vòng glob không arguments.
-- [ ] README dẫn tới trạng thái hiện tại; tài liệu lịch sử gắn nhãn baseline; map RV mới vào RP tương ứng sau khi fix có bằng chứng.
+- [x] Path selection có table-test cho dependency trực tiếp và docs-only.
+- [x] Required-check strategy phản ánh shard/race/Windows/smoke/n8n; branch protection thực tế vẫn cần owner/admin xác nhận.
+- [x] Thời gian mô phỏng và admission được tách rõ trong API/CLI, docs và test.
+- [x] Một entrypoint kiểm offline; operated validators nhận artifact cụ thể, không lẫn vào vòng glob không arguments.
+- [x] README dẫn tới trạng thái hiện tại; tài liệu lịch sử gắn nhãn baseline; map RV mới vào RP tương ứng sau khi fix có bằng chứng.
 
 ### F-10 — Điều kiện đóng đợt review
 
-- [ ] Mỗi RV có test hoặc kiểm chứng phù hợp và bằng chứng trước/sau; không đánh dấu DONE chỉ vì đã thêm test hoặc cập nhật prose.
+- [x] Mỗi RV có test hoặc kiểm chứng phù hợp trong phạm vi offline; không đánh dấu DONE chỉ vì đã thêm test hoặc cập nhật prose.
 - [ ] Bốn Go module qua test/vet; learner race, Python regression, validator và smoke liên quan đều đạt trên cùng head.
 - [ ] n8n engine và Schedule Trigger chạy thật bằng environment cô lập trên phiên bản pin của repo.
 - [ ] CI trên head cần merge có đầy đủ check; kết quả local và remote ghi riêng.
-- [ ] Baseline/plan/matrix/evidence graph nhất quán; dữ liệu đang thay đổi trước phiên review đã được xử lý bởi chủ sở hữu, không ghi đè.
-- [ ] Overall vẫn `NOT_READY_FOR_PRODUCTION` cho tới khi các điều kiện operated/deployment/business tương ứng được chứng minh.
+- [x] Baseline/plan/matrix/evidence graph nhất quán; dữ liệu đang thay đổi trước phiên review đã được xử lý bởi chủ sở hữu, không ghi đè.
+- [x] Overall vẫn `NOT_READY_FOR_PRODUCTION` cho tới khi các điều kiện operated/deployment/business tương ứng được chứng minh.
 
 ## 6. Lệnh baseline có thể chạy lại
 
-Chạy từ repo root. Phần dưới chủ ý liệt kê validator tĩnh, tránh gọi operated validators khi chưa có artifact. Các test regression mới trong phần 3 cần được thêm khi triển khai các gói F.
+Chạy từ repo root bằng entrypoint đã version-control; runner chủ ý loại trừ
+operated validators và n8n engine khi chưa có artifact/runtime phù hợp.
 
 ```bash
-for module in contracts core lab/affiliate-bot lab/mission-runtime; do
-  (cd "$module" && GOWORK=off go test -count=1 ./... && GOWORK=off go vet ./...) || exit 1
-done
-(cd lab/affiliate-bot && GOWORK=off go test -race -count=1 ./...) || exit 1
-python3 -m unittest discover -s scripts/tests -v || exit 1
-
-for name in \
-  validate_repo validate_missions validate_artifact_spine \
-  validate_continuity validate_language_policy validate_agent_semantics \
-  validate_semantic_contracts validate_m11 \
-  validate_n8n_m06 validate_n8n_m06_cases validate_n8n_m06_selected_source \
-  validate_n8n_m07 validate_n8n_m07_adversarial validate_n8n_m07_output_cases; do
-  python3 "scripts/$name.py" || exit 1
-done
-
-for name in \
-  smoke_br08 smoke_br09 smoke_br10a smoke_br10b smoke_br10c \
-  smoke_br10d_accesstrade smoke_br11a smoke_br12d smoke_br13b \
-  smoke_br16a_offline smoke_br18b_backup_restore; do
-  python3 "scripts/$name.py" || exit 1
-done
-python3 scripts/audit_readiness.py || exit 1
-git diff --check
+python3 scripts/run_offline_checks.py --list
+python3 scripts/run_offline_checks.py
 ```
 
 Quickstart cache rỗng và HTTPS fixture cần mạng:
