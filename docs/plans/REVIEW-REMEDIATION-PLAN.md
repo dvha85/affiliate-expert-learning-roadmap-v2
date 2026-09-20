@@ -4,6 +4,19 @@
 <!-- readiness-main-baseline: 1ef3c097eaf6553fe2dacb45166a5adebd78411a -->
 <!-- readiness-baseline-kind: product -->
 
+**Cập nhật F-09 offline runner (2026-09-20):** `scripts/run_offline_checks.py`
+đã trở thành entrypoint version-control cho toàn bộ đường kiểm
+offline/read-only: bốn Go module test/vet, learner race, Python regression,
+static validators, offline smokes, readiness audit và `git diff --check`. Runner
+loại trừ tường minh hai operated validators cần execution artifact và hai
+runner n8n thật cần Node/n8n pin. Targeted plan tests đạt 3/3, `--list` và
+compile/JSON checks đạt; full runner dừng trước khi chạy vì host không có
+`go`, nên chưa ghi offline PASS. Bằng chứng chi tiết nằm tại
+`docs/architecture/EVIDENCE-F09-OFFLINE-RUNNER-20260920.md`; current local
+evidence graph records 154 scoped claims and 174 readiness-audit tests. Đây là
+runbook/evidence boundary, không đóng hosted Go/Windows/n8n, provider/live,
+deployment, pilot, business outcome hoặc production readiness.
+
 **Post-merge sync after PR #475 (2026-09-19):** PR #475 was squash-merged
 into `main` at `2d8eac865b0fff5599da75cd3cbd1575cce20fc7`. Curriculum CI,
 Mission Agent Path CI (including hosted n8n and Windows jobs), Security Scans
@@ -3676,25 +3689,28 @@ proof; readiness vẫn `NOT_READY_FOR_PRODUCTION`. Marker: `Post-merge PR #412 a
 
 ## 5. Cách kiểm và giao việc cho từng PR
 
-Các lệnh baseline dưới đây là lệnh đã có trong repo; các negative cases trong từng RP là công việc bổ sung. Chạy từ repo root; dùng Go theo `go.mod`, Python theo CI, quyền loopback cho tests liên quan. Không cần provider credential cho offline suite.
+Đường kiểm offline/read-only chuẩn chạy từ repo root bằng một entrypoint duy
+nhất:
 
 ```bash
-for module in contracts core lab/affiliate-bot lab/mission-runtime; do
-  (cd "$module" && GOWORK=off go test -count=1 ./... && GOWORK=off go vet ./...) || exit 1
-done
-python3 -m unittest discover -s scripts/tests -v
-for validator in scripts/validate*.py; do
-  python3 "$validator" || exit 1
-done
-python3 scripts/audit_readiness.py
-python3 scripts/smoke_br12d.py
-python3 scripts/smoke_br13b.py
-python3 scripts/smoke_br16a_offline.py
-python3 scripts/smoke_br18b_backup_restore.py
-git diff --check
+python3 scripts/run_offline_checks.py --list
+python3 scripts/run_offline_checks.py
 ```
 
-Quickstart clone/cache trống và pinned HTTPS fetch cần mạng: `python3 scripts/smoke_quickstart.py`, `python3 scripts/smoke_br13c.py`. Chạy cho đợt nghiệm thu tổng và khi sửa phạm vi liên quan. Guard offline phải kiểm bằng transport fixture, không suy test reject PASS từ lỗi DNS/sandbox.
+Runner này chạy theo thứ tự cố định bốn Go module test/vet, learner race,
+Python regression, static validators, offline smokes, readiness audit và
+`git diff --check`. Nó không gọi
+`validate_n8n_m06_operated_execution.py` hoặc
+`validate_n8n_m07_operated_execution.py` khi chưa có execution artifact/history,
+và không gọi engine n8n/Schedule Trigger thật khi chưa có Node/n8n pin. Nếu
+thiếu executable, runner báo blocker trước khi bắt đầu để tránh kết quả nửa
+chừng. Xem [F-09 evidence](../architecture/EVIDENCE-F09-OFFLINE-RUNNER-20260920.md)
+cho lần kiểm hiện tại.
+
+Quickstart clone/cache trống và pinned HTTPS fetch cần mạng:
+`python3 scripts/smoke_quickstart.py`, `python3 scripts/smoke_br13c.py`.
+Chạy cho đợt nghiệm thu tổng và khi sửa phạm vi liên quan. Guard offline phải
+kiểm bằng transport fixture, không suy test reject PASS từ lỗi DNS/sandbox.
 
 Mỗi PR implementation phải ghi:
 

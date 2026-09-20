@@ -100,7 +100,16 @@ def audit_product_baseline_git(root, baseline):
     changed = git("diff", "--name-only", f"{baseline}..HEAD")
     if changed.returncode != 0:
         fail("could not inspect product baseline diff")
-    allowed = ("docs/", "scripts/audit_readiness.py", "scripts/tests/", ".github/workflows/")
+    allowed = (
+        "docs/",
+        "README.md",
+        "curriculum/README.md",
+        "lab/affiliate-bot/README.md",
+        "scripts/audit_readiness.py",
+        "scripts/run_offline_checks.py",
+        "scripts/tests/",
+        ".github/workflows/",
+    )
     unexpected = [
         path
         for path in changed.stdout.splitlines()

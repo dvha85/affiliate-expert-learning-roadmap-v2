@@ -98,13 +98,18 @@ Các guard freshness có trạng thái `ABSTAIN_STALE` và `ABSTAIN_FUTURE`; yê
 
 ## M06–M11 learner entrypoints
 
-Trạng thái hiện hành tại baseline `707ac76`: **PARTIAL / offline only**. Các
+Trạng thái hiện hành trên product main: **PARTIAL / offline only**. Các
 entrypoint M06–M11 đã chạy trong cùng learner Bot và có regression cho identity,
 budget, recovery, HTTP boundary, registry graph và durable STOP. Chúng vẫn chưa
 là live executor hoặc production readiness: selected source/provider, business
 outcome, crash/power-loss, multi-host, deployment và beginner pilot còn mở.
 Xem [review toàn repo 19/09/2026](../../docs/plans/FULL-REPO-REVIEW-2026-09-19.md)
 và [tracker remediation hiện hành](../../docs/plans/REVIEW-REMEDIATION-PLAN.md).
+
+Từ repo root, `python scripts/run_offline_checks.py` chạy trọn bộ kiểm
+offline/read-only đã được version-control. `--list` chỉ in kế hoạch; lệnh
+chính sẽ fail rõ nếu máy thiếu Go/Python/Git. Operated validators cần artifact
+riêng, còn M06/M07 engine và Schedule Trigger cần Node/n8n pin trong CI.
 
 Watcher fixture và watcher n8n dùng chung canonical adapter. Chạy adapter local
 trước khi import blueprint M06:

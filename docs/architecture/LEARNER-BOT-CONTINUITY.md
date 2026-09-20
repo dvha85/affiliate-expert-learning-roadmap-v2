@@ -4,6 +4,16 @@
 
 Repo có nhiều reference surface (bề mặt tham chiếu), nhưng learner chỉ xây **một hệ thống Affiliate Intelligence Bot tiến hóa liên tục**. Mission sau phải nối artifact/state/capability của Mission trước; không được PASS bằng một demo rời không gắn lại vào learner Bot.
 
+## Kiểm chứng hiện hành
+
+Đường kiểm offline/read-only chuẩn được gom tại
+`python scripts/run_offline_checks.py` từ repo root. Entrypoint này bao gồm
+Go test/vet/race, Python regression, static validators, offline smokes,
+readiness audit và `git diff --check`; nó cố ý không gọi operated validators
+thiếu execution artifact hoặc n8n engine thật. Vì vậy kết quả offline không
+đóng selected-source/provider, live executor, deployment, pilot, business
+outcome hay production readiness.
+
 ```text
 M01 learner Bot baseline
 → M02 history/replay
