@@ -23,6 +23,8 @@ _PATH_PREFIXES = (
 _EXACT_PATHS = {
     ".github/workflows/curriculum-ci.yml",
     ".github/workflows/mission-agent-path-ci.yml",
+    "lab/mission-runtime/go.mod",
+    "lab/mission-runtime/go.sum",
     "lab/affiliate-bot/go.mod",
     "lab/affiliate-bot/go.sum",
 }
