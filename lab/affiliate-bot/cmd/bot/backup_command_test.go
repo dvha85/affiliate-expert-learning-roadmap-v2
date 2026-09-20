@@ -18,6 +18,7 @@ import (
 	"github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
 	corem07 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m07"
 	corem10 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m10"
+	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
 func backupCall(t *testing.T, args ...string) (int, map[string]any) {
@@ -1125,6 +1126,232 @@ func TestBackupRestoreRejectsStateCanaryMissingRegistryGrant(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreValidatesHistoricalM10RegistryWithoutActiveCanary(t *testing.T) {
+	runtimeDir, _, _, _ := authorityExpiryFixture(t, "none")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Canary == nil {
+		t.Fatal("authority fixture did not create an active canary")
+	}
+	state.Canary = nil
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+
+	root := filepath.Dir(runtimeDir)
+	backup := filepath.Join(root, "historical-m10-backup")
+	restored := filepath.Join(root, "historical-m10-restored")
+	if code, response := backupCall(t, "create", runtimeDir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("historical M10 registry was not backed up: code=%d response=%+v", code, response)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(backup, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	requiredRegistry := false
+	for _, name := range manifest.Required {
+		if name == "m10-artifacts.jsonl" {
+			requiredRegistry = true
+			break
+		}
+	}
+	if !requiredRegistry {
+		t.Fatalf("historical M10 registry was omitted from required inventory: %+v", manifest.Required)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("historical M10 registry was not restored: code=%d response=%+v", code, response)
+	}
+
+	broken := filepath.Join(root, "historical-m10-broken")
+	copyFlatBackup(t, backup, broken)
+	removeM10ArtifactEntry(t, filepath.Join(broken, "m10-artifacts.jsonl"), corem10.ArtifactKindCanaryGrant, "expiry-grant")
+	if err := readJSON(filepath.Join(broken, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(broken, "m10-artifacts.jsonl")
+	manifest.Files["m10-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m10-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	brokenRestored := filepath.Join(root, "historical-m10-broken-restored")
+	if code, response := backupCall(t, "restore", broken, brokenRestored); code == 0 || response["status"] == "RESTORED" {
+		t.Fatalf("checksum-valid historical M10 registry orphan was restored: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(brokenRestored); !os.IsNotExist(err) {
+		t.Fatalf("invalid historical M10 registry published a restore target: %v", err)
+	}
+}
+
+func TestBackupRestoreReplaysM11RecoveryAdmissionAndRejectsOrphanApproval(t *testing.T) {
+	fixture := newM11UnknownStopFixture(t)
+	historyRecord, err := NewHistoryRecord("restore-admission-history", "2026-09-08T00:00:03Z", "2026-09-08T00:00:03Z", []Observation{historyObservation("restore-admission-history-observation", "restore-admission-product", "Product", 100, .1, "2026-09-08T00:00:00Z")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendHistory(filepath.Join(fixture.dir, "history.jsonl"), historyRecord); err != nil {
+		t.Fatal(err)
+	}
+	newLease := fixture.lease
+	newLease.LeaseID = "restore-admission-new-lease"
+	newLease.ApprovalRef = "restore-admission-new-approval"
+	newLease.ReviewedAt = "2026-09-08T00:00:04Z"
+	newLease.ValidFrom = "2026-09-08T00:00:04Z"
+	newLease.CorrelationID = "restore-admission-new-correlation"
+	newLease.LeaseHash = corem11.ComputeProductionLeaseHash(newLease)
+	newApproval := corem11.ProductionLeaseApproval{
+		ApprovalID:              newLease.ApprovalRef,
+		LeaseID:                 newLease.LeaseID,
+		LeaseVersion:            newLease.LeaseVersion,
+		LeaseHash:               newLease.LeaseHash,
+		PromotionReviewRef:      newLease.PromotionReviewRef,
+		SourceCanaryGrantID:     newLease.SourceCanaryGrantID,
+		SourceCanaryGrantVersion: newLease.SourceCanaryGrantVersion,
+		SourceCanaryGrantHash:   newLease.SourceCanaryGrantHash,
+		SourceE5Refs:            []string{"fixture:e5"},
+		ValidatedRiskClasses:    []string{"RISK0"},
+		ReviewedBy:              "human",
+		ReviewerID:              newLease.ReviewerID,
+		ReviewedAt:              newLease.ReviewedAt,
+		Decision:                "APPROVE_PRODUCTION_LEASE",
+	}
+	newActivation := corem11.ProductionActivationRecord{
+		LeaseID:      newLease.LeaseID,
+		LeaseVersion: newLease.LeaseVersion,
+		LeaseHash:    newLease.LeaseHash,
+		ActivatedAt:  "2026-09-08T00:00:05Z",
+	}
+	newLedger := corem11.ProductionLedger{
+		LeaseID:                     newLease.LeaseID,
+		LeaseVersion:                newLease.LeaseVersion,
+		LeaseHash:                   newLease.LeaseHash,
+		ControlMode:                 "NORMAL",
+		WindowStartedAt:             "2026-09-08T00:00:05Z",
+		PendingExecutionIDs:         []string{},
+		SuccessfulIdempotencyKeys:   []string{},
+		OutcomeLinks:                []corem11.ProductionOutcomeLink{},
+		ReconciliationResolutionIDs: []string{},
+		UpdatedAt:                   "2026-09-08T00:00:05Z",
+	}
+	oldRuntimeDir, err := filepath.Abs(fixture.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRuntimeDir, err := filepath.Abs(filepath.Join(t.TempDir(), "new-runtime"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := corem11.ProductionRecoveryAdmission{
+		RecoveryAdmissionID: "restore-admission-1",
+		PriorRuntimeDir:     oldRuntimeDir,
+		PriorLeaseID:        fixture.lease.LeaseID,
+		PriorLeaseVersion:   fixture.lease.LeaseVersion,
+		PriorLeaseHash:      fixture.lease.LeaseHash,
+		PriorApprovalID:     fixture.lease.ApprovalRef,
+		ResolutionID:        "reviewed-resolution",
+		NewRuntimeID:        "restore-admission-runtime",
+		NewRuntimeDir:       newRuntimeDir,
+		NewLeaseID:          newLease.LeaseID,
+		NewLeaseVersion:     newLease.LeaseVersion,
+		NewLeaseHash:        newLease.LeaseHash,
+		NewApprovalID:       newApproval.ApprovalID,
+		ReviewedBy:          "human",
+		ReviewerID:          "recovery-reviewer",
+		ReviewedAt:          "2026-09-08T00:00:06Z",
+		ExecutionPermitted:  false,
+	}
+	for _, item := range []struct {
+		kind  string
+		value any
+	}{{corem11.ArtifactKindLease, newLease}, {corem11.ArtifactKindLeaseApproval, newApproval}, {corem11.ArtifactKindActivation, newActivation}, {corem11.ArtifactKindLedger, newLedger}, {corem11.ArtifactKindRecoveryAdmission, admission}} {
+		registerM11TestArtifact(t, fixture.dir, item.kind, item.value)
+	}
+
+	root := filepath.Dir(fixture.dir)
+	backup := filepath.Join(root, "m11-admission-backup")
+	restored := filepath.Join(root, "m11-admission-restored")
+	if code, response := backupCall(t, "create", fixture.dir, backup); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("M11 recovery admission was not backed up: code=%d response=%+v", code, response)
+	}
+	var manifest backupManifest
+	if err := readJSON(filepath.Join(backup, "manifest.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(manifest.Required, []string{"m11-artifacts.jsonl"}) {
+		t.Fatalf("M11 registry was omitted from the required inventory: %+v", manifest.Required)
+	}
+	if code, response := backupCall(t, "restore", backup, restored); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("M11 recovery admission was not restored: code=%d response=%+v", code, response)
+	}
+	restoredEntries, err := loadM11ArtifactRegistry(restored)
+	if err != nil {
+		t.Fatalf("load restored M11 registry: %v", err)
+	}
+	foundAdmission := false
+	for _, entry := range restoredEntries {
+		if entry.ArtifactKind == corem11.ArtifactKindRecoveryAdmission && entry.ArtifactID == admission.RecoveryAdmissionID {
+			foundAdmission = true
+		}
+	}
+	if !foundAdmission {
+		t.Fatalf("restored M11 registry lost recovery admission %s", admission.RecoveryAdmissionID)
+	}
+
+	broken := filepath.Join(root, "m11-admission-missing-approval")
+	copyFlatBackup(t, backup, broken)
+	removeM11ArtifactEntry(t, filepath.Join(broken, "m11-artifacts.jsonl"), corem11.ArtifactKindLeaseApproval, newApproval.ApprovalID)
+	registryPath := filepath.Join(broken, "m11-artifacts.jsonl")
+	manifest.Files["m11-artifacts.jsonl"], err = backupFileMetadata(registryPath, "m11-artifacts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(broken, "manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	brokenRestored := filepath.Join(root, "m11-admission-missing-approval-restored")
+	if code, response := backupCall(t, "restore", broken, brokenRestored); code == 0 || response["status"] == "RESTORED" {
+		t.Fatalf("checksum-valid M11 admission without approval was restored: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Stat(brokenRestored); !os.IsNotExist(err) {
+		t.Fatalf("invalid M11 admission published a restore target: %v", err)
+	}
+}
+
+func removeM11ArtifactEntry(t *testing.T, path, kind, artifactID string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := make([][]byte, 0)
+	removed := false
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		entry, err := corem11.ValidateArtifactEntry(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if entry.ArtifactKind == kind && entry.ArtifactID == artifactID {
+			removed = true
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if !removed {
+		t.Fatalf("missing M11 artifact to remove: %s/%s", kind, artifactID)
+	}
+	if err := os.WriteFile(path, append(bytes.Join(kept, []byte{'\n'}), '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func removeM10ArtifactEntry(t *testing.T, path, kind, artifactID string) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -1894,7 +2121,7 @@ func TestBackupRestoreCarriesAndValidatesM07Sidecar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal, err := corem07.RegisterAgentProposal(modelRaw, []corem07.Evidence{evidence}, registry, record.RecordID)
+	proposal, err := corem07.RegisterAgentProposal(modelRaw, []corem07.Evidence{evidence}, registry, record.RecordID, record.RecordedResult.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}

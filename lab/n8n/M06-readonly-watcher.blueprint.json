@@ -35,6 +35,8 @@
         "method": "POST",
         "url": "={{ $('M06 Adapter Input').item.json.adapter_url + '/v1/m06/fixture-import' }}",
         "sendBody": true,
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {fixture:JSON.parse($('M06 Adapter Input').item.json.fixture_json)} }}",
         "options": {"response": {"response": {"fullResponse": true, "responseFormat": "json"}}}

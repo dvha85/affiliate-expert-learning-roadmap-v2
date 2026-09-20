@@ -71,6 +71,12 @@ var backupPublishFault func(phase, path string) error
 // copy path.
 var stableRegularFileReadHook func(path string) error
 
+// stableRegularFileBeforeOpenHook is a test-only seam for replacing an
+// ancestor after the final pathname preflight but before the platform reader
+// binds its handle. Windows uses it to prove that reparse traversal fails
+// closed; production callers cannot select this seam.
+var stableRegularFileBeforeOpenHook func(path string) error
+
 // stableRegularFileContentHook runs in tests only after the shared reader has
 // captured its first descriptor snapshot and before it verifies that snapshot.
 // It proves a same-inode content rewrite is rejected on the real runtime-store
@@ -296,6 +302,11 @@ func readStableRegularFileLimit(path string, limit int64) ([]byte, fs.FileInfo, 
 	}
 	if limit >= 0 && before.Size() > limit {
 		return nil, nil, fmt.Errorf("%s exceeds stable regular file limit", path)
+	}
+	if stableRegularFileBeforeOpenHook != nil {
+		if err := stableRegularFileBeforeOpenHook(path); err != nil {
+			return nil, nil, err
+		}
 	}
 	f, err := openStableRegularFileForRead(path)
 	if err != nil {
@@ -656,11 +667,10 @@ func requiredBackupFiles(source string) ([]string, error) {
 	if accesstradeReceiptRequired {
 		required = append(required, filepath.Base(accesstradeReceiptPath(filepath.Join(source, "outcomes.jsonl"))))
 	}
-	state, err := loadMissionState(source)
-	if err != nil {
+	if _, err := loadMissionState(source); err != nil {
 		return nil, err
 	}
-	if state.Canary != nil {
+	if _, err := os.Lstat(m10ArtifactRegistryPath(source)); err == nil {
 		required = append(required, filepath.Base(m10ArtifactRegistryPath(source)))
 		entries, err := loadM10ArtifactRegistry(source)
 		if err != nil {
@@ -679,6 +689,8 @@ func requiredBackupFiles(source string) ([]string, error) {
 				break
 			}
 		}
+	} else if !os.IsNotExist(err) {
+		return nil, err
 	}
 	if _, err := os.Stat(m11ArtifactRegistryPath(source)); err == nil {
 		required = append(required, filepath.Base(m11ArtifactRegistryPath(source)))
@@ -959,7 +971,7 @@ func validateM07BackupGraph(dir string) error {
 			return err
 		}
 		ctx.Evidence = append(ctx.Evidence, toolEvidence[record.RecordID]...)
-		proposal, output, err := corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID)
+		proposal, output, err := corem07.ValidateRegisteredAgentProposal(raw, ctx.Evidence, nil, record.RecordID, ctx.DecisionID)
 		if err != nil {
 			return fmt.Errorf("M07 proposal is not grounded after restore: %w", err)
 		}
@@ -990,12 +1002,25 @@ func validateM07BackupGraph(dir string) error {
 
 func validateM10BackupGraph(dir string) error {
 	state, err := loadMissionState(dir)
-	if err != nil || state.Canary == nil {
+	if err != nil {
 		return err
+	}
+	if _, registryErr := os.Lstat(m10ArtifactRegistryPath(dir)); os.IsNotExist(registryErr) {
+		if state.Canary == nil {
+			return nil
+		}
+		return fmt.Errorf("active canary is missing its M10 artifact registry")
+	} else if registryErr != nil {
+		return registryErr
 	}
 	entries, err := loadM10ArtifactRegistry(dir)
 	if err != nil {
 		return err
+	}
+	if state.Canary == nil {
+		// Historical M10 artifacts remain restorable after the mutable active
+		// canary has been cleared, but the registry must still be a valid graph.
+		return nil
 	}
 	// The mutable mission state is never sufficient evidence of a delegation.
 	// On restore its active canary must resolve to the exact immutable registry

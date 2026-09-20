@@ -240,7 +240,7 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal, err := corem07.RegisterAgentProposal(modelRaw, ctx.Evidence, nil, records[0].RecordID)
+	proposal, err := corem07.RegisterAgentProposal(modelRaw, ctx.Evidence, nil, records[0].RecordID, ctx.DecisionID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,6 +283,23 @@ func TestMissionM08IntentRejectsM07ProposalSymlinkSwapAfterOpen(t *testing.T) {
 	}
 	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
 		t.Fatalf("M08 intent wrote output after M07 proposal swap: %v", err)
+	}
+	if err := os.Remove(proposalPath); err != nil {
+		t.Fatal(err)
+	}
+	var mismatched corem07.RegisteredAgentProposal
+	if err := json.Unmarshal(proposalBytes, &mismatched); err != nil {
+		t.Fatal(err)
+	}
+	mismatched.RecordID = "different-canonical-record"
+	if _, err := writeNewJSON(proposalPath, mismatched); err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m08-intent", history, requestPath, proposalPath, outputPath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("M08 intent accepted a proposal with mismatched canonical record provenance: code=%d response=%+v", code, response)
+	}
+	if _, err := os.Lstat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("M08 intent wrote output after proposal provenance mismatch: %v", err)
 	}
 }
 
@@ -484,6 +501,13 @@ func TestLearnerM08PreservesNumbersAndFailsClosedForInvalidProposals(t *testing.
 	stored, err := os.ReadFile(intent)
 	if err != nil || !bytes.Contains(stored, []byte(`9007199254740993`)) {
 		t.Fatalf("large number was not preserved: %s, %v", stored, err)
+	}
+	var reloaded LearnerIntent
+	if err := readJSON(intent, &reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := reloaded.Parameters["id"].(json.Number); !ok || got.String() != "9007199254740993" || learnerIntentHash(reloaded) != reloaded.IntentHash {
+		t.Fatalf("large number changed across learner restart/hash reload: intent=%+v", reloaded)
 	}
 	if err := os.WriteFile(request, bytes.Replace(valid, []byte(`"parameters":{"id":9007199254740993}`), []byte(`"parameters":null`), 1), 0600); err != nil {
 		t.Fatal(err)
@@ -1351,6 +1375,43 @@ func TestMissionM10AuthorityExpiryRejectsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReserveAuthorityExpiryBoundariesWithoutMutation(t *testing.T) {
+	for _, expiring := range []string{"intent", "approval", "grant", "cost"} {
+		for _, boundaryCase := range []struct {
+			name   string
+			delta  time.Duration
+			status string
+			code   int
+		}{
+			{name: "before", delta: -time.Nanosecond, status: "RESERVED", code: 0},
+			{name: "at", delta: 0, status: "REJECTED", code: 1},
+			{name: "after", delta: time.Nanosecond, status: "REJECTED", code: 1},
+		} {
+			t.Run(expiring+"/"+boundaryCase.name, func(t *testing.T) {
+				runtimeDir, boundPath, _, boundary := authorityExpiryFixture(t, expiring)
+				clock := boundary.Add(boundaryCase.delta)
+				previousClock := missionClock
+				missionClock = func() time.Time { return clock }
+				t.Cleanup(func() { missionClock = previousClock })
+				before := missionRuntimeSnapshot(t, runtimeDir)
+				reservationID := "expiry-reservation-" + expiring + "-" + boundaryCase.name
+				code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, reservationID)
+				if code != boundaryCase.code || response["status"] != boundaryCase.status {
+					t.Fatalf("%s %s reserve boundary mismatch: code=%d response=%+v", expiring, boundaryCase.name, code, response)
+				}
+				if boundaryCase.code != 0 {
+					assertMissionRuntimeUnchanged(t, before, runtimeDir)
+					return
+				}
+				state, err := loadMissionState(runtimeDir)
+				if err != nil || state.Canary == nil || len(state.Reservations) != 1 || state.Reservations[0].ReservationID != reservationID || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 {
+					t.Fatalf("valid pre-expiry reserve did not produce one canonical reservation: state=%+v err=%v", state, err)
+				}
+			})
+		}
+	}
+}
+
 func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T) {
 	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "cost")
 	root := filepath.Dir(runtimeDir)
@@ -1390,6 +1451,37 @@ func TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload(t *testing.T
 		t.Fatalf("reloaded DENY policy admitted reservation: code=%d response=%+v", code, response)
 	}
 	assertMissionRuntimeUnchanged(t, beforeDenied, runtimeDir)
+}
+
+func TestMissionM10RejectsUnregisteredCanaryBeforeGateOrLedgerMutation(t *testing.T) {
+	runtimeDir, boundPath, _, evaluatedAt := authorityExpiryFixture(t, "none")
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil {
+		t.Fatalf("load canary fixture: state=%+v err=%v", state, err)
+	}
+	forged := state.Canary.CanaryGrant
+	forged.GrantID = "unregistered-canary"
+	forged.GrantHash = corem10.ComputeCanaryGrantHash(forged)
+	state.Canary = &LearnerCanary{CanaryGrant: forged, Status: "ACTIVE"}
+	if err := saveMissionState(runtimeDir, state); err != nil {
+		t.Fatal(err)
+	}
+
+	gateOutput := filepath.Join(filepath.Dir(runtimeDir), "unregistered-gate.json")
+	beforeGate := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, gateOutput, evaluatedAt.Format(time.RFC3339)); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("unregistered canary reached M10 gate: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeGate, runtimeDir)
+	if _, err := os.Stat(gateOutput); !os.IsNotExist(err) {
+		t.Fatalf("rejected gate wrote a portable output: %v", err)
+	}
+
+	beforeReserve := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, "unregistered-canary-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("unregistered canary reached M10 ledger: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, beforeReserve, runtimeDir)
 }
 
 func TestMissionBindRejectsSemanticallyImpossibleM08PolicyWithoutStateMutation(t *testing.T) {
@@ -3086,6 +3178,122 @@ func TestMissionM11DurableStopPreventsLifecycleWrites(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReserveRejectsDurableStopWithoutMutation(t *testing.T) {
+	runtimeDir, boundPath, _, _ := authorityExpiryFixture(t, "none")
+	if code, response := missionCall(t, "m11-stop", runtimeDir, "reserve-stop-boundary"); code != 0 || response["status"] != "STOPPED" {
+		t.Fatalf("durable STOP setup failed: code=%d response=%+v", code, response)
+	}
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-reserve", runtimeDir, boundPath, "reserve-after-stop"); code == 0 || response["status"] != "STOPPED" {
+		t.Fatalf("M10 reserve crossed durable STOP: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
+func TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 1)
+	root := filepath.Dir(runtimeDir)
+	grantPath := filepath.Join(root, "grant.json")
+	approvalPath := filepath.Join(root, "approval.json")
+	binary := buildMissionBinary(t)
+
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", runtimeDir, boundPath, "budget-exhausted"); code != 0 || response["status"] != "RESERVED" {
+		t.Fatalf("fresh Bot did not consume the cap=1 budget: code=%d response=%+v", code, response)
+	}
+	state, err := loadMissionState(runtimeDir)
+	if err != nil || state.Canary == nil || state.Canary.ExecutionsUsed != 1 || state.Canary.CostUsedMinor != 1 || len(state.Reservations) != 1 {
+		t.Fatalf("cap=1 budget ledger is not exhausted exactly once: state=%+v err=%v", state, err)
+	}
+
+	assertRejectedWithoutMutation := func(dir, name string, args ...string) {
+		t.Helper()
+		before := missionRuntimeSnapshot(t, dir)
+		code, response := missionBinaryCall(t, binary, args...)
+		if code == 0 || response["status"] != "REJECTED" {
+			t.Fatalf("%s reopened exhausted authority: code=%d response=%+v", name, code, response)
+		}
+		assertMissionRuntimeUnchanged(t, before, dir)
+	}
+
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m09-approval", runtimeDir, approvalPath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("approval replay did not remain an exact duplicate after exhaustion: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	before = missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-canary", runtimeDir, grantPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("exact grant re-import did not remain an ACK after exhaustion: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	var originalGrant corem10.CanaryGrant
+	if err := readJSON(grantPath, &originalGrant); err != nil {
+		t.Fatal(err)
+	}
+	increasedCap := originalGrant
+	increasedCap.MaxExecutionsTotal = 2
+	increasedCap.MaxExecutionsPerWindow = 2
+	increasedCap.GrantHash = corem10.ComputeCanaryGrantHash(increasedCap)
+	increasedCapPath := filepath.Join(root, "increased-cap-grant.json")
+	writeMissionTestJSON(t, increasedCapPath, increasedCap)
+	assertRejectedWithoutMutation(runtimeDir, "same-ID cap increase", "mission", "m10-canary", runtimeDir, increasedCapPath)
+
+	changedCurrency := originalGrant
+	changedCurrency.Currency = "VND"
+	changedCurrency.GrantHash = corem10.ComputeCanaryGrantHash(changedCurrency)
+	changedCurrencyPath := filepath.Join(root, "changed-currency-grant.json")
+	writeMissionTestJSON(t, changedCurrencyPath, changedCurrency)
+	assertRejectedWithoutMutation(runtimeDir, "same-ID currency change", "mission", "m10-canary", runtimeDir, changedCurrencyPath)
+
+	var originalBound corem10.TrustedCostBound
+	if err := readJSON(boundPath, &originalBound); err != nil {
+		t.Fatal(err)
+	}
+	changedBound := originalBound
+	changedBound.Currency = "VND"
+	changedBound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(changedBound)
+	changedBoundPath := filepath.Join(root, "changed-currency-cost.json")
+	writeMissionTestJSON(t, changedBoundPath, changedBound)
+	assertRejectedWithoutMutation(runtimeDir, "cost-bound currency change", "mission", "m10-cost-register", runtimeDir, changedBoundPath)
+
+	before = missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", runtimeDir, boundPath, "budget-replay-after-approval"); code == 0 || response["status"] != "BUDGET_DENIED" {
+		t.Fatalf("approval/grant replay reopened exhausted budget: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+
+	backupDir := filepath.Join(root, "budget-exhausted-backup")
+	restoredDir := filepath.Join(root, "budget-exhausted-restored")
+	if code, response := backupCall(t, "create", runtimeDir, backupDir); code != 0 || response["status"] != "BACKED_UP" {
+		t.Fatalf("exhausted budget backup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := backupCall(t, "restore", backupDir, restoredDir); code != 0 || response["status"] != "RESTORED" {
+		t.Fatalf("exhausted budget restore failed: code=%d response=%+v", code, response)
+	}
+
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m09-approval", restoredDir, approvalPath); code != 0 || response["status"] != "EXACT_DUPLICATE" {
+		t.Fatalf("restored approval replay was not an exact duplicate: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-canary", restoredDir, grantPath); code != 0 || response["status"] != "ACK" {
+		t.Fatalf("restored exact grant re-import was not an ACK: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+	assertRejectedWithoutMutation(restoredDir, "restored same-ID cap increase", "mission", "m10-canary", restoredDir, increasedCapPath)
+	assertRejectedWithoutMutation(restoredDir, "restored same-ID currency change", "mission", "m10-canary", restoredDir, changedCurrencyPath)
+	assertRejectedWithoutMutation(restoredDir, "restored cost-bound currency change", "mission", "m10-cost-register", restoredDir, changedBoundPath)
+
+	before = missionRuntimeSnapshot(t, restoredDir)
+	if code, response := missionBinaryCall(t, binary, "mission", "m10-reserve", restoredDir, boundPath, "restored-budget-replay"); code == 0 || response["status"] != "BUDGET_DENIED" {
+		t.Fatalf("restored approval/grant replay reopened exhausted budget: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, restoredDir)
+}
+
 func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
 	i.IntentHash = learnerIntentHash(i)
@@ -3100,6 +3308,50 @@ func TestEvaluateLearnerPolicyRequiresReviewForRiskTwo(t *testing.T) {
 	}
 	if p.Decision != "HUMAN_REVIEW" || !p.PolicyReviewRequired || p.ExecutionAuthorized {
 		t.Fatalf("unexpected risk-two policy: %+v", p)
+	}
+}
+
+func TestLearnerM08UsesSharedPolicyConformanceTable(t *testing.T) {
+	for _, scenario := range corem08.PolicyConformanceCases() {
+		if !scenario.LearnerEquivalent {
+			continue
+		}
+		t.Run(scenario.Name, func(t *testing.T) {
+			dir := t.TempDir()
+			policyPath := filepath.Join(dir, "policy-input.json")
+			writeMissionTestJSON(t, policyPath, learnerPolicyRequest{
+				PolicyVersion: scenario.Context.PolicyVersion, Now: scenario.Context.Now,
+				AllowedHosts: scenario.Context.AllowedHosts, ActionRisk: scenario.Context.ActionRisk,
+				SeenIdempotency: scenario.Context.SeenIdempotency,
+			})
+			got, err := evaluateLearnerPolicy(LearnerIntent(scenario.Intent), policyPath, scenario.Context.KnownProposalIDs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Decision != scenario.Decision || got.RiskClass != scenario.RiskClass || got.Reason != scenario.Reason || got.PolicyReviewRequired != scenario.PolicyReview || got.ExecutionAuthorized != scenario.ExecutionAuth {
+				t.Fatalf("learner drifted from shared table: got=%+v want decision=%s risk=%s reason=%s review=%v authority=%v", got, scenario.Decision, scenario.RiskClass, scenario.Reason, scenario.PolicyReview, scenario.ExecutionAuth)
+			}
+		})
+	}
+}
+
+func TestEvaluateLearnerPolicyUsesSharedContextValidation(t *testing.T) {
+	i := LearnerIntent{IntentID: "i", DecisionID: "d", EvidenceIDs: []string{"e"}, ActionType: "PUBLISH", Target: "https://example.com/publish", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2099-01-01T00:00:00Z", ExpiresAt: "2099-01-01T02:00:00Z", CorrelationID: "c", IdempotencyKey: "k", IntentMode: "PROPOSAL_ONLY"}
+	i.IntentHash = learnerIntentHash(i)
+	for name, raw := range map[string]string{
+		"invalid time": `{"policy_version":"v1","now":"tomorrow","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+		"invalid risk": `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":["example.com"],"action_risk":{"PUBLISH":"RISK9"},"seen_idempotency":{}}`,
+		"null hosts":   `{"policy_version":"v1","now":"2099-01-01T01:00:00Z","allowed_hosts":null,"action_risk":{"PUBLISH":"RISK2"},"seen_idempotency":{}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "policy.json")
+			if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := evaluateLearnerPolicy(i, path, nil); err == nil {
+				t.Fatal("invalid policy context accepted")
+			}
+		})
 	}
 }
 

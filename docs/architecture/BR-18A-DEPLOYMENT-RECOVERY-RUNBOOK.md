@@ -6,7 +6,7 @@ quyền STOP trước activation.
 
 ## Cấu hình tham chiếu local
 
-Profile này chỉ chứng minh đường chạy offline của learner Bot. Dùng Go 1.23+
+Profile này chỉ chứng minh đường chạy offline của learner Bot. Dùng Go 1.27+
 và một thư mục dữ liệu riêng, không dùng `lab/affiliate-bot/data` làm store
 runtime.
 

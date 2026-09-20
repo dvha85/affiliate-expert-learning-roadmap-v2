@@ -12,17 +12,198 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReadinessAuditTests(unittest.TestCase):
+    def _git_fixture(self):
+        root = Path(tempfile.mkdtemp(dir=self.temp.name))
+        subprocess.run(["git", "init", str(root)], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "audit@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Readiness Audit"], check=True)
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "fixture"], check=True, capture_output=True, text=True)
+        return root, subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+
+    def test_product_baseline_git_rejects_missing_commit(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, _ = self._git_fixture()
+        with self.assertRaisesRegex(AssertionError, "not a resolvable Git commit"):
+            audit_product_baseline_git(root, "0" * 40)
+
+    def test_product_baseline_git_rejects_undocumented_code_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        (root / "source.go").write_text("package fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "source.go"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "code"], check=True, capture_output=True, text=True)
+        with self.assertRaisesRegex(AssertionError, "non-doc drift"):
+            audit_product_baseline_git(root, baseline)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("scripts/audit_readiness.py", "scripts/smoke_br16a_offline.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_registry_graph_envelope_integrity.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "lab/affiliate-bot/cmd/bot/advisor_fixture.go", "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/cmd/bot/history_schema.go", "lab/affiliate-bot/cmd/bot/watcher_fetch.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go", "lab/affiliate-bot/cmd/bot/advisor_budget.go", "lab/affiliate-bot/cmd/bot/advisor_results.go", "lab/affiliate-bot/cmd/bot/advisor_report.go", "lab/affiliate-bot/cmd/bot/advisor_canary.go", "lab/affiliate-bot/cmd/bot/backup_command.go", "lab/affiliate-bot/cmd/bot/advisor_br10_campaign.go", "lab/affiliate-bot/cmd/bot/advisor_canary_test.go", "lab/affiliate-bot/cmd/bot/accesstrade_import.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/affiliate-bot/cmd/bot/stable_append_posix.go", "lab/affiliate-bot/cmd/bot/stable_append_other.go", "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md", "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md", "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md", "docs/architecture/EVIDENCE-M11-RESTORE-AUTH-EXECUTION-LINEAGE-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md", "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md", "docs/architecture/EVIDENCE-M11-RECOVERY-ADMISSION-FIELD-INTEGRITY-20260917.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
+        full_plan_source = ROOT / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target = self.root / "docs/plans/FULL-REPOSITORY-REVIEW-PLAN-20260919.md"
+        full_plan_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(full_plan_source, full_plan_target)
+        evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md", evidence)
+        for relative in ("scripts/audit_readiness.py", "scripts/smoke_br16a_offline.py", "scripts/mutate_m10_identity_guard.py", "scripts/mutate_m11_identity_guard.py", "scripts/mutate_registry_graph_envelope_integrity.py", "scripts/mutate_backup_source_guard.py", "scripts/mutate_runtime_store_path_guard.py", "scripts/mutate_recovery_journal_path_guard.py", "scripts/mutate_m07_tool_artifact_path_guard.py", "scripts/mutate_m07_portable_input_guard.py", "scripts/mutate_general_portable_input_guard.py", "scripts/mutate_internal_portable_input_guard.py", "scripts/mutate_m07_backup_sidecar_path_guard.py", "scripts/mutate_m08_m07_proposal_path_guard.py", "scripts/mutate_mission_portable_input_guard.py", "scripts/mutate_mission_stop_immutability_guard.py", "scripts/mutate_m07_strict_output_decoder.py", "scripts/mutate_m07_registry_strict_decoder.py", "scripts/mutate_m11_reverse_ledger_graph.py", "lab/affiliate-bot/cmd/bot/advisor_fixture.go", "lab/affiliate-bot/cmd/bot/advisor_fixture_test.go", "lab/affiliate-bot/cmd/bot/advisor_writer_parent_swap_test.go", "lab/affiliate-bot/cmd/bot/artifact_publish_test.go", "lab/affiliate-bot/cmd/bot/history_schema.go", "lab/affiliate-bot/cmd/bot/watcher_fetch.go", "lab/affiliate-bot/internal/store/history.go", "lab/affiliate-bot/internal/store/history_test.go", "lab/affiliate-bot/cmd/bot/action_store_test.go", "lab/affiliate-bot/cmd/bot/outcome_store_test.go", "lab/affiliate-bot/cmd/bot/learner_schema_alias_test.go", "lab/affiliate-bot/cmd/bot/m11_registry.go", "lab/affiliate-bot/cmd/bot/m11_registry_fault_test.go", "lab/affiliate-bot/cmd/bot/advisor_budget.go", "lab/affiliate-bot/cmd/bot/advisor_results.go", "lab/affiliate-bot/cmd/bot/advisor_report.go", "lab/affiliate-bot/cmd/bot/advisor_canary.go", "lab/affiliate-bot/cmd/bot/backup_command.go", "lab/affiliate-bot/cmd/bot/advisor_br10_campaign.go", "lab/affiliate-bot/cmd/bot/advisor_canary_test.go", "lab/affiliate-bot/cmd/bot/accesstrade_import.go", "lab/affiliate-bot/cmd/bot/accesstrade_receipt.go", "lab/affiliate-bot/cmd/bot/accesstrade_import_test.go", "lab/affiliate-bot/cmd/bot/stable_append_posix.go", "lab/affiliate-bot/cmd/bot/stable_append_other.go", "lab/affiliate-bot/cmd/bot/registry_parent_swap_test.go", "lab/n8n/COMPATIBILITY.md", "README.md", "curriculum/README.md", "docs/plans/READINESS-MATRIX.json", "docs/plans/READINESS-EVIDENCE-GRAPH.json", "docs/plans/BEGINNER-READINESS-PLAN.md", "docs/plans/PRE-MERGE-REMEDIATION-737E85A.md", "docs/plans/REVIEW-REMEDIATION-PLAN.md", "docs/architecture/EVIDENCE-M06-ACCESSTRADE-SHOPEE-OPERATED-20260915.md", "docs/architecture/EVIDENCE-BR18B-LOCAL-RECOVERY-DRILL-20260915.md", "docs/architecture/EVIDENCE-BR16B-ASSISTED-FRESH-WORKSPACE-20260915.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-376-20260916.md", "docs/architecture/EVIDENCE-M11-RESTORE-AUTH-EXECUTION-LINEAGE-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-387-20260916.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-408-20260917.md", "docs/architecture/EVIDENCE-LOCAL-REGRESSION-POST-410-20260917.md", "docs/architecture/EVIDENCE-REGISTRY-GRAPH-ENVELOPE-MUTATION-20260917.md", "docs/architecture/EVIDENCE-M11-RECOVERY-ADMISSION-FIELD-INTEGRITY-20260917.md", "docs/architecture/EVIDENCE-RP04-SHARED-CANONICAL-CONTEXT-20260918.md", "docs/architecture/EVIDENCE-PR425-POST-MERGE-20260918.md", ".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml"):
             source, target = ROOT / relative, self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        for relative in ("core/m08/m08.go", "core/m08/m08_test.go", "core/m08/conformance.go", "core/m08/conformance_test.go", "lab/mission-runtime/cmd/demo/m08_boundary.go", "lab/mission-runtime/cmd/demo/m08_boundary_test.go", "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        for relative in ("core/m09/m09.go", "core/m09/m09_test.go", "lab/mission-runtime/cmd/demo/m09.go", "lab/mission-runtime/cmd/demo/m09_boundary.go", "lab/mission-runtime/cmd/demo/m09_test.go"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        for relative in ("core/m10/canary_grant.go", "core/m10/cost_bound.go", "core/m10/canary_gate.go", "core/m10/canary_authorization.go", "core/m10/canary_execution_record.go", "core/m10/historical_chain.go", "core/m10/cost_bound_test.go", "lab/mission-runtime/cmd/demo/m10_boundary.go", "lab/mission-runtime/cmd/demo/m10_chain.go", "lab/mission-runtime/cmd/demo/m10_boundary_test.go", "lab/mission-runtime/cmd/demo/m10_chain_test.go"):
+            source, target = ROOT / relative, self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        evidence_rp02_post_merge = self.root / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md"
+        evidence_rp02_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md", evidence_rp02_post_merge)
+        evidence_rp02_m09_post_merge = self.root / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md"
+        evidence_rp02_m09_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md", evidence_rp02_m09_post_merge)
+        evidence_rp03_m10_post_merge = self.root / "docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md"
+        evidence_rp03_m10_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md", evidence_rp03_m10_post_merge)
+        evidence_rp03_budget_expiry_post_merge = self.root / "docs/architecture/EVIDENCE-RP03-BUDGET-EXPIRY-POST-MERGE-PR472-20260919.md"
+        evidence_rp03_budget_expiry_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-BUDGET-EXPIRY-POST-MERGE-PR472-20260919.md", evidence_rp03_budget_expiry_post_merge)
+        mutation_terminal_chain = self.root / "scripts/mutate_backup_m11_terminal_chain.py"
+        mutation_terminal_chain.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_backup_m11_terminal_chain.py", mutation_terminal_chain)
+        mutation_ledger_outcome_reverse = self.root / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py"
+        mutation_ledger_outcome_reverse.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py", mutation_ledger_outcome_reverse)
+        mutation_reverse_ledger = self.root / "scripts/mutate_m11_reverse_ledger_graph.py"
+        mutation_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_reverse_ledger_graph.py", mutation_reverse_ledger)
+        mutation_outcome_link = self.root / "scripts/mutate_m11_outcome_link_graph.py"
+        mutation_outcome_link.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_outcome_link_graph.py", mutation_outcome_link)
+        mutation_cycle_graph = self.root / "scripts/mutate_m11_cycle_graph.py"
+        mutation_cycle_graph.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_cycle_graph.py", mutation_cycle_graph)
+        mutation_failed_outcome = self.root / "scripts/mutate_backup_m11_failed_outcome.py"
+        mutation_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_backup_m11_failed_outcome.py", mutation_failed_outcome)
+        mutation_reservation_lineage = self.root / "scripts/mutate_m11_reservation_lineage.py"
+        mutation_reservation_lineage.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_reservation_lineage.py", mutation_reservation_lineage)
+        mutation_budget_snapshot = self.root / "scripts/mutate_m11_gate_budget_snapshot.py"
+        mutation_budget_snapshot.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_gate_budget_snapshot.py", mutation_budget_snapshot)
+        mutation_health_policy = self.root / "scripts/mutate_m11_health_policy.py"
+        mutation_health_policy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_health_policy.py", mutation_health_policy)
+        mutation_expiry_authority = self.root / "scripts/mutate_m11_expiry_authority.py"
+        mutation_expiry_authority.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_expiry_authority.py", mutation_expiry_authority)
+        mutation_ledger_activation = self.root / "scripts/mutate_m11_ledger_activation.py"
+        mutation_ledger_activation.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "scripts/mutate_m11_ledger_activation.py", mutation_ledger_activation)
         evidence_windows_runtime = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md"
         evidence_windows_runtime.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md", evidence_windows_runtime)
+        evidence_windows_ancestor_race = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
+        evidence_windows_ancestor_race.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md", evidence_windows_ancestor_race)
+        evidence_post_416 = self.root / "docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md"
+        evidence_post_416.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md", evidence_post_416)
+        evidence_rp02_m08 = self.root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
+        evidence_rp02_m08.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md", evidence_rp02_m08)
+        evidence_pr417 = self.root / "docs/architecture/EVIDENCE-PR417-POST-MERGE-20260918.md"
+        evidence_pr417.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR417-POST-MERGE-20260918.md", evidence_pr417)
+        evidence_pr427 = self.root / "docs/architecture/EVIDENCE-PR427-POST-MERGE-20260918.md"
+        evidence_pr427.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR427-POST-MERGE-20260918.md", evidence_pr427)
+        evidence_pr429 = self.root / "docs/architecture/EVIDENCE-PR429-POST-MERGE-20260918.md"
+        evidence_pr429.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR429-POST-MERGE-20260918.md", evidence_pr429)
+        evidence_pr431 = self.root / "docs/architecture/EVIDENCE-PR431-POST-MERGE-20260918.md"
+        evidence_pr431.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-PR431-POST-MERGE-20260918.md", evidence_pr431)
+        evidence_rp07a = self.root / "docs/architecture/EVIDENCE-RP07A-M11-ADMISSION-RESTORE-20260918.md"
+        evidence_rp07a.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP07A-M11-ADMISSION-RESTORE-20260918.md", evidence_rp07a)
+        evidence_rp07b = self.root / "docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md"
+        evidence_rp07b.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md", evidence_rp07b)
+        evidence_rp08 = self.root / "docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md"
+        evidence_rp08.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md", evidence_rp08)
+        evidence_rp08_failed_outcome = self.root / "docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md"
+        evidence_rp08_failed_outcome.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md", evidence_rp08_failed_outcome)
+        evidence_rp08_reservation_lineage = self.root / "docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md"
+        evidence_rp08_reservation_lineage.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md", evidence_rp08_reservation_lineage)
+        evidence_rp08_budget_snapshot = self.root / "docs/architecture/EVIDENCE-RP08-M11-GATE-BUDGET-SNAPSHOT-MUTATION-20260919.md"
+        evidence_rp08_budget_snapshot.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-GATE-BUDGET-SNAPSHOT-MUTATION-20260919.md", evidence_rp08_budget_snapshot)
+        evidence_rp08_health_policy = self.root / "docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md"
+        evidence_rp08_health_policy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md", evidence_rp08_health_policy)
+        evidence_rp08_expiry = self.root / "docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md"
+        evidence_rp08_expiry.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md", evidence_rp08_expiry)
+        evidence_rp08_post_merge = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR448-20260919.md"
+        evidence_rp08_post_merge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR448-20260919.md", evidence_rp08_post_merge)
+        evidence_rp08_post_merge_pr449 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR449-20260919.md"
+        evidence_rp08_post_merge_pr449.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR449-20260919.md", evidence_rp08_post_merge_pr449)
+        evidence_rp08_post_merge_pr451 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md"
+        evidence_rp08_post_merge_pr451.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md", evidence_rp08_post_merge_pr451)
+        evidence_rp08_ledger_outcome = self.root / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md"
+        evidence_rp08_ledger_outcome.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md", evidence_rp08_ledger_outcome)
+        evidence_rp08_reverse_ledger = self.root / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md"
+        evidence_rp08_reverse_ledger.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md", evidence_rp08_reverse_ledger)
+        evidence_rp08_outcome_link = self.root / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md"
+        evidence_rp08_outcome_link.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md", evidence_rp08_outcome_link)
+        evidence_rp08_cycle = self.root / "docs/architecture/EVIDENCE-RP08-M11-CYCLE-GRAPH-MUTATION-20260919.md"
+        evidence_rp08_cycle.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-M11-CYCLE-GRAPH-MUTATION-20260919.md", evidence_rp08_cycle)
+        evidence_rp08_post_merge_pr453 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md"
+        evidence_rp08_post_merge_pr453.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR453-20260919.md", evidence_rp08_post_merge_pr453)
+        evidence_rp08_post_merge_pr455 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR455-20260919.md"
+        evidence_rp08_post_merge_pr455.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR455-20260919.md", evidence_rp08_post_merge_pr455)
+        evidence_rp08_post_merge_pr457 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR457-20260919.md"
+        evidence_rp08_post_merge_pr457.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR457-20260919.md", evidence_rp08_post_merge_pr457)
+        evidence_rp08_post_merge_pr459 = self.root / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md"
+        evidence_rp08_post_merge_pr459.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md", evidence_rp08_post_merge_pr459)
+        evidence_rp09_claim_count = self.root / "docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md"
+        evidence_rp09_claim_count.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md", evidence_rp09_claim_count)
+        evidence_rp03_grant = self.root / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md"
+        evidence_rp03_grant.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md", evidence_rp03_grant)
+        evidence_rp03_expiry_stop = self.root / "docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md"
+        evidence_rp03_expiry_stop.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md", evidence_rp03_expiry_stop)
+        evidence_rp03_budget = self.root / "docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md"
+        evidence_rp03_budget.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md", evidence_rp03_budget)
         evidence_outcome_process_kill = self.root / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md"
         evidence_outcome_process_kill.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / "docs/architecture/EVIDENCE-M11-OUTCOME-PROCESS-KILL-20260916.md", evidence_outcome_process_kill)
@@ -116,6 +297,111 @@ class ReadinessAuditTests(unittest.TestCase):
     def test_canonical_matrix(self):
         self.assertIn("NOT_READY_FOR_PRODUCTION", self.run_audit(True))
 
+    def test_stale_post_merge_evidence_claim_count_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("151 scoped claims", "150 scoped claims", 1), encoding="utf-8")
+        self.assertIn("current post-merge evidence claim count does not match the evidence graph", self.run_audit(False))
+
+    def test_stale_remediation_plan_claim_count_is_rejected(self):
+        plan = self.root / "docs/plans/REVIEW-REMEDIATION-PLAN.md"
+        plan.write_text(plan.read_text(encoding="utf-8").replace("records 151 scoped claims", "records 150 scoped claims", 1), encoding="utf-8")
+        self.assertIn("current remediation plan claim count does not match the evidence graph", self.run_audit(False))
+
+    def test_missing_windows_reparse_pin_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/windows_directory.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("FILE_FLAG_OPEN_REPARSE_POINT", "removedReparsePointFlag", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race reparse-point pinning guard is missing", self.run_audit(False))
+
+    def test_missing_windows_ancestor_race_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/windows_ancestor_race_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestWindowsStableReaderRejectsAncestorJunctionAfterPreflight", "RemovedWindowsAncestorRaceRegression", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race regression coverage is missing", self.run_audit(False))
+
+    def test_missing_windows_conservative_boundary_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim POSIX traversal parity", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("Windows ancestor-race conservative boundary disclosure is missing", self.run_audit(False))
+
+    def test_missing_rp02_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m08_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem08.DecodePolicyContext", "removedSharedPolicyContextDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-02 M08 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_exact_number_reader_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("decoder.UseNumber()", "removedExactNumberReader()"), encoding="utf-8")
+        self.assertIn("RP-02 M08 learner exact-number/shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_hash_version_guard_is_rejected(self):
+        source = self.root / "core/m08/m08.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("UNSUPPORTED_HASH_VERSION", "REMOVED_HASH_VERSION_GUARD"), encoding="utf-8")
+        self.assertIn("RP-02 M08 core decoder/hash boundary is missing", self.run_audit(False))
+
+    def test_missing_rp02_bounded_evidence_disclosure_is_rejected(self):
+        evidence = self.root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace("does not claim provider access", "provider boundary removed", 1), encoding="utf-8")
+        self.assertIn("RP-02 M08 bounded evidence disclosure is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_core_decoder_boundary_is_rejected(self):
+        source = self.root / "core/m09/m09.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func DecodeAuthorization", "func RemovedDecodeAuthorization", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 core decoder/chain boundary is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_mission_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m09_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem09.DecodeExecution", "removedSharedExecutionDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_learner_shared_approval_use_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("type LearnerApproval = corem09.ApprovalRecord", "type LearnerApproval struct", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 learner shared approval use is missing", self.run_audit(False))
+
+    def test_missing_rp02_m09_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("multi-file crash proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-02 M09 bounded approval/execution boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_core_decoder_boundary_is_rejected(self):
+        source = self.root / "core/m10/cost_bound.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("func DecodeTrustedCostBound", "func RemovedDecodeTrustedCostBound", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 core decoder/chain boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_mission_shared_decoder_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m10_boundary.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem10.DecodeCanaryExecutionRecord", "removedSharedExecutionDecoder", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 mission-runtime shared decoder use is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_historical_chain_use_is_rejected(self):
+        source = self.root / "lab/mission-runtime/cmd/demo/m10_chain.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("corem10.ValidateHistoricalChain", "removedSharedHistoricalChain", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 mission-runtime historical-chain use is missing", self.run_audit(False))
+
+    def test_missing_rp03_m10_decoder_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("crash/power-loss, distributed locking, executor and business outcome proof remain open", "boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-03 M10 shared decoder boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_budget_expiry_implementation_boundary_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("BUDGET_DENIED", "REMOVED_BUDGET_STATUS"), encoding="utf-8")
+        self.assertIn("RP-03 M10 budget/expiry implementation boundary is missing", self.run_audit(False))
+
+    def test_missing_rp03_exhausted_budget_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore", "RemovedBudgetMonotonicityRegression", 1), encoding="utf-8")
+        self.assertIn("RP-03 exhausted-budget regression is missing", self.run_audit(False))
+
+    def test_missing_rp03_expiry_stop_regression_is_rejected(self):
+        source = self.root / "lab/affiliate-bot/cmd/bot/mission_command_test.go"
+        source.write_text(source.read_text(encoding="utf-8").replace("TestMissionM10ReserveRejectsDurableStopWithoutMutation", "RemovedExpiryStopRegression", 1), encoding="utf-8")
+        self.assertIn("RP-03 approval-expiry/STOP regression is missing", self.run_audit(False))
+
+    def test_missing_rp03_budget_expiry_boundary_disclosure_is_rejected(self):
+        matrix = self.root / "docs/plans/READINESS-MATRIX.json"
+        matrix.write_text(matrix.read_text(encoding="utf-8").replace("This is bounded local/offline/synthetic/read-only evidence and does not prove multi-file crash/power-loss, distributed locking, provider, live executor, business outcome, pilot or deployment readiness.", "budget boundary disclosure removed", 1), encoding="utf-8")
+        self.assertIn("RP-03 exhausted-budget boundary disclosure is missing", self.run_audit(False))
+
     def test_missing_learner_schema_identity_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"
         source.write_text(source.read_text(encoding="utf-8").replace("type LearnerIntent = corem08.Intent", "type LearnerIntent struct"), encoding="utf-8")
@@ -194,7 +480,7 @@ class ReadinessAuditTests(unittest.TestCase):
 
     def test_n8n_engine_cache_gate_removal_is_rejected(self):
         workflow = self.root / ".github/workflows/mission-agent-path-ci.yml"
-        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@v4", "removed_n8n_cache", 1), encoding="utf-8")
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("actions/cache@caa296126883cff596d87d8935842f9db880ef25", "removed_n8n_cache", 1), encoding="utf-8")
         self.assertIn("n8n engine CI cache/gate is missing", self.run_audit(False))
 
     def test_deterministic_shard_removal_is_rejected(self):
@@ -266,6 +552,21 @@ class ReadinessAuditTests(unittest.TestCase):
         source = self.root / "scripts/mutate_m11_authorization_lineage.py"
         source.write_text(source.read_text(encoding="utf-8").replace("LINEAGE_GUARDS", "REMOVED_GUARD_SET"), encoding="utf-8")
         self.assertIn("M11 authorization lineage mutation proof is missing", self.run_audit(False))
+
+    def test_missing_m11_ledger_outcome_reverse_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("orphan-ledger-outcome-restored", "removed-ledger-outcome-marker", 1), encoding="utf-8")
+        self.assertIn("M11 ledger-outcome reverse mutation proof is missing", self.run_audit(False))
+
+    def test_missing_m11_reverse_ledger_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_m11_reverse_ledger_graph.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("CORE_GUARD", "REMOVED_CORE_GUARD", 1), encoding="utf-8")
+        self.assertIn("M11 reverse-ledger mutation proof is missing", self.run_audit(False))
+
+    def test_missing_m11_outcome_link_mutation_is_rejected(self):
+        source = self.root / "scripts/mutate_m11_outcome_link_graph.py"
+        source.write_text(source.read_text(encoding="utf-8").replace("CORE_GUARD", "REMOVED_CORE_GUARD", 1), encoding="utf-8")
+        self.assertIn("M11 outcome-link mutation proof is missing", self.run_audit(False))
 
     def test_missing_m11_fixture_outcome_execution_cardinality_is_rejected(self):
         source = self.root / "lab/affiliate-bot/cmd/bot/mission_command.go"

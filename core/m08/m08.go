@@ -56,12 +56,49 @@ type PolicyDecision struct {
 	PolicyCheckedAt      string `json:"policy_checked_at"`
 }
 
+// IntentHashVersionV1 is the persisted hash prefix used by the current M08
+// canonicalization. A future canonicalization must use a new prefix and an
+// explicit migration; it must never reseal an already approved intent in
+// place.
+const IntentHashVersionV1 = "sha256"
+
+// IntentHashVersion returns the version prefix carried by a persisted intent
+// hash. The existing sha256: prefix is treated as version one for backward
+// compatibility; unknown prefixes fail closed.
+func IntentHashVersion(hash string) string {
+	separator := strings.IndexByte(hash, ':')
+	if separator <= 0 {
+		return ""
+	}
+	return hash[:separator]
+}
+
+func ValidateIntentHash(i Intent) string {
+	if strings.TrimSpace(i.IntentHash) == "" {
+		return "TAMPERED_INTENT"
+	}
+	if IntentHashVersion(i.IntentHash) != IntentHashVersionV1 {
+		return "UNSUPPORTED_HASH_VERSION"
+	}
+	if i.IntentHash != ComputeIntentHash(i) {
+		return "TAMPERED_INTENT"
+	}
+	return "VALID"
+}
+
 // DecodeIntent validates original bytes before typed decoding, so duplicate,
 // unknown, case-variant fields and null required fields cannot be hidden by a
 // Go struct conversion. Parameters are restored from contracts.Decode to keep
 // json.Number values exact for hashing.
 func DecodeIntent(raw []byte) (Intent, string) {
 	var i Intent
+	if value, err := contracts.Decode(raw); err == nil {
+		if object, ok := value.(map[string]any); ok {
+			if hash, ok := object["intent_hash"].(string); ok && IntentHashVersion(hash) != "" && IntentHashVersion(hash) != IntentHashVersionV1 {
+				return i, "UNSUPPORTED_HASH_VERSION"
+			}
+		}
+	}
 	if contracts.ValidateRaw("action-intent.schema.json", raw) != nil || contracts.DecodeStrict(raw, &i) != nil {
 		return i, "INVALID_SCHEMA"
 	}
@@ -85,6 +122,75 @@ func DecodePolicy(raw []byte) (PolicyDecision, string) {
 	return p, "VALID"
 }
 
+// DecodePolicyContext is the canonical decoder for the full M08 policy
+// context consumed by the mission harness. It keeps the original JSON
+// presence/null/duplicate/unknown-key boundary before typed decoding, then
+// applies the same semantic checks used by learner-generated contexts.
+func DecodePolicyContext(raw []byte) (PolicyContext, string) {
+	var ctx PolicyContext
+	value, err := contracts.Decode(raw)
+	if err != nil {
+		return ctx, "INVALID_CONTEXT"
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return ctx, "INVALID_CONTEXT"
+	}
+	for _, key := range []string{"policy_version", "now", "known_decision_ids", "known_evidence_ids", "known_proposal_ids", "allowed_hosts", "action_risk", "seen_idempotency"} {
+		if value, exists := object[key]; !exists || value == nil {
+			return ctx, "INVALID_CONTEXT"
+		}
+	}
+	if err := contracts.DecodeStrict(raw, &ctx); err != nil || ValidatePolicyContext(ctx) != "VALID" {
+		return ctx, "INVALID_CONTEXT"
+	}
+	return ctx, "VALID"
+}
+
+// ValidatePolicyContext applies the non-authorizing context invariants shared
+// by the learner and mission harness. A nil known-proposal list is valid for a
+// human intent; agent intents still fail closed later when the proposal link
+// is evaluated against the list.
+func ValidatePolicyContext(ctx PolicyContext) string {
+	if strings.TrimSpace(ctx.PolicyVersion) == "" {
+		return "INVALID_CONTEXT"
+	}
+	if _, err := time.Parse(time.RFC3339, ctx.Now); err != nil {
+		return "INVALID_CONTEXT"
+	}
+	if ctx.AllowedHosts == nil || ctx.ActionRisk == nil || ctx.SeenIdempotency == nil {
+		return "INVALID_CONTEXT"
+	}
+	if !validContextList(ctx.KnownDecisionIDs, false) || !validContextList(ctx.KnownEvidenceIDs, false) || !validContextList(ctx.KnownProposalIDs, false) || !validContextList(ctx.AllowedHosts, true) {
+		return "INVALID_CONTEXT"
+	}
+	for action, risk := range ctx.ActionRisk {
+		if strings.TrimSpace(action) == "" || strings.TrimSpace(risk) == "" || (risk != "RISK0" && risk != "RISK1" && risk != "RISK2") {
+			return "INVALID_CONTEXT"
+		}
+	}
+	for key, intentHash := range ctx.SeenIdempotency {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(intentHash) == "" {
+			return "INVALID_CONTEXT"
+		}
+	}
+	return "VALID"
+}
+
+func validContextList(values []string, required bool) bool {
+	if required && values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" || value != strings.TrimSpace(value) || seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
 // ValidatePolicyForIntent checks the semantic invariants which are available
 // from the two immutable artifacts alone. It intentionally does not replace
 // EvaluatePolicy: a caller that still owns its PolicyContext must re-evaluate
@@ -92,7 +198,13 @@ func DecodePolicy(raw []byte) (PolicyDecision, string) {
 // from using a decision/risk combination that the canonical evaluator could
 // never emit for a successful proposal.
 func ValidatePolicyForIntent(i Intent, p PolicyDecision) string {
-	if i.IntentHash == "" || i.IntentHash != ComputeIntentHash(i) || i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
+	if status := ValidateIntentHash(i); status != "VALID" {
+		if status == "UNSUPPORTED_HASH_VERSION" {
+			return status
+		}
+		return "INVALID_INTENT"
+	}
+	if i.IntentMode != "PROPOSAL_ONLY" || i.ExecutionAuthorized {
 		return "INVALID_INTENT"
 	}
 	if p.PolicyVersion == "" || p.IntentID != i.IntentID || p.IntentHash != i.IntentHash || p.PolicyMode != "NON_AUTHORIZING" || p.ExecutionAuthorized {
@@ -151,7 +263,7 @@ func ComputeIntentHash(i Intent) string {
 		return ""
 	}
 	s := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(s[:])
+	return IntentHashVersionV1 + ":" + hex.EncodeToString(s[:])
 }
 
 func SealIntent(i Intent) Intent {
@@ -198,8 +310,8 @@ func EvaluatePolicy(i Intent, ctx PolicyContext) PolicyDecision {
 		p.Reason = "INTENT_AUTHORITY_FORBIDDEN"
 		return p
 	}
-	if i.IntentHash == "" || i.IntentHash != ComputeIntentHash(i) {
-		p.Reason = "TAMPERED_INTENT"
+	if status := ValidateIntentHash(i); status != "VALID" {
+		p.Reason = status
 		return p
 	}
 	risk, ok := ctx.ActionRisk[i.ActionType]

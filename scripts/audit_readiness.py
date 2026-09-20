@@ -1,6 +1,7 @@
 """Audit readiness claims against the structured matrix and CI wiring."""
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,10 +14,20 @@ CLAIM_STATUSES = {"IMPLEMENTED_OFFLINE", "VERIFIED_OFFLINE", "PARTIAL", "MISSING
 CI_REQUIRED = {
     "scripts/smoke_br16a_offline.py": ".github/workflows/curriculum-ci.yml",
     "scripts/smoke_br18b_backup_restore.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_backup_m11_terminal_chain.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_backup_m11_failed_outcome.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_reservation_lineage.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_gate_budget_snapshot.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_health_policy.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_expiry_authority.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_ledger_activation.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m10_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_identity_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_registry_graph_envelope_integrity.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_m11_authorization_lineage.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_reverse_ledger_graph.py": ".github/workflows/curriculum-ci.yml",
+    "scripts/mutate_m11_outcome_link_graph.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_backup_source_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_runtime_store_path_guard.py": ".github/workflows/curriculum-ci.yml",
     "scripts/mutate_recovery_journal_path_guard.py": ".github/workflows/curriculum-ci.yml",
@@ -39,7 +50,7 @@ PACKAGE_STATUSES = {"PARTIAL", "OPEN"}
 REVIEW_IDS = {f"R{number:02d}" for number in range(1, 17)}
 REVIEW_STATUSES = {"PARTIAL", "OPEN"}
 BASELINE_RE = re.compile(r"^[0-9a-f]{40}$")
-PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline): ([^>]+) -->$", re.MULTILINE)
+PLAN_METADATA_RE = re.compile(r"^<!-- readiness-(as-of|main-baseline|baseline-kind): ([^>]+) -->$", re.MULTILINE)
 PLAN_PACKAGE_RE = re.compile(r"^\| (RP-\d+) \|.*\| (PARTIAL|OPEN) [—-]", re.MULTILINE)
 
 
@@ -47,21 +58,52 @@ def fail(message):
     raise AssertionError(message)
 
 
-def audit_snapshot_metadata(matrix, graph, plan_text):
+def audit_snapshot_metadata(root, matrix, graph, plan_text):
     """Require the three readiness artifacts to describe one reviewed main base."""
     plan_metadata = dict(PLAN_METADATA_RE.findall(plan_text))
-    if set(plan_metadata) != {"as-of", "main-baseline"}:
+    if set(plan_metadata) != {"as-of", "main-baseline", "baseline-kind"}:
         fail("plan lacks exact readiness snapshot metadata")
     as_of = matrix.get("as_of")
     baseline = matrix.get("main_baseline")
+    baseline_kind = matrix.get("baseline_kind")
     if not isinstance(as_of, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_of):
         fail("matrix has invalid readiness as_of")
     if not isinstance(baseline, str) or not BASELINE_RE.fullmatch(baseline):
         fail("matrix has invalid main baseline")
+    if baseline_kind != "product":
+        fail("matrix must declare product baseline semantics")
+    if graph.get("baseline_kind") != baseline_kind or plan_metadata["baseline-kind"] != baseline_kind:
+        fail("matrix/graph/plan baseline-kind mismatch")
     if graph.get("as_of") != as_of or graph.get("main_baseline") != baseline:
         fail("matrix/evidence graph readiness snapshot mismatch")
     if plan_metadata["as-of"] != as_of or plan_metadata["main-baseline"] != baseline:
         fail("matrix/plan readiness snapshot mismatch")
+    audit_product_baseline_git(root=root, baseline=baseline)
+
+
+def audit_product_baseline_git(root, baseline):
+    """Validate product baseline ancestry and prevent undocumented drift."""
+    git_dir = root / ".git"
+    if not git_dir.exists():
+        return
+    def git(*args):
+        return subprocess.run(["git", "-C", str(root), *args], text=True, capture_output=True)
+    if git("cat-file", "-e", f"{baseline}^{{commit}}").returncode != 0:
+        fail("declared product baseline is not a resolvable Git commit")
+    if git("merge-base", "--is-ancestor", baseline, "HEAD").returncode != 0:
+        fail("declared product baseline is not an ancestor of HEAD")
+    status = git("status", "--porcelain", "--untracked-files=all")
+    if status.returncode != 0:
+        fail("could not inspect Git working tree for product baseline")
+    if status.stdout.strip():
+        fail("product baseline audit requires a clean working tree")
+    changed = git("diff", "--name-only", f"{baseline}..HEAD")
+    if changed.returncode != 0:
+        fail("could not inspect product baseline diff")
+    allowed = ("docs/", "scripts/audit_readiness.py", "scripts/tests/")
+    unexpected = [path for path in changed.stdout.splitlines() if path and not path.startswith(allowed)]
+    if unexpected:
+        fail("product baseline has undocumented non-doc drift: " + ", ".join(unexpected[:5]))
 
 
 def audit_package_statuses(matrix, plan_text):
@@ -427,6 +469,341 @@ def audit_runtime_acceptance(root, matrix):
         fail("M04 incomplete JSONL no-mutation regression is missing")
 
 
+def audit_windows_ancestor_race(root, plan_text):
+    """Keep the Windows ancestor-race guard and conservative boundary auditable."""
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (
+            "lab/affiliate-bot/cmd/bot/output_parent_windows.go",
+            "lab/affiliate-bot/cmd/bot/runtime_gate_windows.go",
+            "lab/affiliate-bot/cmd/bot/windows_directory.go",
+            "lab/affiliate-bot/internal/store/stable_read_windows.go",
+        )
+    }
+    test_path = root / "lab/affiliate-bot/cmd/bot/windows_ancestor_race_test.go"
+    test_text = test_path.read_text(encoding="utf-8") if test_path.is_file() else ""
+    store_test_path = root / "lab/affiliate-bot/internal/store/stable_read_windows_test.go"
+    store_test_text = store_test_path.read_text(encoding="utf-8") if store_test_path.is_file() else ""
+    evidence_path = root / "docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    workflow_path = root / ".github/workflows/curriculum-ci.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8") if workflow_path.is_file() else ""
+    if "Cập nhật RP-01 Windows ancestor-race hardening" not in plan_text:
+        fail("Windows ancestor-race plan marker is missing")
+    if any(not text for text in sources.values()):
+        fail("Windows ancestor-race implementation source is missing")
+    if "FILE_FLAG_OPEN_REPARSE_POINT" not in sources["lab/affiliate-bot/cmd/bot/windows_directory.go"] or "pinWindowsDirectoryChain" not in sources["lab/affiliate-bot/cmd/bot/windows_directory.go"]:
+        fail("Windows ancestor-race reparse-point pinning guard is missing")
+    required_tests = (
+        "TestWindowsBackupRestoreRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsStableReaderRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsStableAppendRejectsAncestorJunctionAfterPreflight",
+        "TestWindowsJSONLReaderRejectsAncestorJunctionAfterPreflight",
+    )
+    if any(marker not in test_text for marker in required_tests[:-1]) or required_tests[-1] not in store_test_text or "external tree changed" not in test_text:
+        fail("Windows ancestor-race regression coverage is missing")
+    for boundary in ("portable `openat`/`mkdirat`", "does not claim POSIX traversal parity", "NOT_READY_FOR_PRODUCTION"):
+        if boundary not in evidence_text:
+            fail("Windows ancestor-race conservative boundary disclosure is missing")
+    if "windows-runtime:" not in workflow_text or "go test ./..." not in workflow_text or "go vet ./..." not in workflow_text:
+        fail("Windows runtime CI acceptance is missing")
+
+
+def audit_m08_shared_decoder_policy(root, plan_text):
+    """Keep the RP-02 shared decoder/hash evidence boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật RP-02 shared M08 policy context decoder",
+        "Cập nhật RP-02 shared M08 conformance table",
+        "Cập nhật RP-02 intent hash version boundary",
+        "Cập nhật RP-02 exact-number restart conformance",
+        "Cập nhật RP-02 M08 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-02 M08 shared decoder audit plan markers are incomplete")
+
+    source_paths = (
+        "core/m08/m08.go",
+        "core/m08/conformance.go",
+        "lab/mission-runtime/cmd/demo/m08_boundary.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-02 M08 shared decoder implementation source is missing")
+    core_source = sources["core/m08/m08.go"]
+    if any(marker not in core_source for marker in ("func DecodeIntent", "func DecodePolicy", "func DecodePolicyContext", "UNSUPPORTED_HASH_VERSION", "sha256:")):
+        fail("RP-02 M08 core decoder/hash boundary is missing")
+    if any(marker not in sources["core/m08/conformance.go"] for marker in ("func PolicyConformanceCases", "LearnerEquivalent")):
+        fail("RP-02 M08 shared conformance table is missing")
+    if "corem08.DecodePolicyContext" not in sources["lab/mission-runtime/cmd/demo/m08_boundary.go"]:
+        fail("RP-02 M08 mission-runtime shared decoder use is missing")
+    if sources["lab/affiliate-bot/cmd/bot/mission_command.go"].count("decoder.UseNumber()") < 2 or "corem08.DecodeIntent" not in sources["lab/affiliate-bot/cmd/bot/mission_command.go"]:
+        fail("RP-02 M08 learner exact-number/shared decoder use is missing")
+    if "decoder.UseNumber()" not in sources["lab/affiliate-bot/cmd/bot/backup_command.go"]:
+        fail("RP-02 M08 backup exact-number reader guard is missing")
+
+    test_paths = (
+        "core/m08/m08_test.go",
+        "core/m08/conformance_test.go",
+        "lab/mission-runtime/cmd/demo/m08_boundary_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+    )
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-02 M08 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodePolicyContextSharesStrictAndSemanticBoundary",
+        "TestDecodeIntentPreservesLargeJSONNumberForHash",
+        "TestDecodeIntentRejectsNullParametersAndDuplicateKeys",
+        "TestIntentHashVersionRejectsUnsupportedPrefixWithoutResealing",
+    )
+    if any(marker not in tests["core/m08/m08_test.go"] for marker in required_core_tests):
+        fail("RP-02 M08 core decoder/hash regressions are missing")
+    if "TestPolicyConformanceTable" not in tests["core/m08/conformance_test.go"] or "TestM08HarnessUsesSharedPolicyConformanceTable" not in tests["lab/mission-runtime/cmd/demo/m08_boundary_test.go"] or "TestLearnerM08UsesSharedPolicyConformanceTable" not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"]:
+        fail("RP-02 M08 shared conformance regressions are missing")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m08_boundary_test.go"] for marker in ("9007199254740993", "UNSUPPORTED_HASH_VERSION")) or any(marker not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"] for marker in ("9007199254740993", "learnerIntentHash(reloaded)", "TestEvaluateLearnerPolicyUsesSharedContextValidation")):
+        fail("RP-02 M08 exact-number/hash learner and harness regressions are missing")
+
+    evidence_path = root / "docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    for boundary in ("does not claim provider access", "exact hash-version/migration", "NOT_READY_FOR_PRODUCTION", "9007199254740993"):
+        if boundary not in evidence_text:
+            fail("RP-02 M08 bounded evidence disclosure is missing")
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-02 M08 hosted CI acceptance is missing")
+
+
+def audit_m09_shared_approval_boundary(root, matrix, plan_text):
+    """Keep the RP-02 shared M09 approval/decoder boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật shared M09 approval boundary",
+        "Cập nhật RP-02 M09 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-02 M09 shared decoder audit plan markers are incomplete")
+
+    record = next(
+        (item for item in matrix.get("recent_updates", []) if isinstance(item, dict) and item.get("id") == "RP-02-shared-m09-approval-boundary"),
+        None,
+    )
+    if not isinstance(record, dict):
+        fail("RP-02 M09 shared approval record is missing")
+    source_paths = (
+        "core/m09/m09.go",
+        "lab/mission-runtime/cmd/demo/m09.go",
+        "lab/mission-runtime/cmd/demo/m09_boundary.go",
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+    )
+    test_paths = (
+        "core/m09/m09_test.go",
+        "lab/mission-runtime/cmd/demo/m09_test.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+    )
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if set(source_paths + test_paths) - refs:
+        fail("RP-02 M09 shared approval record lacks implementation/test refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("strict M09 approval", "APPROVED_LIVE", "migration", "live executor", "multi-file crash")):
+        fail("RP-02 M09 bounded approval/execution boundary is missing")
+
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-02 M09 shared decoder implementation source is missing")
+    core_source = sources["core/m09/m09.go"]
+    if any(marker not in core_source for marker in ("func DecodeApproval", "func DecodeAuthorization", "func DecodeExecution", "func ValidateHistoricalChain", "APPROVED_LIVE")):
+        fail("RP-02 M09 core decoder/chain boundary is missing")
+    boundary_source = sources["lab/mission-runtime/cmd/demo/m09_boundary.go"]
+    if any(marker not in boundary_source for marker in ("corem09.DecodeApproval", "corem09.DecodeAuthorization", "corem09.DecodeExecution", "corem09.ValidateHistoricalChain")):
+        fail("RP-02 M09 mission-runtime shared decoder use is missing")
+    learner_source = sources["lab/affiliate-bot/cmd/bot/mission_command.go"]
+    if any(marker not in learner_source for marker in ("type LearnerApproval = corem09.ApprovalRecord", "corem09.ValidateApproval", "corem09.DecodeApproval")):
+        fail("RP-02 M09 learner shared approval use is missing")
+
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-02 M09 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodeApprovalRejectsDuplicateAndUnknownFields",
+        "TestDecodeAuthorizationUsesM09Profile",
+        "TestDecodeExecutionRejectsSchemaAmbiguity",
+        "TestValidateHistoricalChainBindsEveryM09Artifact",
+    )
+    if any(marker not in tests["core/m09/m09_test.go"] for marker in required_core_tests):
+        fail("RP-02 M09 core decoder regressions are missing")
+    required_runtime_tests = (
+        "TestM09EvalPack",
+        "TestM09DurableResumeRevalidates",
+        "TestM09ControlledExecutorConsumesApprovalAndIdempotency",
+    )
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m09_test.go"] for marker in required_runtime_tests) or "TestMissionM09ApprovalUsesSharedStrictBoundaryOnInputAndReload" not in tests["lab/affiliate-bot/cmd/bot/mission_command_test.go"]:
+        fail("RP-02 M09 mission/runtime/learner regressions are missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-02 M09 hosted CI acceptance is missing")
+
+
+def audit_m10_shared_artifact_decoders(root, matrix, plan_text):
+    """Keep the RP-03 shared M10 decoder/chain boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật shared M10 artifact decoders",
+        "Cập nhật shared M10 historical-chain validator",
+        "Cập nhật RP-03 M10 shared decoder audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-03 M10 shared decoder audit plan markers are incomplete")
+
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    decoder_record = updates.get("RP-03-shared-m10-artifact-decoders-20260916")
+    chain_record = updates.get("RP-03-shared-m10-historical-chain-validator-20260916")
+    if not isinstance(decoder_record, dict) or not isinstance(chain_record, dict):
+        fail("RP-03 M10 shared decoder records are missing")
+    decoder_scope = decoder_record.get("scope")
+    chain_scope = chain_record.get("scope")
+    if not isinstance(decoder_scope, str) or any(marker not in decoder_scope for marker in ("core/m10 decoders", "executor", "crash/power-loss")):
+        fail("RP-03 M10 shared decoder boundary is missing")
+    if not isinstance(chain_scope, str) or any(marker not in chain_scope for marker in ("ValidateHistoricalChain", "non-authorizing", "crash/power-loss")):
+        fail("RP-03 M10 historical-chain boundary is missing")
+
+    source_paths = (
+        "core/m10/canary_grant.go",
+        "core/m10/cost_bound.go",
+        "core/m10/canary_gate.go",
+        "core/m10/canary_authorization.go",
+        "core/m10/canary_execution_record.go",
+        "core/m10/historical_chain.go",
+        "lab/mission-runtime/cmd/demo/m10_boundary.go",
+        "lab/mission-runtime/cmd/demo/m10_chain.go",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-03 M10 shared decoder implementation source is missing")
+    core_markers = {
+        "core/m10/canary_grant.go": ("func DecodeCanaryGrant",),
+        "core/m10/cost_bound.go": ("func DecodeTrustedCostBound",),
+        "core/m10/canary_gate.go": ("func ValidateCanaryGateDecision",),
+        "core/m10/canary_authorization.go": ("func ValidateExecutionAuthorization",),
+        "core/m10/canary_execution_record.go": ("func DecodeCanaryExecutionRecord", "func ValidateExecutionRecord"),
+        "core/m10/historical_chain.go": ("func ValidateHistoricalChain",),
+    }
+    if any(marker not in sources[relative] for relative, markers in core_markers.items() for marker in markers):
+        fail("RP-03 M10 core decoder/chain boundary is missing")
+    if any(marker not in sources["lab/mission-runtime/cmd/demo/m10_boundary.go"] for marker in ("corem10.DecodeCanaryGrant", "corem10.DecodeTrustedCostBound", "corem10.ValidateCanaryGateDecision", "corem10.ValidateExecutionAuthorization", "corem10.DecodeCanaryExecutionRecord")):
+        fail("RP-03 M10 mission-runtime shared decoder use is missing")
+    if "corem10.ValidateHistoricalChain" not in sources["lab/mission-runtime/cmd/demo/m10_chain.go"]:
+        fail("RP-03 M10 mission-runtime historical-chain use is missing")
+
+    test_paths = (
+        "core/m10/cost_bound_test.go",
+        "lab/mission-runtime/cmd/demo/m10_boundary_test.go",
+        "lab/mission-runtime/cmd/demo/m10_chain_test.go",
+    )
+    tests = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in test_paths
+    }
+    if any(not text for text in tests.values()):
+        fail("RP-03 M10 shared decoder regression source is missing")
+    required_core_tests = (
+        "TestDecodeCanaryExecutionRecordAcceptsPerformedSuccess",
+        "TestTrustedCostBoundDecodeAndBinding",
+        "TestCanaryGrantDecodeAndBinding",
+        "TestCanaryGateIsNonAuthorizingAndBounded",
+        "TestCanaryAuthorizationBindsGateWithoutExecuting",
+    )
+    if any(marker not in tests["core/m10/cost_bound_test.go"] for marker in required_core_tests):
+        fail("RP-03 M10 core decoder regressions are missing")
+    required_boundary_tests = ("TestM10RawArtifacts", "TestM10RawMutations", "TestM10RawHashesAndNumbers")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m10_boundary_test.go"] for marker in required_boundary_tests):
+        fail("RP-03 M10 mission-runtime decoder regressions are missing")
+    required_chain_tests = ("TestM10ChainBindings", "TestM10ChainScopeAndTime", "TestM10ChainBudget")
+    if any(marker not in tests["lab/mission-runtime/cmd/demo/m10_chain_test.go"] for marker in required_chain_tests):
+        fail("RP-03 M10 historical-chain regressions are missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-03 M10 hosted CI acceptance is missing")
+
+
+def audit_m10_budget_expiry_boundaries(root, matrix, plan_text):
+    """Keep the RP-03 budget/expiry/STOP evidence boundary auditable."""
+    required_plan_markers = (
+        "Cập nhật RP-03 exhausted-budget monotonicity",
+        "Cập nhật RP-03 approval expiry và STOP/reserve boundary",
+        "Cập nhật RP-03 M10 budget/expiry audit guard",
+    )
+    if any(marker not in plan_text for marker in required_plan_markers):
+        fail("RP-03 M10 budget/expiry audit plan markers are incomplete")
+
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    budget_record = updates.get("RP-03-budget-monotonicity-20260918")
+    expiry_record = updates.get("RP-03-expiry-stop-reserve-20260918")
+    if not isinstance(budget_record, dict) or not isinstance(expiry_record, dict):
+        fail("RP-03 M10 budget/expiry records are missing")
+    budget_scope = budget_record.get("scope")
+    expiry_scope = expiry_record.get("scope")
+    if not isinstance(budget_scope, str) or any(marker not in budget_scope for marker in ("cap=1", "backup/restore", "BUDGET_DENIED", "multi-file crash/power-loss")):
+        fail("RP-03 exhausted-budget boundary disclosure is missing")
+    if not isinstance(expiry_scope, str) or any(marker not in expiry_scope for marker in ("before", "at", "after", "STOP", "without mutation", "multi-file crash/power-loss")):
+        fail("RP-03 approval-expiry/STOP boundary disclosure is missing")
+
+    source_paths = (
+        "lab/affiliate-bot/cmd/bot/mission_command.go",
+        "lab/affiliate-bot/cmd/bot/mission_command_test.go",
+        "lab/affiliate-bot/cmd/bot/backup_command_test.go",
+        "scripts/smoke_br16a_offline.py",
+    )
+    sources = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in source_paths
+    }
+    if any(not text for text in sources.values()):
+        fail("RP-03 M10 budget/expiry implementation source is missing")
+    learner_source = sources["lab/affiliate-bot/cmd/bot/mission_command.go"]
+    if any(marker not in learner_source for marker in ("BUDGET_DENIED", "execution authorization has expired", "durable STOP:")):
+        fail("RP-03 M10 budget/expiry implementation boundary is missing")
+    learner_tests = sources["lab/affiliate-bot/cmd/bot/mission_command_test.go"]
+    if "TestMissionM10ExhaustedBudgetCannotBeReopenedAcrossFreshProcessAndRestore" not in learner_tests:
+        fail("RP-03 exhausted-budget regression is missing")
+    if any(marker not in learner_tests for marker in ("TestMissionM10AuthorityExpiryBoundariesAfterBackupRestoreInFreshProcess", "TestMissionM10ReserveRejectsDurableStopWithoutMutation")):
+        fail("RP-03 approval-expiry/STOP regression is missing")
+    if "m10-reserve" not in sources["lab/affiliate-bot/cmd/bot/backup_command_test.go"] or any(marker not in sources["scripts/smoke_br16a_offline.py"] for marker in ("stop_race_state", "BUDGET_DENIED", "m10-reserve")):
+        fail("RP-03 budget/expiry restore and race regression is missing")
+
+    workflows = {
+        relative: (root / relative).read_text(encoding="utf-8") if (root / relative).is_file() else ""
+        for relative in (".github/workflows/curriculum-ci.yml", ".github/workflows/mission-agent-path-ci.yml")
+    }
+    if any(not text for text in workflows.values()) or any(marker not in workflows[".github/workflows/curriculum-ci.yml"] for marker in ("go test ./...", "go vet ./...", "go test -race ./...", "windows-runtime:", "python scripts/smoke_br16a_offline.py")) or any(marker not in workflows[".github/workflows/mission-agent-path-ci.yml"] for marker in ("go test ./...", "go vet ./...")):
+        fail("RP-03 M10 budget/expiry hosted CI acceptance is missing")
+
+
 def audit_evidence_graph(root, criteria_by_id):
     graph_path = root / "docs/plans/READINESS-EVIDENCE-GRAPH.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -498,6 +875,18 @@ def audit_evidence_graph(root, criteria_by_id):
     if graph_ids != set(criteria_by_id):
         fail(f"evidence graph/matrix criterion mismatch: {sorted(graph_ids)}")
     return len(claim_ids)
+
+
+def audit_claim_count_disclosures(root, plan_text, claim_count):
+    """Keep current human-readable claim-count disclosures tied to the graph."""
+    evidence_path = root / "docs/architecture/EVIDENCE-FULL-REPOSITORY-HARDENING-20260919.md"
+    evidence_text = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    evidence_match = re.search(r"`NOT_READY_FOR_PRODUCTION`,\s*(\d+) scoped claims", evidence_text)
+    if evidence_match is None or int(evidence_match.group(1)) != claim_count:
+        fail("current post-merge evidence claim count does not match the evidence graph")
+    plan_match = re.search(r"records\s+(\d+) scoped claims and \d+ readiness-audit tests", plan_text)
+    if plan_match is None or int(plan_match.group(1)) != claim_count:
+        fail("current remediation plan claim count does not match the evidence graph")
 
 
 def audit_public_readiness_boundary(root, overall):
@@ -750,7 +1139,7 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
     cache_gate = updates.get("RP-08-n8n-engine-cache-gating")
     if not isinstance(cache_gate, dict) or "full engine coverage remains required" not in cache_gate.get("scope", ""):
         fail("matrix lacks scoped n8n engine cache/gate acceptance")
-    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@v4" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text:
+    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or "actions/cache@caa296126883cff596d87d8935842f9db880ef25" not in workflow_text or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text or "mission-gate:" not in workflow_text:
         fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 
@@ -773,6 +1162,7 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         "\n  deterministic-smokes-foundations:\n",
         "\n  deterministic-smokes-m06-m07:\n",
         "\n  deterministic-smokes-backup-mutations:\n",
+        "\n  curriculum-gate:\n",
     )
     required = (
         "Learner Bot race regression",
@@ -786,6 +1176,7 @@ def audit_deterministic_runtime_sharding(root, matrix, plan_text):
         "contracts/go.sum",
         "core/go.sum",
         "lab/mission-runtime/go.sum",
+        "curriculum-gate",
     )
     if not all(token in workflow_text for token in required_jobs + required):
         fail("deterministic CI shard/cache is missing a required coverage boundary")
@@ -1142,6 +1533,112 @@ def audit_m11_authorization_lineage_mutation(root, matrix, plan_text):
     )
     if any(marker not in script for marker in required_script) or "scripts/mutate_m11_authorization_lineage.py" not in workflow:
         fail("M11 authorization lineage mutation proof is missing or not wired to CI")
+
+
+def audit_m11_ledger_outcome_reverse_mutation(root, matrix, plan_text):
+    """Require CI mutation coverage for the backup ledger-to-outcome reverse guard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-m11-ledger-outcome-reverse-mutation-20260919")
+    if not isinstance(record, dict) or "disposable" not in record.get("scope", "") or "ledger" not in record.get("scope", "") or "outcome" not in record.get("scope", ""):
+        fail("matrix lacks scoped M11 ledger-outcome reverse mutation acceptance")
+    if "Cập nhật RP-08 M11 ledger-outcome reverse mutation proof" not in plan_text:
+        fail("M11 ledger-outcome reverse mutation lacks a scoped plan marker")
+    required_refs = {
+        "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py",
+        "scripts/smoke_br18b_backup_restore.py",
+        "lab/affiliate-bot/cmd/bot/backup_command.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP08-M11-LEDGER-OUTCOME-REVERSE-MUTATION-20260919.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 ledger-outcome reverse mutation record lacks implementation/test/evidence refs")
+    scope = record.get("scope")
+    if not isinstance(scope, str) or any(marker not in scope for marker in ("checksum-valid", "reverse-cardinality", "offline")):
+        fail("M11 ledger-outcome reverse mutation record lacks bounded scope disclosure")
+    script_path = root / "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "M11 ledger-outcome reverse cardinality guard anchor",
+        "orphan-ledger-outcome-restored",
+        "mutated M11 ledger-outcome reverse guard unexpectedly passed",
+        "BR-18b backup/restore smoke",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_backup_m11_ledger_outcome_reverse_guard.py" not in workflow:
+        fail("M11 ledger-outcome reverse mutation proof is missing or not wired to CI")
+
+
+def audit_m11_reverse_ledger_mutation(root, matrix, plan_text):
+    """Require mutation coverage for the core M11 reverse-ledger graph guard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-m11-reverse-ledger-graph-mutation-20260919")
+    if not isinstance(record, dict) or any(token not in record.get("scope", "") for token in ("disposable", "reverse-ledger", "checksum-valid", "offline")):
+        fail("matrix lacks scoped M11 reverse-ledger mutation acceptance")
+    if "Cập nhật RP-08 M11 reverse-ledger graph mutation proof" not in plan_text:
+        fail("M11 reverse-ledger mutation lacks a scoped plan marker")
+    required_refs = {
+        "scripts/mutate_m11_reverse_ledger_graph.py",
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 reverse-ledger mutation record lacks implementation/test/evidence refs")
+    evidence_path = root / "docs/architecture/EVIDENCE-RP08-M11-REVERSE-LEDGER-GRAPH-MUTATION-20260919.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    script_path = root / "scripts/mutate_m11_reverse_ledger_graph.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "\nCORE_GUARD = '''",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "ledger with an orphan reconciliation resolution link was accepted",
+        "mutated M11 reverse-ledger graph guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_m11_reverse_ledger_graph.py" not in workflow or "## Verification" not in evidence or "NOT_READY_FOR_PRODUCTION" not in evidence:
+        fail("M11 reverse-ledger mutation proof is missing or not wired to CI")
+
+
+def audit_m11_outcome_link_mutation(root, matrix, plan_text):
+    """Require mutation coverage for the core M11 outcome-link graph guard."""
+    updates = {entry.get("id"): entry for entry in matrix.get("recent_updates", []) if isinstance(entry, dict)}
+    record = updates.get("RP-08-m11-outcome-link-graph-mutation-20260919")
+    if not isinstance(record, dict) or any(token not in record.get("scope", "") for token in ("disposable", "outcome", "evaluation", "offline")):
+        fail("matrix lacks scoped M11 outcome-link mutation acceptance")
+    if "Cập nhật RP-08 M11 outcome-link graph mutation proof" not in plan_text:
+        fail("M11 outcome-link mutation lacks a scoped plan marker")
+    required_refs = {
+        "scripts/mutate_m11_outcome_link_graph.py",
+        "core/m11/artifact_registry.go",
+        "core/m11/artifact_test.go",
+        "scripts/audit_readiness.py",
+        "scripts/tests/test_audit_readiness.py",
+        ".github/workflows/curriculum-ci.yml",
+        "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md",
+    }
+    refs = set(record.get("implementation_refs", [])) | set(record.get("test_refs", []))
+    if required_refs - refs:
+        fail("M11 outcome-link mutation record lacks implementation/test/evidence refs")
+    evidence_path = root / "docs/architecture/EVIDENCE-RP08-M11-OUTCOME-LINK-MUTATION-20260919.md"
+    evidence = evidence_path.read_text(encoding="utf-8") if evidence_path.is_file() else ""
+    script_path = root / "scripts/mutate_m11_outcome_link_graph.py"
+    script = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
+    workflow = (root / ".github/workflows/curriculum-ci.yml").read_text(encoding="utf-8")
+    required_script = (
+        "\nCORE_GUARD = '''",
+        "TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks",
+        "ledger outcome link with a swapped outcome ID was accepted",
+        "mutated M11 outcome-link graph guard unexpectedly passed",
+    )
+    if any(marker not in script for marker in required_script) or "scripts/mutate_m11_outcome_link_graph.py" not in workflow or "## Verification" not in evidence or "NOT_READY_FOR_PRODUCTION" not in evidence:
+        fail("M11 outcome-link mutation proof is missing or not wired to CI")
 
 
 def audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text):
@@ -2049,7 +2546,7 @@ def audit(root):
         fail("unsupported readiness matrix version")
     if matrix.get("overall") != "NOT_READY_FOR_PRODUCTION":
         fail("readiness matrix must remain NOT_READY_FOR_PRODUCTION")
-    audit_snapshot_metadata(matrix, graph, plan_text)
+    audit_snapshot_metadata(root, matrix, graph, plan_text)
     audit_package_statuses(matrix, plan_text)
     criteria = matrix.get("criteria")
     if not isinstance(criteria, list) or not criteria:
@@ -2093,6 +2590,9 @@ def audit(root):
     audit_m11_reverse_ledger_graph(root, matrix, plan_text)
     audit_registry_graph_envelope_mutation(root, matrix, plan_text)
     audit_m11_authorization_lineage_mutation(root, matrix, plan_text)
+    audit_m11_ledger_outcome_reverse_mutation(root, matrix, plan_text)
+    audit_m11_reverse_ledger_mutation(root, matrix, plan_text)
+    audit_m11_outcome_link_mutation(root, matrix, plan_text)
     audit_m11_fixture_outcome_execution_cardinality(root, matrix, plan_text)
     audit_m11_recovery_handoff_strict_decode(root, matrix, plan_text)
     audit_m06_history_handoff_strict_decode(root, matrix, plan_text)
@@ -2113,12 +2613,18 @@ def audit(root):
     audit_advisor_fixture_failed_staging_cleanup(root, matrix, plan_text)
     audit_review_findings(matrix, criteria_by_id, plan_text)
     audit_runtime_acceptance(root, matrix)
+    audit_windows_ancestor_race(root, plan_text)
+    audit_m08_shared_decoder_policy(root, plan_text)
+    audit_m09_shared_approval_boundary(root, matrix, plan_text)
+    audit_m10_shared_artifact_decoders(root, matrix, plan_text)
     audit_learner_schema_identity(root, matrix, plan_text)
     audit_registry_append_parent_guard(root, matrix, plan_text)
     audit_advisor_campaign_writer_parent_guard(root, matrix, plan_text)
     audit_registry_graph_envelope_integrity(root, matrix, plan_text)
     audit_post_merge_pr412(root, matrix, plan_text)
     claim_count = audit_evidence_graph(root, criteria_by_id)
+    audit_claim_count_disclosures(root, plan_text, claim_count)
+    audit_m10_budget_expiry_boundaries(root, matrix, plan_text)
     audit_selected_source_operated_run(root, matrix, plan_text)
     audit_local_recovery_drill(root, matrix, plan_text)
     audit_assisted_fresh_workspace(root, matrix, plan_text)

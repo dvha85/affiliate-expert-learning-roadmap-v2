@@ -1,7 +1,454 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
-<!-- readiness-as-of: 2026-09-18 -->
-<!-- readiness-main-baseline: 707ac76aba0c1aac705ec3e52bcbd45e71edfb85 -->
+<!-- readiness-as-of: 2026-09-19 -->
+<!-- readiness-main-baseline: 2d8eac865b0fff5599da75cd3cbd1575cce20fc7 -->
+<!-- readiness-baseline-kind: product -->
+
+**Post-merge sync after PR #475 (2026-09-19):** PR #475 was squash-merged
+into `main` at `2d8eac865b0fff5599da75cd3cbd1575cce20fc7`. Curriculum CI,
+Mission Agent Path CI (including hosted n8n and Windows jobs), Security Scans
+and CodeQL passed on the final head. The product baseline is rebound to the
+merge commit; external provider, deployment, pilot, business-outcome and
+production-readiness evidence remain open.
+
+**Cập nhật FULL repository hardening (2026-09-19):** nhánh thực hiện bổ sung
+body-size guard `limit+1` và bearer token bắt buộc cho canonical adapter, đồng
+bộ token vào runner/blueprint n8n, pin GitHub Actions theo SHA, chuyển Ubuntu
+CI sang `24.04`, thêm cache dependency paths, final gates fail-closed,
+security/Dependabot workflow và repository hygiene metadata. Python audit,
+static n8n validators, JSON/compile checks và 159 Python tests chạy được;
+Go/real n8n chưa chạy trên host này vì thiếu executable. Đây là bằng chứng
+offline/fixture/read-only trên implementation branch; `NOT_READY_FOR_PRODUCTION`
+giữ nguyên cho đến khi có hosted Go/Windows/n8n, branch protection, provider,
+deployment, pilot và business-outcome evidence.
+
+**Baseline sync after PR #457 (2026-09-19):** PR #457 was squash-merged into
+`main` at `40f3d76fa163b6aee6d20bd8c6bd24bceca9254f`, from implementation head
+`d9e74ddcd2475bd1e6e1ab4247d237ae75b21319`. Curriculum CI run `35407311675`
+and Mission Agent Path CI run `35407311697` passed all 13 hosted checks,
+including Windows runtime job `105799633655`, learner race job `105799633794`
+and deterministic backup/mutations job `105799633765`. The outcome-link
+mutation proof now fails at the real swapped OutcomeID assertion after removing
+only the targeted guard in a disposable copy. This rebinds bounded
+offline/read-only mutation evidence to the merged PR #457 snapshot; mutation
+breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot, business outcome and production readiness remain open.
+
+**Cập nhật RP-08 M11 cycle graph mutation (2026-09-19):** implementation PR bổ
+sung disposable-copy mutation tháo riêng guard `ProductionCycleRecord` yêu cầu
+cycle `CLOSED` giữ đúng evaluation outcome, execution, authorization, gate và
+lease lineage. Regression thật `TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks`
+phải fail tại assertion cycle nhận mismatched evaluation outcome; exact-head
+hosted verification sẽ là gate nghiệm thu. Đây chỉ là bounded offline/read-only
+mutation evidence; crash/power-loss, atomic multi-file, distributed/multi-host,
+Windows traversal parity, provider/live execution, deployment, pilot, business
+outcome và production readiness vẫn mở.
+
+**Baseline sync after PR #459 (2026-09-19):** PR #459 was squash-merged into
+`main` at `ec2499a51dee185e7086c683a2ef944de2e650f2`, from implementation head
+`a5c141070a5b4a1b8cfee40f9d3f3a389b1d487f`. Curriculum CI run `35411941678`
+and Mission Agent Path CI run `35411941661` passed all 13 hosted checks,
+including Windows runtime job `105813136321`, learner race job `105813136435`
+and deterministic backup/mutations job `105813136450`. The post-merge evidence
+records 151 scoped claims and 159 readiness-audit tests. This rebinds the
+readiness bookkeeping to the merged PR #459 product baseline only; the M11
+mutation proof remains bounded offline/read-only and crash/power-loss, atomic
+multi-file, distributed/multi-host, Windows traversal parity, provider/live
+execution, deployment, pilot, business outcome and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR459-20260919.md`.
+Marker: `Baseline sync after PR #459`.
+
+**Cập nhật RP-09 claim-count disclosure consistency (2026-09-19):** readiness
+audit now derives the scoped claim count from the evidence graph and rejects a
+stale count in the current post-merge evidence or remediation-plan disclosure.
+The isolated audit suite adds negative fixtures for both disclosures. This
+hardens bookkeeping only; it does not add remote CI, provider/live, deployment,
+pilot, crash/power-loss, distributed-locking or production evidence. Record:
+`docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
+Marker: `Cập nhật RP-09 claim-count disclosure consistency`.
+
+**Baseline sync after PR #462 (2026-09-19):** PR #462 was squash-merged into
+`main` at `0adce7873ce06144e76aa3544284e6e6f0356537`, from implementation head
+`b4322d02cf0279612ed9658cdaf9d402d3337b1b`. GitHub reported 13 checks passed
+on the exact head. The post-merge audit still resolves 150 scoped claims and
+the readiness state remains `NOT_READY_FOR_PRODUCTION`. This records the
+claim-count disclosure invariant as bounded synthetic/read-only evidence only;
+provider/live execution, deployment, pilot, crash/power-loss, distributed
+locking, business outcomes and production readiness remain open. Record:
+`docs/architecture/EVIDENCE-RP09-CLAIM-COUNT-CONSISTENCY-20260919.md`.
+Marker: `Baseline sync after PR #462`.
+
+**Cập nhật RP-01 Windows ancestor-race audit guard (2026-09-19):** readiness
+audit now checks the native Windows reparse-point pinning sources, all four
+controlled ancestor-junction regressions, the `windows-latest` CI job and the
+explicit conservative boundary that does not claim POSIX `openat`/`mkdirat`
+parity. Negative fixtures remove each class of evidence and require audit
+failure. This strengthens evidence integrity only; the single-host boundary,
+distributed locking, crash/power-loss, provider/live execution, deployment,
+pilot and production readiness remain open. Marker:
+`Cập nhật RP-01 Windows ancestor-race audit guard`.
+
+**Baseline sync after PR #464 (2026-09-19):** PR #464 was squash-merged into
+`main` at `d339f6d6db218b2a33fb19eda81a5338c0e26004`, from implementation head
+`ad38a9a65b32b0800aed3a229e493916eb4c330f`. GitHub reported 13 checks passed
+on the exact head. The post-merge audit still resolves 150 scoped claims and
+the readiness state remains `NOT_READY_FOR_PRODUCTION`; the Windows evidence
+remains a bounded single-host conservative boundary without POSIX traversal
+parity. Record:
+`docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-AUDIT-20260919.md`.
+Marker: `Baseline sync after PR #464`.
+
+**Cập nhật RP-02 M08 shared decoder audit guard (2026-09-19):** readiness
+audit now independently checks the canonical `core/m08` intent/policy/context
+decoder, shared conformance table, learner and mission-runtime consumers,
+exact-number readers, hash-version fail-closed tests, hosted CI commands and
+the existing bounded evidence disclosure. Negative fixtures must fail when a
+shared consumer, exact-number/hash marker or readiness boundary is removed.
+This is evidence-integrity hardening only; hash migration, cross-store
+persistence, provider/live execution, deployment, pilot and production
+readiness remain open. Marker:
+`Cập nhật RP-02 M08 shared decoder audit guard`.
+
+**Cập nhật RP-02 M09 shared decoder audit guard (2026-09-19):** readiness
+audit now checks the existing shared M09 approval boundary record against the
+real `core/m09` approval/authorization/execution decoders, historical-chain
+validator, mission-runtime consumers, learner reload path, focused regressions
+and hosted CI declarations. Negative fixtures must fail when a decoder,
+consumer, learner alias, regression or bounded disclosure is removed. This is
+evidence-integrity hardening only; policy-context provenance, broader
+authorization/execution conformance, migration, cross-store persistence,
+provider/live execution, deployment, pilot and production readiness remain
+open. Marker: `Cập nhật RP-02 M09 shared decoder audit guard`.
+
+**Baseline sync after PR #468 (2026-09-19):** PR #468 was squash-merged into
+`main` at `1e2a5e4`, from implementation head
+`261fc1f2ed0d052fb7a3599e861c3190ec9e31a0`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 134 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-02 M09 evidence-integrity
+hardening only; policy-context provenance, broader authorization/execution
+conformance, migration, cross-store persistence, provider/live execution,
+deployment, pilot and production readiness remain open. Record:
+`docs/architecture/EVIDENCE-RP02-POST-MERGE-PR468-20260919.md`.
+Marker: `Baseline sync after PR #468`.
+
+**Cập nhật RP-03 M10 shared decoder audit guard (2026-09-19):** readiness
+audit now checks the existing shared M10 decoder and historical-chain records
+against the real core grant, cost-bound, gate, authorization and execution
+decoders, the mission-runtime boundary, the shared historical-chain validator,
+focused regressions and hosted CI declarations. Negative fixtures must fail
+when a decoder, mission consumer, chain call, regression or bounded disclosure
+is removed. This is evidence-integrity hardening only; ledger durability,
+crash/power-loss, distributed locking, provider/live execution, deployment,
+pilot and production readiness remain open. Marker:
+`Cập nhật RP-03 M10 shared decoder audit guard`.
+
+**Cập nhật RP-03 M10 budget/expiry audit guard (2026-09-19):** readiness
+audit now checks the existing exhausted-budget monotonicity and approval
+expiry/STOP-reserve records against the real learner implementation, fresh
+process/restore regressions, cross-process smoke and hosted CI declarations.
+Negative fixtures must fail when the budget/expiry implementation, regression
+or conservative boundary disclosure is removed. This is evidence-integrity
+hardening only; multi-file crash/power-loss, distributed locking,
+provider/live execution, deployment, pilot and production readiness remain
+open. Marker: `Cập nhật RP-03 M10 budget/expiry audit guard`.
+
+**Baseline sync after PR #472 (2026-09-19):** PR #472 was squash-merged into
+`main` at `f88ef2d`, from implementation head
+`7442cf825403a95f44bc4839d5c36fd6b95817b0`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 142 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-03 budget/expiry
+evidence-integrity hardening only; multi-file crash/power-loss, distributed
+locking, provider/live execution, deployment, pilot and production readiness
+remain open. Record:
+`docs/architecture/EVIDENCE-RP03-BUDGET-EXPIRY-POST-MERGE-PR472-20260919.md`.
+Marker: `Baseline sync after PR #472`.
+
+**Baseline sync after PR #473 (2026-09-19):** PR #473 was squash-merged into
+`main` at `0fb578a1`, from implementation head `6f15547a`. GitHub reported 13
+exact-head checks passed, including Windows runtime, learner race and the
+deterministic backup/mutation path. The post-merge audit still resolves 150
+scoped claims and the isolated readiness suite passes 142 tests; the state
+remains `NOT_READY_FOR_PRODUCTION`. This rebinds the existing RP-03/R10
+24-process reservation, M11 outcome-barrier and reservation commit-fault
+evidence to current main only; distributed locking, kill/power-loss,
+multi-file atomicity, provider/live execution, deployment, pilot, business
+outcome and production readiness remain open. Record:
+`docs/architecture/EVIDENCE-RP03-CONCURRENT-RESERVATION-POST-MERGE-PR473-20260919.md`.
+Marker: `Baseline sync after PR #473`.
+
+**Baseline sync after PR #470 (2026-09-19):** PR #470 was squash-merged into
+`main` at `b41e69c`, from implementation head
+`5db49308c768a34fa17dc4144c83f482fbdbba87`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 138 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-03 M10 evidence-integrity
+hardening only; ledger durability, crash/power-loss, distributed locking,
+provider/live execution, deployment, pilot and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP03-POST-MERGE-PR470-20260919.md`.
+Marker: `Baseline sync after PR #470`.
+
+**Baseline sync after PR #466 (2026-09-19):** PR #466 was squash-merged into
+`main` at `1b65f83cc85c1bcc549e66a1e64d8c1162af5053`, from implementation head
+`7be41010fca41cf66d054273b6cbc691d7474174`. GitHub reported 13 exact-head
+checks passed. Post-merge audit and the isolated Python readiness suite passed
+with 150 scoped claims and 130 tests; the state remains
+`NOT_READY_FOR_PRODUCTION`. This synchronizes RP-02 evidence-integrity
+hardening only; broader conformance, hash migration, cross-store persistence,
+provider/live execution, deployment, pilot and production readiness remain
+open. Record:
+`docs/architecture/EVIDENCE-RP02-POST-MERGE-PR466-20260919.md`.
+Marker: `Baseline sync after PR #466`.
+
+**Baseline sync after PR #455 (2026-09-19):** PR #455 was squash-merged into
+`main` at `8346d676ee9fbacd364025cb9f28f9cac1c40216`, from implementation head
+`872f9f67a4993bed9cdeaaf38ede685604f10435`. Curriculum CI run `35395007915`
+and Mission Agent Path CI run `35395007875` passed all 13 hosted checks,
+including the new M11 reverse-ledger graph mutation step, Windows runtime job
+`105761719057`, learner race job `105761719174` and deterministic
+backup/mutations job `105761719050`. The post-merge evidence records 145
+scoped claims and 120 readiness-audit tests. This rebinds readiness bookkeeping
+to the merged PR #455 baseline only; mutation breadth, ledger durability,
+crash/power-loss, atomic multi-file, distributed/multi-host, Windows traversal
+parity, provider/live execution, deployment, pilot, business outcome and
+production readiness remain open.
+
+**Baseline sync after PR #453 (2026-09-19):** PR #453 was squash-merged into
+`main` at `f1e29560561da1f8757f725f00d39ee50536b763`, from implementation head
+`eb36c98a4c4c0bc55ee06857db338e3286dbd0bd`. Curriculum CI run `35391489583`
+and Mission Agent Path CI run `35391489747` passed all 13 hosted checks,
+including deterministic-smokes-backup-mutations job `105750642048`, Windows
+runtime job `105750642188` and learner race job `105750641947`. The new
+disposable mutation removes only the M11 backup restore reverse
+ledger-to-outcome cardinality guard and requires the real BR-18b smoke to fail
+at the checksum-valid orphan-ledger case. This is bounded offline mutation
+evidence; broader mutation breadth, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot, business outcome and production readiness remain open.
+
+**Baseline sync after PR #451 (2026-09-19):** PR #451 was squash-merged into
+`main` at `f34d8c838bc7a2154e0555c5e12da7c2e06b89ec`, from implementation head
+`810a4bafc5fb58774c7ca1bfa505c75421bfc590`. Curriculum CI run `35388186329`
+and Mission Agent Path CI run `35388186527` passed all 13 hosted checks,
+including the M11 ledger-activation mutation job `105739978015`, Windows
+runtime job `105739977805` and learner race job `105739978038`. The disposable
+mutation removes only the M11 ledger-to-activation timing predicate in a
+temporary copy and requires the real lifecycle graph regression to reject the
+pre-activation ledger. This post-merge RP-08 snapshot rebinds readiness
+bookkeeping to the merged PR #451 baseline only; it does not close complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or production
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR451-20260919.md`.
+Marker: `Baseline sync after PR #451`.
+
+**Baseline sync after PR #449 (2026-09-19):** PR #449 was squash-merged into
+`main` at `33e993029fbe52b0dd97435f9ab96cb1050a0404`, from implementation head
+`c4be4771bacb72dc2248d904f8d741626b31f8c2`. Curriculum CI run `35384717309`
+and Mission Agent Path CI run `35384717312` passed all 13 hosted checks,
+including Windows runtime job `105728816947`, learner race job
+`105728817451` and deterministic backup/mutation smokes job `105728817469`.
+This post-merge RP-08 snapshot rebinds readiness bookkeeping to the merged
+PR #449 baseline only; it does not close complete mutation breadth,
+power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR449-20260919.md`.
+Marker: `Baseline sync after PR #449`.
+
+**Baseline sync after PR #448 (2026-09-19):** PR #448 was squash-merged into
+`main` at `3938b129cfc4e8bdf7929bed397fc8083e706699`, from implementation head
+`699b99be182ea3b93e7cd73e2fe925c876b47c7f`. Curriculum CI run `35383498350`
+and Mission Agent Path CI run `35383498300` passed all 13 hosted checks,
+including Windows runtime job `105724942268` and learner race job
+`105724944658`. This post-merge RP-08 snapshot rebinds the readiness
+bookkeeping to the merged evidence/audit baseline only; it does not close
+complete mutation breadth, power-loss/filesystem-crash durability, atomic
+multi-file publication, distributed/multi-host safety, Windows traversal
+parity, provider/live execution, deployment, business outcomes or
+clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-POST-MERGE-PR448-20260919.md`.
+Marker: `Baseline sync after PR #448`.
+
+**Baseline sync after PR #447 (2026-09-19):** PR #447 was squash-merged into
+`main` at `2538968b6d9d94c7c33c2573d2b2b09e55afb000`, from implementation head
+`bc32db664bc2c4ebdc71e3affd2b133c0994ea2c`. Curriculum CI run `35382273805`
+and Mission Agent Path CI run `35382273774` passed all 13 hosted checks,
+including the exact M11 lease-expiry mutation job `105720996473`, Windows
+runtime job `105720996711` and learner race job `105720996581`. The post-merge
+RP-08 snapshot records a checksum-valid canonical M11 gate evaluated exactly at
+lease expiry being rejected; the disposable mutation removes only the strict
+lease-expiry comparison and requires the real regression to fail. This closes
+one bounded offline mutation gap only; it does not claim complete mutation
+breadth, power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-EXPIRY-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #447`.
+
+**Baseline sync after PR #445 (2026-09-19):** PR #445 was squash-merged into
+`main` at `aa6ead57f68e91d9824f144ba367e4f8b78dd6bd`, from implementation head
+`cce98b4d7ddf0e122da5db5f853ddcd070608066`. Curriculum CI run `35379166920`
+and Mission Agent Path CI run `35379166826` passed all 13 hosted checks,
+including deterministic-smokes-backup-mutations job `105710955207`, Windows
+runtime job `105710955118` and learner race job `105710955837`. The post-merge
+RP-08 snapshot records that a checksum-valid M11 gate with a degraded health
+snapshot is rejected, and a disposable mutation removing the production-health
+admission predicate fails the real graph regression. This closes one bounded
+offline mutation gap only; it does not claim complete mutation breadth,
+power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-HEALTH-POLICY-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #445`.
+
+**Baseline sync after PR #443 (2026-09-19):** PR #443 was squash-merged into
+`main` at `e95cc321a37e3f8f239a594fa0e23412cbb43571`, from implementation head
+`536a9029033020c14e5960aeca641ca304f60392`. Curriculum CI run `35375980090`
+and Mission Agent Path CI run `35375980154` passed all 13 checks, including
+the new M11 gate budget snapshot mutation job `105700643729`, Windows runtime
+job `105700644179` and learner race job `105700643942`. The post-merge RP-08
+snapshot records a checksum-valid M11 gate whose execution counter is drifted
+from the referenced ledger; the real core graph regression rejects it, and a
+disposable mutation removing that comparison fails the same regression. This
+closes one bounded offline mutation gap only; it does not claim complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or clean-machine/
+target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-GATE-BUDGET-SNAPSHOT-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #443`.
+
+**Baseline sync after PR #441 (2026-09-19):** PR #441 was squash-merged into
+`main` at `08319c7998895a54efbcd6a39458c6abdcd28311`, from implementation head
+`64bf4cb7858ed4670ed40aa61d3b0c9c24a93f96`. Curriculum CI run `35373009084`
+and Mission Agent Path CI run `35373009156` passed all 13 checks, including
+Windows runtime job `105691163624`, learner race job `105691163542` and the
+required `deterministic-smokes-backup-mutations` job `105691163529`. The
+post-merge RP-08 snapshot records a checksum-valid M11 execution whose
+reservation-ledger pending ID is replaced with an unrelated ID; the focused
+core graph and backup/restore regressions fail closed, and a disposable
+mutation removing both guards fails inside both Go module boundaries. This
+closes one bounded offline mutation gap only; it does not claim complete
+mutation breadth, power-loss/filesystem-crash durability, atomic multi-file
+publication, distributed/multi-host safety, Windows traversal parity,
+provider/live execution, deployment, business outcomes or clean-machine/
+target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-RESERVATION-LINEAGE-MUTATION-20260919.md`.
+Marker: `Baseline sync after PR #441`.
+
+**Baseline sync after PR #439 (2026-09-18):** PR #439 was squash-merged into
+`main` at `4032bb238bb121a90d451628a333fab8ff2f623d`, from implementation head
+`b2762358405135db2b2dc7c07e412d823f0d1cae`. Curriculum CI run `35367101749`
+and Mission Agent Path CI run `35367101788` both passed all 13 checks,
+including Windows runtime job `105672103306`, learner race job `105672102842`,
+and the required `deterministic-smokes-backup-mutations` job `105672102565`.
+The post-merge RP-08 snapshot records a checksum-valid second FAILED M11
+execution without its fixture outcome; restore fails closed with
+`GRAPH_FAILED` before publishing the target, and a disposable mutation that
+removes the semantic guard makes the real smoke fail. This closes one bounded
+offline mutation gap only; it does not claim complete mutation breadth,
+power-loss/filesystem-crash durability, atomic multi-file publication,
+distributed/multi-host safety, Windows traversal parity, provider/live
+execution, deployment, business outcomes or clean-machine/target-host
+readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-FAILED-OUTCOME-MUTATION-20260918.md`.
+Marker: `Baseline sync after PR #439`.
+
+**Baseline sync after PR #437 (2026-09-18):** PR #437 was squash-merged into
+`main` at `b6010508ed058f8edd828e9bacdcf92fd70e0308`, from implementation head
+`156331e4363490ef2e08d29bae6820d4104dc74b`. Curriculum CI run
+`35362296661` and Mission Agent Path CI run `35362296433` both passed all 13
+checks, including Windows runtime `105656245515`, learner race
+`105656245369`, and the required M11 terminal-chain mutation proof
+`105656245417`. The post-merge RP-08 snapshot records that removing the
+evaluation-to-closed-cycle reverse-cardinality guard makes the real BR-18b
+backup/restore smoke fail closed before publishing the missing-cycle restore
+target. This closes one bounded offline mutation gap only; it does not claim
+complete mutation breadth, power-loss/filesystem-crash durability, atomic
+multi-file publication, distributed/multi-host safety, Windows traversal
+parity, provider/live execution, deployment, business outcomes or
+clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP08-M11-TERMINAL-MUTATION-20260918.md`. Marker:
+`Baseline sync after PR #437`.
+
+**Baseline sync after PR #435 (2026-09-18):** PR #435 was squash-merged into
+`main` at `af2eb0d20d10d8f638480b8cdd8141c8b051ec1c`, from implementation head
+`f398c6e5782803eed494fd9a5a609c4aec1320ca`. Curriculum CI run
+`35359232122` and Mission Agent Path CI run `35359232042` both passed all 13
+checks, including Windows runtime, learner race, full Go test/vet and the
+backup/restore mutation smoke. The post-merge RP-07b snapshot records explicit
+assertions for a restored `CLOSED` M11 cycle with matching execution,
+outcome/evaluation/cycle lineage and a `NORMAL` post-ledger, plus the reviewed
+UNKNOWN-to-STOP reconciliation boundary. This remains bounded
+offline/fixture/read-only evidence; it does not claim prior-runtime
+availability, live recovery, power-loss/filesystem-crash durability, atomic
+multi-file, distributed/multi-host, provider/live execution, deployment,
+business outcomes or clean-machine/target-host readiness. Record:
+`docs/architecture/EVIDENCE-RP07B-M11-RESTORE-CHAIN-20260918.md`. Marker:
+`Baseline sync after PR #435`.
+
+**Baseline sync after PR #433 (2026-09-18):** PR #433 was squash-merged into
+`main` at `c8fe14218ef2a22f6faf0cbd1c9a335c1073dffb`, from implementation head
+`e406e405b43c954353c6fe58c21f096f28a5ea1f`. Hosted Curriculum CI run
+`35350741433` and Mission Agent Path CI run `35350741436` both passed all 13
+checks, including Windows runtime `105618004234`, learner race `105618003984`
+and the new backup/restore regression. The post-merge RP-07a snapshot records
+that backup/restore v3 preserves a valid M11 `ProductionRecoveryAdmission` and
+fails closed when a checksum-valid registry is missing the immutable new-runtime
+approval, without publishing a restore target. This remains bounded
+offline/fixture/read-only evidence; it does not claim prior-runtime availability,
+live recovery, power-loss/filesystem-crash durability, atomic multi-file,
+distributed/multi-host, provider/live execution, deployment or business
+outcomes. Record:
+`docs/architecture/EVIDENCE-RP07A-M11-ADMISSION-RESTORE-20260918.md`. Marker:
+`Baseline sync after PR #433`.
+
+**Baseline sync after PR #429 (2026-09-18):** PR #429 đã squash-merge vào
+`main` tại `4950b2fd1be80f3c0e58d9f270a44e275c3de0d5`, từ implementation head
+`d079dfc3b2d229805b458ec95c92be0fd15b375f`. Hosted Curriculum CI run
+`35340989562` và Mission Agent Path CI run `35340989656` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race, M07 adversarial/output contracts,
+mission-runtime và n8n regression. Post-merge snapshot cập nhật RP-05b với
+request identity adapter-derived, canonical JSON body digest và fail-closed cho
+forged/legacy provenance; readiness vẫn `NOT_READY_FOR_PRODUCTION`, không thêm
+provider/live execution, deployment, business outcome, distributed locking,
+power-loss hay multi-file atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR429-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #429`.
+
+**Baseline sync after PR #431 (2026-09-18):** PR #431 đã squash-merge vào
+`main` tại `ad5347bf1aae4c0770e0471b668c94bf8621b141`, từ implementation head
+`321eb74b91e991ab319c784205d3f587ef0b01bc`. Hosted Curriculum CI run
+`35344493952` và Mission Agent Path CI run `35344493969` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race và backup/restore mutation smoke. RP-06
+giờ validate mọi M10 registry hiện hữu ngay cả khi mutable state không còn active
+canary, vẫn restore được registry lịch sử hợp lệ và reject orphan registry trước
+publish. Evidence vẫn bounded offline/fixture/read-only; không claim power-loss,
+atomic multi-file, distributed/multi-host, provider, live execution, deployment
+hay business outcome. Record:
+`docs/architecture/EVIDENCE-PR431-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #431`.
+
+**Baseline sync after PR #425 (2026-09-18):** PR #425 đã squash-merge vào
+`main` tại `b7cfe1480973254ad106481d22c142651af3732b`, từ implementation head
+`d3127b99dda310be3620ff54ea0b3add0cd6d44b`. Hosted Curriculum CI run
+`35329168897` và Mission Agent Path CI run `35329168855` đều PASS đủ 13 checks,
+bao gồm Windows runtime, learner race, Go vet và n8n/mission regressions. Hậu-
+merge snapshot chỉ rebinding RP-04 shared canonical context về merge baseline;
+readiness vẫn `NOT_READY_FOR_PRODUCTION`, không thêm provider/live execution,
+deployment, business outcome, distributed locking, power-loss hay multi-file
+atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR425-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #425`.
 
 > Reconcile 18/09/2026: đây là tracker hiện tại của `main` tại baseline trên.
 > Xem [kế hoạch pre-merge tại 737e85a](PRE-MERGE-REMEDIATION-737E85A.md) cho
@@ -49,29 +496,125 @@ crash/power-loss, provider, live executor, business outcome, pilot hoặc
 deployment. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
 Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-RUNTIME-CI-20260918.md`.
 
-**Baseline sync after PR #415 (2026-09-18):** PR #415 đã squash-merge vào
-`main` tại `707ac76aba0c1aac705ec3e52bcbd45e71edfb85`. Hậu-merge Curriculum CI
-run `35303587160` hoàn tất 10/10 jobs PASS, gồm `windows-runtime`; Mission
-Agent Path CI run `35303587091` hoàn tất 3/3 jobs PASS. Local learner race,
-bốn Go module test/vet, 133 Python tests, BR-16a, BR-18b và readiness audit
-cũng PASS; audit vẫn trả `NOT_READY_FOR_PRODUCTION`. Đây là sync evidence
-bounded, không đóng arbitrary non-cooperating writers, full ancestor-race
-parity, distributed locking, crash/power-loss, provider, live executor,
-business outcome, pilot hoặc deployment. Marker: `Baseline sync after PR #415`;
-record: `docs/architecture/EVIDENCE-PR415-POST-MERGE-20260918.md`.
+**Cập nhật RP-01 Windows ancestor-race hardening (2026-09-18):** PR #416 tại
+head `bbd8aec14e56ba0b484376014b2ab5ec775ce3ec` rà lại các Windows reader/
+writer còn đi qua pathname trực tiếp và thêm native parent-chain pinning cho
+backup/restore output, managed lock, stable reader/append và internal/store
+JSONL reader. Existing ancestors được mở với `OPEN_REPARSE_POINT`, không share
+delete; component còn thiếu được tạo và pin từng bước. Regression Windows thay
+ancestor sau preflight bằng junction/reparse point cho các đường backup/restore,
+stable reader/append và store reader đều fail closed, không đổi external tree.
+Curriculum CI run `35306191800` PASS; `windows-runtime` job
+`105478750919` PASS với `go test ./...`, `go vet ./...` và targeted
+lock/backup/restore; learner race job `105478751048` PASS với
+`go test -race ./...`. Mission Agent Path CI run `35306191794` cũng PASS cả
+ba job. Vì Windows không có portable `openat`/`mkdirat` cho
+traversal nhiều component trong boundary này, implementation chỉ claim
+conservative local single-host boundary, không claim POSIX parity, distributed
+locking, power-loss, multi-file atomicity, provider/live execution hoặc
+business outcome. RP-01 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`.
+Record: `docs/architecture/EVIDENCE-RP01-WINDOWS-ANCESTOR-RACE-20260918.md`.
 
-**Working-tree remediation after full-repo review (2026-09-19):** trên working
-tree sau baseline PR #415, các gói F-01…F-06 của báo cáo
-`docs/plans/FULL-REPO-REVIEW-2026-09-19.md` đã được triển khai và có regression
-local tương ứng: bind giữ consumption history; n8n runner cô lập SQLite/regular
-execution; M11 exact intent/health-TTL checks và adapter giữ số lớn; HTTP body
-limits fail closed trước mutation; Schedule Trigger dùng watermark sau shutdown
-và decoder flatted giữ numeric strings. F-07 mới ở mức partial local với path
-filter/helper tests và governance documentation; F-09 cũng partial local với
-runbook/capability updates; F-08 và F-10 vẫn mở. Các thay đổi này đã được
-commit trên nhánh remediation tại `0fef251`, nhưng chưa merge vào `main` và
-chưa có CI/evidence hậu merge mới; chúng không thay đổi
-`NOT_READY_FOR_PRODUCTION`.
+**Baseline sync after PR #417 (2026-09-18):** PR #417 đã squash-merge vào
+`main` tại `c3d10f8`, từ implementation head `6e8ad1a`. PR có 13/13 checks
+PASS, gồm Curriculum CI với Windows runtime và learner race, cùng Mission
+Agent Path CI. Snapshot đã rebinding plan, readiness matrix và evidence graph
+theo baseline RP-02 mới; record: `docs/architecture/EVIDENCE-PR417-POST-MERGE-20260918.md`.
+Đây là post-merge bookkeeping cho bounded offline/fixture decoder, policy và
+provenance evidence; hash migration, cross-store persistence, provider/live
+execution và production readiness vẫn mở. Marker: `Baseline sync after PR #417`.
+
+**Cập nhật RP-03 canonical M10 grant registry binding (2026-09-18):** trước
+`m10-gate` hoặc `m10-reserve`, learner state phải resolve exact immutable
+`CANARY_GRANT` từ M10 registry; grant hợp lệ về schema nhưng chỉ xuất hiện
+trong mutable `mission-state.json` bị fail closed trước gate/ledger mutation.
+Regression dùng real Bot fixture, đổi sang grant mới có hash hợp lệ nhưng không
+đăng ký, rồi kiểm `m10-gate` và `m10-reserve` không tạo output, registry entry,
+reservation hay usage-counter change. Worktree không có Go executable nên hosted
+`go test -race ./...` vẫn là acceptance gate. Đây là local offline/read-only
+lineage guard; không đóng multi-file crash/power-loss, distributed locking,
+provider, live executor, business outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 canonical M10 grant registry binding`.
+
+**Baseline sync after PR #416 (2026-09-18):** PR #416 đã squash-merge vào
+`main` tại `cefdb758f70ce36c08bc822ee658737149600bcd`, từ implementation head
+`bbd8aec14e56ba0b484376014b2ab5ec775ce3ec`. Snapshot hiện tại đã đồng bộ plan,
+readiness matrix và evidence graph về merge baseline này; CI evidence được giữ
+theo các run đã review của PR gồm Windows runtime, targeted lock/backup/restore,
+learner race và Mission Agent Path. RP-01 vẫn `PARTIAL`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`; record này không thêm provider, live-executor,
+business-outcome, pilot, deployment, distributed-locking, power-loss hay
+multi-file atomicity claim. Record:
+`docs/architecture/EVIDENCE-PR416-POST-MERGE-20260918.md`. Marker:
+`Baseline sync after PR #416`.
+
+**Baseline sync after PR #419 (2026-09-18):** PR #419 đã squash-merge vào
+`main` tại `2acfcfc5a80ad590ce06813940ce9bbff83fd839`, từ implementation head
+`104bd186b0546dd4c3e7d8c6a3eebc44fe639ecc`. PR có 13/13 checks PASS: Curriculum
+CI run `35321402705` gồm Windows runtime job `105524487971` và learner race job
+`105524487897`, cùng Mission Agent Path CI run `35321402712` với 3/3 job PASS.
+Snapshot đã rebinding plan, readiness matrix và evidence graph về RP-03
+canonical M10 grant registry binding sau merge; RP-03 vẫn `PARTIAL`, overall
+vẫn `NOT_READY_FOR_PRODUCTION`. Đây là bounded offline/fixture lineage
+evidence, không thêm provider, live-executor, business-outcome, pilot,
+deployment, distributed-locking, power-loss hay multi-file atomicity claim.
+Record: `docs/architecture/EVIDENCE-RP03-M10-CANONICAL-GRANT-REGISTRY-20260918.md`.
+Marker: `Baseline sync after PR #419`.
+
+**Cập nhật RP-03 approval expiry và STOP/reserve boundary (2026-09-18):**
+learner `m10-reserve` nay có regression trực tiếp cho cả bốn authority expiry:
+before boundary phải reserve được, tại/sau boundary phải `REJECTED` và giữ
+nguyên canonical runtime snapshot. Regression riêng persist durable M11 STOP
+rồi chứng minh M10 reserve trả `STOPPED` không đổi state, counter, reservation
+hay registry; synchronized offline smoke tiếp tục cover race thật giữa STOP và
+reserve qua các Bot process. Worktree không có `go.exe`, nên hosted race CI là
+acceptance gate. Đây là bounded local/offline/synthetic/read-only evidence;
+không đóng multi-file crash/power-loss, distributed locking, provider,
+live-executor, business outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 approval expiry và STOP/reserve boundary`.
+
+**Baseline sync after PR #421 (2026-09-18):** PR #421 đã squash-merge vào
+`main` tại `12c50f3337991b533e5ecf363860df1e27bc2217`, từ implementation head
+`3620b24cc3b51d6490473c40103f328c83bc8c20`. PR có 13/13 checks PASS: Curriculum
+CI run `35323363318` gồm Windows runtime job `105530687600` và learner race job
+`105530687837`, cùng Mission Agent Path CI run `35323363297` với 3/3 job PASS.
+Snapshot đã rebinding plan, readiness matrix và evidence graph về regression
+RP-03 expiry/STOP-reserve sau merge; RP-03 vẫn `PARTIAL`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`. Đây là bounded local/offline/synthetic/read-only
+evidence, không thêm multi-file crash/power-loss, distributed locking,
+provider, live-executor, business outcome, pilot hay deployment claim. Record:
+`docs/architecture/EVIDENCE-RP03-EXPIRY-STOP-RESERVE-20260918.md`. Marker:
+`Baseline sync after PR #421`.
+
+**Cập nhật RP-03 exhausted-budget monotonicity (2026-09-18):** R08 nay có
+regression trực tiếp sau khi một grant cap=1 đã được tiêu thụ bởi fresh Bot
+process. Exact replay của M09 approval và exact re-import của M10 grant chỉ
+trả acknowledgement, không reset usage counter. Các payload checksum-valid
+nhưng tăng execution cap, đổi currency của cùng grant, hoặc đăng ký cost bound
+khác currency đều bị reject; `mission-state.json`, usage/reservation state,
+M10 artifact registry và trusted-cost-bound registry giữ byte-identical. Một
+reservation mới vẫn nhận `BUDGET_DENIED`. Cùng chuỗi này được chạy lại trên
+runtime mới sau backup/restore. Local worktree vẫn thiếu `go.exe`, nên hosted
+Windows runtime/race CI là acceptance gate. Đây là bounded
+local/offline/synthetic/read-only evidence; không claim multi-file
+crash/power-loss, distributed locking, provider, live executor, business
+outcome, pilot hay deployment. Marker:
+`Cập nhật RP-03 exhausted-budget monotonicity`.
+
+**Baseline sync after PR #423 (2026-09-18):** PR #423 đã squash-merge regression
+RP-03 exhausted-budget monotonicity vào `main` tại
+`35ebabc2f068cda0a4eef1dd479fc102d03a7a53`, từ implementation head
+`425a78a884247756d8c2202997e5075bc04fc3d2`. PR có 13/13 checks PASS:
+Curriculum CI run `35326131724` gồm Windows runtime job `105539484848` và
+learner race job `105539484967`, cùng Mission Agent Path CI run `35326131948`
+với 3/3 job PASS. Post-merge readiness audit và 118 audit unit tests PASS;
+snapshot đã rebinding plan, readiness matrix và evidence graph về main.
+RP-03 vẫn `PARTIAL`, overall vẫn `NOT_READY_FOR_PRODUCTION`. Đây là bounded
+local/offline/synthetic/read-only evidence, không thêm multi-file
+crash/power-loss, distributed locking, provider, live executor, business
+outcome, pilot hay deployment claim. Record:
+`docs/architecture/EVIDENCE-RP03-BUDGET-MONOTONICITY-20260918.md`. Marker:
+`Baseline sync after PR #423`.
 
 **Baseline sync after PR #403 (2026-09-17):** PR #403 đã squash-merge vào
 `main` tại `8b44011465ea0c8afcfcc832b76f045da0811bd4`, đưa M07 raw-JSON
@@ -1471,7 +2014,65 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 - Policy kiểm created_at/expires_at, schema, authority, risk, proposal/evidence/decision links và idempotency context. Thiếu dependency phải trả trạng thái đóng, không ALLOW.
 - Conformance tests cùng payload/expected result cho CLI và harness: thiếu proposal, proposal không tồn tại, parameters null, future intent, expired, risk không biết, authority tamper, duplicate keys, exact large number qua restart.
 
-**Nghiệm thu:** R06/R07 đóng; output vẫn đúng schema và proposal-only. **Migration:** báo version/hash không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite approval cũ để khớp hash mới.
+**Cập nhật RP-02 shared M08 policy context decoder (2026-09-18):**
+`core/m08` hiện sở hữu full policy-context decoder và semantic validator.
+Mission-runtime dùng decoder này; learner giữ input contract rút gọn nhưng gọi
+cùng validator sau khi bind decision/evidence/proposal IDs. Regression bao phủ
+missing/null/duplicate/unknown/case-variant fields, RFC3339 time, duplicate
+IDs, unknown risk và blank idempotency. Local worktree không có Go executable,
+nên CI hosted vẫn là acceptance gate; RP-02/R06/R07 chưa đóng do còn hash
+version/migration, provenance/conformance và external execution blockers.
+Record: `docs/architecture/EVIDENCE-RP02-SHARED-M08-POLICY-CONTEXT-20260918.md`.
+
+Hosted verification is complete: PR #417 passed all 13 checks in Curriculum CI
+run `35314331386` and Mission Agent Path CI run `35314331378`, including the
+learner race, Windows runtime and mission-runtime test/vet jobs. This records
+offline/fixture acceptance for the shared decoder seam; RP-02/R06/R07 remain
+PARTIAL for shared conformance, hash-version/migration, provenance/persistence
+and external execution requirements.
+
+**Cập nhật RP-02 shared M08 conformance table (2026-09-18):**
+`core/m08/conformance.go` now owns one scenario table with expected decision,
+risk, reason and non-authorizing flags. Core, mission-runtime and learner
+regressions consume that table; learner cases that require an independently
+trusted missing decision/evidence registry are marked as an explicit parity
+boundary because the learner policy-input contract derives those links from
+the bound intent. Curriculum CI run `35315240076` and Mission Agent Path CI
+run `35315240089` passed all 13 checks for this change. RP-02/R06/R07 remain
+PARTIAL pending hash-version/migration, persistence/provenance and external
+execution evidence.
+
+**Cập nhật RP-02 intent hash version boundary (2026-09-18):** `core/m08`
+formalizes the existing `sha256:` prefix as V1. Decode, policy evaluation and
+the mission harness reject an unknown prefix with `UNSUPPORTED_HASH_VERSION`
+and never reseal the old intent in place. Hosted Curriculum CI run
+`35316020312` and Mission Agent Path CI run `35316020309` passed all 13 checks.
+This is version recognition/fail-closed evidence only; migration, approval
+review, exact restart persistence and provenance remain open, so RP-02/R06/R07
+stay PARTIAL.
+
+**Cập nhật RP-02 exact-number restart conformance (2026-09-18):** learner và
+mission-runtime đều ghi/đọc lại intent có `9007199254740993`, giữ
+`json.Number` và xác nhận hash không đổi sau reload. Curriculum CI run
+`35316418613` và Mission Agent Path CI run `35316418619` đã PASS toàn bộ 13
+checks. Đây là local fixture/restart evidence bounded; crash/power-loss,
+multi-process persistence and distributed storage remain open, nên R07 và
+RP-02 vẫn PARTIAL.
+
+**Cập nhật RP-02 persisted M07 proposal provenance (2026-09-18):** learner
+resolver revalidate digest, grounding và canonical `record_id` khi bind
+`proposal_ref`; regression reject proposal có digest hợp lệ nhưng provenance
+khác và không ghi M08 intent. Curriculum CI run `35317820062` và Mission Agent
+Path CI run `35317820048` đã PASS toàn bộ 13 checks. Đây là bounded local
+resolver/read-only evidence; cross-store transactionality, distributed
+persistence and live execution remain open, nên RP-02/R06/R07 vẫn `PARTIAL`.
+
+Marker: `Cập nhật RP-02 shared M08 policy context decoder`.
+
+**Nghiệm thu:** R06/R07 vẫn `PARTIAL`; output vẫn đúng schema và
+proposal-only trong boundary offline hiện tại. **Migration:** báo version/hash
+không hỗ trợ; migration có lệnh riêng, backup và human review; không rewrite
+approval cũ để khớp hash mới.
 
 ### RP-03a/03b — Guard approval, ledger và STOP có tính bền vững
 
@@ -1517,6 +2118,17 @@ hay proof side effect; RP-03/RP-06/RP-07 vẫn mở.
 
 **Nghiệm thu:** R02/R03/R04 đóng; record hợp lệ được ACK phải replay MATCH; field ID thật đi từ context đến intent. **Compatibility:** giữ endpoint lịch sử nếu cần diagnostic nhưng tách rõ envelope/trust level; không tự sửa history đã DRIFT.
 
+**Cập nhật RP-04 shared canonical evidence context (2026-09-18):**
+`core/canonical` nay tạo envelope `canonical-evidence-context/v1` dùng chung
+cho M07/M08 từ canonical history observations. Aggregate IDs phải khớp đúng
+recorded observations; field IDs/provenance được lấy lại từ raw M00 projection,
+reject malformed/forged/duplicate/collision IDs và giữ nguyên missing/null.
+Learner M07 không còn tự dựng field evidence riêng. Đây vẫn là bounded
+offline/fixture/read-only evidence; resolver chỉ nhận record resolve đúng một
+lần và replay `MATCH`, còn provider/live execution, deployment, distributed
+locking, power-loss và multi-file atomicity vẫn mở. Marker:
+`RP-04 shared canonical context`.
+
 ### RP-05a/05b — Grounding và vòng đời tool evidence M07
 
 **Chạm tới:** `core/m07/m07.go`, learner M07 entrypoint, blueprint M07, proposal/output contracts, registry/request adapter và tests.
@@ -1557,6 +2169,33 @@ budget/overflow checks; harness không còn giữ bản sao cross-artifact valid
 Các regression chain hiện tại vì thế chạy đúng implementation dùng chung. Đây
 chỉ là historical canary fixture audit, không cấp quyền, không gọi executor và
 không chứng minh provider, business outcome, crash/power-loss hay multi-host.
+
+**Cập nhật RP-05a proposal metadata (2026-09-18):** `RegisteredAgentProposal`
+giờ persist và resolver kiểm tra lại `validation_result`, `validation_version`,
+`authority_ceiling` cùng provenance của canonical context: `record_id`,
+`decision_id` và evidence IDs đã được model cite. Learner, watcher và restore
+đều truyền decision identity vào cùng resolver; proposal vẫn chỉ là
+`HUMAN_REVIEW` proposal, không cấp approval hay execution authority. Đây vẫn là
+bounded offline/fixture evidence; provider/model operated evidence và n8n
+end-to-end vẫn mở. Marker: `RP-05a proposal metadata`.
+
+**Baseline sync after PR #427 (2026-09-18):** PR #427 đã squash-merge vào
+`main` tại `dcda7894ad72227c588de0f7077dc18cdab92fea` từ implementation head
+`0f9f3aaee9b0e41afd31eaa448df0c59bd7b0504`. Final head đạt đủ 13 hosted
+checks, gồm Windows runtime, learner race, Go vet, backup mutation và n8n
+regression. Evidence post-merge được ghi tại
+`docs/architecture/EVIDENCE-PR427-POST-MERGE-20260918.md`; RP-05 vẫn
+`PARTIAL`, provider/model operated evidence và live execution vẫn mở. Marker:
+`Baseline sync after PR #427`.
+
+**Cập nhật RP-05b tool trace provenance (2026-09-18):** registered tool trace
+giờ lưu riêng `request_id` do adapter tính từ canonical record/tool request và
+`content_digest` tính từ canonical JSON body (ổn định qua serialize/restore). Nếu caller gửi metadata forged,
+registration/restore từ chối; evidence body gắn `SubjectID` với request ID,
+trong khi `TraceID` vẫn bao phủ toàn bộ result. Trace cũ thiếu metadata vì vậy
+fail closed thay vì được tự động nâng cấp. Đây vẫn là bounded offline/fixture
+evidence; không claim provider, live execution hay external readiness.
+Marker: `Cập nhật RP-05b tool trace provenance`.
 
 ### RP-06 — Backup/restore M00–M10 và graph có thể dùng lại
 
@@ -2256,6 +2895,40 @@ không publish target. Snapshot recovery-only không có evaluation vẫn hợp 
 Đây là reverse-cardinality guard local; crash/power-loss, atomic multi-file,
 distributed/multi-host, provider, deployment, pilot và business outcome vẫn
 mở.
+
+**Cập nhật RP-08 M11 ledger-outcome reverse mutation proof (2026-09-19):**
+BR-18b đã có negative case checksum-valid xoá toàn bộ `outcome_links` khỏi
+`PRODUCTION_LEDGER`. Thêm mutation runner tạo learner Bot disposable, tháo
+riêng reverse `ledgerOutcomeLinks` cardinality guard trong backup restore rồi
+đòi smoke thật fail tại marker `orphan-ledger-outcome-restored`; runner cũng
+fail nếu smoke xanh hoặc fail ở seam khác. Đây là proof offline/read-only cho
+một reverse semantic-orphan seam; mutation breadth đầy đủ, crash/power-loss,
+atomic multi-file, distributed/multi-host, Windows traversal parity,
+provider/live execution, deployment, pilot và business outcome vẫn mở.
+
+**Cập nhật RP-08 M11 reverse-ledger graph mutation proof (2026-09-19):**
+implementation branch thêm disposable-copy mutation bỏ riêng guard core yêu cầu
+mọi `ReconciliationResolutionIDs` của ledger checksum-valid phải resolve về đúng
+reconciliation execution và lease của stopped lifecycle. Mutation chạy chính
+`TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks` và phải fail ở
+assertion orphan reconciliation resolution; fail ở seam khác hoặc mutation xanh
+đều làm runner fail. Đây là proof offline/read-only cho một reverse-ledger graph
+seam; mutation breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot và business outcome vẫn mở. Marker: `Cập nhật RP-08 M11
+reverse-ledger graph mutation proof`.
+
+**Cập nhật RP-08 M11 outcome-link graph mutation proof (2026-09-19):**
+implementation branch thêm disposable-copy mutation bỏ riêng reverse guard yêu cầu
+mỗi `PRODUCTION_LEDGER.OutcomeLinks` checksum-valid phải khớp `OutcomeID` của
+offline evaluation khi evaluation tồn tại. Mutation chạy
+`TestArtifactGraphAcceptsAndRejectsExactProductionLifecycleLinks` và phải fail
+tại assertion swapped outcome ID; fail ở seam khác hoặc mutation xanh đều làm
+runner fail. Đây là proof offline/read-only cho một reverse outcome-to-evaluation
+seam; mutation breadth, ledger durability, crash/power-loss, atomic multi-file,
+distributed/multi-host, Windows traversal parity, provider/live execution,
+deployment, pilot và business outcome vẫn mở. Marker: `Cập nhật RP-08 M11
+outcome-link graph mutation proof`.
 
 **Cập nhật M11 restore authorization/execution lineage (2026-09-16):** BR-18b
 giờ tạo bản sao checksum-valid của backup bằng learner Bot thật rồi làm lệch
@@ -2995,25 +3668,15 @@ Các lệnh baseline dưới đây là lệnh đã có trong repo; các negative
 for module in contracts core lab/affiliate-bot lab/mission-runtime; do
   (cd "$module" && GOWORK=off go test -count=1 ./... && GOWORK=off go vet ./...) || exit 1
 done
-python3 -m unittest discover -s scripts/tests -v || exit 1
-
-# Static validators only.  The *_operated_execution.py validators require an
-# execution JSON/history artifact and are called by the corresponding engine
-# runner or operated runbook, so a no-argument glob would stop this offline
-# check with a usage error.
-for name in \
-  validate_repo validate_missions validate_artifact_spine \
-  validate_continuity validate_language_policy validate_agent_semantics \
-  validate_semantic_contracts validate_m11 \
-  validate_n8n_m06 validate_n8n_m06_cases validate_n8n_m06_selected_source \
-  validate_n8n_m07 validate_n8n_m07_adversarial validate_n8n_m07_output_cases; do
-  python3 "scripts/$name.py" || exit 1
+python3 -m unittest discover -s scripts/tests -v
+for validator in scripts/validate*.py; do
+  python3 "$validator" || exit 1
 done
-python3 scripts/audit_readiness.py || exit 1
-python3 scripts/smoke_br12d.py || exit 1
-python3 scripts/smoke_br13b.py || exit 1
-python3 scripts/smoke_br16a_offline.py || exit 1
-python3 scripts/smoke_br18b_backup_restore.py || exit 1
+python3 scripts/audit_readiness.py
+python3 scripts/smoke_br12d.py
+python3 scripts/smoke_br13b.py
+python3 scripts/smoke_br16a_offline.py
+python3 scripts/smoke_br18b_backup_restore.py
 git diff --check
 ```
 

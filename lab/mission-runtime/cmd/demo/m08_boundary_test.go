@@ -7,12 +7,36 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 )
 
 func m08BoundaryFixture() (ShadowActionIntent, ShadowPolicyContext) {
 	i := SealShadowActionIntent(ShadowActionIntent{IntentID: "syn-i", DecisionID: "syn-d", EvidenceIDs: []string{"syn-e"}, ActionType: "DRAFT", Target: "https://example.com/draft", Parameters: map[string]any{}, ProposedBy: "human", CreatedAt: "2026-09-03T01:00:00Z", ExpiresAt: "2026-09-03T03:00:00Z", CorrelationID: "syn-c", IdempotencyKey: "syn-k"})
 	c := ShadowPolicyContext{PolicyVersion: "test-v1", Now: "2026-09-03T02:00:00Z", KnownDecisionIDs: []string{"syn-d"}, KnownEvidenceIDs: []string{"syn-e"}, KnownProposalIDs: []string{}, AllowedHosts: []string{"example.com"}, ActionRisk: map[string]string{"DRAFT": "RISK0"}, SeenIdempotency: map[string]string{}}
 	return i, c
+}
+
+func TestM08ContextUsesCanonicalCoreDecoder(t *testing.T) {
+	_, context := m08BoundaryFixture()
+	valid, _ := json.Marshal(context)
+	if _, status := DecodeM08Context(valid); status != missionValid {
+		t.Fatalf("harness rejected valid context: %s", status)
+	}
+	if _, status := corem08.DecodePolicyContext(valid); status != "VALID" {
+		t.Fatalf("core rejected valid context: %s", status)
+	}
+	for _, raw := range [][]byte{
+		[]byte(strings.Replace(string(valid), `"now":"2026-09-03T02:00:00Z"`, `"now":"tomorrow"`, 1)),
+		[]byte(strings.Replace(string(valid), `"action_risk":{"DRAFT":"RISK0"}`, `"action_risk":{"DRAFT":"RISK9"}`, 1)),
+		[]byte(strings.Replace(string(valid), `"known_decision_ids":["syn-d"]`, `"known_decision_ids":["syn-d","syn-d"]`, 1)),
+	} {
+		_, harnessStatus := DecodeM08Context(raw)
+		_, coreStatus := corem08.DecodePolicyContext(raw)
+		if harnessStatus != "INVALID_CONTEXT" || coreStatus != "INVALID_CONTEXT" {
+			t.Fatalf("context decoder disagreement: harness=%s core=%s", harnessStatus, coreStatus)
+		}
+	}
 }
 func TestM08RawSchema(t *testing.T) {
 	i, c := m08BoundaryFixture()
@@ -106,14 +130,57 @@ func TestM08BoundaryPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestM08HarnessUsesSharedPolicyConformanceTable(t *testing.T) {
+	for _, scenario := range corem08.PolicyConformanceCases() {
+		t.Run(scenario.Name, func(t *testing.T) {
+			got := EvaluateShadowPolicy(ShadowActionIntent{
+				IntentID: scenario.Intent.IntentID, DecisionID: scenario.Intent.DecisionID, EvidenceIDs: scenario.Intent.EvidenceIDs,
+				ActionType: scenario.Intent.ActionType, Target: scenario.Intent.Target, Parameters: scenario.Intent.Parameters,
+				ProposedBy: scenario.Intent.ProposedBy, ProposalRef: scenario.Intent.ProposalRef, CreatedAt: scenario.Intent.CreatedAt,
+				ExpiresAt: scenario.Intent.ExpiresAt, CorrelationID: scenario.Intent.CorrelationID, IdempotencyKey: scenario.Intent.IdempotencyKey,
+				IntentHash: scenario.Intent.IntentHash, IntentMode: scenario.Intent.IntentMode, ExecutionAuthorized: scenario.Intent.ExecutionAuthorized,
+			}, ShadowPolicyContext(scenario.Context))
+			if got.Decision != scenario.Decision || got.RiskClass != scenario.RiskClass || got.Reason != scenario.Reason || got.PolicyReviewRequired != scenario.PolicyReview || got.ExecutionAuthorized != scenario.ExecutionAuth {
+				t.Fatalf("harness drifted from shared table: got=%+v want decision=%s risk=%s reason=%s review=%v authority=%v", got, scenario.Decision, scenario.RiskClass, scenario.Reason, scenario.PolicyReview, scenario.ExecutionAuth)
+			}
+		})
+	}
+}
+
+func TestM08HarnessRejectsUnsupportedHashVersionWithoutResealing(t *testing.T) {
+	i, _ := m08BoundaryFixture()
+	raw, err := json.Marshal(i)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = bytes.Replace(raw, []byte(`"sha256:`), []byte(`"sha256-v2:`), 1)
+	decoded, status := DecodeM08Intent(raw)
+	if status != "UNSUPPORTED_HASH_VERSION" || decoded.IntentHash != "" {
+		t.Fatalf("harness accepted or resealed unsupported hash version: status=%s decoded=%+v", status, decoded)
+	}
+}
+
 func TestM08ParameterNumbers(t *testing.T) {
 	i, _ := m08BoundaryFixture()
 	i.Parameters = map[string]any{"id": json.Number("9007199254740993")}
 	i = SealShadowActionIntent(i)
 	raw, _ := json.Marshal(i)
-	decoded, s := DecodeM08Intent(raw)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "intent.json")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, s := DecodeM08Intent(persisted)
 	if s != missionValid || ComputeShadowIntentHash(decoded) != i.IntentHash {
 		t.Fatal("number rounded", s)
+	}
+	if got, ok := decoded.Parameters["id"].(json.Number); !ok || got.String() != "9007199254740993" {
+		t.Fatalf("large number changed after persisted reload: %#v", decoded.Parameters["id"])
 	}
 }
 func TestM08CLI(t *testing.T) {

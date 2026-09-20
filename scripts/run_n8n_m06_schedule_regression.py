@@ -34,6 +34,8 @@ from n8n_cli_preflight import command_prefix, validate_n8n_command
 from n8n_runtime_env import isolated_n8n_environment
 from validate_n8n_m06_operated_execution import validate_success
 
+ADAPTER_TOKEN = "n8n-regression-canonical-adapter-token-20260919"
+
 
 def import_scheduled_workflow(prefix: list[str], env: dict[str, str], runtime: Path, workflow_id: str, adapter_port: int) -> None:
     """Import a one-second Schedule Trigger copy without changing the blueprint."""
@@ -238,12 +240,12 @@ def run_case(prefix: list[str], args: argparse.Namespace, *, available_adapter: 
     adapter: Optional[subprocess.Popen[str]] = None
     server: Optional[subprocess.Popen[str]] = None
     try:
-        n8n_home = runtime / "n8n"
         env = isolated_n8n_environment(
             runtime,
             broker_port=choose_port(),
             node_path=Path(args.n8n_node) if args.n8n_node else None,
         )
+        env.update({"N8N_BLOCK_ENV_ACCESS_IN_NODE": "false", "CANONICAL_ADAPTER_TOKEN": ADAPTER_TOKEN})
         bot = runtime / "bot"
         run(["go", "build", "-o", str(bot), "./cmd/bot"], env=env, cwd=BOT_DIR)
         history = runtime / "history.jsonl"
