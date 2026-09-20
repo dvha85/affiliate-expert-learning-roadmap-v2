@@ -20,7 +20,7 @@ Trong MVP: nhập JSON/CSV qua adapter có contract; kiểm dữ liệu; xếp h
 
 Ngoài MVP ban đầu: tự đăng bài/gửi tin/spend, tạo link affiliate bằng API giả định, tự đăng ký chương trình, crawl nguồn không được phép, tự áp dụng improvement hoặc khẳng định attribution/doanh thu khi chưa có báo cáo. Watcher chỉ đọc thuộc M06; executor thuộc gate M09+, không được dùng để né action của người ở M03.
 
-M00–M05 phải tiến hóa cùng learner Bot tại `lab/affiliate-bot/`; `lab/mission-runtime/` chỉ là oracle/eval. CLI/adapter/store xuyên suốt vẫn là công việc BR-08–BR-12, không phải chức năng đã có chỉ vì đặc tả này được merge.
+M00–M05 phải tiến hóa cùng learner Bot tại `lab/affiliate-bot/`; `lab/mission-runtime/` chỉ là oracle/eval. Learner Bot hiện đã có các CLI/adapter/store cho chuỗi M00–M11 offline, nhưng đặc tả này vẫn là mục tiêu sản phẩm: implementation và fixture regression không tự chứng minh selected source, provider, business outcome, live executor hay production readiness.
 
 ## 3. Input, nguồn và trạng thái dữ liệu
 
@@ -47,7 +47,7 @@ Một báo cáo nên có:
 5. Việc người cần review và phép đo tiếp theo; không có lời hứa doanh thu.
 6. Khi đã có action/outcome: dòng thời gian ID, trạng thái tạm/chốt, phiên bản báo cáo và evaluation dựa trên những outcome IDs nào.
 
-Xem [case giả lập xuyên suốt](REFERENCE-CASE.md). Đây là mẫu nội dung mong muốn, **không phải ảnh chụp output CLI hiện tại**. BR-08–BR-12 sẽ quyết định lệnh và format lưu trữ, không tự phát minh lệnh chạy chưa tồn tại.
+Xem [case giả lập xuyên suốt](REFERENCE-CASE.md). Đây là mẫu nội dung mong muốn, **không phải ảnh chụp output CLI hiện tại**. Các entrypoint đã có trong learner Bot được cập nhật ở [README của Bot](../../lab/affiliate-bot/README.md); đặc tả này vẫn mô tả mục tiêu sản phẩm và không biến fixture/offline output thành live or production proof.
 
 ## 5. ID và liên kết xuyên suốt
 

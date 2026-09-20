@@ -162,10 +162,10 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 	gates := map[string]ProductionGateDecision{}
 	authorizations := map[string]ProductionExecutionAuthorization{}
 	executions := map[string]ProductionExecutionRecord{}
-		executionAuthorizations := map[string]string{}
-		resolutions := map[string]ProductionReconciliationResolution{}
-		resolutionsByID := map[string]ProductionReconciliationResolution{}
-		admissionNewLeases := map[string]string{}
+	executionAuthorizations := map[string]string{}
+	resolutions := map[string]ProductionReconciliationResolution{}
+	resolutionsByID := map[string]ProductionReconciliationResolution{}
+	admissionNewLeases := map[string]string{}
 	admissionPriorResolutions := map[string]string{}
 	evaluations := map[string]ProductionOutcomeEvaluation{}
 	evaluationExecutions := map[string]string{}
@@ -255,9 +255,15 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			healthObservedAt, healthObservedErr := time.Parse(time.RFC3339, snapshot.ObservedAt)
 			costObservedAt, costObservedErr := time.Parse(time.RFC3339, bound.ObservedAt)
 			costExpiresAt, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
+			maxHealthAgeSeconds := lease.MaxHealthSnapshotAgeSeconds
+			healthAgeOK := maxHealthAgeSeconds >= 0 && int64(maxHealthAgeSeconds) <= int64(^uint64(0)>>1)/int64(time.Second)
+			maxHealthAge := time.Duration(0)
+			if healthAgeOK {
+				maxHealthAge = time.Duration(maxHealthAgeSeconds) * time.Second
+			}
 			healthAllowsProduction := snapshot.TelemetryComplete && snapshot.DependencyState == "HEALTHY" && snapshot.ComplianceAlertCount == 0 && !snapshot.ReconciliationRequired && snapshot.ConsecutiveFailures < lease.MaxConsecutiveFailures && snapshot.OldestPendingOutcomeAgeSeconds <= lease.MaxOutcomeAgeSeconds
 			allowBudgetAvailable := ledgerState.ExecutionsTotal < lease.MaxExecutionsTotal && ledgerState.ExecutionsInWindow < lease.MaxExecutionsPerWindow && ledgerState.PendingOutcomes < lease.MaxPendingOutcomes && x.CostBoundMinor <= lease.MaxCostMinorTotal-ledgerState.CostMinorTotal
-			if !leaseOK || !approvalOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || healthObservedErr != nil || costObservedErr != nil || costExpiryErr != nil || bound.CorrelationID != lease.CorrelationID || x.Decision == "ALLOW_PRODUCTION" && (!healthAllowsProduction || !allowBudgetAvailable || !contains(lease.AllowedRiskClasses, x.RiskClass) || !contains(approval.ValidatedRiskClasses, x.RiskClass)) || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || evaluatedAt.Before(healthObservedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
+			if !leaseOK || !approvalOK || !activationOK || !healthOK || !costOK || !ledgerOK || !ledgerStateOK || !healthAgeOK || evaluatedErr != nil || validFromErr != nil || expiresErr != nil || activationErr != nil || healthObservedErr != nil || costObservedErr != nil || costExpiryErr != nil || bound.CorrelationID != lease.CorrelationID || x.Decision == "ALLOW_PRODUCTION" && (!healthAllowsProduction || !allowBudgetAvailable || evaluatedAt.Sub(healthObservedAt) >= maxHealthAge || !contains(lease.AllowedRiskClasses, x.RiskClass) || !contains(approval.ValidatedRiskClasses, x.RiskClass)) || ledger.ArtifactKind != ArtifactKindLedger || ledger.ContentHash != x.LedgerContentHash || activation.LeaseVersion != x.LeaseVersion || activation.LeaseHash != x.LeaseHash || ledgerState.LeaseID != x.LeaseID || ledgerState.LeaseVersion != x.LeaseVersion || ledgerState.LeaseHash != x.LeaseHash || ledgerState.ControlMode != "NORMAL" || ledgerState.ReconciliationRequired || ledgerState.ExecutionsTotal != x.ExecutionsTotalBefore || ledgerState.ExecutionsInWindow != x.ExecutionsInWindowBefore || ledgerState.CostMinorTotal != x.CostMinorTotalBefore || ledgerState.PendingOutcomes != x.PendingOutcomesBefore || lease.LeaseVersion != x.LeaseVersion || lease.LeaseHash != x.LeaseHash || lease.PolicyVersion != x.PolicyVersion || snapshot.SnapshotHash != x.HealthSnapshotHash || bound.CostBoundHash != x.CostBoundHash || bound.MaxCostMinor != x.CostBoundMinor || bound.Currency != lease.Currency || bound.IntentID != x.IntentID || bound.IntentHash != x.IntentHash || evaluatedAt.Before(validFrom) || evaluatedAt.Before(activatedAt) || evaluatedAt.Before(healthObservedAt) || !evaluatedAt.Before(expiresAt) || evaluatedAt.Before(costObservedAt) || !evaluatedAt.Before(costExpiresAt) {
 				return fmt.Errorf("production gate has an orphaned or mismatched link")
 			}
 			if x.GateID != ComputeProductionGateID(lease, x.IntentID, x.IntentHash, snapshot, bound, ledger, x.EvaluatedAt) {
@@ -277,12 +283,19 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			healthObservedAt, healthTimeErr := time.Parse(time.RFC3339, snapshot.ObservedAt)
 			costObservedAt, costObservedErr := time.Parse(time.RFC3339, bound.ObservedAt)
 			costExpiresAt, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
-			maxHealthAge := time.Duration(lease.MaxHealthSnapshotAgeSeconds) * time.Second
+			maxHealthAgeSeconds := lease.MaxHealthSnapshotAgeSeconds
+			healthExpiryOK := maxHealthAgeSeconds >= 0 && int64(maxHealthAgeSeconds) <= int64(^uint64(0)>>1)/int64(time.Second)
+			maxHealthAge := time.Duration(0)
+			healthExpiry := time.Time{}
+			if healthExpiryOK {
+				maxHealthAge = time.Duration(maxHealthAgeSeconds) * time.Second
+				healthExpiry = healthObservedAt.Add(maxHealthAge)
+			}
 			executorAllowed := false
 			for _, executorID := range lease.ExecutorIDs {
 				executorAllowed = executorAllowed || executorID == x.ExecutorID
 			}
-			if !leaseOK || !gateOK || !healthOK || !costOK || authorizedErr != nil || authorizationExpiryErr != nil || validFromErr != nil || leaseExpiryErr != nil || gateTimeErr != nil || healthTimeErr != nil || costObservedErr != nil || costExpiryErr != nil || !executorAllowed || x.CorrelationID != lease.CorrelationID || x.CorrelationID != bound.CorrelationID || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.LeaseID != x.ProductionLeaseID || gate.LeaseVersion != x.ProductionLeaseVersion || gate.LeaseHash != x.ProductionLeaseHash || gate.Decision != "ALLOW_PRODUCTION" || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || gate.HealthSnapshotID != x.ProductionHealthSnapshotID || gate.HealthSnapshotHash != x.ProductionHealthSnapshotHash || gate.CostBoundID != x.ProductionCostBoundID || gate.CostBoundHash != x.ProductionCostBoundHash || gate.CostBoundMinor != x.ProductionCostBoundMinor || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || authorizedAt.Before(validFrom) || !authorizedAt.Before(leaseExpiresAt) || authorizationExpiresAt.After(leaseExpiresAt) || authorizedAt.Before(costObservedAt) || !authorizedAt.Before(costExpiresAt) || authorizationExpiresAt.After(costExpiresAt) || authorizedAt.Before(gateEvaluatedAt) || authorizedAt.Before(healthObservedAt) || authorizedAt.Sub(healthObservedAt) >= maxHealthAge || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
+			if !leaseOK || !gateOK || !healthOK || !costOK || !healthExpiryOK || authorizedErr != nil || authorizationExpiryErr != nil || validFromErr != nil || leaseExpiryErr != nil || gateTimeErr != nil || healthTimeErr != nil || costObservedErr != nil || costExpiryErr != nil || !executorAllowed || x.CorrelationID != lease.CorrelationID || x.CorrelationID != bound.CorrelationID || lease.LeaseVersion != x.ProductionLeaseVersion || lease.LeaseHash != x.ProductionLeaseHash || gate.LeaseID != x.ProductionLeaseID || gate.LeaseVersion != x.ProductionLeaseVersion || gate.LeaseHash != x.ProductionLeaseHash || gate.Decision != "ALLOW_PRODUCTION" || gate.IntentID != x.IntentID || gate.IntentHash != x.IntentHash || gate.PolicyVersion != x.PolicyVersion || gate.HealthSnapshotID != x.ProductionHealthSnapshotID || gate.HealthSnapshotHash != x.ProductionHealthSnapshotHash || gate.CostBoundID != x.ProductionCostBoundID || gate.CostBoundHash != x.ProductionCostBoundHash || gate.CostBoundMinor != x.ProductionCostBoundMinor || snapshot.SnapshotHash != x.ProductionHealthSnapshotHash || bound.CostBoundHash != x.ProductionCostBoundHash || bound.MaxCostMinor != x.ProductionCostBoundMinor || authorizedAt.Before(validFrom) || !authorizedAt.Before(leaseExpiresAt) || authorizationExpiresAt.After(leaseExpiresAt) || authorizedAt.Before(costObservedAt) || !authorizedAt.Before(costExpiresAt) || authorizationExpiresAt.After(costExpiresAt) || authorizedAt.Before(gateEvaluatedAt) || authorizedAt.Before(healthObservedAt) || authorizationExpiresAt.After(healthExpiry) || authorizedAt.Sub(healthObservedAt) >= maxHealthAge || x.ExecutionMode != "GOVERNED_PRODUCTION" || !x.ExecutionAuthorized {
 				return fmt.Errorf("production authorization has an orphaned or mismatched link")
 			}
 			if x.AuthorizationID != ComputeProductionAuthorizationID(gate.GateID, x.ExecutorID, x.AuthorizedAt) {

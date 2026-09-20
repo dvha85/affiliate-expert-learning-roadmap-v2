@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -167,6 +168,64 @@ func TestM11ChainMutations(t *testing.T) {
 	mutateBundle(t, b, "stop_ledger", "reconciliation_required", false)
 	if _, s := auditBundle(t, b); s != "INVALID_STOP_TRANSITION" {
 		t.Fatal(s)
+	}
+}
+
+func TestM11HistoricalChainBindsCostAndAuthorizationIntentHashes(t *testing.T) {
+	for _, profile := range []string{"closed_cycle", "resolved_stop"} {
+		t.Run(profile+"/foreign-cost-intent", func(t *testing.T) {
+			b := m11Bundle(t, profile)
+			cost := b["cost"].(CanaryCostBound)
+			cost.IntentID = "foreign-intent"
+			cost.IntentHash = "sha256:" + strings.Repeat("a", 64)
+			cost = SealCanaryCostBound(cost)
+			b["cost"] = cost
+			mutateBundle(t, b, "gate", "cost_bound_hash", cost.CostBoundHash)
+			mutateBundle(t, b, "authorization", "production_cost_bound_hash", cost.CostBoundHash)
+			mutateBundle(t, b, "execution", "production_cost_bound_hash", cost.CostBoundHash)
+			if _, status := auditBundle(t, b); status == missionValid {
+				t.Fatal("historical audit accepted a cost bound from another intent")
+			}
+		})
+
+		t.Run(profile+"/foreign-authorization-hash", func(t *testing.T) {
+			b := m11Bundle(t, profile)
+			mutateBundle(t, b, "authorization", "intent_hash", "sha256:"+strings.Repeat("b", 64))
+			if _, status := auditBundle(t, b); status == missionValid {
+				t.Fatal("historical audit accepted an authorization with another intent hash")
+			}
+		})
+	}
+}
+
+func TestM11HistoricalChainRejectsAuthorizationPastHealthTTL(t *testing.T) {
+	b := m11Bundle(t, "closed_cycle")
+	mutateBundle(t, b, "authorization", "expires_at", "2026-09-03T09:00:00Z")
+	mutateBundle(t, b, "execution", "attempted_at", "2026-09-03T08:07:00Z")
+	mutateBundle(t, b, "post_ledger", "last_execution_at", "2026-09-03T08:07:00Z")
+	if _, status := auditBundle(t, b); status == missionValid {
+		t.Fatal("historical audit accepted authorization past the health snapshot TTL")
+	}
+}
+
+func TestM11ChainPreservesLargeIntentNumbersAcrossAdapter(t *testing.T) {
+	b := m11Bundle(t, "closed_cycle")
+	intent := b["intent"].(ShadowActionIntent)
+	intent.Parameters["large_integer"] = json.Number("9007199254740993")
+	intent = SealShadowActionIntent(intent)
+	b["intent"] = intent
+	for _, artifact := range []string{"policy", "gate", "authorization", "execution", "cycle"} {
+		mutateBundle(t, b, artifact, "intent_hash", intent.IntentHash)
+	}
+	cost := b["cost"].(CanaryCostBound)
+	cost.IntentHash = intent.IntentHash
+	cost = SealCanaryCostBound(cost)
+	b["cost"] = cost
+	mutateBundle(t, b, "gate", "cost_bound_hash", cost.CostBoundHash)
+	mutateBundle(t, b, "authorization", "production_cost_bound_hash", cost.CostBoundHash)
+	mutateBundle(t, b, "execution", "production_cost_bound_hash", cost.CostBoundHash)
+	if _, status := auditBundle(t, b); status != missionValid {
+		t.Fatalf("exact large integer intent was changed by the adapter: %s", status)
 	}
 }
 

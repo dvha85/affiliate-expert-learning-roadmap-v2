@@ -19,6 +19,29 @@ import (
 
 func m11ArtifactRegistryPath(dir string) string { return filepath.Join(dir, "m11-artifacts.jsonl") }
 
+func m11HealthAge(maxSeconds int) (time.Duration, bool) {
+	if maxSeconds < 0 || int64(maxSeconds) > int64(^uint64(0)>>1)/int64(time.Second) {
+		return 0, false
+	}
+	return time.Duration(maxSeconds) * time.Second, true
+}
+
+// m11LeaseActiveAt is the authority boundary for the learner M11 adapter.
+// Artifact timestamps supplied to a command are historical provenance and are
+// still checked for graph chronology, but they must never decide whether a
+// lease is active now. That decision uses the process-owned mission clock.
+func m11LeaseActiveAt(lease corem11.ProductionLease, now time.Time) error {
+	validFrom, validFromErr := time.Parse(time.RFC3339, lease.ValidFrom)
+	expires, expiresErr := time.Parse(time.RFC3339, lease.ExpiresAt)
+	if validFromErr != nil || expiresErr != nil {
+		return fmt.Errorf("production lease has invalid validity window")
+	}
+	if now.Before(validFrom) || !now.Before(expires) {
+		return fmt.Errorf("production lease is not active at process time")
+	}
+	return nil
+}
+
 // m11RegistryAppendFault is a test-only seam for deterministic failure drills.
 // Production leaves it nil; it is deliberately not controlled by CLI input or
 // environment variables.
@@ -245,6 +268,9 @@ func activateM11Lease(dir, leaseID, activatedAt string) (corem11.ProductionActiv
 	if lease == nil || !approvalExists {
 		return corem11.ProductionActivationRecord{}, "", fmt.Errorf("activation requires registered production lease and approval")
 	}
+	if err := m11LeaseActiveAt(*lease, missionNowUTC()); err != nil {
+		return corem11.ProductionActivationRecord{}, "", err
+	}
 	activated, errActivated := time.Parse(time.RFC3339, activatedAt)
 	validFrom, errValid := time.Parse(time.RFC3339, lease.ValidFrom)
 	expires, errExpires := time.Parse(time.RFC3339, lease.ExpiresAt)
@@ -300,6 +326,9 @@ func initializeM11Ledger(dir, leaseID, initializedAt string) (corem11.Production
 	}
 	if lease == nil || activation == nil || activation.LeaseVersion != lease.LeaseVersion || activation.LeaseHash != lease.LeaseHash {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("ledger initialization requires registered activation")
+	}
+	if err := m11LeaseActiveAt(*lease, missionNowUTC()); err != nil {
+		return corem11.ProductionLedger{}, "", err
 	}
 	now, errNow := time.Parse(time.RFC3339, initializedAt)
 	activated, errActivated := time.Parse(time.RFC3339, activation.ActivatedAt)
@@ -531,10 +560,11 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	if _, err := m11ArtifactValue(dir, corem11.ArtifactKindLeaseApproval, lease.ApprovalRef); err != nil {
 		return corem11.ProductionGateDecision{}, "", err
 	}
-	now, err := time.Parse(time.RFC3339, evaluatedAt)
+	evaluatedAtTime, err := time.Parse(time.RFC3339, evaluatedAt)
 	if err != nil {
 		return corem11.ProductionGateDecision{}, "", fmt.Errorf("invalid evaluated_at")
 	}
+	processNow := missionNowUTC()
 	gate := corem11.ProductionGateDecision{GateID: corem11.ComputeProductionGateID(*lease, state.Intent.IntentID, state.Intent.IntentHash, *health, cost, ledgerEntry, evaluatedAt), LedgerArtifactID: ledgerEntry.ArtifactID, LedgerContentHash: ledgerEntry.ContentHash, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, RiskClass: state.Policy.RiskClass, HealthSnapshotID: health.SnapshotID, HealthSnapshotHash: health.SnapshotHash, CostBoundID: cost.CostBoundID, CostBoundHash: cost.CostBoundHash, CostBoundMinor: cost.MaxCostMinor, Decision: "DENY", Reason: "INVALID_PRODUCTION_STATE", EvaluatedAt: evaluatedAt, ExecutionsTotalBefore: ledger.ExecutionsTotal, ExecutionsInWindowBefore: ledger.ExecutionsInWindow, CostMinorTotalBefore: ledger.CostMinorTotal, PendingOutcomesBefore: ledger.PendingOutcomes, ExecutionAuthorized: false}
 	decision := func(kind, reason string) (corem11.ProductionGateDecision, string, error) {
 		gate.Decision, gate.Reason = kind, reason
@@ -548,8 +578,14 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	validFrom, e1 := time.Parse(time.RFC3339, lease.ValidFrom)
 	expires, e2 := time.Parse(time.RFC3339, lease.ExpiresAt)
 	activatedAt, e3 := time.Parse(time.RFC3339, activation.ActivatedAt)
-	if e1 != nil || e2 != nil || e3 != nil || now.Before(validFrom) || !now.Before(expires) || activatedAt.After(now) || activation.LeaseHash != lease.LeaseHash {
+	// Lease validity and activation are authority checks and therefore use the
+	// process-owned clock. The evaluated_at value remains provenance for the
+	// immutable gate ID and historical chronology only.
+	if e1 != nil || e2 != nil || e3 != nil || evaluatedAtTime.Before(validFrom) || !evaluatedAtTime.Before(expires) || activatedAt.After(evaluatedAtTime) || activation.LeaseHash != lease.LeaseHash {
 		return decision("DENY", "LEASE_INACTIVE")
+	}
+	if err := m11LeaseActiveAt(*lease, processNow); err != nil || activatedAt.After(processNow) {
+		return corem11.ProductionGateDecision{}, "", fmt.Errorf("production lease is not active at process time")
 	}
 	if ledger.LeaseHash != lease.LeaseHash || ledger.ControlMode == "STOPPED" {
 		return decision("STOP", "STICKY_STOP")
@@ -563,7 +599,7 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	if state.Policy.RiskClass != "RISK0" || state.Policy.Decision != "ALLOW" {
 		return decision("REQUIRE_APPROVAL", "RISK_NOT_PRODUCTION_ELIGIBLE")
 	}
-	if status := corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, now); status != "VALID" {
+	if status := corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, processNow); status != "VALID" {
 		return decision("DENY", status)
 	}
 	if ledger.ExecutionsTotal >= lease.MaxExecutionsTotal || ledger.ExecutionsInWindow >= lease.MaxExecutionsPerWindow || ledger.PendingOutcomes >= lease.MaxPendingOutcomes || cost.MaxCostMinor > lease.MaxCostMinorTotal-ledger.CostMinorTotal {
@@ -573,10 +609,14 @@ func evaluateM11Gate(dir, leaseID, healthID, costID, ledgerID, evaluatedAt strin
 	// A health observation made before this lease was activated cannot attest to
 	// the active runtime. It may be schema-valid and still be stale admission
 	// evidence, so fail closed before a gate can be used to authorize work.
-	if observedErr != nil || observed.Before(activatedAt) || observed.After(now) || health.LeaseHash != lease.LeaseHash {
+	if observedErr != nil || observed.Before(activatedAt) || observed.After(evaluatedAtTime) || health.LeaseHash != lease.LeaseHash {
 		return decision("DENY", "HEALTH_MISMATCH")
 	}
-	if now.Unix()-observed.Unix() >= int64(lease.MaxHealthSnapshotAgeSeconds) {
+	healthAge, healthAgeOK := m11HealthAge(lease.MaxHealthSnapshotAgeSeconds)
+	if !healthAgeOK {
+		return decision("DENY", "INVALID_HEALTH_AGE_LIMIT")
+	}
+	if processNow.Sub(observed) >= healthAge {
 		return decision("DEGRADE", "HEALTH_STALE")
 	}
 	if health.ComplianceAlertCount > 0 {
@@ -602,11 +642,12 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	if state.Intent == nil || state.Policy == nil {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("M11 authorization requires persisted intent and policy")
 	}
-	now, err := time.Parse(time.RFC3339, authorizedAt)
+	authorizedAtTime, err := time.Parse(time.RFC3339, authorizedAt)
 	if err != nil {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("invalid authorized_at")
 	}
-	if err := missionAuthorityActive(state, now); err != nil {
+	processNow := missionNowUTC()
+	if err := missionAuthorityActive(state, processNow); err != nil {
 		return corem11.ProductionExecutionAuthorization{}, "", err
 	}
 	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, leaseID)
@@ -614,6 +655,9 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 		return corem11.ProductionExecutionAuthorization{}, "", err
 	}
 	lease := leaseValue.(*corem11.ProductionLease)
+	if err := m11LeaseActiveAt(*lease, processNow); err != nil {
+		return corem11.ProductionExecutionAuthorization{}, "", err
+	}
 	gateValue, err := m11ArtifactValue(dir, corem11.ArtifactKindGate, gateID)
 	if err != nil {
 		return corem11.ProductionExecutionAuthorization{}, "", err
@@ -632,7 +676,7 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 		return corem11.ProductionExecutionAuthorization{}, "", err
 	}
 	cost := costValue.(corem10.TrustedCostBound)
-	if health.SnapshotHash != gate.HealthSnapshotHash || cost.CostBoundHash != gate.CostBoundHash || cost.MaxCostMinor != gate.CostBoundMinor || corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, now) != "VALID" {
+	if health.SnapshotHash != gate.HealthSnapshotHash || cost.CostBoundHash != gate.CostBoundHash || cost.MaxCostMinor != gate.CostBoundMinor || corem10.ValidFor(cost, state.Intent.IntentID, state.Intent.IntentHash, state.Intent.CorrelationID, lease.Currency, processNow) != "VALID" {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate dependencies no longer resolve")
 	}
 	activationValue, activationLookupErr := m11ArtifactValue(dir, corem11.ArtifactKindActivation, lease.LeaseID+"/"+lease.LeaseVersion)
@@ -643,14 +687,16 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 	gateAt, gateErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
 	healthAt, healthErr := time.Parse(time.RFC3339, health.ObservedAt)
 	activatedAt, activationErr := time.Parse(time.RFC3339, activation.ActivatedAt)
-	if gateErr != nil || healthErr != nil || activationErr != nil || activation.LeaseHash != lease.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) || gateAt.After(now) || healthAt.After(now) || now.Sub(healthAt) >= time.Duration(lease.MaxHealthSnapshotAgeSeconds)*time.Second {
+	healthAge, healthAgeOK := m11HealthAge(lease.MaxHealthSnapshotAgeSeconds)
+	if gateErr != nil || healthErr != nil || activationErr != nil || !healthAgeOK || activation.LeaseHash != lease.LeaseHash || gateAt.Before(activatedAt) || healthAt.Before(activatedAt) || gateAt.After(authorizedAtTime) || healthAt.After(authorizedAtTime) || processNow.Sub(healthAt) >= healthAge {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate health is stale or temporally invalid")
 	}
 	currentLedgerEntry, currentLedger, headErr := m11LedgerHead(dir, lease.LeaseID)
 	if headErr != nil || gate.LedgerArtifactID != currentLedgerEntry.ArtifactID || gate.LedgerContentHash != currentLedgerEntry.ContentHash || gate.GateID != corem11.ComputeProductionGateID(*lease, state.Intent.IntentID, state.Intent.IntentHash, *health, cost, currentLedgerEntry, gate.EvaluatedAt) || currentLedger.ExecutionsTotal != gate.ExecutionsTotalBefore || currentLedger.ExecutionsInWindow != gate.ExecutionsInWindowBefore || currentLedger.CostMinorTotal != gate.CostMinorTotalBefore || currentLedger.PendingOutcomes != gate.PendingOutcomesBefore {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("production gate is stale against the current ledger")
 	}
-	limits := []string{lease.ExpiresAt, state.Intent.ExpiresAt, state.Approval.ExpiresAt, cost.ExpiresAt}
+	healthExpiresAt := healthAt.Add(healthAge).Format(time.RFC3339Nano)
+	limits := []string{lease.ExpiresAt, state.Intent.ExpiresAt, state.Approval.ExpiresAt, cost.ExpiresAt, healthExpiresAt}
 	expires := time.Time{}
 	for _, raw := range limits {
 		parsed, parseErr := time.Parse(time.RFC3339, raw)
@@ -661,7 +707,7 @@ func authorizeM11Production(dir, leaseID, gateID, executorID, authorizedAt strin
 			expires = parsed
 		}
 	}
-	if !expires.After(now) {
+	if !expires.After(processNow) {
 		return corem11.ProductionExecutionAuthorization{}, "", fmt.Errorf("authorization would already be expired")
 	}
 	authorization := corem11.ProductionExecutionAuthorization{AuthorizationID: corem11.ComputeProductionAuthorizationID(gate.GateID, executorID, authorizedAt), IntentID: state.Intent.IntentID, IntentHash: state.Intent.IntentHash, PolicyVersion: state.Policy.PolicyVersion, ProductionLeaseID: lease.LeaseID, ProductionLeaseVersion: lease.LeaseVersion, ProductionLeaseHash: lease.LeaseHash, ProductionGateID: gate.GateID, ProductionHealthSnapshotID: health.SnapshotID, ProductionHealthSnapshotHash: health.SnapshotHash, ProductionCostBoundID: cost.CostBoundID, ProductionCostBoundHash: cost.CostBoundHash, ProductionCostBoundMinor: cost.MaxCostMinor, ExecutorID: executorID, AuthorizedAt: authorizedAt, ExpiresAt: expires.Format(time.RFC3339), IdempotencyKey: state.Intent.IdempotencyKey, CorrelationID: state.Intent.CorrelationID, ExecutionMode: "GOVERNED_PRODUCTION", ExecutionAuthorized: true}
@@ -681,10 +727,11 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 	if state.Stop {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
 	}
-	now, err := time.Parse(time.RFC3339, reservedAt)
+	reservedAtTime, err := time.Parse(time.RFC3339, reservedAt)
 	if err != nil {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("invalid reserved_at")
 	}
+	processNow := missionNowUTC()
 	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
 	if err != nil {
 		return corem11.ProductionLedger{}, "", err
@@ -692,7 +739,7 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 	auth := authValue.(*corem11.ProductionExecutionAuthorization)
 	authorized, authorizedErr := time.Parse(time.RFC3339, auth.AuthorizedAt)
 	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
-	if authorizedErr != nil || err != nil || now.Before(authorized) || !expires.After(now) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
+	if authorizedErr != nil || err != nil || reservedAtTime.Before(authorized) || !expires.After(processNow) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is inactive")
 	}
 	suppliedValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLedger, ledgerID)
@@ -705,6 +752,9 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 		return corem11.ProductionLedger{}, "", err
 	}
 	lease := leaseValue.(*corem11.ProductionLease)
+	if err := m11LeaseActiveAt(*lease, processNow); err != nil {
+		return corem11.ProductionLedger{}, "", err
+	}
 	executionID := corem11.ComputeProductionExecutionID(auth.AuthorizationID)
 	// Exact retries may name their immutable predecessor after a later outcome
 	// has advanced the head. Detect that already-committed transition before
@@ -756,7 +806,7 @@ func reserveM11Authorization(dir, authorizationID, ledgerID, reservedAt string) 
 		return corem11.ProductionLedger{}, "", fmt.Errorf("production budget exhausted")
 	}
 	updated, parseErr := time.Parse(time.RFC3339, ledger.UpdatedAt)
-	if parseErr != nil || !now.After(updated) {
+	if parseErr != nil || !reservedAtTime.After(updated) {
 		return corem11.ProductionLedger{}, "", fmt.Errorf("reservation time must advance the ledger")
 	}
 	next := ledger
@@ -815,18 +865,26 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 	if state.Stop {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("durable STOP: %s", state.StopReason)
 	}
-	now, err := time.Parse(time.RFC3339, attemptedAt)
+	attemptedAtTime, err := time.Parse(time.RFC3339, attemptedAt)
 	if err != nil || strings.TrimSpace(reason) == "" {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("invalid fixture execution input")
 	}
+	processNow := missionNowUTC()
 	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
 	if err != nil {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
 	}
 	auth := authValue.(*corem11.ProductionExecutionAuthorization)
 	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
-	if err != nil || !expires.After(now) {
+	if err != nil || !expires.After(processNow) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is expired")
+	}
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, auth.ProductionLeaseID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	if err := m11LeaseActiveAt(*leaseValue.(*corem11.ProductionLease), processNow); err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
 	}
 	executionID := corem11.ComputeProductionExecutionID(auth.AuthorizationID)
 	record := corem11.ProductionExecutionRecord{ExecutionID: executionID, AuthorizationID: auth.AuthorizationID, ProductionLeaseID: auth.ProductionLeaseID, ProductionLeaseVersion: auth.ProductionLeaseVersion, ProductionLeaseHash: auth.ProductionLeaseHash, ProductionGateID: auth.ProductionGateID, ProductionHealthSnapshotID: auth.ProductionHealthSnapshotID, ProductionHealthSnapshotHash: auth.ProductionHealthSnapshotHash, ProductionCostBoundID: auth.ProductionCostBoundID, ProductionCostBoundHash: auth.ProductionCostBoundHash, ProductionCostBoundMinor: auth.ProductionCostBoundMinor, IntentID: auth.IntentID, IntentHash: auth.IntentHash, ExecutorID: auth.ExecutorID, IdempotencyKey: auth.IdempotencyKey, AttemptedAt: attemptedAt, Status: "FAILED", SideEffectState: "NOT_PERFORMED", Error: reason, CorrelationID: auth.CorrelationID}
@@ -843,7 +901,7 @@ func recordFailedM11Execution(dir, authorizationID, reservationLedgerID, attempt
 	if ledgerEntry.ArtifactID != reservationLedgerID {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
 	}
-	if now.Before(mustM11Time(auth.AuthorizedAt)) || !now.After(mustM11Time(ledger.UpdatedAt)) {
+	if attemptedAtTime.Before(mustM11Time(auth.AuthorizedAt)) || !attemptedAtTime.After(mustM11Time(ledger.UpdatedAt)) {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("execution time must advance an active authorization and ledger")
 	}
 	pending := false
@@ -879,18 +937,26 @@ func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemp
 	if err != nil {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
 	}
-	now, err := time.Parse(time.RFC3339, attemptedAt)
+	attemptedAtTime, err := time.Parse(time.RFC3339, attemptedAt)
 	if err != nil || strings.TrimSpace(reason) == "" {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("invalid unknown execution input")
 	}
+	processNow := missionNowUTC()
 	authValue, err := m11ArtifactValue(dir, corem11.ArtifactKindAuthorization, authorizationID)
 	if err != nil {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
 	}
 	auth := authValue.(*corem11.ProductionExecutionAuthorization)
 	expires, err := time.Parse(time.RFC3339, auth.ExpiresAt)
-	if err != nil || !expires.After(now) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
+	if err != nil || !expires.After(processNow) || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_PRODUCTION" {
 		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", fmt.Errorf("production authorization is inactive")
+	}
+	leaseValue, err := m11ArtifactValue(dir, corem11.ArtifactKindLease, auth.ProductionLeaseID)
+	if err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
+	}
+	if err := m11LeaseActiveAt(*leaseValue.(*corem11.ProductionLease), processNow); err != nil {
+		return corem11.ProductionExecutionRecord{}, corem11.ProductionLedger{}, "", err
 	}
 	executionID := corem11.ComputeProductionExecutionID(auth.AuthorizationID)
 	record := corem11.ProductionExecutionRecord{ExecutionID: executionID, AuthorizationID: auth.AuthorizationID, ProductionLeaseID: auth.ProductionLeaseID, ProductionLeaseVersion: auth.ProductionLeaseVersion, ProductionLeaseHash: auth.ProductionLeaseHash, ProductionGateID: auth.ProductionGateID, ProductionHealthSnapshotID: auth.ProductionHealthSnapshotID, ProductionHealthSnapshotHash: auth.ProductionHealthSnapshotHash, ProductionCostBoundID: auth.ProductionCostBoundID, ProductionCostBoundHash: auth.ProductionCostBoundHash, ProductionCostBoundMinor: auth.ProductionCostBoundMinor, IntentID: auth.IntentID, IntentHash: auth.IntentHash, ExecutorID: auth.ExecutorID, IdempotencyKey: auth.IdempotencyKey, AttemptedAt: attemptedAt, Status: "RECONCILIATION_REQUIRED", SideEffectState: "UNKNOWN", Error: reason, CorrelationID: auth.CorrelationID}
@@ -917,7 +983,7 @@ func recordUnknownM11Execution(dir, authorizationID, reservationLedgerID, attemp
 	if ledgerEntry.ArtifactID != reservationLedgerID {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("production ledger is not the current head")
 	}
-	if now.Before(mustM11Time(auth.AuthorizedAt)) || !now.After(mustM11Time(ledger.UpdatedAt)) {
+	if attemptedAtTime.Before(mustM11Time(auth.AuthorizedAt)) || !attemptedAtTime.After(mustM11Time(ledger.UpdatedAt)) {
 		return record, corem11.ProductionLedger{}, "", fmt.Errorf("execution time must advance an active authorization and ledger")
 	}
 	pending := false

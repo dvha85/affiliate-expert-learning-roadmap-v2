@@ -410,6 +410,39 @@ func loadM10ArtifactRegistry(dir string) ([]corem10.ArtifactEntry, error) {
 	return entries, nil
 }
 
+// missionHasM10AuthorityHistory checks immutable M10 stores before a bind can
+// replace the mutable mission envelope. A partially restored state file may no
+// longer expose Approval/Canary/Reservations even though the registry still
+// owns grants or execution records; rebinding in that situation would orphan
+// the prior lineage just as surely as clearing populated state would.
+func missionHasM10AuthorityHistory(dir string) (bool, error) {
+	entries, err := loadM10ArtifactRegistry(dir)
+	if err != nil {
+		return false, err
+	}
+	if len(entries) != 0 {
+		return true, nil
+	}
+	bounds, err := loadTrustedCostBounds(dir)
+	if err != nil {
+		return false, err
+	}
+	if len(bounds) != 0 {
+		return true, nil
+	}
+	raw, _, err := readStableRegularFile(m10OutcomeStorePath(dir))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := store.RequireCompleteJSONLFraming(raw); err != nil {
+		return false, err
+	}
+	return len(bytes.TrimSpace(raw)) != 0, nil
+}
+
 func registerM10Artifact(dir, kind string, raw []byte) (corem10.ArtifactEntry, string, error) {
 	entry, err := corem10.NewArtifactEntry(kind, raw)
 	if err != nil {
@@ -2369,7 +2402,28 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Intent != nil && s.Intent.IntentID == i.IntentID && s.Intent.IntentHash != i.IntentHash {
 			return emit("REJECTED", nil, fmt.Errorf("cannot rebind an existing intent_id with different content"), 1)
 		}
+		if s.Intent != nil && s.Intent.IntentID == i.IntentID && s.Intent.IntentHash == i.IntentHash && (s.Policy == nil || !reflect.DeepEqual(*s.Policy, p)) {
+			historyExists, historyErr := missionHasM10AuthorityHistory(args[1])
+			if historyErr != nil {
+				return emit("STATE_ERROR", nil, historyErr, 1)
+			}
+			if historyExists || s.Approval != nil || s.Canary != nil || s.Lease != nil || len(s.Reservations) != 0 {
+				return emit("REJECTED", nil, fmt.Errorf("cannot replace policy while authority or consumption history exists"), 1)
+			}
+		}
 		if s.Intent == nil || s.Intent.IntentID != i.IntentID || s.Intent.IntentHash != i.IntentHash {
+			// Authority and consumption belong to the immutable intent lineage,
+			// not to whichever intent happens to be current in this mutable
+			// envelope. Clearing them here would reset a grant's budget and orphan
+			// executions from their reservations (A -> B -> A). Require an explicit
+			// recovery/migration path instead of silently dropping that history.
+			historyExists, historyErr := missionHasM10AuthorityHistory(args[1])
+			if historyErr != nil {
+				return emit("STATE_ERROR", nil, historyErr, 1)
+			}
+			if historyExists || s.Approval != nil || s.Canary != nil || s.Lease != nil || len(s.Reservations) != 0 {
+				return emit("REJECTED", nil, fmt.Errorf("cannot rebind an intent while authority or consumption history exists"), 1)
+			}
 			s.Approval = nil
 			s.Canary = nil
 			s.Lease = nil
