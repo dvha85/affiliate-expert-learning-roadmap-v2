@@ -1,8 +1,11 @@
 # Post-merge governance and security evidence — 2026-09-21
 
-Baseline: `c155effbf6510d1aaa6587cfd8a85bfd009919e6` (`main` and
-`origin/main`). This record is bounded repository/settings evidence and does
-not change the overall readiness decision.
+Merged-main baseline: `8f1c8aaf45247ea62c145e879a86d949a300e44b` (`main` and
+`origin/main`). The product snapshot that this record extends is
+`c155effbf6510d1aaa6587cfd8a85bfd009919e6`; the readiness matrix and evidence
+graph now point at the merged-main commit. This record is bounded
+repository/settings evidence and does not change the overall readiness
+decision.
 
 ## Governance
 
@@ -33,9 +36,11 @@ lab/mission-runtime PASS — no vulnerabilities affecting code
 ```
 
 The scanner also reported one vulnerability in a required module that is not
-reachable by the scanned code; the command exited successfully. A hosted
-Security Scans run on the exact follow-up commit is still required before this
-is treated as independent CI evidence.
+reachable by the scanned code; the command exited successfully. The hosted
+post-merge Security Scans run **#70** on `8f1c8aaf45247ea62c145e879a86d949a300e44b`
+passed both `codeql-go` and the blocking `govulncheck-go-modules` job. The
+post-merge Curriculum CI **#1276** and Mission Agent Path CI **#1233** runs
+also passed on the same merge commit.
 
 ## Remaining readiness boundary
 

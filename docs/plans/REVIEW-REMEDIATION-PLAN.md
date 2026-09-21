@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-21 -->
-<!-- readiness-main-baseline: c155effbf6510d1aaa6587cfd8a85bfd009919e6 -->
+<!-- readiness-main-baseline: 8f1c8aaf45247ea62c145e879a86d949a300e44b -->
 <!-- readiness-baseline-kind: product -->
 
 **Full review follow-up (2026-09-21):** PR #491 self-reviewed and merged at
@@ -24,10 +24,12 @@ requires pull requests, an up-to-date branch, `mission-gate`, `curriculum-gate`
 and `codeql-go`, and blocks force-push and branch deletion; no bypass actors or
 required approval count are configured. The security workflow now uses
 `govulncheck@v1.8.0` without `continue-on-error`; local Go 1.27 scans of all
-four modules pass, while an exact-commit hosted scan remains pending. This
+four modules pass, and the post-merge exact-commit hosted scan is green. This
 closes the repository-settings portion of EXT-01 but keeps
 `NOT_READY_FOR_PRODUCTION` because provider/live, deployment, pilot, business
-outcome and durability evidence remain external. Record:
+outcome and durability evidence remain external. Post-merge push runs Security
+Scans `#70`, Curriculum CI `#1276` and Mission Agent Path CI `#1233` all passed
+on merge commit `8f1c8aaf45247ea62c145e879a86d949a300e44b`. Record:
 `docs/architecture/EVIDENCE-POST-MERGE-GOVERNANCE-SECURITY-20260921.md`.
 Marker: `Post-merge governance and security sync 2026-09-21`.
 
