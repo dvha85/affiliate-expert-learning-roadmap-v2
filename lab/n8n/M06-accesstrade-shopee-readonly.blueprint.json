@@ -34,11 +34,9 @@
       "parameters": {
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('Selected Source Capture Input').item.json.adapter_url + '/v1/m06/accesstrade-shopee-campaign' }}",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {capture:JSON.parse($('Selected Source Capture Input').item.json.sanitized_capture_json)} }}",
         "options": {"response": {"response": {"fullResponse": true, "responseFormat": "json"}}}
