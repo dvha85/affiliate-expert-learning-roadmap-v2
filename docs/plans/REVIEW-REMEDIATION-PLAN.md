@@ -5,19 +5,33 @@
 <!-- readiness-baseline-kind: product -->
 
 **Cập nhật BR-18a — Windows always-on lab decision (2026-09-21):** trong lúc
-chưa có quyền chọn target host/provider, quyết định dùng máy Windows bật 24/7
-với Ubuntu 24.04 LTS trong WSL2 (Hyper-V fallback). Profile chạy Go 1.27,
-Node 24 và n8n 2.38.1 trực tiếp trong Linux trước, chỉ synthetic/read-only,
-loopback mặc định hoặc private LAN có firewall allowlist, và tách runtime/
-backup/restore trên filesystem Linux thay vì `/mnt/c`. Profile này có thể tạo
-evidence bounded cho lifecycle, health, backup/restore, replay, restart và
-durable STOP sau khi được chạy thật; nó không đóng target-host/provider/public
-network, region latency, power-loss/atomic multi-file, distributed durability,
-clean-machine pilot, live executor hay business outcome. Chưa mua/tạo VPS hoặc
-cloud resource; giá Contabo/VNPT chỉ là tham khảo. `BR-18a` vẫn `UNVERIFIED`,
-overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
+chưa có quyền chọn target host/provider, phương án Windows bật 24/7 với Ubuntu
+24.04 LTS trong WSL2 (Hyper-V fallback) được giữ làm profile triển khai về sau.
+Profile chạy Go 1.27, Node 24 và n8n 2.38.1 trực tiếp trong Linux, chỉ
+synthetic/read-only, loopback mặc định hoặc private LAN có firewall allowlist,
+và tách runtime/backup/restore trên filesystem Linux thay vì `/mnt/c`. Profile
+này có thể tạo evidence bounded cho lifecycle, health, backup/restore, replay,
+restart và durable STOP sau khi được chạy thật; nó không đóng target-host/
+provider/public network, region latency, power-loss/atomic multi-file,
+distributed durability, clean-machine pilot, live executor hay business
+outcome. Chưa mua/tạo VPS hoặc cloud resource; giá Contabo/VNPT chỉ là tham
+khảo. `BR-18a` vẫn `UNVERIFIED`, overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
 `docs/architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md`.
 Marker: `Cập nhật BR-18a Windows always-on lab decision 2026-09-21`.
+
+**Cập nhật BR-18a — macOS local verification decision (2026-09-21):** chọn
+macOS native để kiểm chứng ngay thay vì chờ máy Windows hoặc mua VPS. Profile
+dùng Go 1.27, Node 24 và n8n 2.38.1 trực tiếp trên macOS, synthetic/read-only,
+loopback, không provider credential/live executor và tách runtime/backup/
+restore trên `$HOME/affiliate-lab`. Có thể kiểm lifecycle, health,
+backup/restore, replay, restart và durable STOP bounded sau khi có run record;
+không suy ra Linux guest, Windows host, provider/public network, power-loss,
+distributed durability, clean-machine pilot hay production readiness. Windows +
+Ubuntu 24.04 LTS trong WSL2/Hyper-V vẫn là phương án always-on về sau, dùng
+cùng boundary và version pins. `BR-18a` vẫn `UNVERIFIED`, overall vẫn
+`NOT_READY_FOR_PRODUCTION`. Record:
+`docs/architecture/EVIDENCE-BR18A-MACOS-LOCAL-LAB-20260921.md`.
+Marker: `Cập nhật BR-18a macOS local verification decision 2026-09-21`.
 
 **Full review follow-up (2026-09-21):** PR #491 self-reviewed and merged at
 `b447c04262bafd94125b05c2d6df4ecaa8edbeac` from exact head `294e35722cf861fe91337a1a96c9647562367e00`;
