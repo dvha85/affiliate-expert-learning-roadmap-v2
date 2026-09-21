@@ -4,6 +4,19 @@
 <!-- readiness-main-baseline: 8f1c8aaf45247ea62c145e879a86d949a300e44b -->
 <!-- readiness-baseline-kind: product -->
 
+**Cập nhật BR-18a — operated macOS bounded run (2026-09-21):** đã chạy run
+record `macos-br18a-20260921T155228Z` trên MacBook Air với macOS 27.0, Go
+1.27.0, Node 24.21.0 và n8n 2.38.1. Loopback health/API, process restart,
+replay, backup/restore vào thư mục riêng, durable STOP sau restore và các
+mutation sau STOP đều PASS. Hai harness n8n thật cũng PASS: M06/M07 engine
+fixture/sanitized selected-source với loopback model stub, cùng Schedule Trigger
+append/exact-duplicate/restart/reject. Run chỉ synthetic/read-only, không
+provider credential, public ingress, live executor hay business outcome;
+maintainer review còn pending. `BR-18a` target-host/provider vẫn `UNVERIFIED`,
+overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
+`docs/architecture/EVIDENCE-BR18A-MACOS-LOCAL-LAB-20260921.md`.
+Marker: `Cập nhật BR-18a operated macOS bounded run 2026-09-21`.
+
 **Cập nhật BR-18a — Windows always-on lab decision (2026-09-21):** trong lúc
 chưa có quyền chọn target host/provider, phương án Windows bật 24/7 với Ubuntu
 24.04 LTS trong WSL2 (Hyper-V fallback) được giữ làm profile triển khai về sau.

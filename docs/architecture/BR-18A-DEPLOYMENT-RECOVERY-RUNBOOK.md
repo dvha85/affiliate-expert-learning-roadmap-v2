@@ -42,7 +42,7 @@ go build -o "$LAB_BIN" ./cmd/bot
   data/m02-sample-observations.json demo-1 \
   2026-09-03T00:00:00Z 2026-09-03T00:00:00Z
 
-export AFFILIATE_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export CANONICAL_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 nohup "$LAB_BIN" watcher serve "$LAB_RUNTIME/history.jsonl" \
   127.0.0.1:8787 >"$LAB_LOG/watcher.log" 2>&1 &
 echo $! >"$LAB_RUN/watcher.pid"
@@ -116,7 +116,7 @@ go build -o "$LAB_BIN" ./cmd/bot
   data/m02-sample-observations.json demo-1 \
   2026-09-03T00:00:00Z 2026-09-03T00:00:00Z
 
-export AFFILIATE_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export CANONICAL_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 nohup "$LAB_BIN" watcher serve "$LAB_RUNTIME/history.jsonl" \
   127.0.0.1:8787 >"$LAB_LOG/watcher.log" 2>&1 &
 echo $! >"$LAB_RUN/watcher.pid"
@@ -176,13 +176,13 @@ mkdir -p /tmp/affiliate-runtime
 # start / status / logs / stop cho canonical adapter local. Token chỉ nằm
 # trong môi trường process và header Bearer của n8n/caller; không ghi vào URL,
 # fixture hay log.
-export AFFILIATE_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export CANONICAL_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 nohup /tmp/affiliate-bot watcher serve /tmp/affiliate-runtime/history.jsonl \
   127.0.0.1:8787 >/tmp/affiliate-runtime-watcher.log 2>&1 &
 echo $! >/tmp/affiliate-runtime-watcher.pid
 curl --fail http://127.0.0.1:8787/healthz
 # API mutation/read example:
-curl --fail -H "Authorization: Bearer $AFFILIATE_ADAPTER_TOKEN" \
+curl --fail -H "Authorization: Bearer $CANONICAL_ADAPTER_TOKEN" \
   -H 'Content-Type: application/json' 'http://127.0.0.1:8787/v1/history?record_id=demo-1'
 tail -n 50 /tmp/affiliate-runtime-watcher.log
 kill "$(cat /tmp/affiliate-runtime-watcher.pid)"

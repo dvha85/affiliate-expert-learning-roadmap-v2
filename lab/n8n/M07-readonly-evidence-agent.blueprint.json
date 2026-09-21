@@ -61,11 +61,9 @@
       "parameters": {
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/fetch-and-register' }}",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),tool_request:JSON.parse($('M07 Adapter Input').item.json.tool_request_json)} }}",
         "options": {
@@ -97,11 +95,9 @@
       "parameters": {
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/context' }}",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json)} }}",
         "options": {
@@ -157,11 +153,9 @@
       "parameters": {
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/validate' }}",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output_text:$('Require Raw Model JSON Text').item.json.model_output_text,tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
@@ -203,11 +197,9 @@
       "parameters": {
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-proposal' }}",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CANONICAL_ADAPTER_TOKEN }}"}]},
         "specifyBody": "json",
         "jsonBody": "={{ {record_id:$('M07 Adapter Input').item.json.record_id,registry:JSON.parse($('M07 Adapter Input').item.json.tool_registry_json),model_output_text:$('Require Raw Model JSON Text').item.json.model_output_text,tool_result_id:$('Require Registered Tool ACK').item.json.artifact_id} }}",
         "options": {
