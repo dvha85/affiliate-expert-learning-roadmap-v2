@@ -337,7 +337,7 @@ contracts/core/lab/affiliate-bot/lab/mission-runtime: go test -count=1 ./...   P
 contracts/core/lab/affiliate-bot/lab/mission-runtime: go vet ./...             PASS
 lab/affiliate-bot: go test -race -count=1 ./...                                PASS
 lab/mission-runtime: go test -race -count=1 ./...                               PASS
-scripts/tests: 133 unittest tests                                             PASS
+scripts/tests: 185 unittest tests                                             PASS
 scripts/smoke_br16a_offline.py                                                 PASS
 scripts/smoke_br18b_backup_restore.py                                          PASS
 17 mutation guards (`scripts/mutate_*.py`)                                    PASS
