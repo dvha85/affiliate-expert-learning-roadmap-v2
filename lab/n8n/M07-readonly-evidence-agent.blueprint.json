@@ -60,6 +60,8 @@
       "position": [450, 0],
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/fetch-and-register' }}",
         "sendBody": true,
         "sendHeaders": true,
@@ -94,6 +96,8 @@
       "position": [910, 0],
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/context' }}",
         "sendBody": true,
         "sendHeaders": true,
@@ -152,6 +156,8 @@
       "position": [1830, 0],
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/validate' }}",
         "sendBody": true,
         "sendHeaders": true,
@@ -196,6 +202,8 @@
       "position": [2290, 0],
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M07 Adapter Input').item.json.adapter_url + '/v1/m07/register-proposal' }}",
         "sendBody": true,
         "sendHeaders": true,

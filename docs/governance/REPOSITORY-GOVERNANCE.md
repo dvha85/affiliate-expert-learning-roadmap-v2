@@ -19,14 +19,22 @@ Development Agent có thể sửa code/docs/tests và mở PR nhưng không tự
 
 ## 3. Required checks
 
-Khuyến nghị bật required checks trên `main`:
+Khuyến nghị bật hai aggregate required checks trên `main`. Chúng chỉ xanh khi
+tất cả job con hiện hành thành công; `skipped`, `cancelled` hoặc thiếu job đều
+là thất bại:
 
 | Workflow | Tên check chính xác trên GitHub |
 |---|---|
 | `curriculum-ci.yml` — Curriculum CI | `curriculum-gate` |
 | `mission-agent-path-ci.yml` — Mission Agent Path CI | `mission-gate` |
 
-Tên check là tên job, không phải tên step; regression tests Python thuộc job `structure-language-and-foundations`. Khi cấu hình, chọn đúng check do GitHub Actions phát hành trên commit hiện hành. Không dùng các tên cũ `curriculum`, `evidence-and-safety`, `python-regression` hoặc tự thêm tiền tố workflow vào tên check.
+`curriculum-gate` bao phủ `structure-language-and-foundations`, `deterministic-runtime`,
+Windows, hai learner-test shard, race, quickstart và ba nhóm smoke/mutation.
+`mission-gate` bao phủ semantics/blueprints, mission-runtime và n8n engine.
+Tên check là tên job, không phải tên step. Khi cấu hình, chọn đúng check do
+GitHub Actions phát hành trên commit hiện hành. Không dùng các tên cũ
+`curriculum`, `evidence-and-safety`, `python-regression` hoặc tự thêm tiền tố
+workflow vào tên check.
 
 Đây là cấu hình **khuyến nghị**, không xác nhận branch protection hiện đã bật. Sửa tài liệu/workflow không tự sửa branch protection; việc bật hoặc thay required checks cần thao tác quản trị riêng của chủ repo.
 

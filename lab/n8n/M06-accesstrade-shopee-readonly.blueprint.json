@@ -33,6 +33,8 @@
       "position": [560, 0],
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('Selected Source Capture Input').item.json.adapter_url + '/v1/m06/accesstrade-shopee-campaign' }}",
         "sendBody": true,
         "sendHeaders": true,

@@ -52,6 +52,7 @@ Khởi động adapter với history mới trong một thư mục riêng:
 
 ```bash
 cd /Users/hadinh/Documents/ChatGPT/bot/lab/affiliate-bot
+export AFFILIATE_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 go run ./cmd/bot watcher serve /absolute/path/history.jsonl
 ```
 
