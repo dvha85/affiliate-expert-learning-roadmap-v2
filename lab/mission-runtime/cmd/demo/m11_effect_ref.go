@@ -5,7 +5,6 @@ import (
 
 	corem03 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m03"
 	corem05 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m05"
-	corem08 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m08"
 	corem11 "github.com/dvha85/affiliate-expert-learning-roadmap-v2/core/m11"
 )
 
@@ -26,7 +25,9 @@ func ValidateCanonicalProductionClosedCycle(cycle ProductionCycleRecord, state M
 	// Populate internal compatibility aliases only after canonical linkage passes.
 	outcome.ActionID = outcome.EffectRef.EffectID
 	evaluation.ActionID = evaluation.EffectRef.EffectID
-	var ci corem08.Intent
+	// ShadowActionIntent.Parameters may contain json.Number. Convert directly
+	// instead of a generic JSON round trip that silently narrows large integers.
+	ci := coreIntent(state.Intent)
 	var cl corem11.ProductionLease
 	var cg corem11.ProductionGateDecision
 	var ca corem11.ProductionExecutionAuthorization
@@ -34,7 +35,7 @@ func ValidateCanonicalProductionClosedCycle(cycle ProductionCycleRecord, state M
 	var ccycle corem11.ProductionCycleRecord
 	var co corem03.OutcomeRecord
 	var cev corem05.EvaluationRecord
-	if !missionCoreValue(state.Intent, &ci) || !missionCoreValue(state.Lease, &cl) || !missionCoreValue(gate, &cg) || !missionCoreValue(auth, &ca) || !missionCoreValue(exec, &ce) || !missionCoreValue(cycle, &ccycle) || !missionCoreValue(outcome, &co) || !missionCoreValue(evaluation, &cev) {
+	if !missionCoreValue(state.Lease, &cl) || !missionCoreValue(gate, &cg) || !missionCoreValue(auth, &ca) || !missionCoreValue(exec, &ce) || !missionCoreValue(cycle, &ccycle) || !missionCoreValue(outcome, &co) || !missionCoreValue(evaluation, &cev) {
 		return "INVALID_SCHEMA"
 	}
 	var cp *corem05.ImprovementProposal

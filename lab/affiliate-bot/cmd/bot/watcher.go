@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/netip"
@@ -772,23 +773,23 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	mux := http.NewServeMux()
-	protected := func(handler http.Handler) http.Handler {
-		return canonicalAdapterAuthHandler(adapterToken, handler)
+	protected := func(path string, handler http.Handler) {
+		mux.Handle(path, watcherAdmission(handler, adapterToken))
 	}
-	mux.Handle("/v1/m06/fixture-import", protected(m06AdapterHandler(historyPath)))
-	mux.Handle("/v1/m06/accesstrade-shopee-campaign", protected(m06AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/context", protected(m07AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/preflight", protected(m07AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/fetch-and-register", protected(m07AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/register-tool-result", protected(m07AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/validate", protected(m07AdapterHandler(historyPath)))
-	mux.Handle("/v1/m07/register-proposal", protected(m07AdapterHandler(historyPath)))
+	protected("/v1/m06/fixture-import", m06AdapterHandler(historyPath))
+	protected("/v1/m06/accesstrade-shopee-campaign", m06AdapterHandler(historyPath))
+	protected("/v1/m07/context", m07AdapterHandler(historyPath))
+	protected("/v1/m07/preflight", m07AdapterHandler(historyPath))
+	protected("/v1/m07/fetch-and-register", m07AdapterHandler(historyPath))
+	protected("/v1/m07/register-tool-result", m07AdapterHandler(historyPath))
+	protected("/v1/m07/validate", m07AdapterHandler(historyPath))
+	protected("/v1/m07/register-proposal", m07AdapterHandler(historyPath))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"status":"OK","execution_permitted":false}`+"\n")
 	})
-	mux.Handle("/v1/history/append", protected(historyHandoffHTTPHandler(historyPath)))
-	mux.Handle("/v1/history", protected(historyReadHandler(historyPath)))
+	protected("/v1/history/append", historyHandoffHTTPHandler(historyPath))
+	protected("/v1/history", historyReadHandler(historyPath))
 	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second}
 	fmt.Fprintf(stdout, "watcher canonical adapter listening on http://%s\n", address)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -796,6 +797,61 @@ func runWatcherServer(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// watcherAdmission is the server-side caller boundary for every persistent or
+// evidence-producing endpoint. Loopback binding alone does not prevent a
+// hostile local process or browser from submitting a cross-origin POST. The
+// token is supplied out-of-band through the process environment and is never
+// accepted in a URL or request body.
+func watcherAdmission(next http.Handler, token string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !watcherLoopbackHost(r.Host) {
+			writeWatcherAdmissionError(w, http.StatusForbidden, "REJECT_HOST")
+			return
+		}
+		if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" && !watcherLoopbackOrigin(origin) {
+			writeWatcherAdmissionError(w, http.StatusForbidden, "REJECT_ORIGIN")
+			return
+		}
+		expected := "Bearer " + token
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(expected)) != 1 {
+			writeWatcherAdmissionError(w, http.StatusUnauthorized, "REJECT_AUTHENTICATION")
+			return
+		}
+		if r.Method == http.MethodPost {
+			mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if err != nil || !strings.EqualFold(mediaType, "application/json") {
+				writeWatcherAdmissionError(w, http.StatusUnsupportedMediaType, "REJECT_CONTENT_TYPE")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func watcherLoopbackHost(raw string) bool {
+	host := raw
+	if parsed, _, err := net.SplitHostPort(raw); err == nil {
+		host = parsed
+	} else {
+		host = strings.TrimPrefix(strings.TrimSuffix(raw, "]"), "[")
+	}
+	return strings.EqualFold(host, "127.0.0.1") || strings.EqualFold(host, "localhost") || host == "::1"
+}
+
+func watcherLoopbackOrigin(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+		return false
+	}
+	return watcherLoopbackHost(parsed.Host)
+}
+
+func writeWatcherAdmissionError(w http.ResponseWriter, status int, reason string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"status": reason, "canonical_history_ack": false, "execution_permitted": false})
 }
 
 // historyHandoffHTTPHandler is the HTTP counterpart of watcher

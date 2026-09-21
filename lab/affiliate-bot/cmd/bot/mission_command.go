@@ -2578,10 +2578,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
+		now := missionNowUTC()
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, now); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		raw, err := readMissionPortableInput(args[2])
@@ -2592,7 +2593,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
 		}
-		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, missionNowUTC()); status != "VALID" {
+		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, now); status != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
 		}
 		gate, err := evaluateLearnerCanaryGate(s, bound, args[4])
@@ -2629,10 +2630,11 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
+		now := missionNowUTC()
 		if s.Stop || s.Intent == nil || s.Policy == nil || s.Approval == nil || s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("active intent, policy, approval and canary grant required"), 1)
 		}
-		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, now); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		boundRaw, err := readMissionPortableInput(args[2])
@@ -2643,7 +2645,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if status != "VALID" || !resolveTrustedCostBound(args[1], bound) {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound is not a registered canonical artifact"), 1)
 		}
-		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, missionNowUTC()); status != "VALID" {
+		if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, now); status != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
 		}
 		gateRaw, err := readMissionPortableInput(args[3])
@@ -2695,6 +2697,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err := distinctPaths(args[1], args[2]); err != nil {
 			return emit("PATH_ERROR", nil, err, 1)
 		}
+		now := missionNowUTC()
 		s, err := loadMissionState(args[1])
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
@@ -2705,7 +2708,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, now); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		authorizationRaw, err := readMissionPortableInput(args[2])
@@ -2716,12 +2719,13 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil || !resolveM10Artifact(args[1], corem10.ArtifactKindExecutionAuthorization, authorizationRaw) || !authorizationBindsMissionState(authorization, s) {
 			return emit("REJECTED", nil, fmt.Errorf("execution authorization is invalid, unregistered or mismatched"), 1)
 		}
+		authorizedAt, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
 		expiresAt, err := time.Parse(time.RFC3339, authorization.ExpiresAt)
-		if err != nil || !expiresAt.After(missionNowUTC()) {
+		if authorizedErr != nil || err != nil || authorizedAt.After(now) || !expiresAt.After(now) {
 			return emit("REJECTED", nil, fmt.Errorf("execution authorization has expired"), 1)
 		}
 		bound, err := resolveAuthorizationCostBound(args[1], authorization)
-		if err != nil || corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, missionNowUTC()) != "VALID" {
+		if err != nil || corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, now) != "VALID" {
 			return emit("REJECTED", nil, fmt.Errorf("authorization cost bound is invalid or expired"), 1)
 		}
 		reservationID := args[3]
@@ -2742,7 +2746,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if s.Canary.Status != "ACTIVE" || s.Canary.ExecutionsUsed < 0 || s.Canary.CostUsedMinor < 0 || s.Canary.ExecutionsUsed >= s.Canary.MaxExecutionsTotal || authorization.CanaryCostBoundMinor > s.Canary.MaxCostMinorTotal-s.Canary.CostUsedMinor {
 			return emit("BUDGET_DENIED", s.Canary, fmt.Errorf("canary budget exhausted"), 1)
 		}
-		reservation := LearnerReservation{ReservationID: reservationID, GrantID: authorization.CanaryGrantID, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, CostMinor: authorization.CanaryCostBoundMinor, CostBoundID: authorization.CanaryCostBoundID, CostBoundHash: authorization.CanaryCostBoundHash, AuthorizationID: authorization.AuthorizationID, ReservationMode: "GOVERNED_AUTHORIZATION", ReservedAt: missionNowUTC().Format(time.RFC3339Nano)}
+		reservation := LearnerReservation{ReservationID: reservationID, GrantID: authorization.CanaryGrantID, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, CostMinor: authorization.CanaryCostBoundMinor, CostBoundID: authorization.CanaryCostBoundID, CostBoundHash: authorization.CanaryCostBoundHash, AuthorizationID: authorization.AuthorizationID, ReservationMode: "GOVERNED_AUTHORIZATION", ReservedAt: now.Format(time.RFC3339Nano)}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += authorization.CanaryCostBoundMinor
 		s.Reservations = append(s.Reservations, reservation)
@@ -3162,13 +3166,14 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return emit("STATE_ERROR", nil, err, 1)
 		}
+		now := missionNowUTC()
 		if s.Stop {
 			return emit("STOPPED", s, fmt.Errorf("durable STOP: %s", s.StopReason), 1)
 		}
 		if s.Canary == nil {
 			return emit("REJECTED", nil, fmt.Errorf("canary grant required"), 1)
 		}
-		if err := missionCanaryActive(args[1], s, missionNowUTC()); err != nil {
+		if err := missionCanaryActive(args[1], s, now); err != nil {
 			return emit("REJECTED", nil, err, 1)
 		}
 		cost, parseErr := strconv.ParseInt(args[2], 10, 64)
@@ -3185,7 +3190,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 			if !resolveTrustedCostBound(args[1], bound) {
 				return emit("REJECTED", nil, fmt.Errorf("cost bound is not registered"), 1)
 			}
-			if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, missionNowUTC()); status != "VALID" {
+			if status := corem10.ValidFor(bound, s.Intent.IntentID, s.Intent.IntentHash, s.Intent.CorrelationID, s.Canary.Currency, now); status != "VALID" {
 				return emit("REJECTED", nil, fmt.Errorf("cost bound: %s", status), 1)
 			}
 			cost, boundID, boundHash = bound.MaxCostMinor, bound.CostBoundID, bound.CostBoundHash
@@ -3213,7 +3218,7 @@ func runMissionCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		s.Canary.ExecutionsUsed++
 		s.Canary.CostUsedMinor += cost
-		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservationMode: "LEGACY_COMPAT", ReservedAt: missionNowUTC().Format(time.RFC3339Nano)})
+		s.Reservations = append(s.Reservations, LearnerReservation{ReservationID: reservationID, GrantID: s.Canary.GrantID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, CostMinor: cost, CostBoundID: boundID, CostBoundHash: boundHash, ReservationMode: "LEGACY_COMPAT", ReservedAt: now.Format(time.RFC3339Nano)})
 		if err := saveMissionState(args[1], s); err != nil {
 			return emit("STORE_ERROR", nil, err, 1)
 		}

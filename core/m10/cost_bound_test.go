@@ -68,6 +68,34 @@ func TestTrustedCostBoundDecodeAndBinding(t *testing.T) {
 	}
 }
 
+func TestTrustedCostBoundValidForHonorsObservationWindow(t *testing.T) {
+	bound := TrustedCostBound{
+		CostBoundID: "window", IntentID: "intent", IntentHash: "sha256:" + strings.Repeat("a", 64),
+		MaxCostMinor: 1, Currency: "USD", SourceRef: "fixture:window",
+		ObservedAt: "2026-09-08T00:00:00.500000000Z", ExpiresAt: "2026-09-08T01:00:00.500000000Z",
+		CorrelationID: "corr", HashVersion: "go-json-v1",
+	}
+	for _, tc := range []struct {
+		name string
+		now  string
+		want string
+	}{
+		{name: "before observation", now: "2026-09-08T00:00:00.499999999Z", want: "COST_BOUND_NOT_YET_VALID"},
+		{name: "at observation", now: "2026-09-08T00:00:00.500000000Z", want: "VALID"},
+		{name: "at expiry", now: "2026-09-08T01:00:00.500000000Z", want: "COST_BOUND_EXPIRED"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now, err := time.Parse(time.RFC3339Nano, tc.now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := ValidFor(bound, bound.IntentID, bound.IntentHash, bound.CorrelationID, bound.Currency, now); got != tc.want {
+				t.Fatalf("ValidFor(%s) = %s, want %s", tc.now, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestArtifactRegistryEntryCanonicalizesAndRejectsTamper(t *testing.T) {
 	bound := TrustedCostBound{CostBoundID: "c", IntentID: "i", IntentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000", MaxCostMinor: 100, Currency: "USD", SourceRef: "fixture:registry", ObservedAt: "2026-09-08T00:00:00Z", ExpiresAt: "2026-09-08T01:00:00Z", CorrelationID: "x", HashVersion: "go-json-v1"}
 	bound.CostBoundHash = ComputeTrustedCostBoundHash(bound)
@@ -179,6 +207,7 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	if err != nil || !auth.ExecutionAuthorized || auth.ExecutionMode != "GOVERNED_CANARY" || auth.CanaryGateID != gate.GateID {
 		t.Fatal(err, auth)
 	}
+	allowedGate := gate
 	raw, _ := json.Marshal(auth)
 	if _, err := ValidateExecutionAuthorization(raw); err != nil {
 		t.Fatal(err)
@@ -220,8 +249,8 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 		t.Fatal("duplicate immutable grant entry was accepted by canonical M10 graph")
 	}
 	for name, mutate := range map[string]func(*ArtifactEntry){
-		"artifact id": func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-grant" },
-		"content hash": func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
+		"artifact id":     func(entry *ArtifactEntry) { entry.ArtifactID = "foreign-grant" },
+		"content hash":    func(entry *ArtifactEntry) { entry.ContentHash = "sha256:foreign-envelope" },
 		"canonical bytes": func(entry *ArtifactEntry) { entry.Artifact = append([]byte(" \n"), entry.Artifact...) },
 	} {
 		forgedEnvelopeEntries := append([]ArtifactEntry(nil), entries...)
@@ -238,6 +267,43 @@ func TestCanaryAuthorizationBindsGateWithoutExecuting(t *testing.T) {
 	gate.Decision = "DENY"
 	if _, err := AuthorizeCanary(CanaryAuthorizationInput{Gate: gate, Grant: g, CostBound: cost, IntentID: "intent", IntentHash: cost.IntentHash, PolicyVersion: "p1", IdempotencyKey: "key", CorrelationID: "corr", IntentExpiresAt: "2026-09-08T01:45:00Z", ExecutorID: "local_sandbox", AuthorizedAt: "2026-09-08T01:00:00Z"}); err == nil {
 		t.Fatal("denied gate authorized execution")
+	}
+	// A checksum-valid registry mutation must not make an authorization
+	// consumable when its immutable parent gate denies issuance.
+	deniedGate := gate
+	deniedGate.Decision = "DENY"
+	deniedGate.Reason = "CANARY_COST_BUDGET_EXHAUSTED"
+	deniedGateEntry := m10Entry(t, ArtifactKindCanaryGate, deniedGate)
+	deniedAuth := auth
+	deniedAuth.CanaryGateID = deniedGate.GateID
+	deniedEntries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, g), m10Entry(t, ArtifactKindTrustedCostBound, cost), deniedGateEntry, m10Entry(t, ArtifactKindExecutionAuthorization, deniedAuth)}
+	if err := ValidateArtifactGraph(deniedEntries); err == nil {
+		t.Fatal("registry accepted authorization bound to a denying gate")
+	}
+	for name, mutate := range map[string]func(*CanaryGateDecision){
+		"wrong reason": func(candidate *CanaryGateDecision) { candidate.Reason = "FORGED_ELIGIBILITY" },
+		"wrong risk":   func(candidate *CanaryGateDecision) { candidate.RiskClass = "RISK1" },
+	} {
+		candidate := allowedGate
+		mutate(&candidate)
+		candidateEntry := m10Entry(t, ArtifactKindCanaryGate, candidate)
+		candidateEntries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, g), m10Entry(t, ArtifactKindTrustedCostBound, cost), candidateEntry, m10Entry(t, ArtifactKindExecutionAuthorization, auth)}
+		if err := ValidateArtifactGraph(candidateEntries); err == nil {
+			t.Fatalf("registry accepted checksum-valid gate with %s", name)
+		}
+	}
+	for name, mutate := range map[string]func(*ExecutionAuthorization){
+		"out of scope executor": func(candidate *ExecutionAuthorization) { candidate.ExecutorID = "other-executor" },
+		"correlation mismatch":  func(candidate *ExecutionAuthorization) { candidate.CorrelationID = "other-correlation" },
+		"non-positive lifetime": func(candidate *ExecutionAuthorization) { candidate.ExpiresAt = candidate.AuthorizedAt },
+	} {
+		candidate := auth
+		mutate(&candidate)
+		candidate.AuthorizationID = authorizationID(CanaryAuthorizationInput{Gate: allowedGate, IntentID: candidate.IntentID, IntentHash: candidate.IntentHash, ExecutorID: candidate.ExecutorID, AuthorizedAt: candidate.AuthorizedAt, IdempotencyKey: candidate.IdempotencyKey})
+		candidateEntries := []ArtifactEntry{m10Entry(t, ArtifactKindCanaryGrant, g), m10Entry(t, ArtifactKindTrustedCostBound, cost), m10Entry(t, ArtifactKindCanaryGate, allowedGate), m10Entry(t, ArtifactKindExecutionAuthorization, candidate)}
+		if err := ValidateArtifactGraph(candidateEntries); err == nil {
+			t.Fatalf("registry accepted checksum-valid authorization with %s", name)
+		}
 	}
 }
 

@@ -180,8 +180,11 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 		grant, grantOK := grants[authorization.CanaryGrantID]
 		gate, gateOK := gates[authorization.CanaryGateID]
 		bound, boundOK := bounds[authorization.CanaryCostBoundID]
-		if !grantOK || !gateOK || !boundOK || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
+		if !grantOK || !gateOK || !boundOK || gate.Decision != "ALLOW_CANARY" || gate.PerActionApprovalRequired || grant.GrantVersion != authorization.CanaryGrantVersion || grant.GrantHash != authorization.CanaryGrantHash || gate.GrantID != authorization.CanaryGrantID || gate.GrantVersion != authorization.CanaryGrantVersion || gate.GrantHash != authorization.CanaryGrantHash || gate.IntentID != authorization.IntentID || gate.IntentHash != authorization.IntentHash || gate.PolicyVersion != authorization.PolicyVersion || gate.CostBoundID != authorization.CanaryCostBoundID || gate.CostBoundHash != authorization.CanaryCostBoundHash || gate.CostBoundMinor != authorization.CanaryCostBoundMinor || bound.CostBoundHash != authorization.CanaryCostBoundHash || bound.MaxCostMinor != authorization.CanaryCostBoundMinor {
 			return fmt.Errorf("execution authorization has an orphaned or mismatched registry link")
+		}
+		if err := validateCanaryAuthorizationParents(authorization, grant, gate, bound); err != nil {
+			return fmt.Errorf("execution authorization parent graph is invalid: %w", err)
 		}
 		expectedAuthorizationID := authorizationID(CanaryAuthorizationInput{
 			Gate: gate, IntentID: authorization.IntentID, IntentHash: authorization.IntentHash, ExecutorID: authorization.ExecutorID,
@@ -206,6 +209,44 @@ func ValidateArtifactGraph(entries []ArtifactEntry) error {
 			return fmt.Errorf("execution authorization has more than one terminal record")
 		}
 		executionAuthorizations[record.AuthorizationID] = record.ExecutionID
+	}
+	return nil
+}
+
+// validateCanaryAuthorizationParents rechecks the issuance invariants that
+// remain available after the original intent/policy context has been reduced
+// to registry artifacts. A checksum-valid envelope is not enough: the graph
+// must still describe an actually eligible gate, an in-scope executor and a
+// coherent historical time window. This deliberately does not compare against
+// the current wall clock, so backup/restore and historical audits remain
+// deterministic.
+func validateCanaryAuthorizationParents(authorization ExecutionAuthorization, grant CanaryGrant, gate CanaryGateDecision, bound TrustedCostBound) error {
+	if gate.Decision != "ALLOW_CANARY" || gate.Reason != "CANARY_ELIGIBLE" || gate.ExecutionAuthorized || gate.PerActionApprovalRequired || gate.RiskClass != "RISK0" {
+		return fmt.Errorf("gate does not prove canary eligibility")
+	}
+	if grant.IntentionalPlaceholder() || !containsGrantValue(grant.AllowedRiskClasses, gate.RiskClass) || !containsGrantValue(grant.ExecutorIDs, authorization.ExecutorID) {
+		return fmt.Errorf("grant does not delegate the authorized risk or executor")
+	}
+	if grant.CorrelationID != authorization.CorrelationID || bound.CorrelationID != authorization.CorrelationID || bound.IntentID != authorization.IntentID || bound.IntentHash != authorization.IntentHash {
+		return fmt.Errorf("authorization correlation or cost binding is invalid")
+	}
+	if authorization.ExecutionMode != "GOVERNED_CANARY" || !authorization.ExecutionAuthorized {
+		return fmt.Errorf("authorization is not a governed canary capability")
+	}
+	gateAt, gateErr := time.Parse(time.RFC3339, gate.EvaluatedAt)
+	authorizedAt, authorizedErr := time.Parse(time.RFC3339, authorization.AuthorizedAt)
+	expiresAt, expiresErr := time.Parse(time.RFC3339, authorization.ExpiresAt)
+	validFrom, validErr := time.Parse(time.RFC3339, grant.ValidFrom)
+	grantExpires, grantExpiryErr := time.Parse(time.RFC3339, grant.ExpiresAt)
+	costExpires, costExpiryErr := time.Parse(time.RFC3339, bound.ExpiresAt)
+	if gateErr != nil || authorizedErr != nil || expiresErr != nil || validErr != nil || grantExpiryErr != nil || costExpiryErr != nil {
+		return fmt.Errorf("authorization chronology is invalid")
+	}
+	if gateAt.Before(validFrom) || !gateAt.Before(grantExpires) || authorizedAt.Before(gateAt) || !expiresAt.After(authorizedAt) || expiresAt.After(grantExpires) || expiresAt.After(costExpires) {
+		return fmt.Errorf("authorization chronology is invalid")
+	}
+	if status := ValidFor(bound, authorization.IntentID, authorization.IntentHash, authorization.CorrelationID, grant.Currency, gateAt); status != "VALID" {
+		return fmt.Errorf("cost bound is not valid at gate evaluation: %s", status)
 	}
 	return nil
 }

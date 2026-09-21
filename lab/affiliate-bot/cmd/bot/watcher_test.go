@@ -187,6 +187,61 @@ func TestHTTPAdaptersRejectOversizedBodiesBeforeCanonicalMutation(t *testing.T) 
 	})
 }
 
+func TestWatcherAdmissionRejectsUntrustedCallerBeforeMutation(t *testing.T) {
+	dir := t.TempDir()
+	history := filepath.Join(dir, "history.jsonl")
+	raw, err := json.Marshal(m06AdapterRequest{Fixture: mustRawJSON(t, watchFixture())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := watcherAdmission(m06AdapterHandler(history), "test-adapter-token-1234")
+	for _, tc := range []struct {
+		name    string
+		headers map[string]string
+		want    int
+	}{
+		{name: "missing token", headers: map[string]string{"Content-Type": "application/json", "Host": "127.0.0.1:8787"}, want: http.StatusUnauthorized},
+		{name: "untrusted origin", headers: map[string]string{"Authorization": "Bearer test-adapter-token-1234", "Content-Type": "application/json", "Host": "127.0.0.1:8787", "Origin": "https://untrusted.example"}, want: http.StatusForbidden},
+		{name: "wrong media type", headers: map[string]string{"Authorization": "Bearer test-adapter-token-1234", "Content-Type": "text/plain", "Host": "127.0.0.1:8787"}, want: http.StatusUnsupportedMediaType},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8787/v1/m06/fixture-import", bytes.NewReader(raw))
+			for key, value := range tc.headers {
+				req.Header.Set(key, value)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, req)
+			if response.Code != tc.want {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			if _, err := os.Stat(history); !os.IsNotExist(err) {
+				t.Fatalf("rejected request mutated canonical history: %v", err)
+			}
+		})
+	}
+	wrongHost := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8787/v1/m06/fixture-import", bytes.NewReader(raw))
+	wrongHost.Host = "evil.example"
+	wrongHost.Header.Set("Authorization", "Bearer test-adapter-token-1234")
+	wrongHost.Header.Set("Content-Type", "application/json")
+	wrongHostResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongHostResponse, wrongHost)
+	if wrongHostResponse.Code != http.StatusForbidden {
+		t.Fatalf("wrong host was accepted: %d %s", wrongHostResponse.Code, wrongHostResponse.Body.String())
+	}
+	if _, err := os.Stat(history); !os.IsNotExist(err) {
+		t.Fatalf("wrong-host request mutated canonical history: %v", err)
+	}
+	valid := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8787/v1/m06/fixture-import", bytes.NewReader(raw))
+	valid.Host = "127.0.0.1:8787"
+	valid.Header.Set("Authorization", "Bearer test-adapter-token-1234")
+	valid.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, valid)
+	if response.Code != http.StatusOK {
+		t.Fatalf("valid local adapter request rejected: %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestHistoryHandoffRejectsDuplicateRawKeyBeforePersistence(t *testing.T) {
 	dir := t.TempDir()
 	history, input := filepath.Join(dir, "history.jsonl"), filepath.Join(dir, "record.json")
