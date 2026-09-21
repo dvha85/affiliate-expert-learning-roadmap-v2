@@ -1,7 +1,7 @@
 # Kế hoạch sửa sau review toàn repo tại ece6a32
 
 <!-- readiness-as-of: 2026-09-21 -->
-<!-- readiness-main-baseline: b447c04262bafd94125b05c2d6df4ecaa8edbeac -->
+<!-- readiness-main-baseline: c155effbf6510d1aaa6587cfd8a85bfd009919e6 -->
 <!-- readiness-baseline-kind: product -->
 
 **Full review follow-up (2026-09-21):** PR #491 self-reviewed and merged at
@@ -17,6 +17,19 @@ Main is unprotected; owner/admin configuration remains open. CodeQL PASS but
 govulncheck has a non-blocking tool panic, not a clean scan.
 `NOT_READY_FOR_PRODUCTION`, 154 scoped claims; no provider/live, deployment,
 independent pilot, business or durability gap is closed here.
+
+**Post-merge governance and security sync (2026-09-21):** `main` is now covered
+by active GitHub ruleset `23753234` (`Protect main with required CI gates`). It
+requires pull requests, an up-to-date branch, `mission-gate`, `curriculum-gate`
+and `codeql-go`, and blocks force-push and branch deletion; no bypass actors or
+required approval count are configured. The security workflow now uses
+`govulncheck@v1.8.0` without `continue-on-error`; local Go 1.27 scans of all
+four modules pass, while an exact-commit hosted scan remains pending. This
+closes the repository-settings portion of EXT-01 but keeps
+`NOT_READY_FOR_PRODUCTION` because provider/live, deployment, pilot, business
+outcome and durability evidence remain external. Record:
+`docs/architecture/EVIDENCE-POST-MERGE-GOVERNANCE-SECURITY-20260921.md`.
+Marker: `Post-merge governance and security sync 2026-09-21`.
 
 **Post-merge sync after PR #489 (2026-09-21):** PR #489 was squash-merged
 into `main` at `12cb66f45d4e5e27002d4cbf01e6ec0481436759` from implementation

@@ -46,7 +46,6 @@ jobs:
     name: govulncheck-go-modules
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -58,7 +57,7 @@ jobs:
             lab/affiliate-bot/go.sum
             lab/mission-runtime/go.sum
       - name: Install pinned govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
       - name: Scan every Go module
         shell: bash
         run: |

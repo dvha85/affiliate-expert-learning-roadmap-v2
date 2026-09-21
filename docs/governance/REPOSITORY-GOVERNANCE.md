@@ -36,7 +36,9 @@ GitHub Actions phát hành trên commit hiện hành. Không dùng các tên cũ
 `curriculum`, `evidence-and-safety`, `python-regression` hoặc tự thêm tiền tố
 workflow vào tên check.
 
-Đây là cấu hình **khuyến nghị**, không xác nhận branch protection hiện đã bật. Sửa tài liệu/workflow không tự sửa branch protection; việc bật hoặc thay required checks cần thao tác quản trị riêng của chủ repo.
+Phần trên là contract của các gate; trạng thái cấu hình quản trị thực tế được
+ghi riêng bên dưới. Sửa tài liệu/workflow không tự sửa branch protection; việc
+bật hoặc thay required checks vẫn cần thao tác quản trị riêng của chủ repo.
 
 Đồng thời bật:
 
@@ -46,13 +48,28 @@ workflow vào tên check.
 - Block branch deletion;
 - Require conversation resolution nếu không gây ma sát không cần thiết.
 
-### Current stable gate recommendation
+### Current stable gate contract
 
-Branch protection should require `curriculum-gate` from `curriculum-ci.yml` and
-`mission-gate` from `mission-agent-path-ci.yml`. Each final gate waits for every
+The active `main` ruleset requires `curriculum-gate` from `curriculum-ci.yml`
+and `mission-gate` from `mission-agent-path-ci.yml`. Each final gate waits for every
 job in its workflow and fails closed when a job fails or is skipped. The child
 jobs remain visible for diagnosis, but do not need to be listed individually;
 this keeps the required-check contract stable as shards and smoke coverage grow.
+
+### Verified GitHub configuration — 2026-09-21
+
+Ruleset **Protect main with required CI gates** (`23753234`) is active for
+`main`. The verified settings are:
+
+- pull request required before merge;
+- branch must be up to date before merge;
+- required checks: `mission-gate`, `curriculum-gate`, `codeql-go`;
+- force-push and branch deletion blocked;
+- no bypass actors configured;
+- no required approval count configured by this ruleset.
+
+This records the repository setting observed after the ruleset was created; it
+does not claim an independent human review or production authorization.
 
 ## 4. No legacy compatibility layer
 
