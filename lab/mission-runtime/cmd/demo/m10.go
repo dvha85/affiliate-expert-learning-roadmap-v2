@@ -626,18 +626,25 @@ func ExecuteCanaryLocalSandbox(state *M10State, auth CanaryExecutionAuthorizatio
 		return CanaryExecutionRecord{}, "WAIT_RECONCILIATION"
 	}
 	state.Ledger = ledger
-	expected, _, status := AuthorizeCanary(*state, ctx)
-	if status != "AUTHORIZED" {
-		return CanaryExecutionRecord{}, status
-	}
-	if !canaryAuthorizationMatches(auth, expected) {
-		return CanaryExecutionRecord{}, "DENY_AUTHORIZATION"
-	}
 	now, errNow := time.Parse(time.RFC3339, ctx.Now)
 	authorizedAt, errAuthorized := time.Parse(time.RFC3339, auth.AuthorizedAt)
 	expiresAt, errExpires := time.Parse(time.RFC3339, auth.ExpiresAt)
 	if errNow != nil || errAuthorized != nil || errExpires != nil || authorizedAt.After(now) || !expiresAt.After(now) {
 		return CanaryExecutionRecord{}, "DENY_EXPIRED_AUTHORIZATION"
+	}
+	// Revalidate current eligibility and budget at execution time, but bind the
+	// immutable capability to the issuance-time gate. Re-authorizing with ctx.Now
+	// would manufacture a different AuthorizedAt and incorrectly reject a valid
+	// delayed execution.
+	currentGate := EvaluateCanaryGate(*state, ctx)
+	if currentGate.Decision != "ALLOW_CANARY" {
+		return CanaryExecutionRecord{}, currentGate.Decision
+	}
+	issuedCtx := ctx
+	issuedCtx.Now = auth.AuthorizedAt
+	expected, _, status := AuthorizeCanary(*state, issuedCtx)
+	if status != "AUTHORIZED" || !canaryAuthorizationMatches(auth, expected) {
+		return CanaryExecutionRecord{}, "DENY_AUTHORIZATION"
 	}
 
 	marker := sandboxIdempotencyPath(dir, auth.IdempotencyKey)

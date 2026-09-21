@@ -913,23 +913,38 @@ func ExecuteProductionLocalSandbox(state *M11State, a ProductionExecutionAuthori
 	}
 	state.Ledger = ledger
 
-	expected, gate, status := AuthorizeProduction(*state, ctx)
-	if status != "AUTHORIZED" {
-		if gate.Decision == "STOP" {
-			if err := persistStickyStop(ledgerPath, state, gate.Reason, ctx.Now); err != nil {
-				return ProductionExecutionRecord{}, "STOP_PERSISTENCE_FAILED"
-			}
-		}
-		return ProductionExecutionRecord{}, status
-	}
-	if expected != a {
-		return ProductionExecutionRecord{}, "DENY_AUTHORIZATION"
-	}
 	now, errNow := time.Parse(time.RFC3339, ctx.Now)
 	authorizedAt, errAuthorized := time.Parse(time.RFC3339, a.AuthorizedAt)
 	expiresAt, errExpires := time.Parse(time.RFC3339, a.ExpiresAt)
 	if errNow != nil || errAuthorized != nil || errExpires != nil || authorizedAt.After(now) || !expiresAt.After(now) {
 		return ProductionExecutionRecord{}, "DENY_EXPIRED_AUTHORIZATION"
+	}
+	// Critical trusted STOP signals are checked before ordinary policy
+	// eligibility. This keeps a simultaneous policy error from hiding a durable
+	// revocation. The remaining checks deliberately separate current eligibility
+	// from the immutable authorization issued earlier.
+	if reason := trustedCriticalProductionStop(*state, ctx); reason != "" {
+		gate := productionGate(*state, ctx)
+		gate.Decision, gate.Reason = "STOP", reason
+		if err := persistStickyStop(ledgerPath, state, reason, ctx.Now); err != nil {
+			return ProductionExecutionRecord{}, "STOP_PERSISTENCE_FAILED"
+		}
+		return ProductionExecutionRecord{}, "STOP"
+	}
+	currentGate := EvaluateProductionGate(*state, ctx)
+	if currentGate.Decision != "ALLOW_PRODUCTION" {
+		if currentGate.Decision == "STOP" {
+			if err := persistStickyStop(ledgerPath, state, currentGate.Reason, ctx.Now); err != nil {
+				return ProductionExecutionRecord{}, "STOP_PERSISTENCE_FAILED"
+			}
+		}
+		return ProductionExecutionRecord{}, currentGate.Decision
+	}
+	issuedCtx := ctx
+	issuedCtx.Now = a.AuthorizedAt
+	expected, _, status := AuthorizeProduction(*state, issuedCtx)
+	if status != "AUTHORIZED" || expected != a {
+		return ProductionExecutionRecord{}, "DENY_AUTHORIZATION"
 	}
 
 	marker := sandboxIdempotencyPath(dir, a.IdempotencyKey)

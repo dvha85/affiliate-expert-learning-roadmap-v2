@@ -12,8 +12,21 @@ import (
 )
 
 func m11Bundle(t *testing.T, profile string) map[string]any {
+	return m11BundleWithParameters(t, profile, nil)
+}
+
+func m11BundleWithParameters(t *testing.T, profile string, parameters map[string]any) map[string]any {
 	t.Helper()
 	s, c := baseM11()
+	if parameters != nil {
+		s.Intent.Parameters = parameters
+		s.Intent = SealShadowActionIntent(s.Intent)
+		pc := c.PolicyContext
+		pc.Now = "2026-09-03T07:05:00Z"
+		s.Policy = EvaluateShadowPolicy(s.Intent, pc)
+		s.CostBound = SealCanaryCostBound(CanaryCostBound{CostBoundID: s.CostBound.CostBoundID, IntentID: s.Intent.IntentID, IntentHash: s.Intent.IntentHash, MaxCostMinor: s.CostBound.MaxCostMinor, Currency: s.CostBound.Currency, SourceRef: s.CostBound.SourceRef, ObservedAt: s.CostBound.ObservedAt, ExpiresAt: s.CostBound.ExpiresAt, CorrelationID: s.Intent.CorrelationID})
+		c.TrustedCostBounds[s.CostBound.CostBoundID] = s.CostBound.CostBoundHash
+	}
 	a, g, status := AuthorizeProduction(s, c)
 	if status != "AUTHORIZED" {
 		t.Fatal(status)
@@ -116,6 +129,44 @@ func TestM11ChainProfiles(t *testing.T) {
 	b["post_ledger"] = p
 	if _, state := auditBundle(t, b); state != missionValid {
 		t.Fatal(state)
+	}
+}
+
+func TestM11ChainRejectsLossyLargeIntentMutation(t *testing.T) {
+	// Seal the canonical intent with the value at 2^53. The neighboring integer
+	// cannot be silently coerced to the same float64 without invalidating the
+	// hash-bound artifact.
+	b := m11Bundle(t, "closed_cycle")
+	intent := b["intent"].(ShadowActionIntent)
+	intent.Parameters = map[string]any{"product_id": json.Number("9007199254740992")}
+	intent = SealShadowActionIntent(intent)
+	rawIntent, err := json.Marshal(intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire map[string]json.RawMessage
+	if err := json.Unmarshal(rawIntent, &wire); err != nil {
+		t.Fatal(err)
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(wire["parameters"], &params); err != nil {
+		t.Fatal(err)
+	}
+	params["product_id"] = json.RawMessage(`9007199254740993`)
+	wire["parameters"], err = json.Marshal(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b["intent"] = wire
+	if _, status := auditBundle(t, b); status != "TAMPERED_INTENT" {
+		t.Fatalf("large-number neighbor bypassed M11 chain hash check: %s", status)
+	}
+}
+
+func TestM11ChainAcceptsExactLargeIntentNumber(t *testing.T) {
+	b := m11BundleWithParameters(t, "closed_cycle", map[string]any{"product_id": json.Number("9007199254740993")})
+	if _, status := auditBundle(t, b); status != missionValid {
+		t.Fatalf("exact large-number intent was rejected: %s", status)
 	}
 }
 

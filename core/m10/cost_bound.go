@@ -70,8 +70,12 @@ func ValidFor(c TrustedCostBound, intentID, intentHash, correlationID, currency 
 	if c.IntentID != intentID || c.IntentHash != intentHash || c.CorrelationID != correlationID || c.Currency != strings.ToUpper(strings.TrimSpace(currency)) || strings.TrimSpace(c.SourceRef) == "" {
 		return "COST_BOUND_MISMATCH"
 	}
-	expires, err := time.Parse(time.RFC3339, c.ExpiresAt)
-	if err != nil || !expires.After(now) {
+	observed, observedErr := time.Parse(time.RFC3339, c.ObservedAt)
+	expires, expiresErr := time.Parse(time.RFC3339, c.ExpiresAt)
+	if observedErr != nil || expiresErr != nil || now.Before(observed) {
+		return "COST_BOUND_NOT_YET_VALID"
+	}
+	if !expires.After(now) {
 		return "COST_BOUND_EXPIRED"
 	}
 	return "VALID"

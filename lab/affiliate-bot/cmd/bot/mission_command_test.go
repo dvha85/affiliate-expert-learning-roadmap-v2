@@ -1092,6 +1092,54 @@ func TestMissionM10ReservationCapOneAcrossTwentyFourBotProcesses(t *testing.T) {
 	}
 }
 
+func TestMissionM10ReservationRejectsAuthorizationFromFutureWithoutMutation(t *testing.T) {
+	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 2)
+	root := filepath.Dir(runtimeDir)
+	future := base.Add(time.Minute).Format(time.RFC3339)
+	futureGate := filepath.Join(root, "future-gate.json")
+	futureAuthorization := filepath.Join(root, "future-authorization.json")
+	if code, response := missionCall(t, "m10-gate", runtimeDir, boundPath, futureGate, future); code != 0 || response["status"] != "ALLOW_CANARY" {
+		t.Fatalf("future gate setup failed: code=%d response=%+v", code, response)
+	}
+	if code, response := missionCall(t, "m10-authorize", runtimeDir, boundPath, futureGate, futureAuthorization, future, "fixture_stub"); code != 0 || response["status"] != "AUTHORIZED" {
+		t.Fatalf("future authorization setup failed: code=%d response=%+v", code, response)
+	}
+	before, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, response := missionCall(t, "m10-reserve-authorization", runtimeDir, futureAuthorization, "future-reservation"); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("future authorization was reserved before its not-before time: code=%d response=%+v", code, response)
+	}
+	after, err := loadMissionState(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Canary == nil || before.Canary == nil || after.Canary.ExecutionsUsed != before.Canary.ExecutionsUsed || after.Canary.CostUsedMinor != before.Canary.CostUsedMinor || len(after.Reservations) != len(before.Reservations) {
+		t.Fatalf("future authorization rejection mutated canonical budget state: before=%+v after=%+v", before.Canary, after.Canary)
+	}
+}
+
+func TestMissionM10CostRegisterRejectsFutureObservationWithoutMutation(t *testing.T) {
+	base := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	runtimeDir, boundPath, _, _ := authorityFixtureAt(t, base, "none", true, 2)
+	var bound corem10.TrustedCostBound
+	if err := readJSON(boundPath, &bound); err != nil {
+		t.Fatal(err)
+	}
+	bound.ObservedAt = base.Add(time.Minute).Format(time.RFC3339Nano)
+	bound.ExpiresAt = base.Add(2 * time.Hour).Format(time.RFC3339Nano)
+	bound.CostBoundHash = corem10.ComputeTrustedCostBoundHash(bound)
+	futurePath := filepath.Join(filepath.Dir(runtimeDir), "future-observed-cost.json")
+	writeMissionTestJSON(t, futurePath, bound)
+	before := missionRuntimeSnapshot(t, runtimeDir)
+	if code, response := missionCall(t, "m10-cost-register", runtimeDir, futurePath); code == 0 || response["status"] != "REJECTED" {
+		t.Fatalf("future-observed cost bound was registered: code=%d response=%+v", code, response)
+	}
+	assertMissionRuntimeUnchanged(t, before, runtimeDir)
+}
+
 // A fixture outcome is still a durable graph edge: two competing writers must
 // not both attach different observations to the same cancelled execution. This
 // uses normal, separately built Bot processes rather than the in-process
@@ -2610,8 +2658,10 @@ func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
 	if err := readJSON(boundPath, &cost); err != nil {
 		t.Fatal(err)
 	}
-	expiresAt := base.Add(2 * time.Minute)
-	lease := corem11.ProductionLease{LeaseID: "expiry-authority-lease", LeaseVersion: "v1", PolicyVersion: state.Policy.PolicyVersion, ApprovalRef: "expiry-authority-approval", ReviewedBy: "human", ReviewerID: "expiry-reviewer", ReviewedAt: base.Format(time.RFC3339), PromotionReviewRef: "fixture:expiry-authority", SourceCanaryGrantID: state.Canary.GrantID, SourceCanaryGrantVersion: state.Canary.GrantVersion, SourceCanaryGrantHash: state.Canary.GrantHash, ValidFrom: base.Format(time.RFC3339), ExpiresAt: expiresAt.Format(time.RFC3339), AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 60, KillSwitchRequired: true, CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
+	expiresAt := base.Add(2*time.Minute + 999999999*time.Nanosecond)
+	// Keep health freshness from becoming the earliest expiry so this fixture
+	// specifically exercises the lease's sub-second RFC3339Nano boundary.
+	lease := corem11.ProductionLease{LeaseID: "expiry-authority-lease", LeaseVersion: "v1", PolicyVersion: state.Policy.PolicyVersion, ApprovalRef: "expiry-authority-approval", ReviewedBy: "human", ReviewerID: "expiry-reviewer", ReviewedAt: base.Format(time.RFC3339), PromotionReviewRef: "fixture:expiry-authority", SourceCanaryGrantID: state.Canary.GrantID, SourceCanaryGrantVersion: state.Canary.GrantVersion, SourceCanaryGrantHash: state.Canary.GrantHash, ValidFrom: base.Format(time.RFC3339), ExpiresAt: expiresAt.Format(time.RFC3339Nano), AllowedRiskClasses: []string{"RISK0"}, AllowedActionTypes: []string{"DRAFT"}, AllowedHosts: []string{"example.com"}, ExecutorIDs: []string{"fixture_stub"}, MaxExecutionsTotal: 1, MaxExecutionsPerWindow: 1, WindowSeconds: 60, MaxCostMinorTotal: 1, Currency: "USD", MaxPendingOutcomes: 1, MaxConsecutiveFailures: 1, MaxOutcomeAgeSeconds: 60, MaxHealthSnapshotAgeSeconds: 180, KillSwitchRequired: true, CorrelationID: state.Intent.CorrelationID, HashVersion: "go-json-v1"}
 	lease.LeaseHash = corem11.ComputeProductionLeaseHash(lease)
 	approval := corem11.ProductionLeaseApproval{ApprovalID: lease.ApprovalRef, LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, PromotionReviewRef: lease.PromotionReviewRef, SourceCanaryGrantID: lease.SourceCanaryGrantID, SourceCanaryGrantVersion: lease.SourceCanaryGrantVersion, SourceCanaryGrantHash: lease.SourceCanaryGrantHash, SourceE5Refs: []string{"fixture:expiry-e5"}, ValidatedRiskClasses: []string{"RISK0"}, ReviewedBy: "human", ReviewerID: lease.ReviewerID, ReviewedAt: lease.ReviewedAt, Decision: "APPROVE_PRODUCTION_LEASE"}
 	health := corem11.ProductionHealthSnapshot{SnapshotID: "expiry-authority-health", LeaseID: lease.LeaseID, LeaseVersion: lease.LeaseVersion, LeaseHash: lease.LeaseHash, ObservedAt: base.Format(time.RFC3339), SourceRefs: []string{"fixture:expiry-health"}, DependencyState: "HEALTHY", TelemetryComplete: true, HashVersion: "go-json-v1"}
@@ -2653,6 +2703,9 @@ func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
 		t.Fatalf("valid M11 authorization failed: code=%d response=%+v", authorizationCode, authorizationResponse)
 	}
 	authorizationArtifact := authorizationResponse["artifact"].(map[string]any)
+	if got, want := authorizationArtifact["expires_at"], expiresAt.Format(time.RFC3339Nano); got != want {
+		t.Fatalf("M11 authorization truncated fractional expiry: got=%v want=%s", got, want)
+	}
 	authorizationID := authorizationArtifact["authorization_id"].(string)
 	preReserveBackup := backupCheckpoint("pre-reserve")
 	reservationAt := base.Add(30 * time.Second).Format(time.RFC3339)
@@ -2678,16 +2731,16 @@ func TestMissionM11ExpiryRejectsAuthorityWritesWithoutMutation(t *testing.T) {
 	}
 
 	assertRejectedAfterRestore("gate-expiry", preGateBackup, func(restoredDir string) []string {
-		return []string{"mission", "m11-gate", restoredDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, expiresAt.Format(time.RFC3339)}
+		return []string{"mission", "m11-gate", restoredDir, lease.LeaseID, health.SnapshotID, cost.CostBoundID, ledgerID, expiresAt.Format(time.RFC3339Nano)}
 	})
 	assertRejectedAfterRestore("authorization-expiry", preAuthorizeBackup, func(restoredDir string) []string {
-		return []string{"mission", "m11-authorize", restoredDir, lease.LeaseID, gateID, "fixture_stub", expiresAt.Format(time.RFC3339)}
+		return []string{"mission", "m11-authorize", restoredDir, lease.LeaseID, gateID, "fixture_stub", expiresAt.Format(time.RFC3339Nano)}
 	})
 	assertRejectedAfterRestore("reservation-expiry", preReserveBackup, func(restoredDir string) []string {
-		return []string{"mission", "m11-reserve-authorization", restoredDir, authorizationID, ledgerID, expiresAt.Format(time.RFC3339)}
+		return []string{"mission", "m11-reserve-authorization", restoredDir, authorizationID, ledgerID, expiresAt.Format(time.RFC3339Nano)}
 	})
 	assertRejectedAfterRestore("execution-expiry", preExecutionBackup, func(restoredDir string) []string {
-		return []string{"mission", "m11-record-failed", restoredDir, authorizationID, reservationLedgerID, expiresAt.Format(time.RFC3339), "expired fixture execution"}
+		return []string{"mission", "m11-record-failed", restoredDir, authorizationID, reservationLedgerID, expiresAt.Format(time.RFC3339Nano), "expired fixture execution"}
 	})
 
 	// The provenance timestamp is intentionally backdated into the original

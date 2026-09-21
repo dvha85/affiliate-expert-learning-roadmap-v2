@@ -33,6 +33,8 @@
       "notes": "The shared adapter builds the M00 packet and learner HistoryRecord, appends it, then resolves/replays it before ACK. This workflow never constructs canonical history locally.",
       "parameters": {
         "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.AFFILIATE_ADAPTER_TOKEN }}"}]},
         "url": "={{ $('M06 Adapter Input').item.json.adapter_url + '/v1/m06/fixture-import' }}",
         "sendBody": true,
         "sendHeaders": true,

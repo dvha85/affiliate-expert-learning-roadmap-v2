@@ -91,8 +91,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # The PR path gate diffs against the base commit. Keep both parents
-          # of GitHub's synthetic merge commit available without a full clone.
+          # This integration boundary is dependency-sensitive: a shared core,
+          # contract, Go module, action pin, or helper can change the engine
+          # behavior without touching the old adapter path list. Run it for
+          # every PR and fail closed instead of maintaining an incomplete gate.
+          # Keep the PR base available for the informational scope report; the
+          # engine itself runs regardless of the reported scope.
           fetch-depth: 2
       - name: Select n8n engine coverage
         id: n8n-inputs
@@ -123,7 +127,6 @@ jobs:
               ;;
           esac
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           go-version-file: lab/affiliate-bot/go.mod
           cache-dependency-path: |
@@ -132,35 +135,27 @@ jobs:
             core/go.sum
             lab/mission-runtime/go.sum
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           python-version: "3.12"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: steps.n8n-inputs.outputs.run == 'true'
         with:
           node-version: "24"
       - name: Restore pinned n8n runtime
         id: n8n-cache
-        if: steps.n8n-inputs.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/n8n-rp08/node_modules
           key: n8n-engine-${{ runner.os }}-node24-v${{ env.N8N_VERSION }}
       - name: Install pinned n8n engine for disposable offline runtime
-        if: steps.n8n-inputs.outputs.run == 'true' && steps.n8n-cache.outputs.cache-hit != 'true'
+        if: steps.n8n-cache.outputs.cache-hit != 'true'
         run: npm install --prefix "$RUNNER_TEMP/n8n-rp08" --no-audit --no-fund "n8n@$N8N_VERSION"
       - name: Run M06/M07 engine paths and real M06 Schedule Trigger admission
-        if: steps.n8n-inputs.outputs.run == 'true'
         run: |
           python scripts/check_n8n_flatted_parity.py --node-modules "$RUNNER_TEMP/n8n-rp08/node_modules"
           python scripts/run_n8n_engine_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
           python scripts/run_n8n_m06_schedule_regression.py \
             --n8n-cli "$RUNNER_TEMP/n8n-rp08/node_modules/.bin/n8n"
-      - name: Report scoped engine skip
-        if: steps.n8n-inputs.outputs.run != 'true'
-        run: >-
-          echo "n8n engine regression skipped: ${{ steps.n8n-inputs.outputs.reason }}; full coverage still runs on main pushes."
 
   mission-gate:
     name: mission-gate

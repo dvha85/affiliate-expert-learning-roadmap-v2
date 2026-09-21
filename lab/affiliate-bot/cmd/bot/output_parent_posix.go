@@ -30,7 +30,11 @@ func ensureOutputParentPlatform(parent string) error {
 	if err != nil {
 		return fmt.Errorf("open output parent %q: %w", existing, err)
 	}
-	defer unix.Close(directory)
+	// Close the descriptor that is current at return time. A plain
+	// `defer unix.Close(directory)` evaluates the initial descriptor immediately;
+	// after traversal it would leak the final directory (and could later close a
+	// reused descriptor number).
+	defer func() { _ = unix.Close(directory) }()
 	for _, component := range missing {
 		if component == "" || component == "." {
 			continue

@@ -190,7 +190,7 @@ func AuthorizeM09(state M09State, ctx M09Context) (ExecutionAuthorization, strin
 		ApprovalID:          a.ApprovalID,
 		ExecutorID:          ctx.Executor.ExecutorID,
 		AuthorizedAt:        ctx.Now,
-		ExpiresAt:           expires.Format(time.RFC3339),
+		ExpiresAt:           expires.Format(time.RFC3339Nano),
 		IdempotencyKey:      i.IdempotencyKey,
 		CorrelationID:       i.CorrelationID,
 		ExecutionMode:       "APPROVED_LIVE",

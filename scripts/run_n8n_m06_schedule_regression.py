@@ -9,6 +9,7 @@ synthetic fixture and a loopback canonical-store adapter.
 import argparse
 import json
 import os
+import secrets
 import shutil
 import socket
 import sqlite3

@@ -376,6 +376,9 @@ jobs:
       - name: Execute the documented offline entrypoint end to end
         run: python scripts/run_offline_checks.py
 
+  # Keep one stable branch-protection target while still requiring every
+  # learner shard, Windows run, smoke group and readiness audit. A skipped or
+  # cancelled dependency is intentionally not treated as success.
   curriculum-gate:
     name: curriculum-gate
     if: ${{ always() }}
