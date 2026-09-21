@@ -12,11 +12,13 @@ import hashlib
 import os
 import shutil
 import socket
+import secrets
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]

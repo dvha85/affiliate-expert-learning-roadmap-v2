@@ -1162,7 +1162,32 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
         # v6.1.0 pin carried by the Dependabot upgrade.
         "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     }
-    if "Select n8n engine coverage" not in workflow_text or "Restore pinned n8n runtime" not in workflow_text or not any(ref in workflow_text for ref in pinned_cache_refs) or "N8N_VERSION" not in workflow_text or "main_push" not in workflow_text or "n8n_related_change" not in workflow_text or "Report scoped engine skip" not in workflow_text or "mission-gate:" not in workflow_text:
+    # Older revisions used a path-based selector.  That selector was
+    # intentionally replaced by an always-run job because shared cores,
+    # contracts, module manifests and helper scripts can affect the engine
+    # without matching an adapter-only regex.  Accept either shape here so the
+    # readiness audit remains compatible with the migration, but keep the
+    # cache/runtime and aggregate-gate requirements mandatory in both cases.
+    legacy_scoped_gate = all(
+        marker in workflow_text
+        for marker in (
+            "Select n8n engine coverage",
+            "main_push",
+            "n8n_related_change",
+            "Report scoped engine skip",
+        )
+    )
+    always_run_gate = all(
+        marker in workflow_text
+        for marker in (
+            "every PR and fail closed",
+            "mission-gate:",
+            "if: ${{ always() }}",
+            "needs:\n      - mission-semantics-and-blueprints",
+            'test "$result" = success',
+        )
+    )
+    if "Restore pinned n8n runtime" not in workflow_text or not any(ref in workflow_text for ref in pinned_cache_refs) or "N8N_VERSION" not in workflow_text or "mission-gate:" not in workflow_text or not (legacy_scoped_gate or always_run_gate):
         fail("n8n engine CI cache/gate is missing or can silently remove full coverage")
 
 
