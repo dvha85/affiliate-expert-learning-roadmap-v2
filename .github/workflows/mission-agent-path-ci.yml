@@ -95,7 +95,37 @@ jobs:
           # contract, Go module, action pin, or helper can change the engine
           # behavior without touching the old adapter path list. Run it for
           # every PR and fail closed instead of maintaining an incomplete gate.
-          fetch-depth: 1
+          # Keep the PR base available for the informational scope report; the
+          # engine itself runs regardless of the reported scope.
+          fetch-depth: 2
+      - name: Select n8n engine coverage
+        id: n8n-inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=main_push" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
+          scope_status=0
+          scope="$(printf '%s\n' "$changed" | python scripts/n8n_change_scope.py)" || scope_status=$?
+          case "$scope_status:$scope" in
+            0:run)
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              echo "reason=n8n_related_change" >> "$GITHUB_OUTPUT"
+              ;;
+            1:skip)
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=no_n8n_related_change" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "n8n scope helper failed (exit $scope_status); refusing to skip coverage" >&2
+              exit 1
+              ;;
+          esac
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: lab/affiliate-bot/go.mod
@@ -138,11 +168,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Require every mission job to pass
-        env:
-          SEMANTICS: ${{ needs.mission-semantics-and-blueprints.result }}
-          RUNTIME: ${{ needs.mission-runtime.result }}
-          N8N: ${{ needs.n8n-engine-regression.result }}
         run: |
-          for result in "$SEMANTICS" "$RUNTIME" "$N8N"; do
-            test "$result" = success || { echo "mission job did not pass: $result" >&2; exit 1; }
-          done
+          test "${{ needs.mission-semantics-and-blueprints.result }}" = success
+          test "${{ needs.mission-runtime.result }}" = success
+          test "${{ needs.n8n-engine-regression.result }}" = success

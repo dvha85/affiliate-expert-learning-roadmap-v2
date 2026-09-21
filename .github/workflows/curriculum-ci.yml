@@ -398,19 +398,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Require every curriculum job to pass
-        env:
-          STRUCTURE: ${{ needs.structure-language-and-foundations.result }}
-          RUNTIME: ${{ needs.deterministic-runtime.result }}
-          WINDOWS: ${{ needs.windows-runtime.result }}
-          SHARD0: ${{ needs.learner-bot-tests-shard-0.result }}
-          SHARD1: ${{ needs.learner-bot-tests-shard-1.result }}
-          RACE: ${{ needs.learner-bot-race.result }}
-          QUICKSTART: ${{ needs.deterministic-quickstart.result }}
-          FOUNDATIONS: ${{ needs.deterministic-smokes-foundations.result }}
-          M06_M07: ${{ needs.deterministic-smokes-m06-m07.result }}
-          BACKUP: ${{ needs.deterministic-smokes-backup-mutations.result }}
-          OFFLINE: ${{ needs.offline-review-contract.result }}
         run: |
-          for result in "$STRUCTURE" "$RUNTIME" "$WINDOWS" "$SHARD0" "$SHARD1" "$RACE" "$QUICKSTART" "$FOUNDATIONS" "$M06_M07" "$BACKUP" "$OFFLINE"; do
-            test "$result" = success || { echo "curriculum job did not pass: $result" >&2; exit 1; }
-          done
+          test "${{ needs.structure-language-and-foundations.result }}" = success
+          test "${{ needs.deterministic-runtime.result }}" = success
+          test "${{ needs.windows-runtime.result }}" = success
+          test "${{ needs.learner-bot-tests-shard-0.result }}" = success
+          test "${{ needs.learner-bot-tests-shard-1.result }}" = success
+          test "${{ needs.learner-bot-race.result }}" = success
+          test "${{ needs.deterministic-quickstart.result }}" = success
+          test "${{ needs.deterministic-smokes-foundations.result }}" = success
+          test "${{ needs.deterministic-smokes-m06-m07.result }}" = success
+          test "${{ needs.deterministic-smokes-backup-mutations.result }}" = success
+          test "${{ needs.offline-review-contract.result }}" = success

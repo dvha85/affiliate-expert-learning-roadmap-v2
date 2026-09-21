@@ -1184,7 +1184,7 @@ def audit_n8n_engine_runtime_compatibility(root, matrix, plan_text):
             "mission-gate:",
             "if: ${{ always() }}",
             "needs:\n      - mission-semantics-and-blueprints",
-            'test "$result" = success',
+            'test "${{ needs.n8n-engine-regression.result }}" = success',
         )
     )
     if "Restore pinned n8n runtime" not in workflow_text or not any(ref in workflow_text for ref in pinned_cache_refs) or "N8N_VERSION" not in workflow_text or "mission-gate:" not in workflow_text or not (legacy_scoped_gate or always_run_gate):
