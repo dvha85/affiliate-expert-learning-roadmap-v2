@@ -43,11 +43,26 @@ này.
 Lab macOS có thể kiểm lifecycle, health, backup/restore, replay, restart và
 durable STOP sau khi có run record thật. Nó không đóng target-host,
 provider/public-network, Ubuntu-on-WSL2/Hyper-V hoặc Windows-native parity,
-region-latency, power-loss/atomic multi-file, distributed durability hay
-clean-machine pilot; BR-18a vẫn `UNVERIFIED` và overall vẫn
-`NOT_READY_FOR_PRODUCTION`. Quyết định và điều kiện ghi evidence nằm ở
+region-latency, power-loss/atomic multi-file hay distributed durability;
+clean-machine pilot và independent operator review được đặt ngoài phạm vi của
+repo personal-only. BR-18a ở target-host/provider vẫn `UNVERIFIED` và overall
+vẫn `NOT_READY_FOR_PRODUCTION`. Quyết định và điều kiện ghi evidence nằm ở
 [BR-18a macOS local lab decision](../architecture/EVIDENCE-BR18A-MACOS-LOCAL-LAB-20260921.md); phương án Windows được giữ tại
 [BR-18a Windows always-on lab decision](../architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md).
+
+### Phạm vi vận hành personal-local và nhịp backup/recovery
+
+Repo này được maintainer tự vận hành cho mục đích cá nhân. Không cần người
+thứ hai, user/máy sạch hoặc independent beginner pilot để chấp nhận bounded
+macOS lab; quyết định này không tạo learner-operable hoặc production claim.
+Maintainer phải tạo run record mới trước mỗi thay đổi lớn về code, schema,
+toolchain hoặc runtime, sau restore/path change, và mỗi tháng khi lab còn
+được dùng. Mỗi lần phải backup vào target mới, restore vào thư mục trống
+khác, replay history, kiểm tra health/restart và xác nhận durable STOP vẫn
+sticky sau restore; activation/gate mới phải bị từ chối khi STOP còn tồn tại.
+
+Chi tiết lệnh và trường run record nằm trong [personal-local scope decision](../architecture/EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921.md)
+và [BR-18a deployment/recovery runbook](../architecture/BR-18A-DEPLOYMENT-RECOVERY-RUNBOOK.md).
 
 ## 2. Khi nào cần VPS?
 

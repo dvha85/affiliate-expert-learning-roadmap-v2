@@ -11,6 +11,32 @@ target-host/provider. Chạy trực tiếp bằng Go 1.27, Node 24 và n8n 2.38.
 Docker/Compose không bắt buộc. Chỉ dùng fixture/synthetic và read-only, mặc
 định loopback, không provider credential hoặc live executor.
 
+### Phạm vi personal-local
+
+Repo này được maintainer tự vận hành cho mục đích cá nhân. Vì vậy không cần
+second operator, user/máy sạch hoặc independent beginner pilot để chấp nhận
+bounded macOS lab. Run record `macos-br18a-20260921T155228Z` đã đủ làm
+`PERSONAL_LOCAL_SCOPE_ACCEPTED` cho lifecycle local; quyết định chi tiết nằm ở
+[personal-local scope evidence](EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921.md).
+
+Maintainer tự tạo run record mới:
+
+- trước mỗi thay đổi lớn về code, schema, toolchain hoặc runtime;
+- sau restore hoặc thay đổi runtime/backup/restore path; và
+- mỗi tháng khi lab còn được sử dụng.
+
+Mỗi lần kiểm phải dùng backup target mới và restore target trống khác với
+runtime, replay history, kiểm tra health và restart, rồi xác nhận `mission
+status` vẫn giữ `stop: true`. Khi STOP còn sticky, `m11-activate` và `m11-gate`
+phải bị từ chối trước khi tạo artifact mới. Lưu exact versions, host/path,
+bind addresses và kết quả vào `$LAB_ROOT/runs/<run-id>`; không ghi token vào
+log, URL, fixture hay backup.
+
+Đây là acceptance chỉ cho personal-local lab; nó không đóng target-host,
+provider, public network, power-loss, distributed durability, live executor,
+business outcome hoặc production readiness. Nếu sau này cần learner-operable
+hoặc production claim, phải mở lại các yêu cầu review/pilot tương ứng.
+
 Mọi lệnh chạy trong Terminal macOS. Tạo các đường dẫn tách biệt trên
 filesystem macOS trước khi start; không dùng thư mục repo làm canonical store:
 

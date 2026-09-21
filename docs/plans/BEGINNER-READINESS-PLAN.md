@@ -523,6 +523,18 @@ Nghiệm thu bản beginner MVP: người thử hoàn thành đường được 
 
 Không dùng số lần gọi model, test PASS hoặc việc đã tạo account thay cho affiliate outcome thực tế.
 
+#### Phạm vi personal-local của chủ repo (2026-09-21)
+
+Repo này chỉ phục vụ maintainer/operator duy nhất. Vì vậy checklist pilot người
+mới, user/máy sạch và self-service onboarding ở BR-16 được giữ như yêu cầu
+curriculum/production tổng quát nhưng **không phải gate của personal-local
+lab**. Không cần mời người khác chạy runbook; maintainer có thể chấp nhận
+bounded macOS run theo [personal-local scope decision](../architecture/EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921.md).
+
+Quyết định này không được dùng để claim learner-operable, beginner MVP hoặc
+production readiness. Nếu phạm vi sử dụng thay đổi, phải mở lại checklist pilot
+và ghi evidence độc lập trước khi nâng các claim đó.
+
 ## 10. Đợt F — Execution và vận hành 24/7
 
 ### BR-17 — Tích hợp M08–M11 và live adapter có giới hạn
@@ -554,6 +566,10 @@ Liên quan phát hiện 12.
 - [ ] Ghi môi trường và giới hạn tải đã thử; local smoke không được gọi là VPS production proof.
 
 Nghiệm thu: một người khác triển khai được cấu hình theo tài liệu, đọc health, dừng bot và restore dữ liệu; báo cáo window vận hành có restart drill và không mất canonical state.
+
+Trong personal-local scope, maintainer tự thực hiện các bước trên và lưu run
+record; tiêu chí “một người khác” chỉ áp dụng khi công bố learner-operable hoặc
+production deployment.
 
 ### BR-19 — Công bố readiness theo từng lớp
 
