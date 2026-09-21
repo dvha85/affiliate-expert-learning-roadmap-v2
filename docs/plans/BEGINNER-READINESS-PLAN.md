@@ -51,7 +51,7 @@ MVP đầu tiên tạo báo cáo có nguồn và hỗ trợ người thao tác t
 | Một provider/model dùng cho live AI smoke | BR-11 | Người vận hành | Chạy mock cho Capability, để live evidence chưa xác nhận |
 | Phiên bản n8n được hỗ trợ | BR-14 | Người triển khai, người review | Ledger giữ UNVERIFIED |
 | Target/action rủi ro thấp có thể làm live adapter | BR-17 | Chủ repo/người cấp quyền | Chỉ hoàn thiện sandbox; E5/E6 chưa đạt |
-| Nơi chạy 24/7 và giới hạn tài nguyên/chi phí | BR-18 | Chủ repo/người vận hành | Xác minh local deployment; không mặc định mua VPS |
+| Nơi chạy 24/7 và giới hạn tài nguyên/chi phí | BR-18 | Chủ repo/người vận hành | Dùng lab Windows + Ubuntu 24.04 LTS (WSL2 ưu tiên, Hyper-V fallback); chưa mặc định mua VPS và chưa có operated evidence |
 
 Các lựa chọn trên không chặn việc lưu kế hoạch hoặc các sửa lỗi độc lập. Chỉ công việc phụ thuộc vào một lựa chọn mới phải chờ lựa chọn đó.
 
@@ -95,7 +95,7 @@ PR #27 đã review và merge tại `09a2f50`, 4/4 checks PASS trên head `af7c84
 | BR-15 | D | M07 grounding và tool boundary thực thi được | P1 / L | BR-11, BR-14 | PARTIAL | Core/learner adapter kiểm claim/value/ID, adapter-owned tool trace và proposal persistence; CI n8n dùng model stub và local Cockpit synthetic/read-only đã chạy success/restart. Selected-source sanitized fixture qua M07 chỉ cho `price:null` và reject commission bịa; provider diversity và operated selected-source run còn mở |
 | BR-16 | E | Kiểm thử xuyên hệ thống và pilot người mới | P1 / L | BR-05…BR-15 | PARTIAL | Shared M00–M11 fixture workspace/restart đã có; cần pilot máy sạch, operated selected-source evidence và business outcome trước khi coi người mới tự làm trọn lộ trình |
 | BR-17 | F | Tích hợp M08–M11 và một live adapter giới hạn | P2 / L | BR-16 | PARTIAL | R06–R11/R14: schema/policy, exact-number, budget/expiry/concurrency, path safety; RP-03/RP-07 phải nối cost-bound/gate/authorization/execution/EffectRef và M11 lifecycle; chưa có live executor |
-| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | PARTIAL | R12/R13: RP-06 kiểm snapshot/graph M00–M10 sau RP-03/RP-04/RP-05; RP-07a bắt buộc mở rộng inventory/restore M11 trước khi đóng toàn phạm vi; drill target host còn mở |
+| BR-18 | F | Bài triển khai 24/7, backup/restore/recovery | P2 / L | BR-16; phần ghi phụ thuộc BR-17 | PARTIAL | Đã chốt profile interim Windows 24/7 + Ubuntu 24.04 LTS (WSL2 ưu tiên, Hyper-V fallback), Go 1.27/Node 24/n8n 2.38.1, Linux-filesystem runtime/backup và loopback/LAN-only synthetic/read-only; run record trên máy thật, target host/provider, power-loss, distributed durability và pilot vẫn mở; [decision record](../architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md) |
 | BR-19 | E/F | Công bố readiness theo bằng chứng, kiểm soát regression | P3 / M | BR-16; bản production cần BR-17, BR-18 | PARTIAL | CI/audit matrix-graph-plan đã có và giữ overall `NOT_READY_FOR_PRODUCTION`; remote CI evidence, independent review và external proof vẫn còn thiếu |
 
 Có thể làm đồng thời các item không phụ thuộc nhau. Bảng này mô tả dependency công việc, không giao việc cho agent hay tạo lịch tự động.
@@ -460,7 +460,7 @@ BR-17c đang triển khai/review: [M10 ledger/cost/outcome boundary](../architec
 
 BR-17d đang triển khai/review: [M11 lifecycle/STOP/reconciliation boundary](../architecture/BR-17D-M11-LIFECYCLE-BOUNDARY.md) chốt lease/health gate, STOP durable, recovery review và closed-cycle links; unknown usage hoặc thiếu result giữ cycle mở. Chỉ là lab/schema evidence; chưa có deployment 24/7 hay live closed cycles.
 
-BR-18a đã triển khai và review, nội dung được bàn giao qua [PR #90](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/90): [runbook deployment/recovery 24/7](../architecture/BR-18A-DEPLOYMENT-RECOVERY-RUNBOOK.md) yêu cầu runtime/resource limits, backup checksum, restore/replay, STOP drill và human review. Chưa chọn host/backup target nên evidence vẫn UNVERIFIED.
+BR-18a đã triển khai và review, nội dung được bàn giao qua [PR #90](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/90): [runbook deployment/recovery 24/7](../architecture/BR-18A-DEPLOYMENT-RECOVERY-RUNBOOK.md) yêu cầu runtime/resource limits, backup checksum, restore/replay, STOP drill và human review. Quyết định interim ngày 21/09/2026 chọn máy Windows bật 24/7 với Ubuntu 24.04 LTS trong WSL2 (Hyper-V fallback), direct Linux runtime trước, dữ liệu synthetic/read-only, loopback/LAN-only và runtime/backup tách trên Linux filesystem; [decision record](../architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md). Chưa có run record trên máy đó hoặc target/backup host được vận hành nên evidence vẫn UNVERIFIED.
 
 BR-18b đã triển khai và review, bàn giao qua [PR #90](https://github.com/dvha85/affiliate-expert-learning-roadmap-v2/pull/90): [backup/restore smoke offline](../architecture/BR-18B-BACKUP-RESTORE-SMOKE.md) kiểm checksum/tamper, byte-identical restore và durable STOP marker trong thư mục tạm. Đây chưa phải storage/host evidence 24/7; BR-18 vẫn IN_PROGRESS.
 
@@ -666,5 +666,6 @@ BR-04 có thể được chốt song song với ba PR này. Sau đó mới chố
 | 05/09/2026 | Triển khai BR-01, chuyển IN_REVIEW; 18 item còn lại TODO | [Bằng chứng BR-01](#br-01--bằng-chứng-triển-khai); chờ human review |
 | 05/09/2026 | Ghi nhận BR-01 DONE theo yêu cầu merge của chủ repo; triển khai BR-02 IN_REVIEW; 17 item còn lại TODO | PR #20 đã merge; [bằng chứng BR-02](#br-02--bằng-chứng-triển-khai) |
 | 05/09/2026 | BR-02 DONE theo yêu cầu merge; BR-03 IN_PROGRESS, phần a chờ review, b/c TODO | PR #21 merge `1e94ec5`; audit artifact và regression M04 |
+| 21/09/2026 | Chốt profile interim BR-18a cho máy Windows bật 24/7: Ubuntu 24.04 LTS trong WSL2 (Hyper-V fallback), direct Linux runtime, synthetic/read-only, loopback/LAN-only và runtime/backup tách trên Linux filesystem | [BR-18a decision record](../architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md); run record/target-host/provider/power-loss/pilot evidence vẫn UNVERIFIED |
 
 Việc commit kế hoạch không có nghĩa các lỗi đã sửa hoặc Mission của học viên đã PASS.
