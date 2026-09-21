@@ -103,8 +103,11 @@ def audit_product_baseline_git(root, baseline):
     allowed = (
         "docs/",
         "README.md",
+        "core/README.md",
+        "curriculum/",
         "curriculum/README.md",
         "lab/affiliate-bot/README.md",
+        "starter-kits/",
         "scripts/audit_readiness.py",
         "scripts/n8n_change_scope.py",
         "scripts/run_offline_checks.py",
