@@ -4,12 +4,79 @@ Runbook này chuẩn bị cho runtime thật nhưng không tự chọn VPS/nhà 
 Maintainer phải ghi nơi chạy, giới hạn CPU/RAM/disk, secret source và người có
 quyền STOP trước activation.
 
-## Profile interim: Windows 24/7 + Ubuntu 24.04 LTS (2026-09-21)
+## Profile hiện hành: macOS native local verification (2026-09-21)
 
-Đây là profile lab được chọn để trì hoãn VPS trả phí, không phải target-host
-production. Dùng **WSL2 + Ubuntu 24.04 LTS** trước; **Hyper-V + Ubuntu 24.04
-LTS** là fallback khi cần VM boundary. Chạy runtime Linux trực tiếp bằng Go
-1.27, Node 24 và n8n 2.38.1; Docker/Compose không bắt buộc.
+Đây là profile được chọn để kiểm chứng ngay trên macOS trong lúc chưa có
+target-host/provider. Chạy trực tiếp bằng Go 1.27, Node 24 và n8n 2.38.1;
+Docker/Compose không bắt buộc. Chỉ dùng fixture/synthetic và read-only, mặc
+định loopback, không provider credential hoặc live executor.
+
+Mọi lệnh chạy trong Terminal macOS. Tạo các đường dẫn tách biệt trên
+filesystem macOS trước khi start; không dùng thư mục repo làm canonical store:
+
+```bash
+export LAB_ROOT="$HOME/affiliate-lab"
+export LAB_RUNTIME="$LAB_ROOT/runtime"
+export LAB_BACKUPS="$LAB_ROOT/backups"
+export LAB_RESTORES="$LAB_ROOT/restores"
+export LAB_LOG="$LAB_ROOT/var/log"
+export LAB_RUN="$LAB_ROOT/var/run"
+mkdir -p "$LAB_RUNTIME" "$LAB_BACKUPS" "$LAB_RESTORES" "$LAB_LOG" "$LAB_RUN"
+
+go version       # phải là Go 1.27.x
+node --version   # phải là v24.x
+n8n --version    # phải là 2.38.1
+```
+
+Build/start tối thiểu (đổi `REPO_ROOT` theo clone thực tế):
+
+```bash
+export REPO_ROOT="$HOME/src/affiliate-expert-learning-roadmap-v2"
+export LAB_BIN="$LAB_ROOT/bin/affiliate-bot"
+mkdir -p "$(dirname "$LAB_BIN")"
+cd "$REPO_ROOT/lab/affiliate-bot"
+go build -o "$LAB_BIN" ./cmd/bot
+
+"$LAB_BIN" mission init "$LAB_RUNTIME"
+"$LAB_BIN" history capture "$LAB_RUNTIME/history.jsonl" \
+  data/m02-sample-observations.json demo-1 \
+  2026-09-03T00:00:00Z 2026-09-03T00:00:00Z
+
+export AFFILIATE_ADAPTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+nohup "$LAB_BIN" watcher serve "$LAB_RUNTIME/history.jsonl" \
+  127.0.0.1:8787 >"$LAB_LOG/watcher.log" 2>&1 &
+echo $! >"$LAB_RUN/watcher.pid"
+curl --fail http://127.0.0.1:8787/healthz
+```
+
+Đặt `N8N_USER_FOLDER="$LAB_ROOT/n8n"`, `N8N_HOST=127.0.0.1` và
+`N8N_PORT=5678`, rồi dùng Node 24 trong `PATH`. Giữ log/PID ở `LAB_LOG`/
+`LAB_RUN`, không ghi token vào URL, fixture, backup hoặc log. Backup/restore
+phải dùng hai thư mục khác nhau:
+
+```bash
+export N8N_USER_FOLDER="$LAB_ROOT/n8n"
+export N8N_HOST=127.0.0.1
+export N8N_PORT=5678
+export LAB_BACKUP="$LAB_BACKUPS/backup-$(date -u +%Y%m%dT%H%M%SZ)"
+export LAB_RESTORE="$LAB_RESTORES/restore-$(date -u +%Y%m%dT%H%M%SZ)"
+"$LAB_BIN" backup create "$LAB_RUNTIME" "$LAB_BACKUP"
+"$LAB_BIN" backup restore "$LAB_BACKUP" "$LAB_RESTORE"
+"$LAB_BIN" history replay "$LAB_RESTORE/history.jsonl"
+"$LAB_BIN" mission status "$LAB_RESTORE"
+```
+
+Kết quả macOS chỉ được ghi là `PASS` sau khi có health, restart, replay và
+durable-STOP output cùng exact version/host/path record. Khi chưa chạy thật,
+evidence record phải giữ `result: UNVERIFIED`.
+
+## Profile triển khai về sau: Windows 24/7 + Ubuntu 24.04 LTS (WSL2/Hyper-V)
+
+Đây là phương án always-on về sau, không phải điều kiện để bắt đầu kiểm chứng
+trên macOS và không phải target-host production. Dùng **WSL2 + Ubuntu 24.04
+LTS** trước; **Hyper-V + Ubuntu 24.04 LTS** là fallback khi cần VM boundary.
+Chạy runtime Linux trực tiếp bằng Go 1.27, Node 24 và n8n 2.38.1; Docker/Compose
+không bắt buộc.
 
 Mọi lệnh bên dưới chạy **bên trong Ubuntu**, sau khi đã cài đúng toolchain và
 clone repo vào filesystem Linux. Không đặt canonical store trong `/mnt/c`.
@@ -29,7 +96,7 @@ node --version   # phải là v24.x
 n8n --version    # phải là 2.38.1
 ```
 
-Profile chỉ dùng fixture/synthetic và read-only watcher. Adapter phải bind
+Profile Windows chỉ dùng fixture/synthetic và read-only watcher. Adapter phải bind
 `127.0.0.1:8787`; n8n phải bind `127.0.0.1:5678`. Nếu cần kiểm tra từ thiết
 bị khác trong cùng LAN, bind private address sau khi có Windows firewall
 allowlist cụ thể; không port-forward hoặc mở public ingress. Ghi lại bind
@@ -67,7 +134,7 @@ export N8N_HOST=127.0.0.1
 export N8N_PORT=5678
 ```
 
-Đường dẫn backup/restore của profile này phải khác nhau và nằm trên Linux
+Đường dẫn backup/restore của profile Windows phải khác nhau và nằm trên Linux
 filesystem:
 
 ```bash
@@ -85,6 +152,9 @@ Windows/Ubuntu thật, evidence record phải giữ `result: UNVERIFIED`; quyế
 này không đóng target-host/provider/public-network, region latency,
 power-loss/atomic multi-file, distributed durability, clean-machine pilot,
 live executor hoặc business outcome.
+
+Quyết định hiện hành được ghi tại [macOS local lab decision](EVIDENCE-BR18A-MACOS-LOCAL-LAB-20260921.md); profile Windows được giữ tại
+[Windows always-on lab decision](EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md).
 
 ## Cấu hình tham chiếu local
 

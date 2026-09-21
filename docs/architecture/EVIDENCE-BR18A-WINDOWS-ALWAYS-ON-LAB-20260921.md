@@ -4,6 +4,10 @@ Trạng thái: **DECISION_RECORDED / UNVERIFIED**. Đây là quyết định top
 trung gian cho lab always-on; chưa phải operated target-host evidence và chưa
 đóng BR-18a.
 
+Phạm vi hiện tại: macOS native được chọn để kiểm chứng trước; record này giữ
+phương án Windows + Ubuntu 24.04 LTS cho giai đoạn always-on về sau. Xem
+[macOS local verification decision](EVIDENCE-BR18A-MACOS-LOCAL-LAB-20260921.md).
+
 ## Quyết định
 
 - Tạm hoãn VPS trả phí. Máy Windows của chủ repo có thể chạy 24/7 cho lab
