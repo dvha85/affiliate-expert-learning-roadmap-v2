@@ -11,11 +11,17 @@ import smoke_br18b_backup_restore as br18
 
 
 class SmokeFixtureTimeTests(unittest.TestCase):
+    @staticmethod
+    def parse_timestamp(value):
+        # Python 3.9 does not accept the RFC3339 ``Z`` suffix; the smoke
+        # scripts intentionally emit it for the learner-facing artifacts.
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
     def test_whole_second_intervals_and_historical_dates_are_preserved(self):
         for module in (br16, br18):
             with self.subTest(module=module.__name__):
-                earlier = datetime.fromisoformat(module.fixture_time("2026-09-07T00:00:00Z"))
-                later = datetime.fromisoformat(module.fixture_time("2026-09-08T00:00:00Z"))
+                earlier = self.parse_timestamp(module.fixture_time("2026-09-07T00:00:00Z"))
+                later = self.parse_timestamp(module.fixture_time("2026-09-08T00:00:00Z"))
                 self.assertEqual(later - earlier, timedelta(days=1))
 
     def test_fractional_authorizations_always_precede_reservation(self):
@@ -25,10 +31,10 @@ class SmokeFixtureTimeTests(unittest.TestCase):
         now = datetime(2026, 9, 21, 0, 0, 0, 999500, tzinfo=timezone.utc)
         for module in (br16, br18):
             with self.subTest(module=module.__name__), patch.object(module, "_FIXTURE_NOW", now):
-                base = datetime.fromisoformat(module.fixture_time("2026-09-08T00:00:00Z"))
-                reserved = datetime.fromisoformat(module.fixture_time("2026-09-08T00:00:01Z"))
+                base = self.parse_timestamp(module.fixture_time("2026-09-08T00:00:00Z"))
+                reserved = self.parse_timestamp(module.fixture_time("2026-09-08T00:00:01Z"))
                 for index in range(1, 25):
-                    authorized = datetime.fromisoformat(module.fixture_time(f"2026-09-08T00:00:00.{index:03d}Z"))
+                    authorized = self.parse_timestamp(module.fixture_time(f"2026-09-08T00:00:00.{index:03d}Z"))
                     self.assertLess(authorized, reserved)
                     self.assertEqual(authorized - base, timedelta(milliseconds=index))
 

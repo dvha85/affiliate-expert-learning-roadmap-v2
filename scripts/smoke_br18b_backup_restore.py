@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,9 +17,27 @@ ROOT = Path(__file__).resolve().parents[1]
 # when this process runs.
 _FIXTURE_ANCHOR = datetime(2026, 9, 8, tzinfo=timezone.utc)
 _FIXTURE_NOW = datetime.now(timezone.utc) - timedelta(seconds=10)
+_FIXTURE_TIME_RE = re.compile(
+    r"^(?P<head>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"
+    r"(?:\.(?P<fraction>\d+))?(?P<zone>Z|[+-]\d{2}:\d{2})$"
+)
+
+
+def _parse_fixture_datetime(raw):
+    match = _FIXTURE_TIME_RE.fullmatch(raw)
+    if match is None:
+        raise ValueError(f"invalid fixture timestamp: {raw!r}")
+    fraction = match.group("fraction") or ""
+    # datetime arithmetic is microsecond-precision on supported Python
+    # versions. Keep the original fraction for serialization below, but use
+    # only its leading six digits for the shift calculation.
+    microseconds = fraction[:6].ljust(6, "0")
+    suffix = "." + microseconds if fraction else ""
+    zone = "+00:00" if match.group("zone") == "Z" else match.group("zone")
+    return datetime.fromisoformat(match.group("head") + suffix + zone)
 
 def fixture_time(raw):
-    parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    parsed = _parse_fixture_datetime(raw)
     # Preserve fixture fractions without adding process-start microseconds a
     # second time (which could reorder authority and reservation timestamps).
     shifted = parsed + (_FIXTURE_NOW.replace(microsecond=0) - _FIXTURE_ANCHOR)
