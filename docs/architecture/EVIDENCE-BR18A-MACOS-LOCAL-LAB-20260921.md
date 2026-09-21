@@ -1,9 +1,10 @@
 # BR-18a — interim macOS local verification decision (2026-09-21)
 
-Trạng thái: **LOCAL_OPERATED_PASS / REVIEW_PENDING** cho bounded macOS lab run;
-`BR-18a` ở phạm vi target-host/provider vẫn **UNVERIFIED**, và overall
-readiness vẫn `NOT_READY_FOR_PRODUCTION`. Đây chưa phải operated target-host
-evidence.
+Trạng thái: **LOCAL_OPERATED_PASS / PERSONAL_LOCAL_SCOPE_ACCEPTED** cho bounded
+macOS lab run; `BR-18a` ở phạm vi target-host/provider vẫn **UNVERIFIED**, và
+overall readiness vẫn `NOT_READY_FOR_PRODUCTION`. Đây chưa phải operated
+target-host evidence. Quyết định phạm vi personal-local được ghi tại
+[EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921](EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921.md).
 
 ## Quyết định hiện tại
 
@@ -31,9 +32,11 @@ evidence.
 ## Operated macOS run — 2026-09-21
 
 Run record: `macos-br18a-20260921T155228Z`, lưu tại
-`$HOME/affiliate-lab/runs/macos-br18a-20260921T155228Z`. Reviewer: maintainer
-review pending; các kết quả dưới đây là output trực tiếp của automated local
-run, không phải human approval hay production acceptance.
+`$HOME/affiliate-lab/runs/macos-br18a-20260921T155228Z`. Maintainer đã giữ
+run record; các kết quả dưới đây là output trực tiếp của automated local run.
+Với personal-local scope, không yêu cầu second operator,
+clean-machine rerun hay independent beginner pilot. Đây không phải production
+acceptance.
 
 | Trường | Giá trị |
 |---|---|
@@ -94,8 +97,11 @@ Profile này **không** đóng các khoảng trống sau:
 - Ubuntu-on-WSL2/Hyper-V và Windows-native runtime parity;
 - region latency, cloud availability, managed backup và failure của power-loss;
 - atomic multi-file durability, distributed/multi-host locking;
-- clean-machine beginner pilot, live executor, affiliate outcome hoặc business
-  result.
+- live executor, affiliate outcome hoặc business result.
+
+Clean-machine beginner pilot và independent operator review được chủ động đặt
+ngoài phạm vi của repo personal-only; việc bỏ qua chúng không được dùng để
+claim learner-operable hoặc production readiness.
 
 Vì vậy local macOS slice đã có operated run record, nhưng `BR-18a` ở phạm vi
 target-host/provider vẫn `UNVERIFIED` và overall readiness vẫn
@@ -105,9 +111,10 @@ host, public deployment hay production evidence.
 
 ## Run-record gate
 
-Evidence local chỉ được giữ là `LOCAL_OPERATED_PASS` khi có
+Evidence local được giữ là `LOCAL_OPERATED_PASS` trong personal-local scope khi có
 `tested_at_utc`, exact macOS host/OS profile, Go/Node/n8n version output, bind
 address, runtime/backup/restore paths, health result, restart result, replay
-result và durable-STOP result. Human reviewer vẫn phải xác nhận record trước
-khi gọi đây là acceptance; khi thiếu run record hoặc reviewer, trạng thái phải
-quay về `UNVERIFIED`/`REVIEW_PENDING`.
+result và durable-STOP result. Maintainer tự xác nhận record cho mục đích cá
+nhân; human reviewer và clean-machine pilot chỉ bắt buộc nếu sau này muốn claim
+learner-operable hoặc production acceptance. Khi thiếu run record, trạng thái
+phải quay về `UNVERIFIED`.

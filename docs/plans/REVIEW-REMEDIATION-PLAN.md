@@ -4,6 +4,19 @@
 <!-- readiness-main-baseline: 8f1c8aaf45247ea62c145e879a86d949a300e44b -->
 <!-- readiness-baseline-kind: product -->
 
+**Cập nhật personal-local scope (2026-09-21):** repo này được maintainer tự
+vận hành cho mục đích cá nhân. Không yêu cầu second operator, user/máy sạch
+hoặc independent beginner pilot; các mục đó là `out of scope` cho personal
+local lab và không được dùng để claim learner-operable hoặc production. Run
+`macos-br18a-20260921T155228Z` được chấp nhận ở lớp personal-local cho
+health/restart/replay, backup/restore và durable STOP, nhưng readiness tổng thể
+giữ `NOT_READY_FOR_PRODUCTION`. Maintainer phải tạo run record trước mỗi thay
+đổi lớn về code/schema/toolchain/runtime, sau restore/path change và mỗi tháng
+khi lab còn sử dụng; mỗi lần backup vào target mới, restore vào thư mục trống,
+replay history, kiểm tra `stop: true` và fail-closed activation/gate sau STOP.
+Evidence: `docs/architecture/EVIDENCE-PERSONAL-LOCAL-SCOPE-20260921.md`.
+Marker: `Cập nhật personal-local scope 2026-09-21`.
+
 **Cập nhật BR-18a — operated macOS bounded run (2026-09-21):** đã chạy run
 record `macos-br18a-20260921T155228Z` trên MacBook Air với macOS 27.0, Go
 1.27.0, Node 24.21.0 và n8n 2.38.1. Loopback health/API, process restart,
