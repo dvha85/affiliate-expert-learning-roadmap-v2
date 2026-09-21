@@ -4,6 +4,21 @@
 <!-- readiness-main-baseline: 8f1c8aaf45247ea62c145e879a86d949a300e44b -->
 <!-- readiness-baseline-kind: product -->
 
+**Cập nhật BR-18a — Windows always-on lab decision (2026-09-21):** trong lúc
+chưa có quyền chọn target host/provider, quyết định dùng máy Windows bật 24/7
+với Ubuntu 24.04 LTS trong WSL2 (Hyper-V fallback). Profile chạy Go 1.27,
+Node 24 và n8n 2.38.1 trực tiếp trong Linux trước, chỉ synthetic/read-only,
+loopback mặc định hoặc private LAN có firewall allowlist, và tách runtime/
+backup/restore trên filesystem Linux thay vì `/mnt/c`. Profile này có thể tạo
+evidence bounded cho lifecycle, health, backup/restore, replay, restart và
+durable STOP sau khi được chạy thật; nó không đóng target-host/provider/public
+network, region latency, power-loss/atomic multi-file, distributed durability,
+clean-machine pilot, live executor hay business outcome. Chưa mua/tạo VPS hoặc
+cloud resource; giá Contabo/VNPT chỉ là tham khảo. `BR-18a` vẫn `UNVERIFIED`,
+overall vẫn `NOT_READY_FOR_PRODUCTION`. Record:
+`docs/architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md`.
+Marker: `Cập nhật BR-18a Windows always-on lab decision 2026-09-21`.
+
 **Full review follow-up (2026-09-21):** PR #491 self-reviewed and merged at
 `b447c04262bafd94125b05c2d6df4ecaa8edbeac` from exact head `294e35722cf861fe91337a1a96c9647562367e00`;
 [complete RV checklist and remaining work](FULL-REPO-REVIEW-FOLLOWUP-20260921.md).

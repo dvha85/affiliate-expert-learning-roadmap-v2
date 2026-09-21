@@ -16,6 +16,35 @@ Bot có thể luôn hoạt động để quan sát, thu thập, đánh giá và 
 
 VPS/server là **deployment concern (vấn đề triển khai)**, không phải learning prerequisite (điều kiện tiên quyết để học). Không mua/cấu hình VPS chỉ để bắt đầu BOOT, M00 hoặc các Mission chưa cần always-on runtime.
 
+### Quyết định interim ngày 21/09/2026 — Windows always-on lab
+
+Trong lúc chưa chọn và cấp quyền cho target host/provider, dùng máy Windows có
+thể bật 24/7 làm lab trung gian. Profile được chọn là **Ubuntu 24.04 LTS trong
+WSL2**; **Hyper-V + Ubuntu 24.04 LTS** là fallback khi cần VM boundary rõ hơn.
+Chạy Go binary, Node 24 và n8n 2.38.1 trực tiếp trong Linux trước; Docker không
+phải điều kiện của profile này.
+
+Profile này chỉ nhận dữ liệu synthetic/read-only và mặc định bind loopback
+(`127.0.0.1`). Một bài thử từ thiết bị khác chỉ được mở trên private LAN
+address với Windows firewall allowlist; không port-forward, public ingress,
+provider credential hoặc live executor. Canonical runtime và backup phải nằm
+trên filesystem Linux, không đặt trong `/mnt/c`:
+
+```text
+/home/<linux-user>/affiliate-lab/runtime/   # canonical state
+/home/<linux-user>/affiliate-lab/backups/   # backup targets riêng
+/home/<linux-user>/affiliate-lab/restores/  # restore targets riêng
+/home/<linux-user>/affiliate-lab/var/log/   # logs
+/home/<linux-user>/affiliate-lab/var/run/  # pid files
+```
+
+Có thể dùng lab này để kiểm lifecycle, health, backup/restore, replay,
+restart và durable STOP sau khi có run record thật. Nó không đóng target-host,
+provider/public-network, region-latency, power-loss/atomic multi-file,
+distributed durability hoặc clean-machine pilot; BR-18a vẫn `UNVERIFIED` và
+overall vẫn `NOT_READY_FOR_PRODUCTION`. Quyết định và điều kiện ghi evidence
+nằm ở [BR-18a Windows lab decision](../architecture/EVIDENCE-BR18A-WINDOWS-ALWAYS-ON-LAB-20260921.md).
+
 ## 2. Khi nào cần VPS?
 
 | Giai đoạn | Runtime mặc định | VPS/server |
