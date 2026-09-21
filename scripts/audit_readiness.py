@@ -142,6 +142,7 @@ def audit_product_baseline_git(root, baseline):
         "scripts/run_n8n_engine_regression.py",
         "scripts/run_n8n_m06_schedule_regression.py",
         "scripts/smoke_br16a_offline.py",
+        "scripts/smoke_br18b_backup_restore.py",
     }
     if not (root / "docs/plans/REPO-REVIEW-2026-09-21.md").is_file():
         remediation_paths = set()
