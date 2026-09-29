@@ -89,9 +89,20 @@ def invoke(bot, *args, expected=0, env=None):
     return json.loads(result.stdout)
 
 
+def exec_path(bot):
+    """Give Windows os.execv the explicit .exe path that CreateProcess resolves implicitly."""
+
+    if os.name == "nt" and bot.suffix.lower() != ".exe":
+        candidate = bot.with_name(bot.name + ".exe")
+        if candidate.is_file():
+            return candidate
+    return bot
+
+
 def synchronized_bot_calls(bot, env, barrier_dir, calls):
     """Run real Bot subprocesses after every test-owned wrapper is ready."""
     calls = list(calls)
+    executable = exec_path(bot)
     barrier_dir.mkdir()
     release_path = barrier_dir / "release"
     wait_code = "\n".join((
@@ -104,7 +115,7 @@ def synchronized_bot_calls(bot, env, barrier_dir, calls):
     attempts = []
     for label, command in calls:
         attempts.append((label, subprocess.Popen(
-            [sys.executable, "-c", wait_code, str(release_path), str(barrier_dir / f"{label}.ready"), str(bot), *map(str, command)],
+            [sys.executable, "-c", wait_code, str(release_path), str(barrier_dir / f"{label}.ready"), str(executable), *map(str, command)],
             cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
         )))
     deadline = time.monotonic() + 10
@@ -293,7 +304,7 @@ def main(argv=None):
     except ValueError as error:
         parser.error(str(error))
     with workspace as directory:
-        work = Path(directory); bot = work / "bot"; env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"), CANONICAL_ADAPTER_TOKEN=ADAPTER_TOKEN)
+        work = Path(directory); bot = work / ("bot.exe" if os.name == "nt" else "bot"); env = dict(os.environ, GOWORK="off", GOCACHE=str(work / "go-cache"), CANONICAL_ADAPTER_TOKEN=ADAPTER_TOKEN)
         run([go, "build", "-o", bot, "./cmd/bot"], BOT_DIR, env=env)
         state = work / "runtime"; state.mkdir()
         history, observations, model = state / "history.jsonl", work / "observations.json", work / "model.json"

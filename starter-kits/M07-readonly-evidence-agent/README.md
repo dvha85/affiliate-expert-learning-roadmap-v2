@@ -5,7 +5,7 @@ Tham khảo [m07-check offline](../../docs/architecture/M07-JSON-BOUNDARY.md) đ
 1. Học `curriculum/M07/`.
 2. Đọc `CHECKPOINTS.md` và dùng `M07-OPERATED-EVIDENCE-TEMPLATE.md`.
 3. Chạy `cd lab/mission-runtime && go test ./...` và `go run ./cmd/demo M07`.
-4. Import `lab/n8n/M07-readonly-evidence-agent.blueprint.json` và cấu hình model credential cục bộ trong n8n.
+4. Chạy fixture/model stub trước theo [M07.3](../../curriculum/M07/M07.3-n8n-evidence-agent.md), không cần provider key. Import `lab/n8n/M07-readonly-evidence-agent.blueprint.json` và cấu hình credential thật chỉ khi có instance/quyền provider đã review; adapter và n8n dùng cùng `CANONICAL_ADAPTER_TOKEN`.
 5. Giữ Tool Registry read-only/GET-only + host allowlist; không nối write tool.
 6. Chạy normal case, unknown/write case, hallucinated evidence và prompt-injection/tool-output case.
 7. Đối chiếu Agent output với offline evaluator; output vẫn A2-RO/HUMAN_REVIEW.

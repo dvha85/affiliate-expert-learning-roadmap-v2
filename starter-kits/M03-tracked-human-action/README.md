@@ -7,6 +7,9 @@
 5. Thực hiện một action nhỏ do **người** làm, ghi ActionRecord rồi OutcomeRecord; kiểm `ActionRecord.decision_id` khớp `DecisionPacket.decision_id`. OutcomeRecord dùng `effect_ref.effect_kind=HUMAN_ACTION` và `effect_ref.effect_id` khớp `ActionRecord.action_id` để liên kết tới hành động.
 6. Lưu operated evidence dưới `learner/M03/`, không commit dữ liệu nhạy cảm.
 
+Đường thực hành nối M03 với history/decision trước đó nằm trong tài liệu
+[Dùng walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md).
+
 PASS cần Capability + Reality + Operated; fixture/CI chỉ chứng minh capability.
 
 Trước bàn giao hai file JSON, dùng [m03-check](../../docs/architecture/M03-JSON-BOUNDARY.md) để kiểm schema và semantic của cặp file. Lệnh không lưu store và không resolve decision_id với DecisionPacket; bước đối chiếu decision ở mục 5 vẫn bắt buộc. Không chỉnh compliance_reviewed=true chỉ để làm lệnh PASS.

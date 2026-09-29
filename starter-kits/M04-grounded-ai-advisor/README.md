@@ -7,4 +7,7 @@
 5. Chạy advisor với evidence thật; thử hallucinated, stale, future evidence, abstain và write request. Ghi model/provider/version nếu dùng LLM thật.
 6. Lưu operated evidence dưới `learner/M04/`.
 
+Dùng [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) để giữ cùng
+history/action/outcome lineage; mock/provider success không tự tạo Reality PASS.
+
 PASS cần Capability + Reality + Operated; model/fixture success không tự tạo business truth.

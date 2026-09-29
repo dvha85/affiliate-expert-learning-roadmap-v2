@@ -1,5 +1,10 @@
 # BR-15d — M07 operated execution runbook
 
+Trước provider run, chạy model stub disposable theo
+[M07.3](../../curriculum/M07/M07.3-n8n-evidence-agent.md). Cách cô lập
+n8n/adapter và token dùng chung ở [M06.3](../../curriculum/M06/M06.3-n8n-readonly-workflow.md).
+Các bước Cockpit/provider bên dưới là lane có credential/quyền riêng đã review.
+
 Mục tiêu là kiểm engine n8n thật bằng fixture synthetic, không dùng campaign, URL
 affiliate, dữ liệu khách hàng hay quyền thực thi. Cockpit/model credential chỉ tồn tại
 trong n8n local; không đưa vào repository, log chia sẻ hoặc execution capture.

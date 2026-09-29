@@ -10,6 +10,10 @@ Starter kit (bộ khởi đầu) này **không chứa một implementation (tri�
 4. Dùng `M01-OPERATED-EVIDENCE-TEMPLATE.md` cho evidence (bằng chứng) cá nhân của người học.
 5. Chạy executable eval pack (bộ ca đánh giá có thể chạy) tại `evals/M01-deterministic-bot/`.
 
+Nếu cần đi từ packet M00 thật/synthetic tới đầu vào của Bot, dùng
+[Dùng walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md). Packet synthetic
+chỉ là rehearsal; không cập nhật `PROGRESS.md` từ smoke.
+
 ## Không làm ở M01
 
 - không LLM/Agent;

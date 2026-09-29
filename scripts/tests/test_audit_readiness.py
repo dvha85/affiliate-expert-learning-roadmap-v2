@@ -54,11 +54,66 @@ class ReadinessAuditTests(unittest.TestCase):
         root, baseline = self._git_fixture()
         learner_readme = root / "lab/affiliate-bot/README.md"
         learner_readme.parent.mkdir(parents=True, exist_ok=True)
+        compatibility = root / "lab/n8n/COMPATIBILITY.md"
+        compatibility.parent.mkdir(parents=True, exist_ok=True)
         (root / "README.md").write_text("updated public docs\n", encoding="utf-8")
+        (root / "ROADMAP.md").write_text("updated learning roadmap\n", encoding="utf-8")
+        compatibility.write_text("updated n8n compatibility notes\n", encoding="utf-8")
         learner_readme.write_text("updated learner docs\n", encoding="utf-8")
-        subprocess.run(["git", "-C", str(root), "add", "README.md", str(learner_readme.relative_to(root))], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "README.md", "ROADMAP.md", str(compatibility.relative_to(root)), str(learner_readme.relative_to(root))], check=True)
         subprocess.run(["git", "-C", str(root), "commit", "-m", "documentation"], check=True, capture_output=True, text=True)
         audit_product_baseline_git(root, baseline)
+
+    def test_product_baseline_git_allows_only_documented_curriculum_test_harness_paths(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        scoped_paths = (
+            "scripts/validate_learner_walkthroughs.py",
+            "scripts/n8n_runtime_env.py",
+            "scripts/smoke_br12d.py",
+        )
+        plan = root / "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md"
+        plan.parent.mkdir(parents=True, exist_ok=True)
+        plan.write_text(
+            "### CA-01 — regression\n`" + scoped_paths[0] + "`\n"
+            "### CA-05 — shared rehearsal\n`" + scoped_paths[2] + "`\n"
+            "### CA-07 — runtime fixture\n`" + scoped_paths[1] + "`\n",
+            encoding="utf-8",
+        )
+        for relative in scoped_paths:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# scoped synthetic test harness\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md", *scoped_paths], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "documented curriculum test harness"], check=True, capture_output=True, text=True)
+        audit_product_baseline_git(root, baseline)
+
+    def test_product_baseline_git_still_rejects_unplanned_code_with_curriculum_plan(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+
+        root, baseline = self._git_fixture()
+        scoped_paths = (
+            "scripts/validate_learner_walkthroughs.py",
+            "scripts/n8n_runtime_env.py",
+            "scripts/smoke_br12d.py",
+        )
+        plan = root / "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md"
+        plan.parent.mkdir(parents=True, exist_ok=True)
+        plan.write_text(
+            "### CA-01 — regression\n`" + scoped_paths[0] + "`\n"
+            "### CA-05 — shared rehearsal\n`" + scoped_paths[2] + "`\n"
+            "### CA-07 — runtime fixture\n`" + scoped_paths[1] + "`\n",
+            encoding="utf-8",
+        )
+        for relative in (*scoped_paths, "scripts/unrelated.py"):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# source\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md", *scoped_paths, "scripts/unrelated.py"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "mixed documented and undocumented code"], check=True, capture_output=True, text=True)
+        with self.assertRaisesRegex(AssertionError, "scripts/unrelated.py"):
+            audit_product_baseline_git(root, baseline)
 
     def test_product_baseline_git_allows_scoped_offline_runner_drift(self):
         from scripts.audit_readiness import audit_product_baseline_git
@@ -70,6 +125,20 @@ class ReadinessAuditTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(root), "add", "scripts/run_offline_checks.py"], check=True)
         subprocess.run(["git", "-C", str(root), "commit", "-m", "offline-runner"], check=True, capture_output=True, text=True)
         audit_product_baseline_git(root, baseline)
+
+    def test_curriculum_path_in_later_section_does_not_authorize_ca07_drift(self):
+        from scripts.audit_readiness import audit_product_baseline_git
+        root, baseline = self._git_fixture()
+        plan = root / "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md"
+        plan.parent.mkdir(parents=True)
+        plan.write_text("### CA-07 — review\nNo implementation here.\n## 8. Reference commands\n`scripts/n8n_runtime_env.py`\n", encoding="utf-8")
+        target = root / "scripts/n8n_runtime_env.py"
+        target.parent.mkdir()
+        target.write_text("# changed\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-m", "later reference only"], check=True, capture_output=True)
+        with self.assertRaisesRegex(AssertionError, "non-doc drift"):
+            audit_product_baseline_git(root, baseline)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

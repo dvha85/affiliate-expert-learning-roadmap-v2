@@ -114,6 +114,7 @@ def audit_product_baseline_git(root, baseline):
         "scripts/tests/",
         ".github/workflows/",
     )
+    allowed_document_files = {"ROADMAP.md", "lab/n8n/COMPATIBILITY.md"}
     # The 2026-09-21 review is itself the scoped implementation baseline for
     # the remediation PR. Keep its code surface explicit rather than opening
     # the product audit to arbitrary source drift; any other implementation
@@ -146,11 +147,30 @@ def audit_product_baseline_git(root, baseline):
     }
     if not (root / "docs/plans/REPO-REVIEW-2026-09-21.md").is_file():
         remediation_paths = set()
+    curriculum_plan = root / "docs/plans/CURRICULUM-ALIGNMENT-PLAN-20260923.md"
+    if curriculum_plan.is_file():
+        plan_text = curriculum_plan.read_text(encoding="utf-8")
+        headings = list(re.finditer(r"(?m)^(#{1,3})\s+([^\n]+)", plan_text))
+        documented_curriculum_paths = {
+            "scripts/validate_learner_walkthroughs.py": "CA-01",
+            "scripts/smoke_br12d.py": "CA-05",
+            "scripts/n8n_runtime_env.py": "CA-07",
+        }
+        for relative_path, package_id in documented_curriculum_paths.items():
+            for index, heading in enumerate(headings):
+                if heading.group(1) != "###" or not re.match(rf"{package_id}\b", heading.group(2)):
+                    continue
+                section_end = headings[index + 1].start() if index + 1 < len(headings) else len(plan_text)
+                section = plan_text[heading.start():section_end]
+                if f"`{relative_path}`" in section:
+                    remediation_paths.add(relative_path)
+                break
     unexpected = [
         path
         for path in changed.stdout.splitlines()
         if path
         and not path.startswith(allowed)
+        and path not in allowed_document_files
         and path not in remediation_paths
         and path not in {"go.mod", "go.sum"}
         and not path.endswith(("/go.mod", "/go.sum"))

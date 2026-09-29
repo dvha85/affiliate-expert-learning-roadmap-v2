@@ -15,9 +15,16 @@ sys.path.insert(0, str(SCRIPTS))
 
 import run_n8n_m06_schedule_regression as runner
 from run_n8n_m06_schedule_regression import decode_flatted_execution
+from n8n_runtime_env import isolated_n8n_environment
 
 
 class N8nScheduleRegressionTests(unittest.TestCase):
+    def test_pinned_runtime_has_startup_budget_and_valid_sqlite_pool(self):
+        self.assertEqual(runner.SCHEDULE_EXECUTION_TIMEOUT, 90.0)
+        with tempfile.TemporaryDirectory() as directory:
+            environment = isolated_n8n_environment(Path(directory), broker_port=51749, base={})
+        self.assertEqual(environment["DB_SQLITE_POOL_SIZE"], "1")
+
     def test_flatted_numeric_strings_remain_literals(self):
         raw = json.dumps([{"value": "1", "nested": ["2"]}, "1", "2"])
         self.assertEqual(
@@ -88,6 +95,30 @@ class N8nScheduleRegressionTests(unittest.TestCase):
         after_id = next(keyword.value for keyword in replay.keywords if keyword.arg == "after_id")
         self.assertIsInstance(after_id, ast.Name)
         self.assertEqual(after_id.id, "restart_watermark")
+
+    def test_windows_terminate_exit_is_accepted_for_disposable_n8n(self):
+        process = Mock()
+        process.poll.return_value = None
+        process.returncode = 1
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "server.log"
+            log.write_text("n8n stopped by Windows process termination", encoding="utf-8")
+            with patch.object(runner.os, "name", "nt"):
+                runner.stop_n8n(process, log)
+        process.terminate.assert_called_once_with()
+        process.wait.assert_called_once_with(timeout=15)
+
+    def test_windows_already_failed_server_is_not_intentional_teardown(self):
+        process = Mock()
+        process.poll.return_value = 1
+        process.returncode = 1
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "server.log"
+            log.write_text("server crashed", encoding="utf-8")
+            with patch.object(runner.os, "name", "nt"):
+                with self.assertRaisesRegex(AssertionError, "exited 1"):
+                    runner.stop_n8n(process, log)
+        process.terminate.assert_not_called()
 
 
 if __name__ == "__main__":

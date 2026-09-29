@@ -17,6 +17,7 @@ class OfflineCheckPlanTests(unittest.TestCase):
         self.assertIn("Git whitespace check", labels)
         self.assertTrue(any(label.startswith("Go test contracts") for label in labels))
         self.assertTrue(any(label.startswith("Go vet lab/affiliate-bot") for label in labels))
+        self.assertTrue(any(label.startswith("Offline validator scripts/validate_learner_walkthroughs.py") for label in labels))
         self.assertTrue(any(label.startswith("Offline validator scripts/validate_n8n_m07.py") for label in labels))
         self.assertTrue(any(label.startswith("Offline smoke scripts/smoke_br18b_backup_restore.py") for label in labels))
 

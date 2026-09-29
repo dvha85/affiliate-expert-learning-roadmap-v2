@@ -21,6 +21,16 @@
 15. Khi M09 PASS: `M10.1 → M10.2 → M10.3`.
 16. Khi M10 PASS: `M11.1 → M11.2 → M11.3`.
 
+Walkthrough thực hành nối cùng learner Bot từ M00 tới M05:
+[PRACTICE-M00-M05.md](PRACTICE-M00-M05.md). Tài liệu này là hướng dẫn
+rehearsal/continuity, không phải Mission hoặc PASS gate mới.
+
+Lấy bài tiếp theo từ [PROGRESS.md](../PROGRESS.md). Trạng thái
+`NOT_READY_FOR_PRODUCTION` không ngăn học M00–M02. Với M03–M05, nếu thiếu
+account/kênh/outcome thật, dùng rehearsal để học capability và ghi gap, giữ
+Mission gate tương ứng mở. Watcher/Agent M06–M07 và chặng nâng cao M08–M11
+tiếp tục theo thứ tự phía trên, không trở thành yêu cầu tức thời để học M00.
+
 M01–M11 có tài liệu authoring và fixture lab để học capability/boundary; điều đó
 **không** chứng minh một người mới có thể tự hoàn tất độc lập toàn bộ M00–M11 với
 source, provider, deployment hay business outcome thật. Trạng thái repo hiện là

@@ -1,5 +1,9 @@
 # M04 Operated Evidence (bằng chứng vận hành)
 
+Tham khảo [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) để xem
+mock synthetic. Chỉ ghi provider/model và output thật nếu đã thực sự chạy; không
+ghi fixture thành provider evidence.
+
 - Evidence IDs + source/observed_at (mã bằng chứng + nguồn/thời điểm quan sát):
 - Model/provider/version (nếu dùng LLM thật):
 - AdvisorOutput (đầu ra tư vấn):

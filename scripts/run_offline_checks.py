@@ -41,6 +41,7 @@ OFFLINE_VALIDATORS = (
     "scripts/validate_n8n_m07.py",
     "scripts/validate_n8n_m07_adversarial.py",
     "scripts/validate_n8n_m07_output_cases.py",
+    "scripts/validate_learner_walkthroughs.py",
 )
 
 OPERATED_VALIDATORS = (

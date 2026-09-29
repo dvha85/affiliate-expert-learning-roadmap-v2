@@ -1,5 +1,9 @@
 # M01 checkpoints
 
+Dùng [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) để nối packet
+vào input của learner Bot. Fixture chỉ kiểm Capability; không hoàn thành Reality
+hoặc Operated.
+
 ## Capability
 
 - [ ] `go test ./...` PASS.

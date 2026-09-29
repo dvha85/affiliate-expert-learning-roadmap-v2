@@ -1,5 +1,6 @@
 # M03 Checkpoints
 
+- Rehearsal nối tiếp từ [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md); synthetic action/outcome không phải Reality evidence.
 - [ ] ActionRecord liên kết tới DecisionPacket có thật.
 - [ ] `performed_by=human`; không machine execution.
 - [ ] compliance/disclosure/platform review đã ghi.

@@ -1,5 +1,6 @@
 # M05 Checkpoints
 
+- Dùng [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) để tập artifact continuity; synthetic review không phải review người thật.
 - [ ] EvaluationRecord nối Decision→Action→Outcome: `decision_id` khớp quyết định; `effect_ref.effect_kind=HUMAN_ACTION`, `effect_ref.effect_id` khớp `ActionRecord.action_id`; các OutcomeRecord trong `outcome_ids` có cùng `effect_ref`.
 - [ ] ImprovementProposal tham chiếu evaluation IDs có thật.
 - [ ] current/proposed version khác nhau và có rollback.

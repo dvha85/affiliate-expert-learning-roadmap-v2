@@ -43,3 +43,26 @@ Capability PASS (năng lực đạt)
 Từ M02 trở đi, artifact phải nối được với artifact trước đó; ID mồ côi không được dùng để claim Reality/Operated PASS.
 
 Technology (công nghệ) không quyết định thứ tự học. Go/n8n/Agent/MCP/Temporal/OPA chỉ được đưa vào khi Mission hiện tại có nhu cầu và adoption gate (cổng áp dụng) đạt.
+
+## Chặng thực hành sau cập nhật
+
+Đường nối implementation hiện hành được mô tả trong
+[walkthrough M00–M05](curriculum/PRACTICE-M00-M05.md). Đây là tài liệu thực
+hành trên **một learner Bot**, không tạo Mission hoặc PASS gate mới.
+
+```text
+M00–M02: real evidence → deterministic ranking → durable local history/replay
+M03–M05: human action → measured outcome → advisor/evaluation/reviewed proposal
+M06–M07: read-only watcher/Agent → canonical history, không external write
+M08–M11: shadow → approval → governed canary → finite production lease
+```
+
+Phạm vi `PERSONAL_LOCAL_SCOPE_ACCEPTED` hiện chỉ hỗ trợ lab local
+synthetic/read-only và operated bounded lifecycle của maintainer. Nó giúp luyện
+capability/continuity, nhưng không đóng Reality/Operated evidence thật cho
+Mission cần E1–E6 và không thay `NOT_READY_FOR_PRODUCTION`.
+
+Trạng thái đó không ngăn tiếp tục M00–M02 theo [PROGRESS.md](PROGRESS.md).
+Khi chưa có quyền/kênh/outcome thật cho M03–M05, làm rehearsal có input/output
+và failure case trong walkthrough, ghi rõ gap và giữ gate. M08–M11 là chặng
+nâng cao dài hạn; phạm vi cá nhân không xóa các Mission này hoặc tự cấp PASS.

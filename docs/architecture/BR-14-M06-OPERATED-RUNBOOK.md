@@ -1,5 +1,10 @@
 # BR-14 — M06 operated execution runbook
 
+Setup hiện hành: [M06.3](../../curriculum/M06/M06.3-n8n-readonly-workflow.md)
+ghi cwd, parent history, token dùng chung, n8n home/DB cô lập và các case
+persistence. Core change detection được kiểm riêng; report blueprint trả
+APPENDED/EXACT_DUPLICATE, không trả NEW/UNCHANGED/CHANGED.
+
 Mục tiêu là xác nhận engine n8n thật đi qua shared M06 adapter, persist canonical
 history rồi mới báo ACK. Chỉ dùng fixture synthetic; không dùng campaign, URL
 affiliate, dữ liệu khách hàng hay source seller.

@@ -1,5 +1,9 @@
 # M05 Operated Evidence (bằng chứng vận hành)
 
+Tham khảo [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) cho
+synthetic evaluation/proposal/review. Chỉ ghi review thật do người review thực
+hiện; không điền từ fixture.
+
 - Kiểm JSON m05-check: input refs, exit code, output/rejection và case broken link; ghi riêng khỏi human review/operated proof:
 
 - EvaluationRecord / evaluation_id (bản ghi đánh giá / mã đánh giá):
