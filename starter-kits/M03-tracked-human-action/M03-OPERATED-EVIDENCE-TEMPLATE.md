@@ -1,5 +1,9 @@
 # M03 Operated Evidence (bằng chứng vận hành)
 
+Tham khảo [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) cho
+synthetic rehearsal. Chỉ điền bên dưới bằng action/outcome thật đã được review;
+không chép fixture.
+
 - DecisionPacket / decision_id (gói quyết định / mã quyết định):
 - ActionRecord / action_id (bản ghi hành động / mã hành động):
 - Hành động do người thực hiện:

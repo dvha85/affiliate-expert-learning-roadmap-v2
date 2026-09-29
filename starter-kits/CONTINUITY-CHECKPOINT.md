@@ -2,6 +2,10 @@
 
 Checklist này áp dụng **bổ sung** cho checkpoint riêng của từng Mission từ M03 tới M11.
 
+Để rehearsal M00–M05 trên một workspace xem
+[walkthrough chung](../curriculum/PRACTICE-M00-M05.md). Checklist này vẫn cần
+artifact/version thực tế của learner; smoke fixture không tạo credit.
+
 - [ ] Capability mới được gắn vào cùng learner Bot/workspace đang tiến hóa từ M01/M02, không chỉ chạy demo rời.
 - [ ] Ghi `learner_bot_commit_or_version` của implementation đã vận hành.
 - [ ] `previous_mission_artifact_refs` resolve được tới artifact thật từ Mission trước.

@@ -53,7 +53,10 @@ def isolated_n8n_environment(
             "N8N_PERSONALIZATION_ENABLED": "false",
             "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS": "false",
             "DB_TYPE": "sqlite",
-            "DB_SQLITE_POOL_SIZE": "0",
+            # n8n 2.38.1 rejects zero and falls back to its default pool size.
+            # Keep the disposable SQLite runtime explicit and valid across the
+            # pinned Node/n8n compatibility matrix.
+            "DB_SQLITE_POOL_SIZE": "1",
             "EXECUTIONS_MODE": "regular",
             "N8N_RUNNERS_BROKER_PORT": str(broker_port),
             "GOWORK": "off",

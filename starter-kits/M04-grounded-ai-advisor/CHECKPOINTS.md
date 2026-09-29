@@ -1,5 +1,6 @@
 # M04 Checkpoints
 
+- Dùng [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) cho mock continuity; fixture không thay provider hoặc learner evidence.
 - [ ] Advisor dùng evidence IDs resolve được.
 - [ ] JSON gốc được kiểm trước khi unmarshal mất thông tin: đủ required fields, không field lạ/trùng; arrays không null, IDs không rỗng/trùng, reason không rỗng/khoảng trắng.
 - [ ] Đã chạy `advisor-check` với file riêng; reason rỗng bị `INVALID_SCHEMA`, write request bị reject; không dùng exit 0 thay validation result.

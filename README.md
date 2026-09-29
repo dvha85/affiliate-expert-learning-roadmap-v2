@@ -16,7 +16,8 @@ provider, deployment, beginner pilot hay business outcome độc lập.
 4. Nếu chưa từng chạy/sửa/test Bot, học `BOOT.1`.
 5. Chạy `O00.1` để nhìn toàn bộ vòng hệ thống bằng dữ liệu synthetic (mô phỏng); O00 chỉ orientation (định hướng), không tạo PASS.
 6. Bắt đầu M00 tại `curriculum/M00/M00.1-affiliate-intelligence-objective.md`.
-7. Từ repo root, chạy `python scripts/run_offline_checks.py` trong một checkout sạch để kiểm trọn đường offline; dùng `--list` để xem phạm vi. Lệnh này yêu cầu Go/Python/Git và cố ý không gọi operated validators hoặc n8n engine thật.
+7. Sau khi bắt đầu M00, dùng [walkthrough thực hành M00–M05](curriculum/PRACTICE-M00-M05.md) để nối packet, learner Bot, history/replay, action/outcome, advisor và reviewed improvement trong cùng workspace.
+8. Từ repo root, chạy `python scripts/run_offline_checks.py` trong một checkout sạch để kiểm trọn đường offline; dùng `--list` để xem phạm vi. Lệnh này yêu cầu Go/Python/Git và cố ý không gọi operated validators hoặc n8n engine thật.
 
 ## Lộ trình chuẩn
 
@@ -52,6 +53,30 @@ Observation / History
 ```
 
 Runtime/eval offline chỉ chứng minh capability/boundary. Reality/Operated PASS phải dùng artifact thật và các ID liên kết phải resolve được tới artifact trước đó.
+
+## Các chặng học phù hợp với phạm vi hiện tại
+
+`PERSONAL_LOCAL_SCOPE_ACCEPTED` cho phép maintainer luyện một lab local
+synthetic/read-only có vòng đời giới hạn. Nó không thay cho bằng chứng thật của
+M03–M05, nguồn/provider được chọn, pilot người mới, triển khai, kết quả kinh
+doanh hoặc mức sẵn sàng production.
+
+```text
+M00–M02  → packet thật, deterministic Bot, history/replay
+M03–M05  → human action/outcome, grounded advisor, reviewed improvement
+M06–M07  → watcher/Agent chỉ đọc nối canonical history
+M08–M11  → shadow, approval, canary, production lease có quản trị
+```
+
+Lab personal-local có thể dùng rehearsal để học capability và continuity. Chỉ
+artifact phù hợp với Mission mới tạo Reality/Operated evidence; không cập nhật
+`PROGRESS.md` từ fixture/CI.
+
+`NOT_READY_FOR_PRODUCTION` không ngăn học M00–M02. Lấy bài tiếp theo từ
+[PROGRESS.md](PROGRESS.md), rồi dùng walkthrough để xác định input, output và
+failure case của chặng đó. Nếu M03–M05 thiếu account/kênh/outcome thật, luyện
+fixture hỗ trợ và ghi gap, giữ Mission gate mở. M08–M11 vẫn thuộc chương trình
+dài hạn, chưa phải mục tiêu tức thời của lab cá nhân.
 
 ## Các bất biến kiểm soát
 

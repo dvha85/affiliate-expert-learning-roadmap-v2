@@ -1,5 +1,9 @@
 # M02 checkpoints
 
+Dùng [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md) để giữ cùng
+subject/record lineage trong rehearsal. History synthetic không phải M02 Reality
+evidence.
+
 ## Capability
 
 - [ ] M01 tests vẫn PASS.

@@ -10,6 +10,10 @@ M02 tiếp tục dùng **một runtime duy nhất** tại `lab/affiliate-bot`; s
 4. Copy `M02-OPERATED-EVIDENCE-TEMPLATE.md` vào `learner/M02/` cho evidence (bằng chứng) cá nhân.
 5. Executable eval pack (bộ ca đánh giá có thể chạy) nằm ở `evals/M02-history-replay/`.
 
+Chuỗi import packet M00, capture hai observation và replay sau restart được mô
+tả trong [walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md). Đây là
+continuity walkthrough trên cùng learner Bot, không phải implementation thứ hai.
+
 ## Các lệnh
 
 ```bash

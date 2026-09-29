@@ -36,6 +36,7 @@ from n8n_runtime_env import isolated_n8n_environment
 from validate_n8n_m06_operated_execution import validate_success
 
 ADAPTER_TOKEN = "n8n-regression-canonical-adapter-token-20260919"
+SCHEDULE_EXECUTION_TIMEOUT = 90.0
 
 
 def import_scheduled_workflow(prefix: list[str], env: dict[str, str], runtime: Path, workflow_id: str, adapter_port: int) -> None:
@@ -112,7 +113,8 @@ def start_n8n(prefix: list[str], env: dict[str, str], port: int, runtime: Path) 
 
 
 def stop_n8n(process: subprocess.Popen[str], log: Path) -> None:
-    if process.poll() is None:
+    termination_requested = process.poll() is None
+    if termination_requested:
         process.terminate()
     try:
         process.wait(timeout=15)
@@ -120,7 +122,12 @@ def stop_n8n(process: subprocess.Popen[str], log: Path) -> None:
         process.kill()
         process.wait(timeout=15)
         raise AssertionError("disposable n8n server did not stop") from error
-    if process.returncode not in {0, -15}:
+    # ``Popen.terminate()`` maps to ``TerminateProcess`` on Windows.  n8n's
+    # Node process reports exit code 1 for that intentional disposable-runtime
+    # shutdown, whereas POSIX reports SIGTERM as -15.  The scheduled workflow
+    # has already been observed while the server was alive before this branch,
+    # so accept only that platform-specific termination result.
+    if process.returncode not in {0, -15} and not (termination_requested and os.name == "nt" and process.returncode == 1):
         raise AssertionError(f"disposable n8n server exited {process.returncode}:\n{log.read_text(encoding='utf-8')[-8000:]}")
 
 
@@ -137,7 +144,7 @@ def latest_execution_id(database: Path, workflow_id: str) -> int:
         connection.close()
 
 
-def wait_for_execution(database: Path, workflow_id: str, status: str, server: subprocess.Popen[str], log: Path, *, after_id: int = 0, timeout: float = 35) -> tuple[int, dict]:
+def wait_for_execution(database: Path, workflow_id: str, status: str, server: subprocess.Popen[str], log: Path, *, after_id: int = 0, timeout: float = SCHEDULE_EXECUTION_TIMEOUT) -> tuple[int, dict]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if server.poll() is not None:

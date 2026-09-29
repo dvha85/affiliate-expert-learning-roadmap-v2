@@ -7,6 +7,9 @@
 5. Tạo `EvaluationRecord → ImprovementProposal → ReviewRecord` có linkage thật, version/risk/rollback; không auto-apply.
 6. Lưu operated evidence dưới `learner/M05/`.
 
+Chuỗi evaluation → proposal → review trên cùng learner Bot được minh họa trong tài liệu
+[Dùng walkthrough M00–M05](../../curriculum/PRACTICE-M00-M05.md).
+
 PASS cần Capability + Reality + Operated và proposal/review không được mồ côi provenance.
 
 Kiểm 5 file qua [m05-check](../../docs/architecture/M05-JSON-BOUNDARY.md) trước bàn giao. Tool không lưu store hoặc xác thực người review; APPROVE_FOR_MANUAL_CHANGE không tự áp dụng code, và REQUEST_CHANGES/REJECT vẫn là review record hợp lệ.
